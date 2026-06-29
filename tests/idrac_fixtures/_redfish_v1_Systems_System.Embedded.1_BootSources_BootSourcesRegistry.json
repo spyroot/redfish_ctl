@@ -1,0 +1,55 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#AttributeRegistry.AttributeRegistry",
+  "@odata.id": "/redfish/v1/Systems/System.Embedded.1/BootSources/BootSourcesRegistry",
+  "@odata.type": "#AttributeRegistry.v1_3_0.AttributeRegistry",
+  "Id": "BootSourcesRegistry",
+  "Name": "Boot Sources Attribute Registry",
+  "Language": "en",
+  "RegistryVersion": "1.0.0",
+  "OwningEntity": "Dell",
+  "RegistryEntries": {
+    "Attributes": [
+      {
+        "AttributeName": "BootMode",
+        "CurrentValue": "Uefi",
+        "DisplayName": "Boot Mode",
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueName": "Bios"
+          },
+          {
+            "ValueName": "Uefi"
+          }
+        ]
+      },
+      {
+        "AttributeName": "UefiBootSeq",
+        "DisplayName": "UEFI Boot Sequence",
+        "ReadOnly": false,
+        "Type": "Array",
+        "Value": [
+          {
+            "Enabled": true,
+            "Id": "BIOS.Setup.1-1#UefiBootSeq#NIC.PxeDevice.1-1",
+            "Index": 0,
+            "Name": "NIC.PxeDevice.1-1"
+          },
+          {
+            "Enabled": true,
+            "Id": "BIOS.Setup.1-1#UefiBootSeq#RAID.Integrated.1-1",
+            "Index": 1,
+            "Name": "RAID.Integrated.1-1"
+          }
+        ]
+      }
+    ]
+  },
+  "SupportedSystems": [
+    {
+      "ProductName": "PowerEdge",
+      "SystemId": "System.Embedded.1"
+    }
+  ]
+}
