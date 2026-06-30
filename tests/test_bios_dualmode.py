@@ -65,6 +65,39 @@ def test_bios_registry_filters_attribute_names(redfish_api):
     ]
 
 
+def test_bios_change_settings_patches_pending_settings_in_mock_mode(
+    redfish_mock, redfish_service, tmp_path
+):
+    """bios-change PATCHes a JSON spec with an on-reset apply time."""
+    settings_path = "/redfish/v1/Systems/System.Embedded.1/Bios/Settings"
+    redfish_service._overlay[settings_path.lower()] = {"Attributes": {}}
+    payload = {
+        "Attributes": {
+            "ProcCStates": "Disabled",
+            "SriovGlobalEnable": "Enabled",
+        }
+    }
+    spec = tmp_path / "bios_change.json"
+    spec.write_text(json.dumps(payload))
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosChangeSettings,
+        "bios_change_settings",
+        apply="on-reset",
+        from_spec=str(spec),
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    request = redfish_service.last_request
+    assert request.method == "PATCH"
+    assert request.path.lower() == settings_path.lower()
+    assert request.json() == {
+        **payload,
+        "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
+    }
+
+
 def test_bios_clear_pending_posts_discovered_action_in_mock_mode(
     redfish_mock, redfish_service
 ):
