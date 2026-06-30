@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+import idrac_ctl.tasks.cmd_task_svc  # noqa: F401
 from idrac_ctl.idrac_manager import IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
@@ -109,6 +110,23 @@ def test_dell_job_service_returns_delete_queue_action(redfish_api):
         "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
         "Actions/DellJobService.DeleteJobQueue"
     )
+
+
+def test_task_service_root_query_returns_task_links(redfish_api):
+    """task_svc_query returns the TaskService root resource."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.ManagerQuery,
+        "task_svc_query",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data["Name"] == "Task Collection"
+    assert result.data["Links"]["Members"][0]["@odata.id"] == (
+        "/redfish/v1/TaskService/1"
+    )
+    assert result.discovered == {}
 
 
 @pytest.mark.parametrize(
