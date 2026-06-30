@@ -12,6 +12,9 @@
     "State": "Enabled",
     "Health": "OK"
   },
+  "Sensors": {
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/Sensors"
+  },
   "Actions": {
     "#Chassis.Reset": {
       "target": "/redfish/v1/Chassis/System.Embedded.1/Actions/Chassis.Reset",

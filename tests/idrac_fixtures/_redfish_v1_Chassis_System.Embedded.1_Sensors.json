@@ -1,0 +1,12 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#SensorCollection.SensorCollection",
+  "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/Sensors",
+  "@odata.type": "#SensorCollection.SensorCollection",
+  "Name": "Sensors",
+  "Members@odata.count": 1,
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/Sensors/InletTemp"
+    }
+  ]
+}

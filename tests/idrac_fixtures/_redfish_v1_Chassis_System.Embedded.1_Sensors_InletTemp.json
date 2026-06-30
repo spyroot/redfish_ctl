@@ -1,0 +1,14 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#Sensor.Sensor",
+  "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/Sensors/InletTemp",
+  "@odata.type": "#Sensor.v1_7_0.Sensor",
+  "Id": "InletTemp",
+  "Name": "System Board Inlet Temp",
+  "Reading": 23,
+  "ReadingUnits": "Cel",
+  "ReadingType": "Temperature",
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  }
+}
