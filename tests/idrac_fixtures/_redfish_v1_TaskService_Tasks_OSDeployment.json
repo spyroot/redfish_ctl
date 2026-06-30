@@ -1,0 +1,15 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#Task.Task",
+  "@odata.id": "/redfish/v1/TaskService/Tasks/OSDeployment",
+  "@odata.type": "#Task.v1_7_0.Task",
+  "Id": "OSDeployment",
+  "Name": "OS deployment task",
+  "TaskState": "Running",
+  "TaskStatus": "OK",
+  "PercentComplete": 50,
+  "Actions": {
+    "#Task.Cancel": {
+      "target": "/redfish/v1/TaskService/Tasks/OSDeployment/Actions/Task.Cancel"
+    }
+  }
+}
