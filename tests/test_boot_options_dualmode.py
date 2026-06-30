@@ -1,6 +1,7 @@
 """Dual-mode tests for boot option and boot-source commands."""
 import json
 
+from idrac_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
 
@@ -97,3 +98,32 @@ def test_boot_settings_query_returns_dell_boot_sources_settings(redfish_api):
         "/redfish/v1/Systems/System.Embedded.1/Oem/Dell/DellBootSources/Settings/"
         "Actions/DellManager.ClearPending"
     )
+
+
+def test_boot_options_clear_posts_clear_pending_action_in_mock_mode(
+    redfish_mock, redfish_service, monkeypatch
+):
+    """boot-options-clear POSTs an empty payload to the Dell clear-pending action."""
+    task_state = {"TaskState": "Completed", "TaskStatus": "OK"}
+
+    def fetch_task(self, task_id):
+        assert task_id == redfish_service.JOB_ID
+        return task_state
+
+    monkeypatch.setattr(BootOptionsClearPending, "fetch_task", fetch_task)
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOptionsClearPending,
+        "clear_pending",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == redfish_service.JOB_ID
+    assert result.data["task_state"] == task_state
+    request = redfish_service.last_request
+    assert request.method == "POST"
+    assert request.path.lower() == (
+        "/redfish/v1/systems/system.embedded.1/oem/dell/dellbootsources/settings/"
+        "actions/dellmanager.clearpending"
+    )
+    assert request.json() == {}
