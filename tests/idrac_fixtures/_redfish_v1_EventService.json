@@ -1,0 +1,17 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#EventService.EventService",
+  "@odata.id": "/redfish/v1/EventService",
+  "@odata.type": "#EventService.v1_7_0.EventService",
+  "Id": "EventService",
+  "Name": "Event Service",
+  "ServiceEnabled": true,
+  "Actions": {
+    "#EventService.SubmitTestEvent": {
+      "target": "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent"
+    },
+    "Oem": {}
+  },
+  "Subscriptions": {
+    "@odata.id": "/redfish/v1/EventService/Subscriptions"
+  }
+}
