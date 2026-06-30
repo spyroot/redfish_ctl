@@ -38,6 +38,25 @@ def test_event_submit_test_posts_payload_to_discovered_target_in_mock_mode(
     }
 
 
+def test_action_list_returns_supermicro_action_inventory_without_posts(
+    redfish_mock_factory,
+):
+    """actions inventories linked Redfish action targets without mutating state."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(ApiRequestType.ActionList, "action_list")
+
+    full_types = {row["FullType"] for row in result.data}
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data
+    assert "#ComputerSystem.Reset" in full_types
+    assert "#EventService.SubmitTestEvent" in full_types
+    assert all(row["Target"] for row in result.data)
+    assert all(row["Level"] for row in result.data)
+    assert _post_requests(service) == []
+
+
 def test_system_reset_confirm_posts_reset_payload_to_host_action_in_mock_mode(
     redfish_mock_factory,
 ):
