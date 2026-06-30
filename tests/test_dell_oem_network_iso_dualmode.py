@@ -74,6 +74,29 @@ def test_dell_oem_attach_posts_network_iso_payload(
     }
 
 
+def test_dell_oem_attach_status_posts_empty_body_to_get_attach_status(
+    redfish_mock,
+    redfish_service,
+):
+    """oem-attach-status POSTs an empty body to the discovered GetAttachStatus action."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.GetAttachStatus,
+        "get_attach_status",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {}
+    assert result.discovered is None
+    assert result.extra is None
+    assert result.error is None
+    assert redfish_service.last_request.method == "POST"
+    assert redfish_service.last_request.path == (
+        "/redfish/v1/dell/systems/system.embedded.1/dellosdeploymentservice/"
+        "actions/dellosdeploymentservice.getattachstatus"
+    )
+    assert redfish_service.last_request.json() == {}
+
+
 @pytest.mark.parametrize(
     ("request_type", "command_name", "action_name"),
     [
