@@ -147,6 +147,36 @@ def test_job_delete_all_posts_clear_queue_payload_in_mock_mode(
     assert redfish_service.last_request.json() == {"JobID": job_id}
 
 
+def test_job_apply_posts_bios_job_creation_payload_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """job_apply creates a BIOS apply job without rebooting offline."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.JobApply,
+        "job_apply",
+        setting="bios",
+        do_watch=False,
+    )
+
+    post_requests = [
+        request for request in redfish_service.requests if request.method == "POST"
+    ]
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert len(post_requests) == 1
+    post_path = post_requests[0].path.lower().replace("//", "/")
+    assert post_path == "/redfish/v1/managers/idrac.embedded.1/jobs"
+
+    payload = post_requests[0].json()
+    assert payload["RebootJobType"] == "ForceReboot"
+    assert payload["TargetSettingsURI"].endswith(
+        "/redfish/v1/Systems/System.Embedded.1/Bios/Settings"
+    )
+    assert payload["StartTime"] == "TIME_NOW"
+    assert payload["EndTime"] == "TIME_NA"
+
+
 def test_tasks_list_returns_task_collection_and_actions(redfish_api):
     """chassis_service_query for TasksList returns expanded task members."""
     result = redfish_api.sync_invoke(ApiRequestType.TasksList, "chassis_service_query")
