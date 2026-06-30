@@ -1,0 +1,17 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#Chassis.Chassis",
+  "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1",
+  "@odata.type": "#Chassis.v1_15_0.Chassis",
+  "Id": "NetworkFabric.1",
+  "Name": "Network Adapter Mock Chassis",
+  "ChassisType": "Module",
+  "Manufacturer": "Dell Inc.",
+  "Model": "Network Adapter Fixture",
+  "NetworkAdapters": {
+    "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters"
+  },
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  }
+}

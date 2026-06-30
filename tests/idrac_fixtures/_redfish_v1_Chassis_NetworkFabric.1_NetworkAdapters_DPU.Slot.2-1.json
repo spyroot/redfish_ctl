@@ -1,0 +1,14 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/DPU.Slot.2-1",
+  "@odata.type": "#NetworkAdapter.v1_9_0.NetworkAdapter",
+  "Id": "DPU.Slot.2-1",
+  "Name": "BlueField DPU Adapter",
+  "Manufacturer": "NVIDIA",
+  "Model": "BlueField-3 DPU",
+  "PartNumber": "900-9D3B6-MOCK",
+  "SerialNumber": "DPU-MOCK-SN001",
+  "Status": {
+    "State": "Enabled",
+    "Health": "Warning"
+  }
+}

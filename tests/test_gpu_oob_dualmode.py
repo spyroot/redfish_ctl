@@ -24,4 +24,11 @@ def test_gpu_oob_commands_return_list_payloads(redfish_api, request_type, comman
     assert result.error is None
 
     if redfish_api.idrac_ip == "mock-idrac":
-        assert result.data == []
+        if request_type is ApiRequestType.NetworkAdapters:
+            adapter_ids = {row["Id"] for row in result.data}
+            adapter_classes = {row["DeviceClass"] for row in result.data}
+
+            assert adapter_ids == {"NIC.Integrated.1-1", "DPU.Slot.2-1"}
+            assert adapter_classes == {"NIC", "DPU"}
+        else:
+            assert result.data == []
