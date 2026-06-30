@@ -117,6 +117,24 @@ def test_storage_drives_buckets_non_raid_disk_in_mock_mode(
     assert raid_ids == []
 
 
+def test_storage_convert_noraid_skips_post_when_disks_are_nonraid_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """storage-convert-noraid returns a no-op result when every disk is NonRAID."""
+    _seed_drive(redfish_service, "NonRAID")
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.ConvertNoneRaid,
+        "convert_none_raid",
+        controller=_CONTROLLER,
+        exclude_filter="",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {"Status": "all disk are none raid"}
+    assert all(request.method != "POST" for request in redfish_service.requests)
+
+
 @pytest.mark.live
 def test_storage_drives_live_returns_command_result(redfish_api):
     """Against real hardware, storage-drives returns a CommandResult.
