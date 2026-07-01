@@ -118,3 +118,26 @@ def test_dell_oem_empty_action_posts_use_discovered_targets(
         f"actions/dellosdeploymentservice.{action_name.lower()}"
     )
     assert redfish_service.last_request.json() == {}
+
+
+def test_dell_oem_attach_status_posts_discovered_status_action(
+    redfish_mock,
+    redfish_service,
+):
+    """oem-attach-status POSTs to the discovered GetAttachStatus target."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.GetAttachStatus,
+        "get_attach_status",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {}
+    assert result.discovered is None
+    assert result.extra is None
+    assert result.error is None
+    assert redfish_service.last_request.method == "POST"
+    assert redfish_service.last_request.path == (
+        "/redfish/v1/dell/systems/system.embedded.1/dellosdeploymentservice/"
+        "actions/dellosdeploymentservice.getattachstatus"
+    )
+    assert redfish_service.last_request.json() == {}
