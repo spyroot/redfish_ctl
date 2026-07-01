@@ -1,4 +1,6 @@
 """Dual-mode-style mock tests for vendor-neutral action commands."""
+import json
+
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
 
@@ -6,6 +8,65 @@ from idrac_ctl.redfish_manager import CommandResult
 def _post_requests(service):
     """Return POST requests recorded by the mock Redfish service."""
     return [request for request in service.requests if request.method == "POST"]
+
+
+def _mutating_requests(service):
+    """Return non-GET requests recorded by the mock Redfish service."""
+    return [
+        request for request in service.requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    ]
+
+
+def test_action_list_discovers_dell_actions_in_dual_mode(redfish_api):
+    """actions lists Dell reset targets from the dual-mode client."""
+    result = redfish_api.sync_invoke(ApiRequestType.ActionList, "action_list")
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert isinstance(result.data, list)
+    assert result.data
+    json.dumps(result.data)
+
+    required_keys = {"Resource", "Action", "FullType", "Target", "Level"}
+    assert all(required_keys <= row.keys() for row in result.data)
+    targets_by_type = {(row["FullType"], row["Target"]) for row in result.data}
+    expected_targets = {
+        (
+            "#ComputerSystem.Reset",
+            "/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset",
+        ),
+        (
+            "#Manager.Reset",
+            "/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset",
+        ),
+        (
+            "#Chassis.Reset",
+            "/redfish/v1/Chassis/System.Embedded.1/Actions/Chassis.Reset",
+        ),
+        (
+            "#Bios.ResetBios",
+            "/redfish/v1/Systems/System.Embedded.1/Bios/Settings/Actions/Bios.ResetBios",
+        ),
+    }
+    assert expected_targets <= targets_by_type
+
+    levels_by_type = {row["FullType"]: row["Level"] for row in result.data}
+    for full_type, _target in expected_targets:
+        assert levels_by_type[full_type] == "destructive"
+
+
+def test_action_list_records_no_mutating_requests_in_mock_mode(
+    redfish_mock,
+    redfish_service,
+):
+    """actions uses only GET requests when inventorying the mock tree."""
+    result = redfish_mock.sync_invoke(ApiRequestType.ActionList, "action_list")
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data
+    assert _mutating_requests(redfish_service) == []
 
 
 def test_event_submit_test_posts_payload_to_discovered_target_in_mock_mode(
