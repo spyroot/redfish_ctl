@@ -14,15 +14,16 @@ import logging
 import os
 from json import JSONDecodeError
 from unittest import TestCase
-from idrac_ctl.idrac_manager import IDracManager, CommandResult
+
+import pytest
+
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_shared import RedfishJson
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -125,7 +126,7 @@ class TestAttribute(TestCase):
                          f"Failed to fetch mandatory {RedfishJson.Data_id} key")
 
         self.assertTrue("SystemInfo.1.BootTime" in query_result.data,
-                        f"Failed to retrieve key SystemInfo.1.BootTime key")
+                        "Failed to retrieve key SystemInfo.1.BootTime key")
 
     def test_basic_attr_query_filter_save(self):
         """test basic query
@@ -159,4 +160,4 @@ class TestAttribute(TestCase):
                          f"Failed to fetch mandatory {RedfishJson.Data_id} key")
 
         self.assertTrue("SystemInfo.1.BootTime" in query_result.data,
-                        f"Failed to retrieve key SystemInfo.1.BootTime key")
+                        "Failed to retrieve key SystemInfo.1.BootTime key")

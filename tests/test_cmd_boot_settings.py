@@ -9,20 +9,20 @@ PYTHONWARNINGS=ignore:Unverified HTTPS request
 
 Author Mus spyroot@gmail.com
 """
-import os
 import json
 import logging
-
-from unittest import TestCase
+import os
 from json import JSONDecodeError
-from idrac_ctl.idrac_manager import IDracManager, CommandResult
+from unittest import TestCase
+
+import pytest
+
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -64,4 +64,3 @@ class TestBootSettings(TestCase):
             self.fail("raised exception")
         except JSONDecodeError as _:
             self.fail("raised exception")
-

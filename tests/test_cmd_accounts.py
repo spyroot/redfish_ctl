@@ -10,19 +10,20 @@ PYTHONWARNINGS=ignore:Unverified HTTPS request
 Author Mus spyroot@gmail.com
 """
 import json
+import logging
 import os
 from json import JSONDecodeError
 from unittest import TestCase
-from idrac_ctl.idrac_manager import IDracManager, CommandResult
+
+import pytest
+
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_shared import RedfishJson
-import logging
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -104,16 +105,16 @@ class TestAccounts(TestCase):
         self.assertIsInstance(members_data, list)
 
         self.assertTrue(len(members_data) == member_count,
-                        f"member count and len of list must match")
+                        "member count and len of list must match")
 
         for m in members_data:
-            self.assertTrue("AccountTypes" in m, f"Failed to fetch mandatory AccountTypes " f"key from member data")
+            self.assertTrue("AccountTypes" in m, "Failed to fetch mandatory AccountTypes " "key from member data")
 
     def test_basic_base_save_expanded_query(self):
         """test basic query
         :return:
         """
-        log.warning(f"Running test_basic_base_save_expanded_query")
+        log.warning("Running test_basic_base_save_expanded_query")
 
         manager = self.setUpClass()
         query_result = manager.sync_invoke(
