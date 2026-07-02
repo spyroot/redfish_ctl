@@ -231,6 +231,23 @@ def process_respond(cmd_args, command_result):
     return query_request
 
 
+def is_network_scan(args) -> bool:
+    """True when the invocation is a credential-less network-segment scan.
+
+    ``bmc-scan`` always scans a segment; ``discovery`` scans only when
+    ``--network`` is given. Both find BMCs on a segment with no target host and
+    no credentials, so they must bypass the single-host IDRAC_IP/credential gate
+    and the startup ``check_api_version()`` / vendor probe (which would connect
+    to a host that scan mode does not have).
+    """
+    sub = getattr(args, "subcommand", None)
+    if sub == "bmc-scan":
+        return True
+    if sub == "discovery" and getattr(args, "scan_network", None):
+        return True
+    return False
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     """Main entry point
     """
@@ -250,7 +267,12 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
                                insecure=insecure,
                                is_http=cmd_args.use_http,
                                is_debug=cmd_args.debug)
-    _ = redfish_api.check_api_version()
+
+    # A network scan has no single target host, so skip the version handshake
+    # (it would try to connect to a host we do not have).
+    scan_mode = is_network_scan(cmd_args)
+    if not scan_mode:
+        _ = redfish_api.check_api_version()
 
     if cmd_args.verbose:
         logger.info("verbose is set on")
@@ -268,11 +290,26 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
 
         # invoke cmd
-        command_result = redfish_api.sync_invoke(
-            cmd.type, cmd.name, **arg_dict
-        )
+        if scan_mode:
+            # Credential-less dispatch: inject empty connection fields (invoke
+            # pops them) without the non-empty IDRAC_IP/credential check that
+            # sync_invoke enforces — a segment scan needs neither.
+            scan_kwargs = dict(arg_dict)
+            scan_kwargs.update({
+                "idrac_ip": cmd_args.idrac_ip or "",
+                "username": cmd_args.idrac_username or "",
+                "password": cmd_args.idrac_password or "",
+                "port": cmd_args.idrac_port,
+                "insecure": insecure,
+                "is_http": cmd_args.use_http,
+            })
+            command_result = redfish_api.invoke(cmd.type, cmd.name, **scan_kwargs)
+        else:
+            command_result = redfish_api.sync_invoke(
+                cmd.type, cmd.name, **arg_dict
+            )
 
-        if redfish_api.redfish_vendor == "Dell":
+        if not scan_mode and redfish_api.redfish_vendor == "Dell":
             if isinstance(command_result.data, dict):
                 command_result.data["idrac_version"] = redfish_api.idrac_manager_version
                 command_result.data["redfish_version"] = redfish_api.redfish_version
@@ -470,27 +507,31 @@ def idrac_main_ctl():
             console_error_printer(f"Error:{fne}")
             sys.exit(1)
 
-    if args.idrac_ip is None or len(args.idrac_ip) == 0:
-        print(
-            "Please indicate the idrac ip. "
-            "--idrac_ip or set IDRAC_IP environment variable. "
-            "(export IDRAC_IP=ip_address)"
-        )
-        sys.exit(1)
-    if args.idrac_username is None or len(args.idrac_username) == 0:
-        print(
-            "Please indicate the idrac username."
-            "--idrac_username or set IDRAC_USERNAME environment variable. "
-            "(export IDRAC_USERNAME=ip_address)"
-        )
-        sys.exit(1)
-    if args.idrac_password is None or len(args.idrac_password) == 0:
-        print(
-            "Please indicate the idrac password. "
-            "--idrac_password or set IDRAC_PASSWORD environment."
-            "(export IDRAC_PASSWORD=ip_address)"
-        )
-        sys.exit(1)
+    # A network-segment scan (bmc-scan, or discovery --network) has no single
+    # target host and uses no credentials, so it skips the IDRAC_IP/credential
+    # gate that every host-targeted command requires.
+    if not is_network_scan(args):
+        if args.idrac_ip is None or len(args.idrac_ip) == 0:
+            print(
+                "Please indicate the idrac ip. "
+                "--idrac_ip or set IDRAC_IP environment variable. "
+                "(export IDRAC_IP=ip_address)"
+            )
+            sys.exit(1)
+        if args.idrac_username is None or len(args.idrac_username) == 0:
+            print(
+                "Please indicate the idrac username."
+                "--idrac_username or set IDRAC_USERNAME environment variable. "
+                "(export IDRAC_USERNAME=ip_address)"
+            )
+            sys.exit(1)
+        if args.idrac_password is None or len(args.idrac_password) == 0:
+            print(
+                "Please indicate the idrac password. "
+                "--idrac_password or set IDRAC_PASSWORD environment."
+                "(export IDRAC_PASSWORD=ip_address)"
+            )
+            sys.exit(1)
     try:
         main(args, cmd_dict)
     except AuthenticationFailed as af:
@@ -499,3 +540,9 @@ def idrac_main_ctl():
         console_error_printer(f"Error: {http_error}")
     except ssl.SSLCertVerificationError as ssl_err:
         console_error_printer(f"Error: {ssl_err}")
+
+
+if __name__ == "__main__":
+    # Allow running the CLI without the installed console script, e.g.
+    #   python -m idrac_ctl.idrac_main discovery --network 192.168.254.0/24
+    idrac_main_ctl()

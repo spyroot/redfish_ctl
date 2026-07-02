@@ -1,19 +1,16 @@
-"""Offline test for bmc-scan — detect Redfish BMCs on a network segment.
+"""Offline test for the bmc-scan command (segment BMC discovery).
 
-Probes each host in a CIDR with one unauthenticated ``GET /redfish/v1``. A 200
-with RedfishVersion is an open ServiceRoot; a 401/403 is an auth-locked BMC (the
-ServiceRoot exists but requires a login — still a real BMC); anything else (404,
-connection refused, timeout) is not Redfish. Read-only: one GET per host, no
-credentials, no mutation. All network I/O is mocked — no real hosts are touched.
+Command-level behavior: subnet validation and dispatch through the manager. The
+scan engine itself (probe, CIDR expansion, auth-locked detection) is covered in
+test_net_scan.py. All network I/O is mocked — no real hosts are touched.
 """
 import requests
 
-from idrac_ctl.discovery.cmd_bmc_scan import BmcScan
 from idrac_ctl.idrac_shared import ApiRequestType
 
 
 class _Resp:
-    """Minimal stand-in for requests.Response used by the probe."""
+    """Minimal stand-in for requests.Response."""
 
     def __init__(self, status, payload=None):
         self.status_code = status
@@ -23,66 +20,6 @@ class _Resp:
         if self._payload is None:
             raise ValueError("no json body")
         return self._payload
-
-
-def test_probe_open_serviceroot():
-    """A 200 ServiceRoot with RedfishVersion is reported as an open BMC."""
-    def fake_get(url, **_):
-        return _Resp(200, {
-            "RedfishVersion": "1.14.0", "Product": "PowerEdge",
-            "Oem": {"Dell": {}},
-            "Managers": {"@odata.id": "/redfish/v1/Managers"},
-            "Systems": {"@odata.id": "/redfish/v1/Systems"},
-        })
-    orig, requests.get = requests.get, fake_get
-    try:
-        row = BmcScan._probe("10.0.0.5", 443, 2)
-    finally:
-        requests.get = orig
-    assert row["IP"] == "10.0.0.5"
-    assert row["Auth"] == "open"
-    assert row["RedfishVersion"] == "1.14.0"
-    assert row["Vendor"] == ["Dell"]
-    assert row["Systems"] == "/redfish/v1/Systems"
-
-
-def test_probe_auth_locked_serviceroot():
-    """A 403/401 ServiceRoot is still detected as a BMC, marked Auth=required."""
-    for status in (401, 403):
-        orig, requests.get = requests.get, lambda url, **_: _Resp(status)
-        try:
-            row = BmcScan._probe("10.0.0.6", 443, 2)
-        finally:
-            requests.get = orig
-        assert row is not None, f"status {status} should still detect a BMC"
-        assert row["Auth"] == "required"
-        assert row["IP"] == "10.0.0.6"
-        assert row["RedfishVersion"] is None
-
-
-def test_probe_not_redfish_is_none():
-    """A 404, a non-Redfish 200, or a connection error is not a BMC (None)."""
-    # 404 — no ServiceRoot here
-    orig, requests.get = requests.get, lambda url, **_: _Resp(404)
-    try:
-        assert BmcScan._probe("10.0.0.7", 443, 2) is None
-    finally:
-        requests.get = orig
-    # 200 but no RedfishVersion — some other web server on 443
-    orig, requests.get = requests.get, lambda url, **_: _Resp(200, {"hello": "world"})
-    try:
-        assert BmcScan._probe("10.0.0.8", 443, 2) is None
-    finally:
-        requests.get = orig
-
-    # connection refused / timeout — raises, treated as no host
-    def boom(url, **_):
-        raise requests.exceptions.ConnectTimeout("timed out")
-    orig, requests.get = requests.get, boom
-    try:
-        assert BmcScan._probe("10.0.0.9", 443, 2) is None
-    finally:
-        requests.get = orig
 
 
 def test_execute_requires_subnet(redfish_mock_factory):

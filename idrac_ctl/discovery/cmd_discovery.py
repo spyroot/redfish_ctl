@@ -56,11 +56,28 @@ class Discovery(IDracManager,
     @abstractmethod
     def register_subcommand(cls):
         """Register command and all optional flags.
+
+        Two modes: with ``--network`` it scans a segment for Redfish BMCs (a
+        credential-less sweep, shared with ``bmc-scan``); without it, it deep
+        crawls the single configured host's Redfish tree.
         :param cls:
         :return:
         """
         cmd_parser = cls.base_parser()
-        help_text = "command discovery all action."
+        cmd_parser.add_argument(
+            '--network', required=False, dest='scan_network', type=str, default=None,
+            help="scan a network segment (CIDR, e.g. 192.168.254.0/24) for Redfish "
+                 "BMCs instead of crawling one host; needs no idrac_ip/credentials")
+        cmd_parser.add_argument(
+            '--port', required=False, dest='scan_port', type=int, default=443,
+            help="with --network: HTTPS port to probe (default 443)")
+        cmd_parser.add_argument(
+            '--timeout', required=False, dest='scan_timeout', type=float, default=2.0,
+            help="with --network: per-host probe timeout in seconds (default 2)")
+        cmd_parser.add_argument(
+            '--workers', required=False, dest='scan_workers', type=int, default=64,
+            help="with --network: concurrent probes (default 64)")
+        help_text = "command discovery all action (or --network CIDR to scan a segment)."
         return cmd_parser, "discovery", help_text
 
     def extract_odata_ids(self, data):
@@ -202,10 +219,25 @@ class Discovery(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                scan_network: Optional[str] = None,
+                scan_port: Optional[int] = 443,
+                scan_timeout: Optional[float] = 2.0,
+                scan_workers: Optional[int] = 64,
                 **kwargs) -> CommandResult:
         """Executes discovery action command
         python idrac_ctl discovery
+        python idrac_ctl discovery --network 192.168.254.0/24
 
+        With ``scan_network`` set, this is a credential-less segment scan for
+        Redfish BMCs (returns a list of {IP, Vendor, Product, RedfishVersion,
+        Auth}); it never crawls the single host and never writes the ``.npy``
+        rest-api map. Without it, the original single-host deep crawl runs
+        unchanged.
+
+        :param scan_network: CIDR to scan for BMCs instead of crawling one host.
+        :param scan_port: with ``scan_network``, HTTPS port to probe.
+        :param scan_timeout: with ``scan_network``, per-host probe timeout (s).
+        :param scan_workers: with ``scan_network``, concurrent probes.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param filename: if filename indicate call will save a bios setting to a file.
@@ -213,6 +245,17 @@ class Discovery(IDracManager,
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """
+
+        # Network-scan mode: find BMCs on a segment, no target host or creds.
+        if scan_network:
+            from ..cmd_utils import save_if_needed
+            from .net_scan import scan_segment
+            try:
+                found = scan_segment(scan_network, scan_port, scan_timeout, scan_workers)
+            except ValueError as ve:
+                return CommandResult([], None, None, f"invalid network '{scan_network}': {ve}")
+            save_if_needed(filename, found)
+            return CommandResult(found, None, None, None)
 
         os.makedirs(self.json_response_dir, exist_ok=True)
         if not os.path.isdir(self.json_response_dir):

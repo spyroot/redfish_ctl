@@ -2,7 +2,10 @@
 # Read-only host discovery: one unauthenticated GET /redfish/v1 per host, no
 # credentials, no mutation. Use it to locate Dell/HPE/Supermicro/OpenBMC BMCs on
 # a lab or rack subnet when you don't yet know their IPs.
+#
+# Two equivalent entry points (same engine) — neither needs IDRAC_IP or creds:
 idrac_ctl bmc-scan --subnet 192.168.254.0/24
+idrac_ctl discovery --network 192.168.254.0/24   # integrated under `discovery`
 
 # Tune the sweep for a big/slow segment:
 #   --port     HTTPS port to probe (default 443)
