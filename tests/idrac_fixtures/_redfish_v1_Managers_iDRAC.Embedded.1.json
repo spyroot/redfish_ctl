@@ -10,6 +10,28 @@
     "State": "Enabled",
     "Health": "OK"
   },
+  "SerialConsole": {
+    "ServiceEnabled": true,
+    "ConnectTypesSupported": [
+      "IPMI",
+      "SSH"
+    ],
+    "MaxConcurrentSessions": 4
+  },
+  "GraphicalConsole": {
+    "ServiceEnabled": true,
+    "ConnectTypesSupported": [
+      "KVMIP"
+    ],
+    "MaxConcurrentSessions": 2
+  },
+  "CommandShell": {
+    "ServiceEnabled": true,
+    "ConnectTypesSupported": [
+      "SSH"
+    ],
+    "MaxConcurrentSessions": 4
+  },
   "Links": {
     "ManagerForServers": [
       {
