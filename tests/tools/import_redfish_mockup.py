@@ -30,6 +30,7 @@ LINK_KEYS = {
     "SecureBoot", "SecureBootDatabases", "Certificates", "Signatures",
     "Storage", "Volumes", "Drives",
     "NetworkDeviceFunctions",
+    "BootOptions", "Boot",
     "UpdateService", "FirmwareInventory", "SoftwareInventory", "Triggers",
 }
 ROOT = "/redfish/v1"
