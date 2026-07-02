@@ -35,6 +35,47 @@ def probe_reachable(url: str, auth, verify: bool, timeout: float) -> bool:
         return False
 
 
+def wait_reachable(url: str, auth, verify: bool,
+                   timeout: float = 300.0, interval: float = 5.0,
+                   reboot_cycle: bool = False) -> dict:
+    """Poll ``url`` until reachable, bounded by ``timeout``. Reusable by any command.
+
+    With ``reboot_cycle`` it first waits for the service to go DOWN (confirming a
+    reset actually started) and then for it to come back UP. Returns
+    ``{reachable, waited_s[, went_down]}``. Probes at least once even if the
+    timeout is tiny.
+    """
+    probe_timeout = max(1.0, min(interval or 5.0, 5.0))
+    interval = max(0.0, interval or 0.0)
+    start = time.monotonic()
+    deadline = start + max(0.0, timeout or 0.0)
+
+    out: dict = {}
+    if reboot_cycle:
+        went_down = False
+        while True:
+            if not probe_reachable(url, auth, verify, probe_timeout):
+                went_down = True
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(interval)
+        out["went_down"] = went_down
+
+    reachable = False
+    while True:
+        if probe_reachable(url, auth, verify, probe_timeout):
+            reachable = True
+            break
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(interval)
+
+    out["reachable"] = reachable
+    out["waited_s"] = round(time.monotonic() - start, 1)
+    return out
+
+
 class WaitReady(IDracManager,
                 scm_type=ApiRequestType.WaitReady,
                 name='wait',
@@ -57,9 +98,6 @@ class WaitReady(IDracManager,
                          help="first wait for the BMC to go DOWN, then wait for it to come back UP")
         return cmd, "wait", "wait for the BMC Redfish service to be reachable"
 
-    def _reachable(self, url, auth, verify, probe_timeout) -> bool:
-        return probe_reachable(url, auth, verify, probe_timeout)
-
     def execute(self,
                 wait_timeout: Optional[float] = 300.0,
                 wait_interval: Optional[float] = 5.0,
@@ -69,35 +107,8 @@ class WaitReady(IDracManager,
         scheme = "http" if self._is_http else "https"
         url = f"{scheme}://{self.redfish_ip}:{self._port}/redfish/v1/"
         auth = (self._username, self._password) if self._username else None
-        verify = self._is_verify_cert
-        probe_timeout = max(1.0, min(wait_interval or 5.0, 5.0))
-        interval = max(0.0, wait_interval or 0.0)
-        start = time.monotonic()
-        deadline = start + max(0.0, wait_timeout or 0.0)
-
-        went_down = None
-        if wait_reboot_cycle:
-            went_down = False
-            while True:
-                if not self._reachable(url, auth, verify, probe_timeout):
-                    went_down = True
-                    break
-                if time.monotonic() >= deadline:
-                    break
-                time.sleep(interval)
-
-        reachable = False
-        while True:
-            if self._reachable(url, auth, verify, probe_timeout):
-                reachable = True
-                break
-            if time.monotonic() >= deadline:
-                break
-            time.sleep(interval)
-
-        data = {"target": self.redfish_ip, "reachable": reachable,
-                "waited_s": round(time.monotonic() - start, 1)}
-        if wait_reboot_cycle:
-            data["went_down"] = went_down
-        error = None if reachable else f"BMC not reachable within {wait_timeout}s"
-        return CommandResult(data, None, None, error)
+        result = wait_reachable(url, auth, self._is_verify_cert,
+                                wait_timeout, wait_interval, wait_reboot_cycle)
+        result["target"] = self.redfish_ip
+        error = None if result["reachable"] else f"BMC not reachable within {wait_timeout}s"
+        return CommandResult(result, None, None, error)

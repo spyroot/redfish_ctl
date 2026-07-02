@@ -9,8 +9,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -45,6 +44,18 @@ class ManagerReset(IDracManager,
             required=False, dest="do_graceful",
             default=True, help="do graceful reset.")
 
+        cmd_arg.add_argument(
+            '--wait', action='store_true',
+            required=False, dest="do_wait", default=False,
+            help="after the reset, wait for the BMC to go DOWN then come back "
+                 "reachable (ServiceRoot), instead of polling a reset task the "
+                 "down BMC cannot report.")
+
+        cmd_arg.add_argument(
+            '--wait-timeout', required=False, type=float,
+            dest="wait_timeout", default=300.0,
+            help="with --wait: max seconds to wait for the BMC (default 300).")
+
         help_text = "command reboot idrac manager"
         return cmd_arg, "manager-reboot", help_text
 
@@ -54,6 +65,8 @@ class ManagerReset(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_graceful: Optional[bool] = True,
+                do_wait: Optional[bool] = False,
+                wait_timeout: Optional[float] = 300.0,
                 **kwargs) -> CommandResult:
         """Reset IDRAC manager services
         :param do_async will not wait
@@ -86,5 +99,21 @@ class ManagerReset(IDracManager,
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
+
+        # Optionally wait for the BMC to actually cycle. A Manager reset takes the
+        # BMC itself offline, so we poll ServiceRoot reachability (down then up)
+        # rather than a reset task the down BMC cannot answer.
+        if do_wait:
+            from ..cmd_wait import wait_reachable
+            scheme = "http" if self._is_http else "https"
+            url = f"{scheme}://{self.redfish_ip}:{self._port}/redfish/v1/"
+            auth = (self._username, self._password) if self._username else None
+            wr = wait_reachable(url, auth, self._is_verify_cert,
+                                wait_timeout, 5.0, reboot_cycle=True)
+            if isinstance(cmd_result.data, dict):
+                cmd_result.data["wait"] = wr
+            else:
+                cmd_result = CommandResult({"reset": cmd_result.data, "wait": wr},
+                                           None, None, cmd_result.error)
 
         return cmd_result

@@ -87,3 +87,28 @@ def test_wait_reboot_cycle_reports_went_down(redfish_mock_factory):
         requests.get = orig
     assert res.data["went_down"] is True
     assert res.data["reachable"] is True
+
+
+def test_manager_reboot_wait_attaches_wait_block(redfish_mock_factory, monkeypatch):
+    """manager-reboot --wait attaches the reachability wait result to its output.
+
+    The reset POST + task path is stubbed so the test isolates the new --wait
+    behavior: after the reset, the reboot-cycle wait result is attached.
+    """
+    import idrac_ctl.cmd_wait as cw
+    from idrac_ctl.idrac_manager import IDracManager
+    from idrac_ctl.idrac_shared import IdracApiRespond
+    from idrac_ctl.redfish_manager import CommandResult
+
+    mgr, _ = redfish_mock_factory("hpe")
+    monkeypatch.setattr(IDracManager, "idrac_members", "/redfish/v1/Managers/1", raising=False)
+    monkeypatch.setattr(
+        IDracManager, "base_post",
+        lambda self, *a, **k: (CommandResult({"Status": "ok"}, None, None, None), IdracApiRespond.Ok))
+    monkeypatch.setattr(
+        cw, "wait_reachable",
+        lambda *a, **k: {"reachable": True, "went_down": True, "waited_s": 0.1})
+
+    res = mgr.sync_invoke(ApiRequestType.ManagerReset, "manager_reset", do_wait=True)
+    assert res.data["Status"] == "ok"
+    assert res.data["wait"] == {"reachable": True, "went_down": True, "waited_s": 0.1}
