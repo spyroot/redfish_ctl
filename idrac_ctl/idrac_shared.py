@@ -97,6 +97,7 @@ class ApiRequestType(Enum):
     NetworkPorts = auto()
     OemInfo = auto()
     ConsoleInfo = auto()
+    BiosSnapshot = auto()
 
     # boot sources
     BootSourcePending = auto()

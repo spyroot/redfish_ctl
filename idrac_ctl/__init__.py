@@ -26,6 +26,7 @@ from .bios.cmd_bios_pending import *
 from .bios.cmd_change_boot_order import *
 from .bios.bios_registry import *
 from .bios.cmd_change_bios import *
+from .bios.cmd_bios_snapshot import *
 from .bios.cmd_bios_reset_default import *
 #
 from .attribute.cmd_attribute import *
