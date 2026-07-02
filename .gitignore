@@ -20,6 +20,8 @@ CODEX_TASKS.md
 CODEX_*.md
 COORDINATION.md
 FLASH_BRAIN.md
+NV72_OTEL_BRIEF.md
+*_BRIEF.md
 .codex/
 .claude/
 .agent-review/
