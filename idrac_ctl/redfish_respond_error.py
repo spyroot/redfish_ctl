@@ -5,7 +5,7 @@ A mapping redfish error python object.
 
 Author Mus spyroot@gmail.com
 """
-from typing import Optional, List
+from typing import List, Optional
 
 from .redfish_respond import RedfishRespondMessage
 
@@ -132,9 +132,58 @@ class RedfishError(RedfishRespondMessage):
         """
         return self._message_extended
 
+    @staticmethod
+    def _fmt_message(m) -> str:
+        """Render one extended-info entry to a readable string, never raising.
+
+        ``message_extended`` may hold either parsed ``RedfishMessage`` objects or
+        the raw JSON dicts from the service, and a Redfish message legitimately
+        carries only a ``MessageId`` + ``MessageArgs`` with no human-readable
+        ``Message`` (e.g. iLO ``PropertyNotWritableOrUnknown``). Fall back to the
+        id + args in that case so the error stays informative.
+        """
+        try:
+            if isinstance(m, dict):
+                msg = m.get("Message")
+                mid = m.get("MessageId", "") or ""
+                args = m.get("MessageArgs") or []
+            else:
+                msg = getattr(m, "message", None)
+                mid = getattr(m, "message_id", "") or ""
+                args = getattr(m, "message_args", None) or []
+            if msg:
+                return str(msg)
+            if mid:
+                return f"{mid} {list(args)}" if args else str(mid)
+            return ""
+        except Exception:
+            return ""
+
+    def __str__(self) -> str:
+        """Human-readable, never-raising rendering of the Redfish error.
+
+        Combines the top-level message, each extended-info entry, and the HTTP
+        status. Robust to ``message_extended`` being raw dicts or objects, and to
+        a missing/None ``Message`` — the failure mode that previously made
+        ``str(exception)`` raise and surface as ``<exception str() failed>``.
+        """
+        parts = []
+        top = getattr(self, "_message", None)
+        if top and top != "root":
+            parts.append(str(top))
+        for m in (self._message_extended or []):
+            frag = self._fmt_message(m)
+            if frag:
+                parts.append(frag)
+        exc = getattr(self, "_exception_msg", "") or getattr(self, "exception_msg", "")
+        if exc:
+            parts.append(str(exc))
+        body = "; ".join(dict.fromkeys(p for p in parts if p)) or "Redfish error"
+        code = getattr(self, "_status_code", None)
+        return f"{body} (HTTP {code})" if code else body
+
     def __repr__(self) -> str:
-        msgs = [m.message for m in self._message_extended]
-        return "\n".join(msgs) + "\n"
+        return self.__str__()
 
     @message_extended.setter
     def message_extended(self, value):
