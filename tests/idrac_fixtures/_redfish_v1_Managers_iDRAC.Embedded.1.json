@@ -22,6 +22,12 @@
       }
     ]
   },
+  "Oem": {
+    "Dell": {
+      "@odata.type": "#DellManager.v1_0_0.DellManager",
+      "LifecycleControllerVersion": "7.00.00.00"
+    }
+  },
   "Actions": {
     "#Manager.Reset": {
       "target": "/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset",
