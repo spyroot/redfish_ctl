@@ -6,8 +6,46 @@ and no real host is touched.
 """
 import requests
 
-from idrac_ctl.cmd_wait import probe_reachable
+from idrac_ctl.cmd_wait import probe_reachable, wait_for
 from idrac_ctl.idrac_shared import ApiRequestType
+
+
+def test_wait_for_satisfied_predicate():
+    """wait_for returns satisfied once the generic predicate becomes True, echoing the label."""
+    calls = {"n": 0}
+
+    def ready():
+        calls["n"] += 1
+        return calls["n"] >= 3        # True on the third poll
+    res = wait_for(ready, description="media mounted", timeout=5, interval=0)
+    assert res["satisfied"] is True
+    assert res["waiting_for"] == "media mounted"
+
+
+def test_wait_for_times_out():
+    """A predicate that never holds times out with satisfied=False."""
+    res = wait_for(lambda: False, description="never", timeout=0.05, interval=0)
+    assert res["satisfied"] is False
+    assert res["waiting_for"] == "never"
+
+
+def test_wait_for_predicate_exception_is_not_yet():
+    """A raising predicate counts as 'not yet', not a crash."""
+    def boom():
+        raise RuntimeError("still working")
+    res = wait_for(boom, description="job done", timeout=0.05, interval=0)
+    assert res["satisfied"] is False
+
+
+def test_wait_for_invert_first_records_precondition():
+    """invert_first waits for False (e.g. down) then True (up); records precondition_met."""
+    seq = iter([True, False, True, True])   # up, down, up, ...
+
+    def state():
+        return next(seq, True)
+    res = wait_for(state, description="cycle", timeout=5, interval=0, invert_first=True)
+    assert res["precondition_met"] is True   # observed the False phase
+    assert res["satisfied"] is True
 
 
 class _Resp:

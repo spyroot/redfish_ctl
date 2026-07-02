@@ -35,44 +35,78 @@ def probe_reachable(url: str, auth, verify: bool, timeout: float) -> bool:
         return False
 
 
-def wait_reachable(url: str, auth, verify: bool,
-                   timeout: float = 300.0, interval: float = 5.0,
-                   reboot_cycle: bool = False) -> dict:
-    """Poll ``url`` until reachable, bounded by ``timeout``. Reusable by any command.
+def wait_for(predicate,
+             description: str = "condition",
+             timeout: float = 300.0,
+             interval: float = 5.0,
+             invert_first: bool = False) -> dict:
+    """Poll a no-arg ``predicate() -> bool`` until it is True, bounded by ``timeout``.
 
-    With ``reboot_cycle`` it first waits for the service to go DOWN (confirming a
-    reset actually started) and then for it to come back UP. Returns
-    ``{reachable, waited_s[, went_down]}``. Probes at least once even if the
-    timeout is tiny.
+    A **generic** wait any command can consume for any event/condition — the BMC
+    becoming reachable, a power state reached, virtual media mounted, a job/task
+    reaching a state, a file finishing copying. The caller supplies the predicate
+    plus a human ``description`` of what is being awaited; the result echoes it so
+    the operator sees exactly what was (or was not) satisfied. A predicate that
+    raises is treated as "not yet". Probes at least once even for a tiny timeout.
+
+    ``invert_first`` first waits for the predicate to be False (e.g. the BMC to go
+    DOWN) before waiting for it to be True — the down-then-up reboot pattern.
+
+    :return: ``{waiting_for, satisfied, waited_s[, precondition_met]}``
     """
-    probe_timeout = max(1.0, min(interval or 5.0, 5.0))
+    def probe() -> bool:
+        try:
+            return bool(predicate())
+        except Exception:
+            return False
+
     interval = max(0.0, interval or 0.0)
     start = time.monotonic()
     deadline = start + max(0.0, timeout or 0.0)
+    out: dict = {"waiting_for": description}
 
-    out: dict = {}
-    if reboot_cycle:
-        went_down = False
+    if invert_first:
+        precondition_met = False
         while True:
-            if not probe_reachable(url, auth, verify, probe_timeout):
-                went_down = True
+            if not probe():
+                precondition_met = True
                 break
             if time.monotonic() >= deadline:
                 break
             time.sleep(interval)
-        out["went_down"] = went_down
+        out["precondition_met"] = precondition_met
 
-    reachable = False
+    satisfied = False
     while True:
-        if probe_reachable(url, auth, verify, probe_timeout):
-            reachable = True
+        if probe():
+            satisfied = True
             break
         if time.monotonic() >= deadline:
             break
         time.sleep(interval)
 
-    out["reachable"] = reachable
+    out["satisfied"] = satisfied
     out["waited_s"] = round(time.monotonic() - start, 1)
+    return out
+
+
+def wait_reachable(url: str, auth, verify: bool,
+                   timeout: float = 300.0, interval: float = 5.0,
+                   reboot_cycle: bool = False) -> dict:
+    """Wait for the Redfish ServiceRoot at ``url`` to respond (the BMC is up).
+
+    A thin wrapper over :func:`wait_for` with a reachability predicate; keeps the
+    ``reachable`` / ``went_down`` keys its callers (the ``wait`` command,
+    ``manager-reboot --wait``) expect, and carries the ``waiting_for`` label.
+    """
+    probe_timeout = max(1.0, min(interval or 5.0, 5.0))
+    res = wait_for(lambda: probe_reachable(url, auth, verify, probe_timeout),
+                   description=f"BMC reachable at {url}",
+                   timeout=timeout, interval=interval, invert_first=reboot_cycle)
+    out = {"waiting_for": res["waiting_for"],
+           "reachable": res["satisfied"], "waited_s": res["waited_s"]}
+    if reboot_cycle:
+        out["went_down"] = res.get("precondition_met", False)
     return out
 
 

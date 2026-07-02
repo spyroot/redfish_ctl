@@ -24,11 +24,13 @@ from typing import Any, Dict, Mapping, Optional
 DELL = "dell"
 HPE = "hpe"
 SUPERMICRO = "supermicro"
+OPENBMC = "openbmc"
 GENERIC = "generic"
 
 # Map an OEM namespace / type token (lowercased) to a canonical vendor tag.
 # Vendors use a couple of spellings (Dell/Emc, Hpe/Hp, Supermicro/SMC), so we
-# normalize them all to one tag here.
+# normalize them all to one tag here. OpenBMC is firmware, not a hardware OEM, but
+# it surfaces its own ``Oem.OpenBmc`` namespace so it is identifiable the same way.
 _OEM_KEY_TO_VENDOR = {
     "dell": DELL,
     "emc": DELL,
@@ -37,6 +39,7 @@ _OEM_KEY_TO_VENDOR = {
     "supermicro": SUPERMICRO,
     "smc": SUPERMICRO,
     "smci": SUPERMICRO,
+    "openbmc": OPENBMC,
 }
 
 # Substrings searched in Manufacturer/Vendor free-text (lowercased). Ordered so
@@ -50,6 +53,7 @@ _TEXT_TOKENS = (
     ("hp", HPE),
     ("supermicro", SUPERMICRO),
     ("super micro", SUPERMICRO),
+    ("openbmc", OPENBMC),
 )
 
 
@@ -110,7 +114,8 @@ def classify_vendor(service_root: Optional[Dict[str, Any]]) -> str:
 
     :param service_root: a parsed ``/redfish/v1/`` ServiceRoot dict. ``None`` or a
         non-mapping value is treated as unidentifiable.
-    :return: one of ``"dell"``, ``"hpe"``, ``"supermicro"``, or ``"generic"``.
+    :return: one of ``"dell"``, ``"hpe"``, ``"supermicro"``, ``"openbmc"``, or
+        ``"generic"``.
 
     The signals are consulted in a fixed ranking (Oem child key, then
     ``@odata.type`` OEM prefix, then ``Manufacturer``/``Vendor`` substring); the

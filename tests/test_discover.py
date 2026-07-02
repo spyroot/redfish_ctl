@@ -52,6 +52,20 @@ def test_classify_supermicro_via_vendor_field_no_oem():
     assert classify_vendor(service_root) == "supermicro"
 
 
+def test_classify_openbmc_via_oem():
+    """A ServiceRoot with an Oem.OpenBmc block classifies as ``openbmc``."""
+    service_root = {
+        "@odata.type": "#ServiceRoot.v1_5_0.ServiceRoot",
+        "Oem": {"OpenBmc": {"@odata.type": "#OemServiceRoot.v1_0_0.OemServiceRoot"}},
+    }
+    assert classify_vendor(service_root) == "openbmc"
+
+
+def test_classify_openbmc_via_vendor_text():
+    """OpenBMC is recognized from Vendor/Manufacturer text when no Oem block is present."""
+    assert classify_vendor({"Manufacturer": "OpenBMC Project", "Product": "BMC"}) == "openbmc"
+
+
 def test_classify_unknown_is_generic():
     """A ServiceRoot with no vendor signal falls back to ``generic``."""
     service_root = {
