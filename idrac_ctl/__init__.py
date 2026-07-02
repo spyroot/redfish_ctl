@@ -62,6 +62,7 @@ from .virtual_media.cmd_virtual_media_eject import *
 from .cmd_current_boot import *
 
 from .cmd_query import *
+from .cmd_wait import *
 
 # storage
 from .storage.cmd_storage_controllers import *
