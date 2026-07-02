@@ -135,6 +135,9 @@ class ApiRequestType(Enum):
     QueryAccount = auto()
     QueryAccounts = auto()
     QueryAccountService = auto()
+    AccountCreate = auto()
+    AccountUpdate = auto()
+    AccountDelete = auto()
 
     ChassisQuery = auto()
     ChassisReset = auto()
