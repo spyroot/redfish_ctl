@@ -23,9 +23,11 @@ activated (the raw hex key goes in the BMC web-UI license field, not the Redfish
 `LicenseManager.ActivateLicense` action). Once licensed, `system`, `console-info`, `chassis`, and
 `manager-time` work over Redfish, but this early 1.0.1 firmware is thin: `boot-state` returns empty
 boot data and `UpdateService`/`FirmwareInventory` are a `403`/`404` stub, so there is no Redfish
-firmware update until the BMC is flashed out of band. Newer BMC firmware (e.g. X10 BMC 4.00) tracks
-Supermicro's *Redfish Reference Guide 2.0a* and exposes the fuller `UpdateService` +
-`FirmwareInventory`, at which point Redfish-driven updates become possible.
+firmware update. Flashing this board BMC 3.88 -> 4.00 (verified live) did **not** change that: it
+stayed `RedfishVersion 1.0.1` with `UpdateService` still `403` and `FirmwareInventory` still `404`, so
+the X10SDV has no Redfish update path on any BMC firmware — use the BMC web UI or Supermicro SUM. The
+fuller `UpdateService`/`FirmwareInventory` in Supermicro's *Redfish Reference Guide 2.0a* applies to
+newer platforms (X11/X12/H12+), not the X10.
 
 **HPE iLO.** Proof lives in `tests/hpe_fixtures/`, imported from the HPE iLO emulator corpus, plus
 the live-emulator canary in `examples/hpe_ilo_canary.sh`. The common ids are `Systems/1`,
