@@ -134,6 +134,7 @@ from .boot_source.cmd_boot_state import *
 # account
 from .accounts.cmd_accounts import *
 from .accounts.cmd_account_manage import *
+from .accounts.cmd_account_sshkey import *
 from .accounts.cmd_query_account import *
 from .accounts.cmd_account_svc import *
 from .accounts.cmd_privilage_registry import *

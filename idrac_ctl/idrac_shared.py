@@ -138,6 +138,7 @@ class ApiRequestType(Enum):
     AccountCreate = auto()
     AccountUpdate = auto()
     AccountDelete = auto()
+    AccountImportSSHKey = auto()
 
     ChassisQuery = auto()
     ChassisReset = auto()
