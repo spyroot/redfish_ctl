@@ -5,6 +5,8 @@ password is never echoed), the "nothing to change" / "no target" errors, and the
 self-delete guard that refuses to remove the logged-in account. No real BMC and
 no network — writes are mocked or dry-run.
 """
+import pytest
+
 from idrac_ctl.accounts.cmd_account_manage import (
     DEFAULT_ROLE,
     AccountDelete,
@@ -19,6 +21,18 @@ def test_build_create_payload():
     """Create body carries UserName, Password, and the requested RoleId."""
     assert build_create_payload("test", "pw", "Operator") == {
         "UserName": "test", "Password": "pw", "RoleId": "Operator"}
+
+
+@pytest.mark.parametrize("role", ["Administrator", "Operator", "ReadOnly"])
+def test_create_payload_covers_all_three_roles(role):
+    """All three standard privilege levels build a correct create body.
+
+    These are the RoleIds every vendor exposes (Dell/HPE/Supermicro) and were
+    each verified end-to-end on a live HPE iLO 5 (create -> RoleId read-back ->
+    delete).
+    """
+    assert build_create_payload("test", "pw", role) == {
+        "UserName": "test", "Password": "pw", "RoleId": role}
 
 
 def test_build_create_payload_defaults_to_readonly():
