@@ -16,6 +16,17 @@ control target.
 Redfish 1.17 crawl. The important ids are `System_0`, `HGX_Baseboard_0`, `BMC_0`, and `HGX_BMC_0`.
 Read/query and telemetry are validated; job scheduling stays conservative.
 
+**Supermicro X10 (early Redfish).** Validated live only — no committed fixture — so treat "Supermicro"
+as a range, not one target. An X10SDV-TLN4F (Xeon-D, ASPEED AST2400, BMC 3.88, **Redfish 1.0.1**)
+returns `403` on its Redfish service root and everything under it until the **SFT-DCMS** license is
+activated (the raw hex key goes in the BMC web-UI license field, not the Redfish
+`LicenseManager.ActivateLicense` action). Once licensed, `system`, `console-info`, `chassis`, and
+`manager-time` work over Redfish, but this early 1.0.1 firmware is thin: `boot-state` returns empty
+boot data and `UpdateService`/`FirmwareInventory` are a `403`/`404` stub, so there is no Redfish
+firmware update until the BMC is flashed out of band. Newer BMC firmware (e.g. X10 BMC 4.00) tracks
+Supermicro's *Redfish Reference Guide 2.0a* and exposes the fuller `UpdateService` +
+`FirmwareInventory`, at which point Redfish-driven updates become possible.
+
 **HPE iLO.** Proof lives in `tests/hpe_fixtures/`, imported from the HPE iLO emulator corpus, plus
 the live-emulator canary in `examples/hpe_ilo_canary.sh`. The common ids are `Systems/1`,
 `Managers/1`, and `Chassis/1`. Read/query, Secure Boot, logs, network, telemetry, and guarded
@@ -66,6 +77,33 @@ idrac_ctl oem-info
 These commands are valuable because they start from advertised Redfish links instead of assuming Dell
 resource ids. On multi-system hosts, `IDracManager` also picks the host ComputerSystem by looking for
 `Bios` or `Boot` links. That keeps a GB300 host (`System_0`) distinct from the HGX baseboard member.
+
+## Worked Example: Fix A Drifted BMC Clock (Supermicro)
+
+A BMC with no NTP and a dead/unset RTC reports the wrong time, which then skews every log and SEL
+timestamp. This is common on thin firmware — the X10SDV-TLN4F above booted with its clock stuck in
+2020. `manager-time`, defined in `idrac_ctl/manager/cmd_manager_time.py`, reads the Manager's Redfish
+`DateTime` by default and writes it only with an explicit flag. It is vendor-neutral (it walks
+`discover_manager_ids()`), so the same commands work on Dell, HPE, or generic Redfish.
+
+```bash
+export IDRAC_IP=192.168.254.119 IDRAC_USERNAME=ADMIN IDRAC_PASSWORD=ADMIN
+
+# 1. Read the current clock (no write) — here it is years behind.
+idrac_ctl manager-time
+#   "DateTime": "2020-02-25T18:05:32+00:00"
+
+# 2. Set it to this host's current UTC (a deliberate write).
+idrac_ctl manager-time --now
+#   "Requested": "2026-07-02T20:56:42+00:00", "WriteStatus": "IdracApiRespond.Ok"
+
+# Or set an explicit time / local offset instead of --now:
+idrac_ctl manager-time --set 2026-07-02T20:00:00+00:00 --offset +00:00
+```
+
+Only `--now`/`--set` write; a bare `manager-time` is read-only. If the BMC exposes NTP it is better to
+configure that, but early Redfish (Supermicro 1.0.1) often does not, so setting `DateTime` directly is
+the fix. See `examples/example_manager_time.sh`.
 
 ## Adding A Vendor
 

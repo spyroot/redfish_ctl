@@ -104,6 +104,7 @@ Safety labels:
 | `logs` | Read system and manager log entries. | Read |
 | `manager` | Read manager data. | Read |
 | `manager-reboot` | Reboot the iDRAC manager. | Write |
+| `manager-time` | Read the BMC (Manager) clock; `--now`/`--set` write `DateTime` (read-only by default, no dry-run). | Write |
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
