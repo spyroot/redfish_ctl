@@ -100,6 +100,7 @@ class ApiRequestType(Enum):
     BiosSnapshot = auto()
     BootState = auto()
     BmcScan = auto()
+    ManagerTime = auto()
 
     # boot sources
     BootSourcePending = auto()
