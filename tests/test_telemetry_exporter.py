@@ -1,5 +1,8 @@
 """Offline tests for the Redfish telemetry exporter contract."""
 
+import pytest
+
+import idrac_ctl.telemetry.exporter as exporter_mod
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.telemetry.exporter import (
     MetricSample,
@@ -8,6 +11,7 @@ from idrac_ctl.telemetry.exporter import (
     exporter_argv_uses_secret,
     load_exporter_env_file,
     render_prometheus_text,
+    resolve_signalfx_ingest_url,
     to_signalfx_body,
 )
 
@@ -232,3 +236,95 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes"} <= metrics
     assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
     assert all(recorded.method != "POST" for recorded in service.requests)
+
+
+def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkeypatch):
+    """--once --push-signalfx builds the SignalFx body AND POSTs it exactly once."""
+    mgr, _service = redfish_mock_factory("supermicro")
+    monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", "test-token")
+
+    calls = []
+
+    def fake_push(body, token, ingest_url, timeout=20.0):
+        calls.append({"body": body, "token": token, "ingest_url": ingest_url})
+        return 200
+
+    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+
+    result = mgr.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        push_signalfx=True,
+        signalfx_ingest_url="https://ingest.us1.signalfx.com/v2/datapoint",
+        label_bmc_ip="172.25.230.29",
+        vendor="supermicro",
+    )
+
+    # Pushed exactly once, with the same body that is returned to the caller.
+    assert len(calls) == 1
+    assert calls[0]["token"] == "test-token"
+    assert calls[0]["ingest_url"] == "https://ingest.us1.signalfx.com/v2/datapoint"
+    assert calls[0]["body"] is result.data
+    assert result.data["gauge"]
+    assert result.extra["push_status"] == 200
+    assert result.extra["sample_count"] == len(result.data["gauge"])
+
+
+def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkeypatch):
+    """A bare host (no /v2/datapoint) is rejected before any datapoint is pushed."""
+    mgr, _service = redfish_mock_factory("supermicro")
+    monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", "test-token")
+
+    called = []
+    monkeypatch.setattr(exporter_mod, "push_signalfx",
+                        lambda *a, **k: called.append(1))
+
+    with pytest.raises(ValueError, match="v2/datapoint"):
+        mgr.sync_invoke(
+            ApiRequestType.Exporter,
+            "exporter",
+            once=True,
+            exporter_output="signalfx",
+            push_signalfx=True,
+            signalfx_ingest_url="https://ingest.us1.observability.splunkcloud.com",
+            label_bmc_ip="172.25.230.29",
+            vendor="supermicro",
+        )
+    assert called == []
+
+
+def test_once_push_signalfx_requires_ingest_url(redfish_mock_factory, monkeypatch):
+    """Missing SPLUNK_INGEST_URL (and no --signalfx-ingest-url) raises a clear error."""
+    mgr, _service = redfish_mock_factory("supermicro")
+    monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", "test-token")
+    monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
+
+    with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
+        mgr.sync_invoke(
+            ApiRequestType.Exporter,
+            "exporter",
+            once=True,
+            exporter_output="signalfx",
+            push_signalfx=True,
+            label_bmc_ip="172.25.230.29",
+            vendor="supermicro",
+        )
+
+
+def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypatch):
+    """The ingest URL resolver falls back to env and demands the /v2/datapoint path."""
+    monkeypatch.setenv("SPLUNK_INGEST_URL",
+                       "https://ingest.us1.signalfx.com/v2/datapoint")
+    assert (resolve_signalfx_ingest_url()
+            == "https://ingest.us1.signalfx.com/v2/datapoint")
+    assert (resolve_signalfx_ingest_url("https://custom.example/v2/datapoint")
+            == "https://custom.example/v2/datapoint")
+
+    with pytest.raises(ValueError, match="v2/datapoint"):
+        resolve_signalfx_ingest_url("https://ingest.us1.observability.splunkcloud.com")
+
+    monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
+    with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
+        resolve_signalfx_ingest_url()

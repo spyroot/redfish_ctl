@@ -14,10 +14,13 @@ from typing import Optional
 from ..idrac_manager import IDracManager
 from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from . import exporter
 from .exporter import (
     build_identity_dimensions,
     build_metric_samples,
     render_prometheus_text,
+    resolve_signalfx_ingest_url,
+    resolve_signalfx_token,
     run_signalfx_loop,
     serve_prometheus,
     to_signalfx_body,
@@ -175,19 +178,29 @@ class Exporter(IDracManager,
                 **kwargs) -> CommandResult:
         """Scrape once, serve Prometheus, or push SignalFx datapoints."""
         if once:
+            # Resolve and validate the push target BEFORE scraping so a missing
+            # token or a bare (non-/v2/datapoint) ingest URL fails fast.
+            if exporter_output == "signalfx" and push_signalfx:
+                token = resolve_signalfx_token(signalfx_token_env)
+                ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
+                samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                body = to_signalfx_body(samples)
+                status = exporter.push_signalfx(body, token, ingest_url)
+                return CommandResult(
+                    body, None,
+                    {"sample_count": len(samples),
+                     "push_status": status,
+                     "ingest_url": ingest_url},
+                    None,
+                )
             samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"
                     else render_prometheus_text(samples))
             return CommandResult(data, None, {"sample_count": len(samples)}, None)
 
         if push_signalfx or exporter_output == "signalfx":
-            import os
-            token = os.environ.get(signalfx_token_env or "SPLUNK_ACCESS_TOKEN", "")
-            ingest_url = signalfx_ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
-            if not token:
-                raise ValueError(f"{signalfx_token_env} is not set")
-            if not ingest_url:
-                raise ValueError("SPLUNK_INGEST_URL is not set")
+            token = resolve_signalfx_token(signalfx_token_env)
+            ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
 
             def scrape_samples():
                 return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)

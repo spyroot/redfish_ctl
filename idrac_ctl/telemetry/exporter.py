@@ -55,6 +55,9 @@ FABRIC_PROPERTY_METRICS = {
 }
 SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
+# push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
+# datapoint endpoint (…/v2/datapoint), never a bare host.
+SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 
 
 @dataclass(frozen=True)
@@ -314,8 +317,53 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     }
 
 
+def _require_datapoint_url(ingest_url: str) -> str:
+    """Return ``ingest_url`` when it is a full SignalFx datapoint endpoint, else raise.
+
+    ``push_signalfx`` POSTs the URL as-is (it does not append a path), so a bare
+    host such as ``https://ingest.us1.observability.splunkcloud.com`` accepts the
+    request context but silently drops every datapoint. Require the full
+    ``…/v2/datapoint`` endpoint so misconfiguration fails loudly instead.
+    """
+    if SIGNALFX_DATAPOINT_PATH not in (ingest_url or ""):
+        raise ValueError(
+            "SignalFx ingest URL must be the full datapoint endpoint ending in "
+            f"{SIGNALFX_DATAPOINT_PATH} (e.g. "
+            "https://ingest.us1.signalfx.com/v2/datapoint), not a bare host like "
+            f"https://ingest.us1.observability.splunkcloud.com; got {ingest_url!r}"
+        )
+    return ingest_url
+
+
+def resolve_signalfx_token(token_env: Optional[str] = None) -> str:
+    """Return the SignalFx ingest token from ``token_env`` (default SPLUNK_ACCESS_TOKEN)."""
+    name = token_env or "SPLUNK_ACCESS_TOKEN"
+    token = os.environ.get(name, "")
+    if not token:
+        raise ValueError(f"{name} is not set")
+    return token
+
+
+def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
+    """Return a validated SignalFx datapoint ingest URL.
+
+    Falls back to the ``SPLUNK_INGEST_URL`` environment variable and requires the
+    full ``…/v2/datapoint`` endpoint (see ``_require_datapoint_url``).
+    """
+    url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
+    if not url:
+        raise ValueError("SPLUNK_INGEST_URL is not set")
+    return _require_datapoint_url(url)
+
+
 def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 20.0) -> int:
-    """POST a SignalFx datapoint body and return the status code."""
+    """POST a SignalFx datapoint body and return the status code.
+
+    ``ingest_url`` must be the full SignalFx datapoint endpoint (``…/v2/datapoint``);
+    it is POSTed verbatim, so a bare host silently drops every datapoint
+    (see ``_require_datapoint_url``).
+    """
+    _require_datapoint_url(ingest_url)
     data = json.dumps(body).encode()
     req = urllib.request.Request(
         ingest_url,
