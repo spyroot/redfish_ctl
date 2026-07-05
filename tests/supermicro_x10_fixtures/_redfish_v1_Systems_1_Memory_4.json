@@ -1,0 +1,35 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#Memory.Memory",
+    "@odata.type": "#Memory.v1_1_0.Memory",
+    "@odata.id": "/redfish/v1/Systems/1/Memory/4",
+    "Id": "4",
+    "Name": "DIMMB2",
+    "RankCount": 4,
+    "Description": "Memory",
+    "CapacityMiB": 16384,
+    "DataWidthBits": 64,
+    "BusWidthBits": 72,
+    "MemoryMedia": [
+        "DRAM"
+    ],
+    "MemoryType": "DRAM",
+    "MemoryDeviceType": "DDR4",
+    "OperatingSpeedMhz": 2133,
+    "AllowedSpeedsMHz": [
+        2133
+    ],
+    "DeviceLocator": "DIMMB2",
+    "MemoryLocation": {
+        "Socket": 0,
+        "MemoryController": 0,
+        "Channel": 1,
+        "Slot": 1
+    },
+    "Manufacturer": "Micron",
+    "SerialNumber": "16E1F6F3",
+    "PartNumber": "36ASF2G72PZ-2G1B1",
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    }
+}

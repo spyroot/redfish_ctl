@@ -1,0 +1,8 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#FilterRuleCollection.FilterRuleCollection",
+    "@odata.type": "#FilterRuleCollection.FilterRuleCollection",
+    "@odata.id": "/redfish/v1/Managers/1/IPAccessControl/FilterRules",
+    "Name": "Filter Rule Collection",
+    "Members": [],
+    "Members@odata.count": 0
+}

@@ -1,0 +1,62 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#SmcNodeManager.SmcNodeManager",
+    "@odata.type": "#SmcNodeManager.v1_0_0.SmcNodeManager",
+    "@odata.id": "/redfish/v1/Systems/1/SmcNodeManager",
+    "Id": "Node Manager",
+    "Name": "Node Manager",
+    "Capabilities": [
+        {
+            "DomainID": "Entire platform",
+            "PolicyType": "Power Control Policy",
+            "MaxConcurrentSettings": 16,
+            "MaxValueAfterReset": 32767,
+            "MinValueAfterReset": 1,
+            "MaxCorrectionTime": 600000,
+            "MinCorrectionTime": 6000,
+            "MaxReportingPeriod": 3600,
+            "MinReportingPeriod": 1,
+            "DomainLimitingScope": 0
+        }
+    ],
+    "Statistics": [
+        {
+            "Mode": "Global power statistics",
+            "DomainID": "Entire platform",
+            "Timestamp": "2017-04-26T04:31:02+00:00",
+            "CurrentValue": 0,
+            "MaximumValue": 0,
+            "MinimumValue": 0,
+            "AverageValue": 0,
+            "ReportingPeriod": 385869
+        }
+    ],
+    "Version": {
+        "IntelNMVersion": "Supported Intel NM 3.0",
+        "IPMIVersion": "Intel NM IPMI version 3.0",
+        "PatchVersion": 0,
+        "MajorRevision": 3,
+        "MinorRevision": 3
+    },
+    "Selftest": {
+        "MajorCode": 85,
+        "MinorCode": 0,
+        "ImageFlags": "Operational"
+    },
+    "Policy": [
+        {
+            "DomainID": "Entire platform",
+            "PolicyID": 1,
+            "PolicyType": 0,
+            "PolicyExceptionActions": 0,
+            "PowerLimit": 0,
+            "CorrectionTimeLimit": 0,
+            "PolicyTriggerLimit": 0,
+            "StatReportingPeriod": 0
+        }
+    ],
+    "Actions": {
+        "#SmcNodeManager.ClearAllPolicies": {
+            "target": "/redfish/v1/Systems/1/SmcNodeManager/Actions/SmcNodeManager.ClearAllPolicies"
+        }
+    }
+}
