@@ -1,7 +1,11 @@
 """Dual-mode test for the chassis query command."""
 import json
 
+import pytest
+
 from idrac_ctl.chassis.cmd_chasis_reset import ChassisReset
+from idrac_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
+from idrac_ctl.cmd_exceptions import InvalidArgumentFormat
 from idrac_ctl.idrac_shared import ApiRequestType, PowerState, RedfishAction
 from idrac_ctl.redfish_manager import CommandResult
 
@@ -25,6 +29,21 @@ def test_chassis_query_returns_idrac_chassis_collection(redfish_api):
 def test_power_state_property_returns_fixture_power_state(redfish_api):
     """power_state maps the chassis PowerState value onto the enum."""
     assert redfish_api.power_state is PowerState.On
+
+
+def test_chassis_update_rejects_empty_id_before_patch(redfish_mock, redfish_service):
+    """chassis-update rejects an empty chassis id before any PATCH is sent."""
+    request_count = len(redfish_service.requests)
+
+    with pytest.raises(InvalidArgumentFormat, match="chassis_id is empty string"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.ChassisUpdate,
+            "update_chassis",
+            chassis_id="",
+            from_spec="unused.json",
+        )
+
+    assert len(redfish_service.requests) == request_count
 
 
 def test_chassis_reset_posts_forceoff_payload_in_mock_mode(
