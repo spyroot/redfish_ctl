@@ -1,8 +1,12 @@
 """Dual-mode tests for system configuration commands."""
 
+import pytest
+
+from idrac_ctl.cmd_exceptions import InvalidArgument
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
 from idrac_ctl.system.cmd_system_config import ExportSystemConfig
+from idrac_ctl.system.cmd_system_one_time_boot import ImportOneTimeBoot  # noqa: F401
 
 
 def test_system_export_posts_expected_payload_in_mock_mode(
@@ -45,3 +49,19 @@ def test_system_export_posts_expected_payload_in_mock_mode(
         "IncludeInExport": "IncludeReadOnly",
         "ExportUse": "Clone",
     }
+
+
+def test_one_time_boot_import_rejects_invalid_shutdown_type_before_post(
+    redfish_mock, redfish_service
+):
+    """ImportOneTimeBoot rejects bad shutdown_type before any Redfish POST."""
+    with pytest.raises(InvalidArgument, match="Invalid shutdown type"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.ImportOneTimeBoot,
+            "import_sysconfig",
+            config="unused.xml",
+            shutdown_type="power-cycle",
+            host_power_state="Off",
+        )
+
+    assert all(request.method != "POST" for request in redfish_service.requests)
