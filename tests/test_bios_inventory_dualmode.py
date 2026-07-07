@@ -59,3 +59,25 @@ def test_bios_inventory_filter_selects_matching_attribute(redfish_api):
     assert "ProcCStates" in result.data
     # filtering returns a flat {attr: value} map, not the full Bios resource
     assert "@odata.id" not in result.data
+
+
+def test_bios_inventory_filter_file_selects_list_attributes(
+    redfish_mock, redfish_service, tmp_path
+):
+    """A JSON list passed via --from_file narrows BIOS output to those keys."""
+    query_file = tmp_path / "bios_query.json"
+    query_file.write_text(json.dumps(["ProcCStates", "SysMemSize"]))
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosQuery,
+        "bios_inventory",
+        attr_filter_file=str(query_file),
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {
+        "ProcCStates": "Disabled",
+        "SysMemSize": "768 GB",
+    }
+    json.dumps(result.data)
+    assert {request.method for request in redfish_service.requests} == {"GET"}
