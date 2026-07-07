@@ -9,6 +9,9 @@ Author Mus spyroot@gmail.com
 """
 import json
 
+import pytest
+
+from idrac_ctl.cmd_exceptions import InvalidArgument
 from idrac_ctl.compute.cmd_power_state import RebootHost
 from idrac_ctl.idrac_shared import IDRAC_API, ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
@@ -68,6 +71,20 @@ def test_boot_one_shot_patches_requested_target_in_mock_mode(
         ApiRequestType.CurrentBoot, "current_boot_query"
     )
     assert current.data["BootSourceOverrideTarget"] == "Pxe"
+
+
+def test_boot_one_shot_rejects_invalid_target_before_patch_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot rejects unsupported targets before mutating Boot settings."""
+    with pytest.raises(InvalidArgument, match="Invalid boot device Tape"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.BootOneShot,
+            "boot_one_shot",
+            device="Tape",
+        )
+
+    assert all(request.method != "PATCH" for request in redfish_service.requests)
 
 
 def test_reboot_posts_reset_action_payload_in_mock_mode(
