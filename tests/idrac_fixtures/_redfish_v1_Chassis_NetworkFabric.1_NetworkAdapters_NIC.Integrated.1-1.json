@@ -1,0 +1,14 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/NIC.Integrated.1-1",
+  "@odata.type": "#NetworkAdapter.v1_9_0.NetworkAdapter",
+  "Id": "NIC.Integrated.1-1",
+  "Name": "Integrated ConnectX Adapter",
+  "Manufacturer": "NVIDIA",
+  "Model": "ConnectX-7 25GbE Adapter",
+  "PartNumber": "900-9X7AE-MOCK",
+  "SerialNumber": "NIC-MOCK-SN001",
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  }
+}
