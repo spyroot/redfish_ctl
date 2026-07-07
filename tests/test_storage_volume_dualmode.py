@@ -34,6 +34,31 @@ def test_storage_query_filters_controller_ids(redfish_api):
     ]
 
 
+def test_storage_query_without_filter_returns_all_controller_ids(
+    redfish_mock, redfish_service
+):
+    """storage_query without a filter returns every controller ID without mutating."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.StorageQuery,
+        "storage_query",
+        id_filter="",
+    )
+
+    assert isinstance(result, CommandResult)
+    json.dumps({"data": result.data, "discovered": result.discovered})
+    assert result.data == ["RAID.Integrated.1-1"]
+    assert result.discovered == [
+        "/redfish/v1/Systems/System.Embedded.1/Storage/RAID.Integrated.1-1"
+    ]
+    assert result.extra is None
+    assert result.error is None
+
+    assert {request.method for request in redfish_service.requests} == {"GET"}
+    assert redfish_service.last_request.path.lower() == (
+        "/redfish/v1/systems/system.embedded.1/storage"
+    )
+
+
 def test_volume_query_returns_controller_volume_collection(redfish_api):
     """vol_query fetches the volume collection under the selected controller."""
     result = redfish_api.sync_invoke(
