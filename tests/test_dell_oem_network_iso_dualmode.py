@@ -10,6 +10,7 @@ from idrac_ctl.redfish_manager import CommandResult
 
 OS_DEPLOYMENT = "/redfish/v1/Dell/Systems/System.Embedded.1/DellOSDeploymentService"
 ACTION_PREFIX = f"{OS_DEPLOYMENT}/Actions/DellOSDeploymentService"
+OS_DEPLOYMENT_TASK = "/redfish/v1/TaskService/Tasks/OSDeployment"
 
 
 def test_dell_oem_actions_discovers_network_iso_actions(redfish_api):
@@ -34,6 +35,30 @@ def test_dell_oem_actions_discovers_network_iso_actions(redfish_api):
     assert result.discovered["ConnectNetworkISOImage"].target == (
         f"{ACTION_PREFIX}.ConnectNetworkISOImage"
     )
+
+
+def test_oem_net_iso_task_discovers_os_deployment_task_actions(
+    redfish_mock,
+    redfish_service,
+):
+    """oem-net-iso-task reads the OSDeployment task and discovers its actions."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellOemTask,
+        "dell_oem_actions",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, CommandResult)
+    assert isinstance(result.data.data, dict)
+    assert result.data.data["@odata.id"] == OS_DEPLOYMENT_TASK
+    assert "Cancel" in result.discovered
+    assert result.discovered["Cancel"].target == (
+        f"{OS_DEPLOYMENT_TASK}/Actions/Task.Cancel"
+    )
+
+    request = redfish_service.last_request
+    assert request.method == "GET"
+    assert request.path.lower() == OS_DEPLOYMENT_TASK.lower()
 
 
 def test_dell_oem_attach_posts_network_iso_payload(
