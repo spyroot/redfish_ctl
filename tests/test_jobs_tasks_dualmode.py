@@ -234,3 +234,15 @@ def test_get_task_returns_completed_job_state_without_polling(redfish_api):
 
     assert isinstance(result, CommandResult)
     assert result.data.value == "Completed"
+
+
+def test_job_watch_returns_completed_job_state(redfish_api):
+    """job_watch returns the terminal state for an existing Dell OEM job."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.JobWatch,
+        "job_watch",
+        job_id=JOB_ID,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data.value == "Completed"
