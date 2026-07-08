@@ -65,6 +65,23 @@ def test_bios_registry_filters_attribute_names(redfish_api):
     ]
 
 
+def test_bios_registry_noreadonly_filters_read_only_entries(redfish_api):
+    """bios_registry --noreadonly removes read-only registry attributes."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.BiosRegistry,
+        "bios_registry",
+        no_read_only=True,
+        is_value_only=False,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert [entry["AttributeName"] for entry in result.data] == [
+        "ProcCStates",
+        "SriovGlobalEnable",
+    ]
+    assert all(entry["ReadOnly"] is False for entry in result.data)
+
+
 def test_bios_change_settings_patches_pending_settings_in_mock_mode(
     redfish_mock, redfish_service, tmp_path
 ):
