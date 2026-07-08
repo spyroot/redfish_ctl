@@ -31,6 +31,7 @@ def test_dell_oem_actions_discovers_network_iso_actions(redfish_api):
         "DisconnectNetworkISOImage",
         "GetAttachStatus",
         "GetNetworkISOImageConnectionInfo",
+        "BootToNetworkISO",
     }.issubset(result.discovered)
     assert result.discovered["ConnectNetworkISOImage"].target == (
         f"{ACTION_PREFIX}.ConnectNetworkISOImage"
@@ -96,6 +97,46 @@ def test_dell_oem_attach_posts_network_iso_payload(
         "ShareName": "/exports/isos",
         "ImageName": "rhel.iso",
         "UserName": "media-user",
+    }
+
+
+def test_dell_oem_boot_network_iso_posts_discovered_action_payload(
+    redfish_mock,
+    redfish_service,
+    monkeypatch,
+):
+    """oem-boot-netios POSTs share details to BootToNetworkISO."""
+    monkeypatch.setattr(
+        IDracManager,
+        "fetch_task",
+        lambda self, task_id: {"TaskState": "Completed"},
+    )
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellOemNetIsoBoot,
+        "delloem_netios_boot",
+        ip_addr="192.0.2.20",
+        share_type="CIFS",
+        share_name="install-media",
+        remote_image="ubuntu.iso",
+        remote_username="media-user",
+        remote_workgroup="LAB",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == redfish_service.JOB_ID
+    assert result.data["task_state"] == {"TaskState": "Completed"}
+    assert redfish_service.last_request.path == (
+        "/redfish/v1/dell/systems/system.embedded.1/dellosdeploymentservice/"
+        "actions/dellosdeploymentservice.boottonetworkiso"
+    )
+    assert redfish_service.last_request.json() == {
+        "IPAddress": "192.0.2.20",
+        "ShareType": "CIFS",
+        "ShareName": "install-media",
+        "ImageName": "ubuntu.iso",
+        "UserName": "media-user",
+        "Workgroup": "LAB",
     }
 
 
