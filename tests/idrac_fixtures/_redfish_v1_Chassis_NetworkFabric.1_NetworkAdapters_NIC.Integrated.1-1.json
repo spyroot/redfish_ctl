@@ -7,6 +7,9 @@
   "Model": "ConnectX-7 25GbE Adapter",
   "PartNumber": "900-9X7AE-MOCK",
   "SerialNumber": "NIC-MOCK-SN001",
+  "Ports": {
+    "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/NIC.Integrated.1-1/Ports"
+  },
   "Status": {
     "State": "Enabled",
     "Health": "OK"

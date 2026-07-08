@@ -1,0 +1,15 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/NIC.Integrated.1-1/Ports/NIC.Integrated.1-1-1",
+  "@odata.type": "#Port.v1_8_0.Port",
+  "Id": "NIC.Integrated.1-1-1",
+  "Name": "Integrated NIC Port 1",
+  "LinkStatus": "LinkUp",
+  "LinkState": "Enabled",
+  "LinkNetworkTechnology": "Ethernet",
+  "CurrentSpeedGbps": 25,
+  "MaxSpeedGbps": 25,
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  }
+}

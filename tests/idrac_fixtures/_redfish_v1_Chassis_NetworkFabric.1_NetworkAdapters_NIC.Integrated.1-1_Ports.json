@@ -1,0 +1,11 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/NIC.Integrated.1-1/Ports",
+  "@odata.type": "#PortCollection.PortCollection",
+  "Name": "Network Adapter Port Collection",
+  "Members@odata.count": 1,
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/Chassis/NetworkFabric.1/NetworkAdapters/NIC.Integrated.1-1/Ports/NIC.Integrated.1-1-1"
+    }
+  ]
+}
