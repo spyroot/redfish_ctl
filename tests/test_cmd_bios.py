@@ -15,23 +15,22 @@ PYTHONWARNINGS=ignore:Unverified HTTPS request
 Author Mus spyroot@gmail.com
 """
 import json
+import logging
 import os
 import pathlib
 from json import JSONDecodeError
 from unittest import TestCase
 
+import pytest
+
 import idrac_ctl
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_manager import CommandResult
-from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl import save_if_needed
-import logging
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
+from idrac_ctl.idrac_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -96,7 +95,7 @@ class TestBios(TestCase):
 
         generated_file = pathlib.Path(bios_filename)
         self.assertTrue(generated_file.exists(),
-                        f"cmd must save a file")
+                        "cmd must save a file")
 
         json_file = idrac_ctl.from_json_spec(bios_filename)
         try:

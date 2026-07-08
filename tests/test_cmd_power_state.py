@@ -2,14 +2,15 @@ import logging
 import os
 import time
 from unittest import TestCase
+
+import pytest
+
 from idrac_ctl.idrac_manager import IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).

@@ -13,12 +13,11 @@ Author Mus spyroot@gmail.com
 import json
 import os
 from unittest import TestCase
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.idrac_manager import CommandResult
-
 
 import pytest
+
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
+from idrac_ctl.idrac_shared import ApiRequestType
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).

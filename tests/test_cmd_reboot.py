@@ -2,14 +2,14 @@ import logging
 import os
 from unittest import TestCase
 
+import pytest
+
 from idrac_ctl.idrac_manager import IDracManager
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 "/var/www/html/ph4-rt-refresh_adj_offline_testnf_os4_flex21.iso"
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).

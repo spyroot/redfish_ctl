@@ -15,18 +15,18 @@ import logging
 import os
 from json import JSONDecodeError
 from unittest import TestCase
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_manager import CommandResult
+
+import pytest
+
+from idrac_ctl import save_if_needed
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_exceptions import RedfishException
 from idrac_ctl.redfish_shared import RedfishJson
-from idrac_ctl import save_if_needed
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).

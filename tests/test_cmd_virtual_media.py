@@ -6,9 +6,10 @@ import logging
 import os
 from unittest import TestCase
 
+import pytest
+
 from idrac_ctl.cmd_exceptions import InvalidArgument
-from idrac_ctl.idrac_manager import CommandResult
-from idrac_ctl.idrac_manager import IDracManager
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 
 img_location = "http://10.241.7.99/ph4-rt-refresh_adj_offline_testnf_os4_flex21.iso"
@@ -16,8 +17,6 @@ img_location = "http://10.241.7.99/ph4-rt-refresh_adj_offline_testnf_os4_flex21.
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -55,7 +54,7 @@ class TestVirtualMedia(TestCase):
         self.assertIsInstance(query_result.data, dict)
         data = query_result.data
         self.assertTrue("Members" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
 
     def test_base_fetch_media_device(self):
         """Base test fetch device by device id
@@ -71,11 +70,11 @@ class TestVirtualMedia(TestCase):
         self.assertIsInstance(query_result.data, dict)
         data = query_result.data
         self.assertTrue("Inserted" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
         self.assertTrue("ConnectedVia" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
         self.assertTrue("Name" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
 
     def test_base_fetch_media_device_not_found(self):
         """Base test for wrong dev id
@@ -92,7 +91,7 @@ class TestVirtualMedia(TestCase):
         self.assertIsInstance(query_result.data, dict)
         data = query_result.data
         self.assertTrue("Status" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
 
     def test_base_fetch_media_empty(self):
         """Base test for empty device list
@@ -109,7 +108,7 @@ class TestVirtualMedia(TestCase):
         self.assertIsInstance(query_result.data, dict)
         data = query_result.data
         self.assertTrue("Members" in data,
-                        f"member key must in respond")
+                        "member key must in respond")
 
     def test_base_insert_media(self):
         """Base test attach media no id must raise
@@ -151,7 +150,7 @@ class TestVirtualMedia(TestCase):
         data = cmd_resp.data
         self.assertTrue(
             "Status" in data,
-            f"Status key must in respond"
+            "Status key must in respond"
         )
 
     def test_base_eject(self):
@@ -170,4 +169,4 @@ class TestVirtualMedia(TestCase):
         self.assertIsInstance(cmd_resp.data, dict)
         data = cmd_resp.data
         self.assertTrue("Status" in data,
-                        f"Status key must in respond")
+                        "Status key must in respond")

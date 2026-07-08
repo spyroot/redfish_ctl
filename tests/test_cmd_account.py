@@ -10,18 +10,19 @@ PYTHONWARNINGS=ignore:Unverified HTTPS request
 Author Mus spyroot@gmail.com
 """
 import json
+import logging
 import os
 from json import JSONDecodeError
 from unittest import TestCase
-from idrac_ctl.idrac_manager import IDracManager, CommandResult
+
+import pytest
+
+from idrac_ctl.idrac_manager import CommandResult, IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
-import logging
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
-
-import pytest
 
 # Integration tests: require a reachable iDRAC.
 # Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
@@ -65,4 +66,4 @@ class TestAccounts(TestCase):
             self.fail("raised exception")
 
         self.assertTrue("AccountTypes" in query_result.data,
-                        f"Failed to fetch mandatory AccountTypes key")
+                        "Failed to fetch mandatory AccountTypes key")
