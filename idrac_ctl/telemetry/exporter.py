@@ -236,22 +236,35 @@ def samples_from_nvlink_rows(
 def samples_from_metric_report_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map TelemetryService MetricReport rows into GB300 fabric metrics."""
+    """Map every TelemetryService MetricReport row into a metric sample.
+
+    Fabric properties get curated ``hw.fabric.*`` names and fabric dimensions;
+    every other property (GPU FP16/FP32 activity, thermal, power, memory, …) is
+    emitted under a generic ``hw.gb300.*`` name so the FULL telemetry surface
+    reaches OTel/Prometheus, not just the fabric subset.
+    """
     samples = []
     for row in rows:
         prop = row.get("MetricProperty")
         if not prop:
             continue
         prop_info = _parse_metric_property(str(prop))
-        if prop_info["property"] not in FABRIC_PROPERTY_METRICS:
-            continue
         value = _as_float(row.get("MetricValue"))
         if value is None:
             continue
-        metric = FABRIC_PROPERTY_METRICS[prop_info["property"]]
-        fabric = "ib" if prop_info.get("port", "").lower().startswith("ib") else "nvlink"
-        dims = _fabric_dims(identity, prop_info.get("system"),
-                            prop_info.get("gpu"), prop_info.get("port"), fabric)
+        prop_name = prop_info["property"]
+        if prop_name in FABRIC_PROPERTY_METRICS:
+            metric = FABRIC_PROPERTY_METRICS[prop_name]
+            fabric = "ib" if prop_info.get("port", "").lower().startswith("ib") else "nvlink"
+            dims = _fabric_dims(identity, prop_info.get("system"),
+                                prop_info.get("gpu"), prop_info.get("port"), fabric)
+        else:
+            metric = _generic_metric_name(prop_name)
+            dims = _with_dims(identity, source="metric-report",
+                              property=_dim_value(prop_name))
+            for key in ("system", "gpu", "port", "chassis", "index"):
+                if prop_info.get(key):
+                    dims[key] = str(prop_info[key])
         dims["report"] = str(row.get("Report") or "unknown")
         samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
     return samples
@@ -503,13 +516,26 @@ def _gpu_dim(chassis: str) -> dict[str, str]:
 def _parse_metric_property(prop: str) -> dict[str, str]:
     path, _, fragment = prop.partition("#")
     parts = [part for part in path.strip("/").split("/") if part]
-    info = {"property": (fragment.strip("/").split("/")[-1] if fragment else parts[-1])}
+    frag = [p for p in fragment.strip("/").split("/") if p] if fragment else []
+    idx = None
+    if frag:
+        # a trailing numeric segment (e.g. .../NVDECUtilizationPercent/0) is an
+        # array index, not the metric name — keep the name, expose the index
+        if frag[-1].isdigit() and len(frag) >= 2:
+            prop_name, idx = frag[-2], frag[-1]
+        else:
+            prop_name = frag[-1]
+    else:
+        prop_name = parts[-1] if parts else "metric"
+    info = {"property": prop_name}
+    if idx is not None:
+        info["index"] = idx
     for collection, key in (("Systems", "system"), ("Processors", "gpu"),
                             ("Ports", "port"), ("Chassis", "chassis")):
         if collection in parts:
-            index = parts.index(collection) + 1
-            if index < len(parts):
-                info[key] = parts[index]
+            i = parts.index(collection) + 1
+            if i < len(parts):
+                info[key] = parts[i]
     return info
 
 
@@ -519,6 +545,16 @@ def _unit_for_metric(metric: str) -> Optional[str]:
     if metric.endswith("_gbps") or metric.endswith("port_speed"):
         return "Gbps"
     return None
+
+
+def _generic_metric_name(prop: str) -> str:
+    """Vendor-neutral metric name for any MetricReport property not in the
+    curated fabric map, so the full telemetry surface is exported rather than
+    just fabric counters. e.g. ``FP16ActivityPercent`` -> ``hw.gb300.fp16_activity_percent``.
+    """
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", prop)
+    snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
+    return f"hw.gb300.{snake or 'metric'}"
 
 
 def _dim_value(value) -> str:
