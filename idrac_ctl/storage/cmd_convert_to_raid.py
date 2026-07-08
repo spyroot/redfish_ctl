@@ -14,8 +14,9 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..cmd_utils import find_ids
 from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
