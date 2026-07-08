@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, BootSourceOverrideMode, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -56,12 +56,21 @@ class BootOneShot(IDracManager,
             default=None,
             help="uefi_target")
 
+        cmd_parser.add_argument(
+            '--mode', required=False, type=str, default=None,
+            choices=[m.value for m in BootSourceOverrideMode],
+            help="boot source override mode UEFI or Legacy (Redfish "
+                 "BootSourceOverrideMode). Force UEFI to boot the UEFI device "
+                 "entry, e.g. a UEFI virtual CD/DVD on boards where the Legacy "
+                 "path is unusable.")
+
         help_text = "command change one shoot boot"
         return cmd_parser, "boot-one-shot", help_text
 
     def execute(self,
                 device: Optional[str] = None,
                 uefi_target: Optional[str] = None,
+                mode: Optional[str] = None,
                 do_check: Optional[str] = None,
                 filename: Optional[str] = None,
                 data_type: Optional[str] = "json",
@@ -77,6 +86,8 @@ class BootOneShot(IDracManager,
 
         :param do_reboot:  will reboot host
         :param do_power_on: will power on server if server in power down state.
+        :param mode: boot source override mode, "UEFI" or "Legacy"
+                     (Redfish BootSourceOverrideMode). None leaves it unchanged.
         :param uefi_target:
         :param device:  get the list of supported device.
                         For example None, Pxe,Cd,Hdd,BiosSetup,UefiTarget,SDCard,UefiHttp
@@ -117,6 +128,13 @@ class BootOneShot(IDracManager,
                 f"supported device {boot_device}"
             )
 
+        # validate the requested boot mode (UEFI vs Legacy) before mutating
+        valid_modes = [m.value for m in BootSourceOverrideMode]
+        if mode is not None and mode not in valid_modes:
+            raise InvalidArgument(
+                f"Invalid boot mode {mode}, supported modes {valid_modes}"
+            )
+
         if uefi_target is not None:
             current_boot = self.sync_invoke(
                 ApiRequestType.BootOptions, "boot_sources_query"
@@ -129,9 +147,18 @@ class BootOneShot(IDracManager,
                     f"Invalid uefi device path {uefi_target},"
                     f" supported uefi devices {boot_device}")
 
+        # record the one-time boot request so UEFI vs Legacy boots are auditable
+        self.logger.info(
+            "boot-one-shot: one-time boot target=%s mode=%s uefi_target=%s",
+            device,
+            mode if mode is not None else "(unchanged)",
+            uefi_target if uefi_target is not None else "(none)",
+        )
+
         payload = {
             "Boot": {
                 "BootSourceOverrideTarget": device,
+                "BootSourceOverrideMode": mode,
                 "UefiTargetBootSourceOverride": uefi_target
             }
         }

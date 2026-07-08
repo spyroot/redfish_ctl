@@ -117,3 +117,76 @@ def test_reboot_posts_reset_action_payload_in_mock_mode(
         "/redfish/v1/systems/system.embedded.1/actions/computersystem.reset"
     )
     assert request.json() == {"ResetType": "PowerCycle"}
+
+
+def test_boot_one_shot_uefi_mode_sets_override_mode_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot --mode UEFI adds BootSourceOverrideMode=UEFI to the PATCH."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Cd",
+        mode="UEFI",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    request = redfish_service.last_request
+    assert request.method == "PATCH"
+    assert request.json() == {
+        "Boot": {
+            "BootSourceOverrideTarget": "Cd",
+            "BootSourceOverrideMode": "UEFI",
+        }
+    }
+
+
+def test_boot_one_shot_legacy_mode_sets_override_mode_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot --mode Legacy adds BootSourceOverrideMode=Legacy to the PATCH."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Cd",
+        mode="Legacy",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    assert redfish_service.last_request.json() == {
+        "Boot": {
+            "BootSourceOverrideTarget": "Cd",
+            "BootSourceOverrideMode": "Legacy",
+        }
+    }
+
+
+def test_boot_one_shot_omits_mode_when_not_requested_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """Without --mode the PATCH carries only the target (backward compatible)."""
+    redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Cd",
+    )
+    boot = redfish_service.last_request.json()["Boot"]
+    assert "BootSourceOverrideMode" not in boot
+    assert boot["BootSourceOverrideTarget"] == "Cd"
+
+
+def test_boot_one_shot_rejects_invalid_mode_before_patch_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot rejects an unsupported mode before mutating Boot settings."""
+    with pytest.raises(InvalidArgument, match="Invalid boot mode"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.BootOneShot,
+            "boot_one_shot",
+            device="Cd",
+            mode="BIOS",
+        )
+
+    assert all(request.method != "PATCH" for request in redfish_service.requests)
