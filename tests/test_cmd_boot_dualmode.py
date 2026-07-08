@@ -50,6 +50,68 @@ def test_current_boot_query_returns_boot_settings(redfish_api):
     assert result.data["BootSourceOverrideTarget"] in allowable_targets
 
 
+def test_boot_state_command_dual_mode_returns_dell_offline_shape(
+    redfish_api, redfish_service
+):
+    """boot-state synthesizes Dell System.Boot, BootOptions, and VirtualMedia."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.BootState, "boot-state"
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.discovered is None
+    assert result.extra is None
+    assert result.error is None
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+
+    state = result.data
+    assert set(state) == {
+        "System",
+        "BootMode",
+        "Override",
+        "OverrideTarget",
+        "OneTimeBootPending",
+        "NextBoot",
+        "BootOrder",
+        "BootableEntries",
+        "MountedMedia",
+    }
+    assert state["System"] == "System.Embedded.1"
+    assert state["Override"] == "Disabled"
+    assert state["OverrideTarget"] == "None"
+    assert state["OneTimeBootPending"] is False
+
+    assert isinstance(state["BootOrder"], list)
+    assert all(isinstance(entry, str) for entry in state["BootOrder"])
+    if state["BootOrder"]:
+        assert state["NextBoot"] == state["BootOrder"][0]
+    else:
+        assert state["NextBoot"] is None
+
+    assert isinstance(state["BootableEntries"], list)
+    bootable_entries = {
+        entry["Ref"]: entry
+        for entry in state["BootableEntries"]
+    }
+    assert bootable_entries == {
+        "HardDisk.List.1-1": {
+            "Ref": "HardDisk.List.1-1",
+            "DisplayName": "Integrated RAID Controller 1",
+            "Enabled": True,
+        },
+        "NIC.PxeDevice.1-1": {
+            "Ref": "NIC.PxeDevice.1-1",
+            "DisplayName": "Embedded NIC 1 Port 1 Partition 1",
+            "Enabled": True,
+        },
+    }
+    assert isinstance(state["MountedMedia"], list)
+    assert all(set(media) == {"Device", "Image"} for media in state["MountedMedia"])
+    assert redfish_service.requests
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
 def test_boot_one_shot_patches_requested_target_in_mock_mode(
     redfish_mock, redfish_service
 ):
