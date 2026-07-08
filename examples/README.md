@@ -76,6 +76,10 @@ Safety labels:
 - `example_sensors_read.sh` (**Read**) reads sensors and filters temperatures, fans, power supplies,
   and voltages with `jq`.
   Run: `bash examples/example_sensors_read.sh`
+- `example_supermicro_provision_from_iso.sh` (**Write**) mounts an OS installer ISO on a Supermicro
+  BMC over SMB (SMB1 for old X10-era BMCs) and boots it once in UEFI (`UefiUsbCd`) to run an
+  unattended install.
+  Run: `bash examples/example_supermicro_provision_from_iso.sh`
 - `hpe_ilo_canary.sh` (**Guarded**) starts the HPE iLO emulator and runs read-only commands plus a
   dry-run reset preview.
   Run: `bash examples/hpe_ilo_canary.sh`

@@ -1,5 +1,7 @@
 # Transactional BIOS change: capture a restore point, apply, roll back if needed.
-# This is the safety net for mutating a real box — snapshot BEFORE you change.
+# A BIOS change has no built-in undo and a bad value can leave the host unbootable
+# or unstable — so capture the exact current values FIRST. That snapshot is your
+# rollback: re-applying it puts every attribute back the way it was.
 
 # 1) Capture the CURRENT values of exactly the attributes you are about to change
 #    (change.json is your bios-change spec). rollback.json is the precise inverse.
