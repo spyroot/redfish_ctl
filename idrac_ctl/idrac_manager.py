@@ -26,49 +26,48 @@ import asyncio
 import functools
 import json
 import logging
+import os
 import time
 from abc import abstractmethod
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Tuple, Dict
+from typing import Dict, Optional, Tuple
 
 import requests
 from tqdm import tqdm
 
-from .redfish_exceptions import RedfishException
-from .redfish_exceptions import RedfishUnauthorized
-from .redfish_exceptions import RedfishForbidden
-
-from .redfish_manager import RedfishManager
-from .redfish_task_state import TaskState
-from .redfish_task_state import TaskStatus
-from .redfish_shared import RedfishJsonSpec, RedfishJson, RedfishApi
-
+from .cmd_exceptions import (
+    AuthenticationFailed,
+    DeleteRequestFailed,
+    InvalidArgumentFormat,
+    MissingMandatoryArguments,
+    PatchRequestFailed,
+    PostRequestFailed,
+    ResourceNotFound,
+    UnexpectedResponse,
+    UnsupportedAction,
+)
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .redfish_manager import CommandResult
-from .idrac_shared import ApiRequestType, HTTPMethod, CliJobTypes
-from .idrac_shared import ApiRespondString
-from .idrac_shared import PowerState
-from .idrac_shared import IDRAC_API
-from .idrac_shared import IDRAC_JSON
-from .idrac_shared import IDRACJobType
-from .idrac_shared import IdracApiRespond
-from .idrac_shared import JobApplyTypes
-from .idrac_shared import RedfishAction
+from .idrac_shared import (
+    IDRAC_API,
+    IDRAC_JSON,
+    ApiRequestType,
+    ApiRespondString,
+    CliJobTypes,
+    HTTPMethod,
+    IdracApiRespond,
+    IDRACJobType,
+    JobApplyTypes,
+    JobState,
+    PowerState,
+    RedfishAction,
+    ScheduleJobType,
+)
 from .idrac_shared import ResetType as ResetType
-from .idrac_shared import ScheduleJobType
-from .idrac_shared import JobState
-
-from .cmd_exceptions import AuthenticationFailed
-from .cmd_exceptions import ResourceNotFound
-from .cmd_exceptions import PostRequestFailed
-from .cmd_exceptions import DeleteRequestFailed
-
-from .cmd_exceptions import InvalidArgumentFormat
-from .cmd_exceptions import MissingMandatoryArguments
-from .cmd_exceptions import PatchRequestFailed
-from .cmd_exceptions import UnexpectedResponse
-from .cmd_exceptions import UnsupportedAction
+from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
+from .redfish_manager import CommandResult, RedfishManager
+from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
+from .redfish_task_state import TaskState, TaskStatus
 
 module_logger = logging.getLogger('idrac_ctl.idrac_manager')
 
@@ -375,15 +374,19 @@ class IDracManager(RedfishManager):
         if hdr is not None:
             headers.update(hdr)
 
+        # Bound every GET so a hung/unreachable BMC can't block a crawl or an
+        # unattended telemetry poll forever. Override via IDRAC_HTTP_TIMEOUT.
+        timeout = float(os.environ.get("IDRAC_HTTP_TIMEOUT", "30"))
+
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
             return requests.get(
-                req, verify=self._is_verify_cert, headers=headers
+                req, verify=self._is_verify_cert, headers=headers, timeout=timeout
             )
         else:
             return requests.get(
                 req, verify=self._is_verify_cert,
-                auth=(self._username, self._password)
+                auth=(self._username, self._password), timeout=timeout
             )
 
     def sync_invoke(self, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
