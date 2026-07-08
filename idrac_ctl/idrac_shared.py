@@ -64,6 +64,7 @@ class ApiRequestType(Enum):
     VirtualMediaGet = auto()
     VirtualMediaInsert = auto()
     VirtualMediaEject = auto()
+    SmcVirtualMediaMount = auto()
     CurrentBoot = auto()
 
     # storage

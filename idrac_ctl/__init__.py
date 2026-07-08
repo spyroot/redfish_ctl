@@ -59,6 +59,7 @@ from .manager.cmd_manager_reset import *
 from .virtual_media.cmd_virtual_media_get import *
 from .virtual_media.cmd_virtual_media_insert import *
 from .virtual_media.cmd_virtual_media_eject import *
+from .virtual_media.cmd_smc_virtual_media import *
 from .cmd_current_boot import *
 
 from .cmd_query import *
