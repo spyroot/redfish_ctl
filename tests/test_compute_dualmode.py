@@ -31,3 +31,28 @@ def test_compute_query_returns_system_settings_for_610_plus_in_mock_mode(
     assert redfish_service.last_request.path.lower() == (
         "/redfish/v1/systems/system.embedded.1/settings"
     )
+
+
+def test_compute_query_uses_system_resource_before_610(
+    redfish_api, redfish_service, monkeypatch
+):
+    """compute-query reads the ComputerSystem resource before the Settings URI is available."""
+    monkeypatch.setattr(
+        IDracManager,
+        "idrac_manager_version",
+        property(lambda self: "6.00.00.00"),
+    )
+
+    result = redfish_api.sync_invoke(ApiRequestType.ComputeQuery, "query")
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data["@odata.id"] == "/redfish/v1/Systems/System.Embedded.1"
+    assert result.data["Id"] == "System.Embedded.1"
+    assert result.error is None
+    assert redfish_service.last_request.method == "GET"
+    assert (
+        redfish_service.last_request.path.lower()
+        == "/redfish/v1/systems/system.embedded.1"
+    )
