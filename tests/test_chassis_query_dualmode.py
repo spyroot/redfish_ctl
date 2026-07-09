@@ -5,7 +5,7 @@ import pytest
 
 from redfish_ctl.chassis.cmd_chasis_reset import ChassisReset
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
-from redfish_ctl.cmd_exceptions import InvalidArgumentFormat
+from redfish_ctl.cmd_exceptions import FailedDiscoverAction, InvalidArgumentFormat
 from redfish_ctl.idrac_shared import ApiRequestType, PowerState, RedfishAction
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -96,3 +96,37 @@ def test_chassis_reset_posts_forceoff_payload_in_mock_mode(
     assert request.method == "POST"
     assert request.path.lower() == expected_path.lower()
     assert request.json() == {"ResetType": "ForceOff"}
+
+
+def test_chassis_reset_missing_target_raises_without_post(
+    redfish_mock, redfish_service
+):
+    """chassis-reset rejects a Reset action with no target before POST."""
+    member_path = "/redfish/v1/Chassis/System.Embedded.1"
+    member_response = redfish_mock.api_get_call(
+        f"https://mock-idrac{member_path}", {}
+    )
+    assert member_response.status_code == 200, f"missing fixture for {member_path}"
+    member = member_response.json()
+    member["Actions"]["#Chassis.Reset"]["target"] = None
+
+    collection_response = redfish_mock.api_get_call(
+        "https://mock-idrac/redfish/v1/Chassis", {}
+    )
+    assert collection_response.status_code == 200
+    collection_path = redfish_service.last_request.path
+    collection = collection_response.json()
+    collection["Members"] = [member]
+    redfish_service._overlay[collection_path] = collection
+
+    with pytest.raises(
+        FailedDiscoverAction,
+        match="Failed discover reset chassis actions",
+    ):
+        redfish_mock.sync_invoke(
+            ApiRequestType.ChassisReset,
+            "reboot",
+            reset_type="ForceOff",
+        )
+
+    assert all(request.method != "POST" for request in redfish_service.requests)
