@@ -1,11 +1,14 @@
 """Offline tests for the Redfish telemetry exporter contract."""
 
+import argparse
+
 import pytest
 
 import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
+    apply_exporter_env_file,
     build_identity_dimensions,
     build_metric_samples,
     exporter_argv_uses_secret,
@@ -216,6 +219,51 @@ def test_exporter_env_file_loader_and_argv_secret_guard(tmp_path):
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password", "not-real", "exporter"])
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password=not-real", "exporter"])
     assert not exporter_argv_uses_secret(["idrac_ctl", "exporter"])
+
+
+def test_exporter_env_file_supports_redfish_keys(tmp_path):
+    """The credential file accepts REDFISH_* keys (the going-forward names)."""
+    env_file = tmp_path / "redfish_exporter.env"
+    env_file.write_text(
+        "\n".join([
+            "REDFISH_IP=203.0.113.10",
+            "REDFISH_USERNAME=admin",
+            "REDFISH_PASSWORD=not-real",
+            "REDFISH_PORT=443",
+        ])
+    )
+    assert load_exporter_env_file(env_file) == {
+        "REDFISH_IP": "203.0.113.10",
+        "REDFISH_USERNAME": "admin",
+        "REDFISH_PASSWORD": "not-real",
+        "REDFISH_PORT": "443",
+    }
+
+    args = argparse.Namespace(idrac_ip="", idrac_username="root",
+                              idrac_password="", idrac_port=443,
+                              exporter_credential_file=str(env_file))
+    apply_exporter_env_file(args)
+    assert args.idrac_ip == "203.0.113.10"
+    assert args.idrac_username == "admin"
+    assert args.idrac_password == "not-real"
+    assert args.idrac_port == 443
+
+
+def test_exporter_env_file_prefers_redfish_over_idrac(tmp_path):
+    """When a file carries both, REDFISH_* wins; IDRAC_* alone still works."""
+    both = tmp_path / "both.env"
+    both.write_text("REDFISH_IP=203.0.113.10\nIDRAC_IP=198.51.100.5\n")
+    args = argparse.Namespace(idrac_ip="", idrac_username="root",
+                              idrac_password="", idrac_port=443)
+    apply_exporter_env_file(args, path=str(both))
+    assert args.idrac_ip == "203.0.113.10"  # REDFISH_* preferred
+
+    legacy = tmp_path / "legacy.env"
+    legacy.write_text("IDRAC_IP=198.51.100.5\n")
+    args2 = argparse.Namespace(idrac_ip="", idrac_username="root",
+                               idrac_password="", idrac_port=443)
+    apply_exporter_env_file(args2, path=str(legacy))
+    assert args2.idrac_ip == "198.51.100.5"  # legacy fallback still honored
 
 
 def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_factory):

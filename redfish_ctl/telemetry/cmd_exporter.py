@@ -65,7 +65,8 @@ class Exporter(IDracManager,
             help="vendor dimension override, e.g. supermicro or dell")
         cmd_parser.add_argument(
             "--credential-file", dest="exporter_credential_file", default=None, type=str,
-            help="gitignored KEY=VALUE runtime file for IDRAC_IP/USERNAME/PASSWORD/PORT")
+            help="gitignored KEY=VALUE runtime file for "
+                 "REDFISH_IP/USERNAME/PASSWORD/PORT (legacy IDRAC_* also accepted)")
         cmd_parser.add_argument(
             "--push-signalfx", action="store_true", default=False,
             help="push SignalFx datapoints instead of returning/serving Prometheus output")

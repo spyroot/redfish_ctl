@@ -101,8 +101,19 @@ def build_identity_dimensions(
     }
 
 
+# Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
+# the legacy IDRAC_* keys still work as a fallback during the rename.
+_EXPORTER_CRED_KEYS = frozenset({
+    "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
+    "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
+})
+
+
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
-    """Read a simple KEY=VALUE runtime env file without printing secret values."""
+    """Read a simple KEY=VALUE runtime env file without printing secret values.
+
+    Accepts REDFISH_IP/USERNAME/PASSWORD/PORT and the legacy IDRAC_* names.
+    """
     values = {}
     for raw_line in Path(path).read_text().splitlines():
         line = raw_line.strip()
@@ -110,7 +121,7 @@ def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if key in {"IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT"}:
+        if key in _EXPORTER_CRED_KEYS:
             values[key] = value.strip().strip("'\"")
     return values
 
@@ -129,23 +140,29 @@ def exporter_argv_uses_secret(argv: Iterable[str]) -> bool:
 def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
     """Apply exporter credential-file values to an argparse namespace in place."""
     file_path = path or getattr(args, "exporter_credential_file", None)
-    file_path = file_path or os.environ.get("IDRAC_EXPORTER_CREDENTIAL_FILE")
+    file_path = (file_path
+                 or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE")
+                 or os.environ.get("IDRAC_EXPORTER_CREDENTIAL_FILE"))
     if not file_path:
         return
     values = load_exporter_env_file(file_path)
-    mapping = {
-        "IDRAC_IP": "idrac_ip",
-        "IDRAC_USERNAME": "idrac_username",
-        "IDRAC_PASSWORD": "idrac_password",
-        "IDRAC_PORT": "idrac_port",
-    }
-    for env_name, attr in mapping.items():
-        if env_name not in values:
+    # (namespace attr, REDFISH_* key, legacy IDRAC_* key). REDFISH_* wins when both
+    # are present in the file; IDRAC_* is the fallback.
+    mapping = (
+        ("idrac_ip", "REDFISH_IP", "IDRAC_IP"),
+        ("idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
+        ("idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
+        ("idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
+    )
+    for attr, redfish_key, idrac_key in mapping:
+        key = redfish_key if redfish_key in values else idrac_key
+        if key not in values:
             continue
+        is_password = attr == "idrac_password"
         current = getattr(args, attr, "")
-        if current in ("", None, "root") or env_name == "IDRAC_PASSWORD":
-            value = values[env_name]
-            setattr(args, attr, int(value) if env_name == "IDRAC_PORT" else value)
+        if current in ("", None, "root") or is_password:
+            value = values[key]
+            setattr(args, attr, int(value) if attr == "idrac_port" else value)
 
 
 def build_metric_samples(
