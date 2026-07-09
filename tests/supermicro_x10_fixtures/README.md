@@ -9,6 +9,6 @@ the X10 Redfish is frozen at 1.0.1 and does **not** expose `UpdateService`,
 testing vendor-neutral commands against a minimal real-world Redfish tree.
 
 Served via `redfish_mock_factory("supermicro_x10")` (see `tests/conftest.py`).
-Captured with `idrac_ctl discovery`. Contains lab identifiers (MACs/IP/account
+Captured with `redfish_ctl discovery`. Contains lab identifiers (MACs/IP/account
 names), no credentials or tokens — committed with owner approval, same as the
 GB300 corpus.

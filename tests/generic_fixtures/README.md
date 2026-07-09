@@ -1,7 +1,7 @@
 # Generic Redfish test fixtures (DMTF, BSD-3-Clause)
 
 A slice of DMTF's `public-rackmount1` reference mockup — a **product-neutral**
-Redfish tree — used to prove idrac_ctl's commands work on standard Redfish, not
+Redfish tree — used to prove redfish_ctl's commands work on standard Redfish, not
 just the three real vendors we have (Dell/Supermicro/HPE). It uses yet another id
 scheme (`Systems/437XR1138R2`), so it's an independent check that discovery and
 the link-navigated commands make no vendor assumptions.

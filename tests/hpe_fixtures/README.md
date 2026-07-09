@@ -1,7 +1,7 @@
 # HPE iLO test fixtures (third-party, BSD-3-Clause)
 
 A bounded, link-consistent slice of an **HPE ProLiant DL380a (iLO)** Redfish tree,
-used to prove idrac_ctl's commands are vendor-neutral on a non-Dell, non-Supermicro
+used to prove redfish_ctl's commands are vendor-neutral on a non-Dell, non-Supermicro
 host. The mock (`tests/conftest.py`, via `redfish_mock_factory("hpe")`) serves these
 by URL exactly like the Supermicro corpus.
 

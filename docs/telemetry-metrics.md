@@ -87,6 +87,13 @@ listener (`redfish_ctl exporter --output prometheus`, no `--once`) and point a S
 OpenTelemetry Collector (prometheus receiver -> `splunk_hec` exporter) at it, which lands
 the same metrics in a HEC index.
 
+For a **native OTLP** pipeline (no Collector hop for the BMC data), use
+`redfish_ctl exporter --output otlp` — it pushes these same `hw.*` series over OTLP and honors the
+standard `OTEL_EXPORTER_OTLP_*` environment so it behaves like any other OTLP producer. The identity
+dimensions become OTel resource attributes and the per-metric dimensions become datapoint attributes;
+monotonic counters are emitted as OTLP Sum and instantaneous readings as Gauge. Needs the
+`redfish_ctl[otlp]` extra. See [Telemetry exporter](telemetry-exporter.md#otlp-opentelemetry).
+
 > Live verification of the push needs a real `SPLUNK_ACCESS_TOKEN` and your realm's
 > `SPLUNK_INGEST_URL`; without them, use `--once --output signalfx` to validate the
 > datapoint envelope offline.
