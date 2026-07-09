@@ -1,3 +1,7 @@
 include *.py
 include LICENSE
 include *.sh
+# setup.py reads these at build time, so they must ship in the sdist for an
+# isolated (PEP 517) `python -m build` / sdist install to succeed.
+include requirements.txt
+include README.md
