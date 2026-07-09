@@ -1,8 +1,40 @@
 # redfish_ctl
 
-`redfish_ctl` is my command-line tool for talking to Dell iDRAC and other Redfish BMCs. I use it for
-JSON-first inventory, BIOS, boot, storage, virtual media, sensors, logs, firmware, and job workflows
-without opening the BMC web UI.
+`redfish_ctl` is a standalone command-line tool I built to drive server BMCs entirely through the
+Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
+with JSON-first output (save to file), both synchronous and asynchronous calls, optional server-side
+`$expand` on large collection reads, and a read-first, guarded-write model (mutating commands preview
+with `--dry_run` and require `--confirm`). It is vendor-neutral by design — Dell iDRAC,
+Supermicro (including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish — built on
+a product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
+
+What it does across the whole server lifecycle:
+
+- **Inventory & health** — system, chassis, manager, processors, memory, PCI, storage, drives,
+  network adapters/ports, NVLink ports, ethernet interfaces, and firmware inventory.
+- **BIOS** — read and stage attributes, pending management, the attribute registry, transactional
+  snapshots/restore points for rollback, and curated tuning profiles (low-latency, Dell
+  System/Workload, Intel, AMD).
+- **Boot** — boot order, one-time boot (UEFI or Legacy), boot sources, and next-boot inference.
+- **Power & reset** — vendor-neutral host reset / power-cycle (discovers `ComputerSystem.Reset`),
+  chassis reset, manager reboot, and a guarded `system-reset`.
+- **Storage & RAID** — controllers, drives, volumes, the RAID service, RAID/non-RAID conversion,
+  and volume initialize.
+- **Virtual media & OS provisioning** — mount/eject ISOs, one-shot ISO boot, Supermicro OEM
+  virtual media (CfgCD), and Dell OEM network-ISO boot.
+- **Serial console & SOL** — report and enable host BIOS serial redirection together with the BMC
+  Serial-over-LAN service, in one step, vendor-neutrally.
+- **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
+  an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
+  — to Prometheus, SignalFx, and Splunk Observability.
+- **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
+- **Accounts & security** — create/update/delete accounts, SSH-key import, the account and privilege
+  services, Secure Boot, and SPDM component-integrity attestation.
+- **Jobs & tasks** — Dell Lifecycle Controller jobs and the standard Redfish Job/Task services,
+  with watch/apply/delete.
+- **Config, logs & events** — system config export/import, system and manager logs (SEL), test
+  events, the BMC clock, and a `wait` that blocks until the BMC answers after a reboot.
+- **Discovery** — scan a subnet for BMCs, classify their vendor, and crawl a Redfish tree.
 
 > The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
 > backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
