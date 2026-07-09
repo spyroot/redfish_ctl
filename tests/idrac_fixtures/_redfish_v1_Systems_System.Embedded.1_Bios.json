@@ -20,6 +20,7 @@
     "BootMode": "Uefi",
     "OneTimeBootMode": "Disabled",
     "ProcCStates": "Disabled",
+    "SerialComm": "Off",
     "SriovGlobalEnable": "Enabled",
     "SysMemSize": "768 GB",
     "SystemModelName": "PowerEdge R740"

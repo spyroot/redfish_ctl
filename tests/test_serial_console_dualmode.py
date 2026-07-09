@@ -55,6 +55,40 @@ def test_serial_console_enable_dry_run_plans_without_patch(redfish_mock, redfish
     assert _mutating(redfish_service) == []
 
 
+def test_serial_console_enable_confirm_patches_bios_and_skips_enabled_sol(
+    redfish_mock, redfish_service
+):
+    """--enable --confirm stages BIOS serial redirection without repatching enabled SOL."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.SerialConsoleConfig,
+        "serial-console",
+        enable=True,
+        confirm=True,
+    )
+
+    data = _unwrap(result)
+    assert data["plan"]["bios"]["payload"] == {
+        "Attributes": {"SerialComm": "OnConRedirCom2"}
+    }
+    assert data["plan"]["sol"] == []
+    assert data["plan"]["sol_already_enabled"] == ["iDRAC.Embedded.1"]
+    assert data["status_before"]["BiosSerialAttribute"] == "SerialComm"
+    assert data["status_before"]["BiosSerialCurrent"] == "Off"
+
+    mutating_requests = _mutating(redfish_service)
+    assert len(mutating_requests) == 1
+    bios_patch = mutating_requests[0]
+    assert bios_patch.method == "PATCH"
+    assert bios_patch.path.lower() == (
+        "/redfish/v1/systems/system.embedded.1/bios/settings"
+    )
+    assert bios_patch.json() == {
+        "Attributes": {"SerialComm": "OnConRedirCom2"}
+    }
+    assert data["applied"]["bios"]["Status"] == "ok"
+    assert data["applied"]["sol"] == []
+
+
 def test_serial_console_enable_needs_value_for_unknown_attr(redfish_mock, redfish_service):
     """An unknown BIOS attribute with no --bios_value is rejected before any write."""
     import pytest
