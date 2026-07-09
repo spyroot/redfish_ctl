@@ -138,7 +138,7 @@ class JobList(IDracManager,
         elif jb_type == "reboot_no_force":
             return "RebootNoForce"
         else:
-            ValueError("Unknown job type")
+            raise ValueError("Unknown job type")
 
     def execute(self,
                 filename: [str] = None,
@@ -186,34 +186,25 @@ class JobList(IDracManager,
         self.default_error_handler(response)
         filtered_data = []
 
+        members = data.get('Members', [])
+
+        def by_state(*states):
+            return [job for job in members if job.get('JobState') in states]
+
         if filter_scheduled:
-            scheduled_jobs = [job for job in data['Members'] if job['JobState'] == 'Scheduled'
-                              or job['JobState'] == 'Scheduling']
-            filtered_data += scheduled_jobs
+            filtered_data += by_state('Scheduled', 'Scheduling')
         if filter_completed:
-            completed_jobs = [job for job in data['Members'] if job['JobState'] == 'Completed']
-            filtered_data += completed_jobs
+            filtered_data += by_state('Completed')
         if reboot_completed:
-            reboot_completed_jobs = [job for job in data['Members'] if job['JobState'] == 'RebootCompleted']
-            filtered_data += reboot_completed_jobs
+            filtered_data += by_state('RebootCompleted')
         if running:
-            reboot_completed_jobs = [job for job in data['Members'] if job['JobState'] == 'Running']
-            filtered_data += reboot_completed_jobs
+            filtered_data += by_state('Running')
         if reboot_pending:
-            reboot_pending_jobs = [job for job in data['Members'] if job['JobState'] == 'RebootPending']
-            filtered_data += reboot_pending_jobs
-        if filter_completed:
-            completed_jobs = [job for job in data['Members'] if job['JobState'] == 'RebootFailed']
-            filtered_data += completed_jobs
-        if filter_completed:
-            completed_jobs = [job for job in data['Members'] if job['JobState'] == 'Waiting']
-            filtered_data += completed_jobs
-        if filter_completed:
-            completed_jobs = [job for job in data['Members'] if job['JobState'] == 'Paused']
-            filtered_data += completed_jobs
+            filtered_data += by_state('RebootPending')
         if failed:
-            reboot_pending_jobs = [job for job in data['Members'] if job['JobState'] == 'Failed']
-            filtered_data += reboot_pending_jobs
+            # RebootFailed is a failure state, so it belongs with --failed
+            # (previously these were wrongly gated on filter_completed).
+            filtered_data += by_state('Failed', 'RebootFailed')
         # default
         if filter_scheduled is False and filter_completed \
                 is False and reboot_completed is False and running is False and reboot_pending is False:

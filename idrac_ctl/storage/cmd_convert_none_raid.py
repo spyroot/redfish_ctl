@@ -90,7 +90,9 @@ class ConvertNoneRaid(IDracManager,
             if 'Oem' in cmd_rest.data:
                 oem = cmd_rest.data['Oem']
                 if 'Dell' in oem:
-                    raid_status = oem['Dell']['DellPhysicalDisk']['RaidStatus']
+                    raid_status = (
+                        oem['Dell'].get('DellPhysicalDisk', {}).get('RaidStatus', '')
+                    )
                     if 'NonRAID' in raid_status:
                         none_raid_disk_ids.append(disk_id)
                     else:
@@ -109,9 +111,7 @@ class ConvertNoneRaid(IDracManager,
         none_raid_disk_ids = [x for x in raid_disk_ids if x not in exclude_filter]
         if len(none_raid_disk_ids) > 0:
             payload = {"PDArray": none_raid_disk_ids}
-            cmd_result = self.base_post(target_api, payload, do_async=do_async)
-            resp = self.parse_task_id(cmd_result)
-            cmd_result.data.update(resp)
+            cmd_result, _ = self.base_post(target_api, payload, do_async=do_async)
             return CommandResult(cmd_result.data, None, None, None)
 
         return CommandResult({"Status": "all disk are none raid"}, None, None, None)

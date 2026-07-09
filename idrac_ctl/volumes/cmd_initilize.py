@@ -75,7 +75,5 @@ class VolumeInit(IDracManager,
         redfish_action = vol_data.discovered['Initialize']
         target_api = redfish_action.target
         payload = {'InitializeType': "Fast"}
-        cmd_result = self.base_post(target_api, payload, do_async=do_async)
-        resp = self.parse_task_id(cmd_result)
-        cmd_result.data.update(resp)
+        cmd_result, _ = self.base_post(target_api, payload, do_async=do_async)
         return CommandResult(cmd_result.data, None, None, None)

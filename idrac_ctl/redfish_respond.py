@@ -144,7 +144,7 @@ class RedfishRespondMessage:
         for k in json_dict.keys():
             # for each key that value is list we expect data count
             if isinstance(json_dict[k], list):
-                odata_count = f"{json_dict[k]}@odata.count"
+                odata_count = f"{k}@odata.count"
                 if odata_count in json_dict:
                     odata_counts_keys[k] = odata_count
 
@@ -180,7 +180,7 @@ class RedfishRespondMessage:
             if jsonMessage.Message in v:
                 msg.message = v[jsonMessage.Message]
 
-            if jsonMessage.MessageId.lower() in v:
+            if jsonMessage.Message.lower() in v:
                 msg.message = v[jsonMessage.Message.lower()]
 
             # list of args

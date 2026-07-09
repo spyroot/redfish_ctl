@@ -57,7 +57,7 @@ class QueryCompute(IDracManager,
         major = int(ver_by_parts[0])
         minor = int(ver_by_parts[1])
 
-        if major >= 6 and minor >= 10:
+        if (major, minor) >= (6, 10):
             # Support for new ComputerSystem Settings URI
             # URI: /redfish/v1/Systems/<ComputerSystem-Id>/Settings
             target_api = f"{self.idrac_manage_servers}/Settings"
