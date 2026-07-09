@@ -19,7 +19,7 @@ import warnings
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
+from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
 from ..idrac_shared import Singleton, ApiRequestType
@@ -83,13 +83,13 @@ class VirtualDiskQuery(
 
         storage_id = self.sync_invoke(ApiRequestType.StorageListQuery,
                                       "storage_list")
-        storage_members = storage_id.data['Members']
+        storage_members = storage_id.data.get('Members', [])
         storage_ids = [k['@odata.id'].split("/")[-1]
                        for k in storage_members if '@odata.id' in k]
 
         if device_id not in storage_ids:
             raise InvalidArgument(f"Storage device_id {device_id} "
-                                  "not found, available {storage_ids}")
+                                  f"not found, available {storage_ids}")
 
         r = f"https://{self.idrac_ip}{self.idrac_manage_servers}" \
             f"/Storage/{device_id}/Volumes"
@@ -98,12 +98,11 @@ class VirtualDiskQuery(
         self.default_error_handler(response)
         data = response.json()
 
-        vd_list = []
-        if not data['Members']:
+        if not data.get('Members'):
             return CommandResult(None, None, None, None)
-        else:
-            vd_list = [i['@odata.id'].split("/")[-1] for i in data['Members']]
+        vd_list = [i['@odata.id'].split("/")[-1] for i in data['Members']]
 
+        results = []
         for vol_id in vd_list:
             r = f"https://{self.idrac_ip}{self.idrac_manage_servers}" \
                 f"/Storage/Volumes/{vol_id}"
@@ -113,9 +112,7 @@ class VirtualDiskQuery(
             except ResourceNotFound as exp:
                 warnings.warn(str(exp))
                 continue
-                pass
-            resp_data = response.json()
-            vd_list.append(resp_data)
+            results.append(response.json())
 
         save_if_needed(filename, data)
-        return CommandResult(vd_list, None, None, None)
+        return CommandResult(results, None, None, None)

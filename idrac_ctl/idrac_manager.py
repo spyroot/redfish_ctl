@@ -565,7 +565,7 @@ class IDracManager(RedfishManager):
                     )
                 if resp.status_code == 401:
                     self.logger.error("task service returned 401")
-                    AuthenticationFailed("Authentication failed.")
+                    raise AuthenticationFailed("Authentication failed.")
                 # if server failed, meanwhile HTTP exception propagate
                 # up on the stack.
                 if resp.status_code > 499:
@@ -1845,7 +1845,7 @@ class IDracManager(RedfishManager):
                 )
                 return cmd_result.data
         else:
-            raise
+            raise ResourceNotFound("no iDRAC manager member found")
 
     @cached_property
     def idrac_members(self) -> str:
@@ -2182,9 +2182,7 @@ class IDracManager(RedfishManager):
                 duration_time=None
             )
         else:
-            ValueError("Unknown apply time")
-
-        return {}
+            raise ValueError("Unknown apply time")
 
     def api_success_msg(self,
                         api_respond: IdracApiRespond,

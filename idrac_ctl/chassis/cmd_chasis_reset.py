@@ -101,7 +101,7 @@ class ChassisReset(IDracManager,
         target_api = self.discover_reset(reset_type)
 
         if target_api is None:
-            FailedDiscoverAction(
+            raise FailedDiscoverAction(
                 "Failed discover reset chassis actions."
             )
 
