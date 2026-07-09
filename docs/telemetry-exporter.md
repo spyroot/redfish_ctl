@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-`idrac_ctl exporter`, defined in `idrac_ctl/telemetry/cmd_exporter.py`, is the read-only path for
+`redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`, is the read-only path for
 turning BMC Redfish telemetry into metrics. I use it when the BMC can see hardware state that an
 in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink fabric counters.
 
@@ -27,10 +27,10 @@ put the password on argv; the exporter rejects `--idrac_password`.
 ```bash
 mkdir -p .internal
 cat > .internal/idrac_exporter.env <<'EOF'
-IDRAC_IP=172.25.230.29
-IDRAC_USERNAME=admin
-IDRAC_PASSWORD=replace-with-runtime-secret
-IDRAC_PORT=443
+REDFISH_IP=192.0.2.29
+REDFISH_USERNAME=admin
+REDFISH_PASSWORD=replace-with-runtime-secret
+REDFISH_PORT=443
 EOF
 ```
 
@@ -39,7 +39,7 @@ EOF
 The default mode serves Prometheus text at `/metrics`:
 
 ```bash
-idrac_ctl exporter \
+redfish_ctl exporter \
   --credential-file .internal/idrac_exporter.env \
   --vendor supermicro \
   --listen 0.0.0.0 \
@@ -49,7 +49,7 @@ idrac_ctl exporter \
 For a local smoke read, render once and exit:
 
 ```bash
-idrac_ctl exporter \
+redfish_ctl exporter \
   --credential-file .internal/idrac_exporter.env \
   --vendor supermicro \
   --once \
@@ -64,12 +64,12 @@ Every series carries the join labels used by the GB300 dashboards:
 |---|---|
 | `host.name` | `gb300-poc1-slotN` |
 | `node` | `slotN` |
-| `server.address` | `172.25.230.{40+N}` |
-| `bmc.ip` | BMC address from `IDRAC_IP` or `--label-bmc-ip` |
+| `server.address` | `192.0.2.{40+N}` |
+| `bmc.ip` | BMC address from `REDFISH_IP` or `--label-bmc-ip` |
 | `vendor` | `supermicro`, `dell`, or the value passed with `--vendor` |
 
-The default slot math is `N = BMC last octet - 20`. For BMC `172.25.230.29`, the exporter labels the
-series as `host.name=gb300-poc1-slot9`, `node=slot9`, and `server.address=172.25.230.49`.
+The default slot math is `N = BMC last octet - 20`. For BMC `192.0.2.29`, the exporter labels the
+series as `host.name=gb300-poc1-slot9`, `node=slot9`, and `server.address=192.0.2.49`.
 
 Use `--label-bmc-ip` only when the connection address is not the BMC address you want in the metric
 labels.
@@ -80,7 +80,7 @@ SignalFx push mode uses `SPLUNK_ACCESS_TOKEN`, the ingest token read from the pr
 and `SPLUNK_INGEST_URL`, the ingest URL read from the process environment.
 
 ```bash
-idrac_ctl exporter \
+redfish_ctl exporter \
   --credential-file .internal/idrac_exporter.env \
   --vendor supermicro \
   --output signalfx \

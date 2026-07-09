@@ -5,18 +5,18 @@ Author: Mus <spyroot@gmail.com>
 Before I trust a change, I clear any live iDRAC environment and run the offline suite:
 
 ```bash
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
 ruff check <changed>
 ```
 
-`IDRAC_IP`, `IDRAC_USERNAME`, and `IDRAC_PASSWORD` are read by the CLI and by the dual-mode test
-fixture. If `IDRAC_IP` is still exported from real hardware work, `redfish_api` switches to live mode,
+`REDFISH_IP`, `REDFISH_USERNAME`, and `REDFISH_PASSWORD` are read by the CLI and by the dual-mode test
+fixture. If `REDFISH_IP` is still exported from real hardware work, `redfish_api` switches to live mode,
 so unset those variables for the default suite.
 
 ## Which Lane To Use
 
 **Mock lane, default.** `tests/conftest.py` builds `MockRedfishService` from the captured DMTF tree in
-`idrac_ctl/json_responses/`. Dell-shaped gaps are overlaid from `tests/idrac_fixtures/`. The service
+`redfish_ctl/json_responses/`. Dell-shaped gaps are overlaid from `tests/idrac_fixtures/`. The service
 handles `GET`, `POST`, `PATCH`, `DELETE`, and action-style POSTs, so mutating command tests can stay
 offline.
 
@@ -24,15 +24,15 @@ Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock
 `redfish_service` when you need to inspect requests or state changes.
 
 **Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
-by default and against approved hardware when `IDRAC_IP` is set. Tests that require hardware are
+by default and against approved hardware when `REDFISH_IP` is set. Tests that require hardware are
 marked `@pytest.mark.live` and skip without that variable.
 
 For approved live hardware only:
 
 ```bash
-IDRAC_IP=<idrac> \
-IDRAC_USERNAME=root \
-IDRAC_PASSWORD=<password> \
+REDFISH_IP=<idrac> \
+REDFISH_USERNAME=root \
+REDFISH_PASSWORD=<password> \
 pytest -q -m live
 ```
 
@@ -83,7 +83,7 @@ conda environment and keep the live variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest --cov=idrac_ctl
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest --cov=redfish_ctl
 ```
 
 ## Fleet And Concurrency Tests

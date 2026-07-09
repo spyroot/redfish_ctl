@@ -10,6 +10,6 @@ cat > /tmp/workload_profile.spec.json <<'JSON'
 }
 JSON
 
-idrac_ctl bios-registry --attr_name WorkloadProfile
-idrac_ctl bios-change --from_spec /tmp/workload_profile.spec.json on-reset --show
-idrac_ctl bios-change --from_spec /tmp/workload_profile.spec.json on-reset -r
+redfish_ctl bios-registry --attr_name WorkloadProfile
+redfish_ctl bios-change --from_spec /tmp/workload_profile.spec.json on-reset --show
+redfish_ctl bios-change --from_spec /tmp/workload_profile.spec.json on-reset -r

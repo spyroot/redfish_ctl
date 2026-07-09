@@ -4,7 +4,7 @@ Author: Mus <spyroot@gmail.com>
 
 > Status: design only. The CLI works without this service.
 
-For one server, I use `idrac_ctl` directly. For a fleet, I want one service that can reach the BMC
+For one server, I use `redfish_ctl` directly. For a fleet, I want one service that can reach the BMC
 network, keep desired state, read observed state, and reconcile the two. Clients should not all need
 direct routes to BMCs.
 
@@ -12,8 +12,8 @@ direct routes to BMCs.
 
 The CLI already has the pieces I would reuse:
 
-- `RedfishManager`, defined in `idrac_ctl/redfish_manager.py`, for product-neutral HTTP.
-- `IDracManager`, defined in `idrac_ctl/idrac_manager.py`, for Dell/iDRAC behavior and host-system
+- `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, for product-neutral HTTP.
+- `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, for Dell/iDRAC behavior and host-system
   selection.
 - Vendor-neutral reads such as `sensors`, `network-adapters`, `metric-reports`, `logs`,
   `secure-boot`, and `oem-info`.

@@ -8,10 +8,10 @@ boot, storage, virtual-media, or firmware-adjacent changes on real hardware.
 Set the normal connection variables first:
 
 ```bash
-export IDRAC_IP=10.0.0.42
-export IDRAC_USERNAME=root
-export IDRAC_PASSWORD='your-password'
-export IDRAC_PORT=443
+export REDFISH_IP=10.0.0.42
+export REDFISH_USERNAME=root
+export REDFISH_PASSWORD='your-password'
+export REDFISH_PORT=443
 ```
 
 Safety labels:

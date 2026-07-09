@@ -43,15 +43,15 @@ main target for deep lifecycle control and Dell OEM operations.
 
 ## Runtime Discovery
 
-`classify_vendor()`, defined in `idrac_ctl/discover/classifier.py`, detects `dell`, `hpe`,
+`classify_vendor()`, defined in `redfish_ctl/discover/classifier.py`, detects `dell`, `hpe`,
 `supermicro`, or `generic` from a ServiceRoot dict. It checks OEM keys first, then an OEM-prefixed
 `@odata.type`, then manufacturer/vendor text.
 
-`get_vendor()`, defined in `idrac_ctl/vendors/__init__.py`, returns the matching capability profile
+`get_vendor()`, defined in `redfish_ctl/vendors/__init__.py`, returns the matching capability profile
 or the generic fallback:
 
 ```python
-from idrac_ctl.vendors import get_vendor
+from redfish_ctl.vendors import get_vendor
 
 caps = get_vendor("dell")
 if caps.one_query_param_per_uri:
@@ -63,17 +63,17 @@ if caps.one_query_param_per_uri:
 The cleanest shared commands are link-following Redfish readers:
 
 ```bash
-idrac_ctl system
-idrac_ctl chassis
-idrac_ctl sensors
-idrac_ctl network-adapters
-idrac_ctl network-ports
-idrac_ctl ethernet-interfaces
-idrac_ctl metric-reports
-idrac_ctl component-integrity
-idrac_ctl secure-boot
-idrac_ctl logs
-idrac_ctl oem-info
+redfish_ctl system
+redfish_ctl chassis
+redfish_ctl sensors
+redfish_ctl network-adapters
+redfish_ctl network-ports
+redfish_ctl ethernet-interfaces
+redfish_ctl metric-reports
+redfish_ctl component-integrity
+redfish_ctl secure-boot
+redfish_ctl logs
+redfish_ctl oem-info
 ```
 
 These commands are valuable because they start from advertised Redfish links instead of assuming Dell
@@ -84,7 +84,7 @@ resource ids. On multi-system hosts, `IDracManager` also picks the host Computer
 
 Start small and prove the read path first:
 
-1. Add `idrac_ctl/vendors/<name>/capabilities.py` with only facts you have verified.
+1. Add `redfish_ctl/vendors/<name>/capabilities.py` with only facts you have verified.
 2. Add a fixture overlay under `tests/<vendor>_fixtures/`; include upstream license files when the
    corpus requires them.
 3. Use `redfish_mock_factory("<vendor>")`, defined in `tests/conftest.py`, so tests exercise the same
@@ -98,5 +98,5 @@ fixtures, and proof that standard Redfish reads work.
 
 ## Migration
 
-Dell command code still lives mostly in `idrac_ctl/idrac_manager.py` and `idrac_ctl/delloem/`.
+Dell command code still lives mostly in `redfish_ctl/idrac_manager.py` and `redfish_ctl/delloem/`.
 Moving that code under `vendors/dell/` is planned as commands are split out.

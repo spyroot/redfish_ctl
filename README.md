@@ -1,8 +1,12 @@
-# idrac_ctl
+# redfish_ctl
 
-`idrac_ctl` is my command-line tool for talking to Dell iDRAC and other Redfish BMCs. I use it for
+`redfish_ctl` is my command-line tool for talking to Dell iDRAC and other Redfish BMCs. I use it for
 JSON-first inventory, BIOS, boot, storage, virtual media, sensors, logs, firmware, and job workflows
 without opening the BMC web UI.
+
+> The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
+> backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
+> `IDRAC_IP`/`IDRAC_USERNAME`/`IDRAC_PASSWORD`/`IDRAC_PORT` env vars all keep working.
 
 Author: Mus <spyroot@gmail.com>
 
@@ -11,17 +15,17 @@ Author: Mus <spyroot@gmail.com>
 Use Python 3.10 or newer.
 
 ```bash
-python -m pip install idrac_ctl
-idrac_ctl --version
+python -m pip install redfish_ctl
+redfish_ctl --version
 ```
 
 For local development, use the checked-in conda environment:
 
 ```bash
-git clone https://github.com/spyroot/idrac_ctl.git
-cd idrac_ctl
+git clone https://github.com/spyroot/redfish_ctl.git
+cd redfish_ctl
 conda env create -f environment.yml
-conda activate idrac_ctl
+conda activate redfish_ctl
 ```
 
 ## Connect
@@ -29,10 +33,10 @@ conda activate idrac_ctl
 The CLI reads these environment variables in `idrac_main.py`, so I set them once per shell:
 
 ```bash
-export IDRAC_IP=10.0.0.42
-export IDRAC_USERNAME=root
-export IDRAC_PASSWORD='your-password'
-export IDRAC_PORT=443
+export REDFISH_IP=10.0.0.42
+export REDFISH_USERNAME=root
+export REDFISH_PASSWORD='your-password'
+export REDFISH_PORT=443
 ```
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
@@ -43,32 +47,32 @@ only when the BMC has a certificate chain you trust.
 Start with the host ComputerSystem:
 
 ```bash
-idrac_ctl system
+redfish_ctl system
 ```
 
 A healthy response includes `data.Id`, `data.Name`, and usually `data.PowerState`. If you have `jq`
 installed, this is a compact smoke check:
 
 ```bash
-idrac_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
+redfish_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
 ```
 
 ## Common Reads
 
 ```bash
-idrac_ctl manager
-idrac_ctl chassis
-idrac_ctl sensors
-idrac_ctl firmware_inventory
-idrac_ctl bios --filter ProcCStates,SysMemSize
-idrac_ctl storage-list
-idrac_ctl get_vm
-idrac_ctl logs
+redfish_ctl manager
+redfish_ctl chassis
+redfish_ctl sensors
+redfish_ctl firmware_inventory
+redfish_ctl bios --filter ProcCStates,SysMemSize
+redfish_ctl storage-list
+redfish_ctl get_vm
+redfish_ctl logs
 ```
 
-`sensors`, defined in `idrac_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns
+`sensors`, defined in `redfish_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns
 temperature, power, fan, and voltage readings with units. `discovery`, defined in
-`idrac_ctl/discovery/cmd_discovery.py`, is the heavier crawl that records what a BMC exposes.
+`redfish_ctl/discovery/cmd_discovery.py`, is the heavier crawl that records what a BMC exposes.
 
 ## Vendor Reach
 
@@ -83,9 +87,9 @@ firmware update, and manager reset. I always read current state first, preview w
 `--show` or `--dry_run`, then verify after the job or task completes.
 
 ```bash
-idrac_ctl system-reset --reset_type GracefulRestart --dry_run
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-idrac_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
+redfish_ctl system-reset --reset_type GracefulRestart --dry_run
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
 ```
 
 Use `--confirm` only when you mean to perform a guarded action such as `system-reset` or

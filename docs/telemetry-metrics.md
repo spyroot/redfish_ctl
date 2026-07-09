@@ -23,7 +23,7 @@ operator guidance, not schema-declared units.
 `Context` is the parent Redfish fragment or path segment that disambiguates
 repeated source metric names without copying the full fixture path.
 
-`idrac_ctl exporter`, defined in `idrac_ctl/telemetry/cmd_exporter.py`, emits
+`redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`, emits
 numeric `MetricValue` rows only. Known fabric counters use curated
 `hw.fabric.*` names; every other numeric row becomes a generated
 `hw.gb300.*` metric name derived from the source metric name.
@@ -34,15 +34,15 @@ Start with direct read-only Redfish GET paths before running a long-lived
 exporter process:
 
 ```bash
-idrac_ctl metric-definitions
-idrac_ctl metric-reports --report HGX_ProcessorPortMetrics_0
+redfish_ctl metric-definitions
+redfish_ctl metric-reports --report HGX_ProcessorPortMetrics_0
 ```
 
-Then run a one-shot Prometheus render from `idrac_ctl exporter`, which reads
+Then run a one-shot Prometheus render from `redfish_ctl exporter`, which reads
 the BMC and prints text instead of opening a listener:
 
 ```bash
-idrac_ctl exporter --vendor supermicro --once --output prometheus
+redfish_ctl exporter --vendor supermicro --once --output prometheus
 ```
 
 For SignalFx, `SPLUNK_ACCESS_TOKEN`, the ingest token read by the exporter
@@ -57,12 +57,12 @@ SignalFx is Splunk Observability Cloud, so the exporter's `signalfx` output push
 these metrics straight into Splunk Observability — no extra bridge.
 
 1. Push to your org (realm ingest URL + an access token). `SPLUNK_INGEST_URL` and
-   `SPLUNK_ACCESS_TOKEN` are read from the environment by `idrac_ctl exporter`:
+   `SPLUNK_ACCESS_TOKEN` are read from the environment by `redfish_ctl exporter`:
 
 ```bash
 export SPLUNK_ACCESS_TOKEN='<org access token>'
 export SPLUNK_INGEST_URL='https://ingest.<realm>.signalfx.com/v2/datapoint'
-idrac_ctl exporter --vendor supermicro --output signalfx --push-signalfx
+redfish_ctl exporter --vendor supermicro --output signalfx --push-signalfx
 ```
 
 2. Find the data in Splunk Observability. Under **Metrics -> Metric Finder**, search the
@@ -83,7 +83,7 @@ Datapoints land within a few seconds of the push; when the Metric Finder shows t
 names carrying your `host`/`vendor` dimensions, live data is flowing.
 
 For **Splunk Enterprise/Cloud (HEC)** rather than Observability: run the Prometheus
-listener (`idrac_ctl exporter --output prometheus`, no `--once`) and point a Splunk
+listener (`redfish_ctl exporter --output prometheus`, no `--once`) and point a Splunk
 OpenTelemetry Collector (prometheus receiver -> `splunk_hec` exporter) at it, which lands
 the same metrics in a HEC index.
 

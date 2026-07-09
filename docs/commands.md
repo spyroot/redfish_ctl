@@ -2,21 +2,22 @@
 
 Author: Mus <spyroot@gmail.com>
 
-When I connect to a new BMC, I run `idrac_ctl system` first. It proves the endpoint, credentials, and
+When I connect to a new BMC, I run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before I ask for deeper inventory or stage any change.
 
-The table below follows the 103 command names imported by `idrac_ctl/__init__.py`. Run
-`idrac_ctl <command> --help` for flags on your installed version.
+The table below follows the 103 command names imported by `redfish_ctl/__init__.py`. Run
+`redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
+backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
 ## Connection Basics
 
 `idrac_main.py` reads these environment variables when you do not pass explicit connection flags:
 
 ```bash
-export IDRAC_IP=10.0.0.42
-export IDRAC_USERNAME=root
-export IDRAC_PASSWORD='your-password'
-export IDRAC_PORT=443
+export REDFISH_IP=10.0.0.42
+export REDFISH_USERNAME=root
+export REDFISH_PASSWORD='your-password'
+export REDFISH_PORT=443
 ```
 
 TLS verification is off by default because lab BMCs commonly use self-signed certificates.
@@ -26,21 +27,21 @@ when you have a trusted chain.
 ## First Reads
 
 ```bash
-idrac_ctl system
-idrac_ctl manager
-idrac_ctl chassis
-idrac_ctl sensors
-idrac_ctl firmware_inventory
-idrac_ctl bios --filter ProcCStates,SysMemSize
-idrac_ctl logs
-idrac_ctl accounts --usernames
-idrac_ctl storage-list
-idrac_ctl get_vm
+redfish_ctl system
+redfish_ctl manager
+redfish_ctl chassis
+redfish_ctl sensors
+redfish_ctl firmware_inventory
+redfish_ctl bios --filter ProcCStates,SysMemSize
+redfish_ctl logs
+redfish_ctl accounts --usernames
+redfish_ctl storage-list
+redfish_ctl get_vm
 ```
 
 `system` returns the host ComputerSystem. `manager` returns the BMC manager. `sensors`, defined in
-`idrac_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns readings with units.
-`logs`, defined in `idrac_ctl/logs/cmd_logs.py`, follows system and manager LogService entries.
+`redfish_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns readings with units.
+`logs`, defined in `redfish_ctl/logs/cmd_logs.py`, follows system and manager LogService entries.
 
 ## Registered Commands
 
@@ -159,17 +160,17 @@ Safety labels:
 ## Vendor-Neutral Telemetry Reads
 
 ```bash
-idrac_ctl sensors
-idrac_ctl metric-definitions
-idrac_ctl metric-reports
-idrac_ctl telemetry-triggers
-idrac_ctl network-adapters
-idrac_ctl network-ports
-idrac_ctl ethernet-interfaces
-idrac_ctl component-integrity
-idrac_ctl secure-boot
-idrac_ctl logs
-idrac_ctl oem-info
+redfish_ctl sensors
+redfish_ctl metric-definitions
+redfish_ctl metric-reports
+redfish_ctl telemetry-triggers
+redfish_ctl network-adapters
+redfish_ctl network-ports
+redfish_ctl ethernet-interfaces
+redfish_ctl component-integrity
+redfish_ctl secure-boot
+redfish_ctl logs
+redfish_ctl oem-info
 ```
 
 These commands are the best starting point on non-Dell BMCs. They follow Redfish links and are
@@ -187,47 +188,47 @@ Before I run a write, I use the same four phases:
 ### BIOS Change From A Spec
 
 ```bash
-idrac_ctl bios --filter ProcCStates,SysProfile,WorkloadProfile
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
-idrac_ctl jobs
+redfish_ctl bios --filter ProcCStates,SysProfile,WorkloadProfile
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl jobs
 ```
 
 Many BIOS changes remain pending until an apply job and host reset. Add `-r` only when you are ready
 for the host reset:
 
 ```bash
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
 
 ### Secure Boot
 
 ```bash
-idrac_ctl secure-boot
-idrac_ctl bios-registry --attr_name SecureBoot
-idrac_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset --show
-idrac_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset -r
-idrac_ctl secure-boot
+redfish_ctl secure-boot
+redfish_ctl bios-registry --attr_name SecureBoot
+redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset --show
+redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset -r
+redfish_ctl secure-boot
 ```
 
 ### Virtual Media ISO Boot
 
 ```bash
-idrac_ctl get_vm
-idrac_ctl eject_vm --device_id 1
-idrac_ctl insert_vm --uri_path http://10.0.0.10/ubuntu.iso --device_id 1
-idrac_ctl get_vm
-idrac_ctl boot-one-shot --device Cd -r
-idrac_ctl current_boot
+redfish_ctl get_vm
+redfish_ctl eject_vm --device_id 1
+redfish_ctl insert_vm --uri_path http://10.0.0.10/ubuntu.iso --device_id 1
+redfish_ctl get_vm
+redfish_ctl boot-one-shot --device Cd -r
+redfish_ctl current_boot
 ```
 
 ### Power Reset
 
 ```bash
-idrac_ctl system
-idrac_ctl system-reset --reset_type GracefulRestart --dry_run
-idrac_ctl system-reset --reset_type GracefulRestart --confirm
-idrac_ctl system
+redfish_ctl system
+redfish_ctl system-reset --reset_type GracefulRestart --dry_run
+redfish_ctl system-reset --reset_type GracefulRestart --confirm
+redfish_ctl system
 ```
 
 `system-reset` previews by default and performs the reset only when `--confirm` is present. The older
@@ -237,13 +238,13 @@ the same dry-run guard.
 ### Firmware Update
 
 ```bash
-idrac_ctl firmware_inventory
-idrac_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
-idrac_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
-idrac_ctl tasks
+redfish_ctl firmware_inventory
+redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
+redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
+redfish_ctl tasks
 ```
 
-`firmware-update`, defined in `idrac_ctl/firmware/cmd_firmware_update.py`, is destructive when
+`firmware-update`, defined in `redfish_ctl/firmware/cmd_firmware_update.py`, is destructive when
 confirmed. Use only approved images and approved non-production targets until you have your own
 firmware rollout process.
 

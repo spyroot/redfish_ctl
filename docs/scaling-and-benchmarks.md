@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-I want `idrac_ctl` to grow past one server and drive roughly 1,000 BMCs to a desired state with
+I want `redfish_ctl` to grow past one server and drive roughly 1,000 BMCs to a desired state with
 numbers that show it is fast, correct, and stable. This page is the design target for that fleet
 engine, simulator, and benchmark gate. Those runnable artifacts are not in the repository yet.
 

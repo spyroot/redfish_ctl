@@ -2,14 +2,14 @@
 # Any HTTP response (200/401/403) means the BMC is up; connection error means not yet.
 
 # Wait up to 5 min for the BMC to answer:
-idrac_ctl wait
+redfish_ctl wait
 
 # Tune the wait:
-idrac_ctl wait --timeout 600 --interval 5
+redfish_ctl wait --timeout 600 --interval 5
 
 # The clean reboot pattern — reset the BMC, then wait for the full down->up cycle:
-idrac_ctl manager-reboot
-idrac_ctl wait --reboot-cycle --timeout 300
+redfish_ctl manager-reboot
+redfish_ctl wait --reboot-cycle --timeout 300
 
 # --reboot-cycle first waits for the BMC to go DOWN, then for it to come back UP,
 # and reports went_down + reachable + waited_s. Vendor-neutral (Dell/HPE/Supermicro).

@@ -8,20 +8,20 @@ inspect the registry, preview the change, stage it, then verify after the reset.
 ## The Safe Pattern
 
 ```bash
-idrac_ctl bios-registry --attr_name SysProfile
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
-idrac_ctl jobs
-idrac_ctl bios --filter SysProfile,ProcCStates,MemFrequency
+redfish_ctl bios-registry --attr_name SysProfile
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl jobs
+redfish_ctl bios --filter SysProfile,ProcCStates,MemFrequency
 ```
 
 Use `-r` only when you are ready for the host reset:
 
 ```bash
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
 
-`bios-change`, defined in `idrac_ctl/bios/cmd_change_bios.py`, requires an apply mode:
+`bios-change`, defined in `redfish_ctl/bios/cmd_change_bios.py`, requires an apply mode:
 `on-reset`, `auto-boot`, or `maintenance`. `--show` previews the payload and does not apply changes.
 
 ## Included Examples
@@ -41,8 +41,8 @@ The low-latency profile turns off common jitter sources such as deep CPU C-state
 tests, then enables high-performance memory and SR-IOV knobs where the platform supports them.
 
 ```bash
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
 
 Always verify attribute names and allowed values on the target BMC. Dell, HPE, and other vendors do
@@ -53,9 +53,9 @@ not use exactly the same BIOS registry names.
 Dell PowerEdge systems often expose one high-level `SysProfile` attribute:
 
 ```bash
-idrac_ctl bios-registry --attr_name SysProfile
-idrac_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset --show
-idrac_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset -r
+redfish_ctl bios-registry --attr_name SysProfile
+redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset --show
+redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset -r
 ```
 
 Newer systems can also expose `WorkloadProfile`; read the registry before assuming the value name.
@@ -77,8 +77,8 @@ A custom profile is just a JSON spec with an `Attributes` object:
 Save it, preview it, then apply it:
 
 ```bash
-idrac_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset --show
-idrac_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
+redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset --show
+redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
 ```
 
 ## Intel And AMD Notes

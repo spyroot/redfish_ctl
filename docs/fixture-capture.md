@@ -17,7 +17,7 @@ and prove the fixture with offline tests before committing it.
   Redfish surfaces against cached DMTF schemas.
 - `tests/idrac_fixtures/`, the Dell overlay directory loaded by
   `tests/conftest.py`, holds hand-curated fixture JSON for missing Dell paths.
-- `idrac_ctl/json_responses/`, the captured DMTF mockup base tree used by the
+- `redfish_ctl/json_responses/`, the captured DMTF mockup base tree used by the
   default mock service, stays generic and should not receive Dell-only overlays.
 
 No API key is required. A capture needs only an approved lab BMC address and a
@@ -26,7 +26,7 @@ Never paste credentials into chat, docs, commit messages, logs, or test output.
 
 ## Capture
 
-Run the capture from a trusted local shell. `IDRAC_IP`, the endpoint variable read
+Run the capture from a trusted local shell. `REDFISH_IP`, the endpoint variable read
 by this project and its tests, should point at an approved lab iDRAC. Use a
 short-lived lab credential. The DMTF creator requires the password as a command
 argument, so avoid shared hosts and do not preserve the command in shell history.
@@ -41,16 +41,16 @@ python3 -m venv /tmp/redfish-mockup-creator-venv
 python -m pip install -r requirements.txt
 
 printf 'iDRAC IP or host: '
-read -r IDRAC_IP
+read -r REDFISH_IP
 printf 'iDRAC username: '
-read -r IDRAC_USERNAME
-read -rsp "iDRAC password: " IDRAC_PASSWORD
+read -r REDFISH_USERNAME
+read -rsp "iDRAC password: " REDFISH_PASSWORD
 printf '\n'
 
 python redfishMockupCreate.py \
-  --user "$IDRAC_USERNAME" \
-  --password "$IDRAC_PASSWORD" \
-  --rhost "$IDRAC_IP" \
+  --user "$REDFISH_USERNAME" \
+  --password "$REDFISH_PASSWORD" \
+  --rhost "$REDFISH_IP" \
   --Secure \
   --Auth Session \
   --Dir /tmp/idrac-redfish-mockup
@@ -170,7 +170,7 @@ The test should assert the command contract:
 - URL path or action target used by the command.
 - POST or PATCH payload for mutating commands.
 - `CommandResult` shape and key fields for read-only commands.
-- No live iDRAC dependency when `IDRAC_IP` is unset.
+- No live iDRAC dependency when `REDFISH_IP` is unset.
 
 ## Verification Gate
 
@@ -178,7 +178,7 @@ Before committing, run the exact offline gate from a shell with the live variabl
 cleared:
 
 ```bash
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest -q
 
 ruff check \
@@ -192,7 +192,7 @@ python -m json.tool \
 For docs-only changes to this SOP, run:
 
 ```bash
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest -q
 
 ruff check docs/fixture-capture.md

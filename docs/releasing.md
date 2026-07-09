@@ -2,24 +2,24 @@
 
 Author: Mus <spyroot@gmail.com>
 
-`idrac_ctl` is published as the PyPI package named `idrac_ctl`, defined in `setup.py`. The console
-entry point installed by that package is also `idrac_ctl`.
+`redfish_ctl` is published as the PyPI package named `redfish_ctl`, defined in `setup.py`. The console
+entry point installed by that package is also `redfish_ctl`.
 
 ## User Install
 
 ```bash
-python -m pip install idrac_ctl
-idrac_ctl --version
-idrac_ctl --help
+python -m pip install redfish_ctl
+redfish_ctl --version
+redfish_ctl --help
 ```
 
 For a checkout:
 
 ```bash
-git clone https://github.com/spyroot/idrac_ctl
-cd idrac_ctl
+git clone https://github.com/spyroot/redfish_ctl
+cd redfish_ctl
 python -m pip install .
-idrac_ctl --version
+redfish_ctl --version
 ```
 
 ## Release Checklist
@@ -37,7 +37,7 @@ I use this order so a broken package does not reach PyPI:
 Run the offline tests with live BMC variables unset:
 
 ```bash
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
 ruff check <changed files>
 ```
 
@@ -61,12 +61,12 @@ python -m twine check dist/*
 Use a throwaway environment:
 
 ```bash
-conda create -n idrac-ctl-release-test python=3.10
-conda activate idrac-ctl-release-test
+conda create -n redfish-ctl-release-test python=3.10
+conda activate redfish-ctl-release-test
 python -m pip install --upgrade pip setuptools wheel
-python -m pip install dist/idrac_ctl-*.whl
-idrac_ctl --version
-idrac_ctl --help
+python -m pip install dist/redfish_ctl-*.whl
+redfish_ctl --version
+redfish_ctl --help
 ```
 
 The current `local_install.sh` helper creates a `test1` conda environment, builds `sdist` and wheel,

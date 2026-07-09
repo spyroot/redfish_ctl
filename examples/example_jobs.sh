@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Read running jobs.
-idrac_ctl jobs --running
+redfish_ctl jobs --running
 
 # Read completed jobs.
-idrac_ctl jobs --completed
+redfish_ctl jobs --completed
 
 # Watch one job until it reaches a terminal state.
-idrac_ctl job-watch --job_id JID_746683021869
+redfish_ctl job-watch --job_id JID_746683021869
 
 # Delete one approved job.
-idrac_ctl job-rm --job_id JID_746683021869
+redfish_ctl job-rm --job_id JID_746683021869

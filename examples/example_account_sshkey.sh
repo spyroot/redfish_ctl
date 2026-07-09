@@ -2,13 +2,13 @@
 # Dry-run by default; only --confirm writes. Enforces HPE's limits: RSA key, <=1366 bytes.
 
 # Preview what would be sent (no write):
-idrac_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub
+redfish_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub
 
 # Authorize the key for user 'test':
-idrac_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub --confirm
+redfish_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub --confirm
 
 # Clear the account's authorized SSH keys:
-idrac_ctl account-import-sshkey --username test --remove --confirm
+redfish_ctl account-import-sshkey --username test --remove --confirm
 
 # Caveat: this sends HPE's DOCUMENTED body (PATCH Oem.Hpe.SSHKeys). Acceptance is
 # firmware-dependent — an iLO 5 on fw 2.96 rejects it (PropertyNotWritableOrUnknown)

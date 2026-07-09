@@ -5,14 +5,14 @@ set -euo pipefail
 # This changes storage state; run it only on an approved non-production target.
 
 # First list controllers.
-idrac_ctl storage-controllers
+redfish_ctl storage-controllers
 
 # Then inspect drives under the controller you plan to change.
-idrac_ctl storage-drives \
+redfish_ctl storage-drives \
   --controller AHCI.Embedded.2-1 \
   --filter Drives,Volumes
 
 # Convert disks under that controller. Use --exclude for disks you must not touch.
-idrac_ctl storage-convert-noraid \
+redfish_ctl storage-convert-noraid \
   --controller AHCI.Embedded.2-1 \
   --exclude Disk.Direct.0-0:AHCI.Embedded.2-1

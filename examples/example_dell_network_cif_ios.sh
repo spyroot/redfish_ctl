@@ -12,14 +12,14 @@ set -euo pipefail
 : "${CIFS_PASSWORD:?set CIFS_PASSWORD}"
 
 # Check whether media is already attached.
-idrac_ctl oem-net-ios-status
-idrac_ctl oem-attach-status
+redfish_ctl oem-net-ios-status
+redfish_ctl oem-attach-status
 
 # Disconnect stale media before attaching a new image.
-idrac_ctl oem-disconnect
+redfish_ctl oem-disconnect
 
 # Attach the image.
-idrac_ctl oem-attach \
+redfish_ctl oem-attach \
   --ip_addr "$CIFS_SERVER" \
   --share_name "$CIFS_SHARE" \
   --remote_image "$CIFS_IMAGE" \
@@ -27,10 +27,10 @@ idrac_ctl oem-attach \
   --remote_password "$CIFS_PASSWORD"
 
 # Verify attach status.
-idrac_ctl oem-net-ios-status
+redfish_ctl oem-net-ios-status
 
 # Boot from the attached network ISO.
-idrac_ctl oem-boot-netios \
+redfish_ctl oem-boot-netios \
   --ip_addr "$CIFS_SERVER" \
   --share_name "$CIFS_SHARE" \
   --remote_image "$CIFS_IMAGE" \
@@ -38,4 +38,4 @@ idrac_ctl oem-boot-netios \
   --remote_password "$CIFS_PASSWORD"
 
 # Watch Dell OEM deployment task state.
-idrac_ctl oem-net-iso-task
+redfish_ctl oem-net-iso-task

@@ -4,8 +4,8 @@
 #   OsWatchdogTimer=Disabled                       MemFrequency=MaxPerf
 #   SriovGlobalEnable=Enabled  (for passthrough/DPDK workloads)
 # Preview exactly what will be sent, changing nothing:
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
 # Stage the whole profile and reboot to apply (-r):
-idrac_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 # Confirm a couple of knobs after the host is back:
-idrac_ctl bios --filter ProcCStates
+redfish_ctl bios --filter ProcCStates
