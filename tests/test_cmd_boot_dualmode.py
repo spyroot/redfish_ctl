@@ -154,6 +154,29 @@ def test_boot_one_shot_rejects_invalid_target_before_patch_in_mock_mode(
     assert all(request.method != "PATCH" for request in redfish_service.requests)
 
 
+def test_boot_one_shot_none_disarms_override_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot --device None disables the one-shot override."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="None",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    request = redfish_service.last_request
+    assert request.method == "PATCH"
+    assert request.path.lower() == "/redfish/v1/systems/system.embedded.1"
+    assert request.json() == {
+        "Boot": {
+            "BootSourceOverrideEnabled": "Disabled",
+            "BootSourceOverrideTarget": "None",
+        }
+    }
+
+
 def test_reboot_posts_reset_action_payload_in_mock_mode(
     redfish_mock, redfish_service, monkeypatch
 ):
