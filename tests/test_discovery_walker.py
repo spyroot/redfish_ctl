@@ -17,9 +17,12 @@ client is never constructed. The whole module runs green with no IDRAC_IP set.
 Author Mus spyroot@gmail.com
 """
 import pytest
+import requests
 
+from idrac_ctl.discovery import cmd_discovery
 from idrac_ctl.discovery.cmd_discovery import (
     DEFAULT_DISCOVERY_MAX_DEPTH,
+    LOG_ENTRY_MEMBER_RE,
     Discovery,
 )
 from idrac_ctl.redfish_exceptions import RedfishForbidden, RedfishNotFound
@@ -237,6 +240,164 @@ def test_query_filter_skips_without_fetch(tmp_path):
 
     assert fake.fetch_counts == {"/redfish/v1/A": 1}
     assert "/redfish/v1/Managers/iDRAC/LogServices/Sel/Entries" in disc.visited_urls
+
+
+# --------------------------------------------------------------------------- #
+# Log-entry members skip (crawl safety) — LOG_ENTRY_MEMBER_RE
+# --------------------------------------------------------------------------- #
+
+_ENTRIES = "/redfish/v1/Managers/HGX_BMC_0/LogServices/Journal/Entries"
+
+
+def _log_graph():
+    """A -> Journal Entries collection -> two individual entry members."""
+    return {
+        "/redfish/v1/A": {
+            "@odata.id": "/redfish/v1/A",
+            "Log": {"@odata.id": _ENTRIES},
+        },
+        _ENTRIES: {
+            "@odata.id": _ENTRIES,
+            "Members": [
+                {"@odata.id": _ENTRIES + "/abc_100"},
+                {"@odata.id": _ENTRIES + "/def_200"},
+            ],
+        },
+        _ENTRIES + "/abc_100": {"@odata.id": _ENTRIES + "/abc_100", "Message": "x"},
+        _ENTRIES + "/def_200": {"@odata.id": _ENTRIES + "/def_200", "Message": "y"},
+    }
+
+
+def test_log_entry_members_skipped_by_default(tmp_path):
+    """Default crawl keeps the Entries collection but skips its members.
+
+    Enumerating every LogServices entry (thousands on a live GB300 HGX BMC)
+    overloaded the BMC (SSL EOF) for no structural value, so members are marked
+    visited and never fetched unless --include-log-entries is set. The
+    ``_make_discovery`` helper leaves ``_skip_log_entries`` unset; the walker's
+    ``getattr(..., True)`` default means skip, matching production.
+    """
+    disc, fake = _make_discovery(tmp_path, _log_graph())
+
+    disc.recursive_discovery("/redfish/v1/A")
+
+    # Root + the Entries collection index are fetched...
+    assert fake.fetch_counts == {"/redfish/v1/A": 1, _ENTRIES: 1}
+    # ...but the individual entry members are skipped (visited, never fetched).
+    assert disc.visited_urls.get(_ENTRIES + "/abc_100") is True
+    assert disc.visited_urls.get(_ENTRIES + "/def_200") is True
+    assert _ENTRIES + "/abc_100" not in fake.fetch_counts
+    assert _ENTRIES + "/abc_100" not in disc._discovered_url_file_mapping
+
+
+def test_log_entry_members_crawled_when_included(tmp_path):
+    """With include_log_entries (``_skip_log_entries=False``) members are fetched."""
+    disc, fake = _make_discovery(tmp_path, _log_graph())
+    disc._skip_log_entries = False
+
+    disc.recursive_discovery("/redfish/v1/A")
+
+    assert fake.fetch_counts.get(_ENTRIES + "/abc_100") == 1
+    assert fake.fetch_counts.get(_ENTRIES + "/def_200") == 1
+    assert _ENTRIES + "/abc_100" in disc._discovered_url_file_mapping
+
+
+@pytest.mark.parametrize(
+    "path, is_member",
+    [
+        ("/redfish/v1/Managers/HGX_BMC_0/LogServices/Journal/Entries/abc_1", True),
+        ("/redfish/v1/Managers/iDRAC/LogServices/Sel/Entries/12", True),
+        ("/redfish/v1/Managers/iDRAC/LogServices/Lclog/Entries/9", True),
+        ("/redfish/v1/Systems/1/LogServices/EventLog/Entries/xyz", True),
+        # The Entries collection index itself is NOT a member (kept).
+        ("/redfish/v1/Managers/HGX_BMC_0/LogServices/Journal/Entries", False),
+        # The LogService and the LogServices collection are kept.
+        ("/redfish/v1/Managers/HGX_BMC_0/LogServices/Journal", False),
+        ("/redfish/v1/Managers/HGX_BMC_0/LogServices", False),
+        # A non-log resource that merely contains 'Entries' is kept.
+        ("/redfish/v1/Systems/1/Memory/Entries", False),
+    ],
+)
+def test_log_entry_member_regex(path, is_member):
+    """LOG_ENTRY_MEMBER_RE matches individual entries across vendors, never the
+    collection index or unrelated resources."""
+    assert bool(LOG_ENTRY_MEMBER_RE.search(path)) is is_member
+
+
+# --------------------------------------------------------------------------- #
+# _query_with_retry — resilience to fragile-BMC transport drops
+# --------------------------------------------------------------------------- #
+
+
+def test_query_with_retry_recovers_from_transient_error(tmp_path, monkeypatch):
+    """A transient transport drop (SSL EOF) is retried, not lost.
+
+    GB300 HGX BMCs drop HTTPS connections under a sustained crawl; the walker
+    must back off and retry rather than skip the resource.
+    """
+    monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "4")
+    monkeypatch.setenv("IDRAC_DISCOVERY_BACKOFF", "0")
+    monkeypatch.setenv("IDRAC_DISCOVERY_PACE_MS", "0")
+    disc, _ = _make_discovery(tmp_path, {})
+
+    calls = {"n": 0}
+
+    def flaky(resource_path, *a, **k):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise requests.exceptions.ConnectionError("SSL UNEXPECTED_EOF")
+        return CommandResult({"ok": True}, None, "GET", None)
+
+    disc.base_query = flaky
+
+    result = disc._query_with_retry("/redfish/v1/X")
+
+    assert result.data == {"ok": True}
+    assert calls["n"] == 3  # two failures + one success
+
+
+def test_query_with_retry_raises_after_exhausting(tmp_path, monkeypatch):
+    """When every attempt drops, the last transport error is raised."""
+    monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "3")
+    monkeypatch.setenv("IDRAC_DISCOVERY_BACKOFF", "0")
+    disc, _ = _make_discovery(tmp_path, {})
+
+    calls = {"n": 0}
+
+    def always_fail(resource_path, *a, **k):
+        calls["n"] += 1
+        raise requests.exceptions.ConnectionError("down")
+
+    disc.base_query = always_fail
+
+    with pytest.raises(requests.exceptions.ConnectionError):
+        disc._query_with_retry("/redfish/v1/X")
+    assert calls["n"] == 3  # exactly IDRAC_DISCOVERY_RETRIES attempts
+
+
+def test_query_with_retry_does_not_retry_non_transport(tmp_path, monkeypatch):
+    """A non-transport error (e.g. 404) propagates at once, never retried.
+
+    Only ``requests.RequestException`` transport drops are transient; a
+    RedfishNotFound is terminal and must reach the caller's handler unchanged.
+    """
+    monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "4")
+    disc, _ = _make_discovery(tmp_path, {})
+
+    calls = {"n": 0}
+
+    def not_found(resource_path, *a, **k):
+        calls["n"] += 1
+        raise RedfishNotFound("/redfish/v1/X")
+
+    disc.base_query = not_found
+
+    with pytest.raises(RedfishNotFound):
+        disc._query_with_retry("/redfish/v1/X")
+    assert calls["n"] == 1  # no retries for a terminal error
 
 
 def test_non_redfish_path_is_ignored(tmp_path):

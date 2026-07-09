@@ -195,3 +195,9 @@ dmypy.json
 .pyre/
 /old/
 /old/jsons/
+
+# Downloaded vendor firmware blobs and local scratch (large / machine-specific)
+bios_firmware/
+clean.sh
+mount_media.sh
+tests/popen_test.py

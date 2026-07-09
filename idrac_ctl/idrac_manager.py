@@ -378,13 +378,17 @@ class IDracManager(RedfishManager):
         # unattended telemetry poll forever. Override via IDRAC_HTTP_TIMEOUT.
         timeout = float(os.environ.get("IDRAC_HTTP_TIMEOUT", "30"))
 
+        # Reuse one pooled keep-alive connection across GETs (see _http_session):
+        # opening a fresh TLS connection per request wedges fragile BMCs.
+        session = self._http_session()
+
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
-            return requests.get(
+            return session.get(
                 req, verify=self._is_verify_cert, headers=headers, timeout=timeout
             )
         else:
-            return requests.get(
+            return session.get(
                 req, verify=self._is_verify_cert,
                 auth=(self._username, self._password), timeout=timeout
             )
@@ -560,7 +564,7 @@ class IDracManager(RedfishManager):
                         f"with Retry-After {retry_after}"
                     )
                 if resp.status_code == 401:
-                    self.logger.error(f"task service returned 401")
+                    self.logger.error("task service returned 401")
                     AuthenticationFailed("Authentication failed.")
                 # if server failed, meanwhile HTTP exception propagate
                 # up on the stack.
@@ -583,7 +587,7 @@ class IDracManager(RedfishManager):
                 # As long as the operation is in process, the service shall return the HTTP 202 Accepted status code
                 # when the client performs a GET request on the task monitor URI.
                 elif resp.status_code == 202:
-                    self.logger.info(f"task service returned 202")
+                    self.logger.info("task service returned 202")
                     # state acquisition and update state
                     resp_data = resp.json()
                     task_state, task_status = self.get_task_state(resp)
@@ -1717,7 +1721,7 @@ class IDracManager(RedfishManager):
 
         if cmd_chassis.error is not None:
             self.logger.info(
-                f"Failed to fetch a chassis power state. Chassis return error."
+                "Failed to fetch a chassis power state. Chassis return error."
             )
             return cmd_chassis
 
@@ -1737,7 +1741,7 @@ class IDracManager(RedfishManager):
                 return CommandResult({}, None, None, None)
         else:
             self.logger.info(
-                f"Failed to acquire current power state."
+                "Failed to acquire current power state."
             )
 
         return cmd_chassis

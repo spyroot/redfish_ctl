@@ -3,6 +3,17 @@
 .git
 .gitignore
 
+# Live-lab secrets and coordination board — MUST never enter an image. The
+# container gets BMC creds at run time via env, never from a baked-in file.
+.internal/
+COORDINATION.md
+
+# Bulky, run-time-only, or captured data the package does not need to run.
+tests/supermicro_fixtures/
+dumps/
+reports/
+.json_responses/
+
 # Agent / AI instruction files and generated plans
 CLAUDE.md
 AGENTS.md

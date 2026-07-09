@@ -10,12 +10,15 @@ import asyncio
 import collections
 import functools
 import logging
+import os
 import re
 from abc import abstractmethod
 from functools import cached_property
 from typing import Dict, Optional
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .cmd_exceptions import AuthenticationFailed, ResourceNotFound, TaskIdUnavailable
 from .cmd_utils import save_if_needed
@@ -197,6 +200,39 @@ class RedfishManager:
                 )
             )
 
+    def _http_session(self) -> requests.Session:
+        """Return a cached keep-alive Session so many GETs reuse ONE connection.
+
+        Historically every GET opened a fresh TCP+TLS connection. A full
+        discovery crawl of a single BMC is hundreds of requests, and fragile
+        embedded BMC HTTPS servers (seen live on GB300 HGX baseboards) drop
+        connections and then wedge (stop answering on 443) under that handshake
+        volume. A pooled ``requests.Session`` with HTTP keep-alive collapses the
+        crawl onto a small reused connection pool, and a urllib3 ``Retry`` adds
+        transport-level backoff for transient drops. Verify / auth / timeout
+        semantics of the GET itself are unchanged. Tunable via env:
+        ``IDRAC_HTTP_POOL`` (pool size), ``IDRAC_HTTP_RETRIES``,
+        ``IDRAC_HTTP_BACKOFF``. Inherited by IDracManager.
+        """
+        session = getattr(self, "_session_cache", None)
+        if session is None:
+            session = requests.Session()
+            pool = int(os.environ.get("IDRAC_HTTP_POOL", "4"))
+            retries = Retry(
+                total=int(os.environ.get("IDRAC_HTTP_RETRIES", "3")),
+                backoff_factor=float(os.environ.get("IDRAC_HTTP_BACKOFF", "0.5")),
+                status_forcelist=(500, 502, 503, 504),
+                allowed_methods=frozenset(["GET"]),
+                raise_on_status=False,
+            )
+            adapter = HTTPAdapter(
+                pool_connections=pool, pool_maxsize=pool, max_retries=retries
+            )
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            self._session_cache = session
+        return session
+
     def api_get_call(
             self, req: str, hdr: Dict) -> requests.models.Response:
         """Make api request either with x-auth authentication
@@ -210,19 +246,25 @@ class RedfishManager:
         if hdr is not None:
             headers.update(hdr)
 
+        # Bound every GET so a hung/unreachable BMC can't block forever.
+        timeout = float(os.environ.get("IDRAC_HTTP_TIMEOUT", "30"))
+        # Reuse one pooled keep-alive connection across GETs (see _http_session):
+        # opening a fresh TLS connection per request wedges fragile BMCs.
+        session = self._http_session()
+
         if self._x_auth is not None:
             headers.update(
                 {
                     'X-Auth-Token': self._x_auth
                 }
             )
-            return requests.get(
-                req, verify=self._is_verify_cert, headers=headers
+            return session.get(
+                req, verify=self._is_verify_cert, headers=headers, timeout=timeout
             )
         else:
-            return requests.get(
+            return session.get(
                 req, verify=self._is_verify_cert,
-                auth=(self._username, self._password)
+                auth=(self._username, self._password), timeout=timeout
             )
 
     def get_with_query(

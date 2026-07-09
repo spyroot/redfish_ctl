@@ -6,9 +6,13 @@ Author Mus spyroot@gmail.com
 """
 import json
 import os
+import re
+import time
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
+
+import requests
 
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
@@ -20,6 +24,16 @@ from ..redfish_manager import CommandResult
 # purely to guarantee termination even if normalization/dedup ever misses a
 # cyclic back-reference.
 DEFAULT_DISCOVERY_MAX_DEPTH = 32
+
+# Matches an individual *member* of any LogService's Entries collection
+# (``/LogServices/<Sel|Journal|Lclog|...>/Entries/<entry-id>``), across vendors.
+# These entries are transient, high-cardinality log lines with no structural
+# value to the crawl or the igc RL map; enumerating them one GET at a time
+# overloads the BMC — observed live on GB300 HGX BMCs as an SSL "UNEXPECTED_EOF"
+# storm over thousands of Journal entries. The crawl keeps the ``.../Entries``
+# collection index itself (which does not match, having nothing after
+# ``/Entries/``) and skips only the members unless --include-log-entries is set.
+LOG_ENTRY_MEMBER_RE = re.compile(r"/LogServices/[^/]+/Entries/.+")
 
 
 class Discovery(IDracManager,
@@ -77,6 +91,14 @@ class Discovery(IDracManager,
         cmd_parser.add_argument(
             '--workers', required=False, dest='scan_workers', type=int, default=64,
             help="with --network: concurrent probes (default 64)")
+        cmd_parser.add_argument(
+            '--include-log-entries', action='store_true', dest='include_log_entries',
+            default=False,
+            help="also crawl individual LogServices/*/Entries members (SEL, "
+                 "Journal, Lclog...). Off by default: entries are transient, "
+                 "high-cardinality, and enumerating them can overload a BMC "
+                 "(SSL EOF) with no structural value. The Entries collection "
+                 "index is always captured.")
         help_text = "command discovery all action (or --network CIDR to scan a segment)."
         return cmd_parser, "discovery", help_text
 
@@ -135,6 +157,43 @@ class Discovery(IDracManager,
             path = path.rstrip("/") or path
         return path
 
+    def _query_with_retry(self, resource_path):
+        """``base_query`` with bounded backoff retries on transient transport errors.
+
+        Fragile BMCs (seen live on GB300 HGX baseboards) drop HTTPS connections
+        under a sustained crawl -- SSL ``UNEXPECTED_EOF`` / urllib3 "Max retries
+        exceeded" -- because every GET opens a fresh TLS connection. Those are
+        transient: a short backoff lets the BMC's HTTPS server recover, so we
+        retry instead of losing the resource (the old behaviour silently skipped
+        it). Non-transport failures (403/404, JSON errors) are *not* retried --
+        they are not ``requests.RequestException`` and propagate to the caller's
+        existing handlers unchanged.
+
+        Tunable via env: ``IDRAC_DISCOVERY_RETRIES`` (default 4),
+        ``IDRAC_DISCOVERY_BACKOFF`` seconds (default 2.0, exponential), and
+        ``IDRAC_DISCOVERY_PACE_MS`` (default 0) to throttle the request rate and
+        be gentle on a fragile BMC.
+
+        :param resource_path: canonical Redfish resource path to fetch.
+        :return: the ``base_query`` CommandResult.
+        :raises: the last transport exception if all attempts fail.
+        """
+        attempts = max(1, int(os.environ.get("IDRAC_DISCOVERY_RETRIES", "4")))
+        backoff = float(os.environ.get("IDRAC_DISCOVERY_BACKOFF", "2.0"))
+        pace = float(os.environ.get("IDRAC_DISCOVERY_PACE_MS", "0")) / 1000.0
+        last_exc = None
+        for attempt in range(attempts):
+            try:
+                result = self.base_query(resource_path)
+                if pace:
+                    time.sleep(pace)
+                return result
+            except requests.exceptions.RequestException as exc:
+                last_exc = exc
+                if attempt + 1 < attempts:
+                    time.sleep(backoff * (2 ** attempt))
+        raise last_exc
+
     def recursive_discovery(self,
                             resource_path,
                             depth: int = 0,
@@ -162,11 +221,20 @@ class Discovery(IDracManager,
                 self.visited_urls[resource_path] = True
                 return
 
+        # Skip individual log-entry members (any vendor's LogService) unless the
+        # caller opted in with --include-log-entries. Defaults to skipping so the
+        # crawl never grinds thousands of transient entries and overloads the BMC
+        # (see LOG_ENTRY_MEMBER_RE). The parent ``.../Entries`` collection index
+        # is still captured; only its members are skipped.
+        if getattr(self, "_skip_log_entries", True) and LOG_ENTRY_MEMBER_RE.search(resource_path):
+            self.visited_urls[resource_path] = True
+            return
+
         if resource_path in self.visited_urls or not resource_path.startswith("/redfish/v1"):
             return
 
         try:
-            result = self.base_query(resource_path)
+            result = self._query_with_retry(resource_path)
             allow_header = result.extra
             if allow_header is not None:
                 allowed_methods = [method.strip() for method in allow_header.split(",")]
@@ -223,6 +291,7 @@ class Discovery(IDracManager,
                 scan_port: Optional[int] = 443,
                 scan_timeout: Optional[float] = 2.0,
                 scan_workers: Optional[int] = 64,
+                include_log_entries: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes discovery action command
         python idrac_ctl discovery
@@ -238,6 +307,8 @@ class Discovery(IDracManager,
         :param scan_port: with ``scan_network``, HTTPS port to probe.
         :param scan_timeout: with ``scan_network``, per-host probe timeout (s).
         :param scan_workers: with ``scan_network``, concurrent probes.
+        :param include_log_entries: also crawl individual LogServices/*/Entries
+               members (off by default; enumerating them can overload a BMC).
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param filename: if filename indicate call will save a bios setting to a file.
@@ -256,6 +327,11 @@ class Discovery(IDracManager,
                 return CommandResult([], None, None, f"invalid network '{scan_network}': {ve}")
             save_if_needed(filename, found)
             return CommandResult(found, None, None, None)
+
+        # Off by default -> recursive_discovery skips individual log-entry members
+        # (see LOG_ENTRY_MEMBER_RE) so the crawl does not grind thousands of
+        # transient entries and overload the BMC.
+        self._skip_log_entries = not include_log_entries
 
         os.makedirs(self.json_response_dir, exist_ok=True)
         if not os.path.isdir(self.json_response_dir):

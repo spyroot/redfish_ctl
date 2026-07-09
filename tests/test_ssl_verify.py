@@ -10,6 +10,7 @@ kwarg via a monkeypatched stub so no real network call is ever made.
 from types import SimpleNamespace
 
 import pytest
+import requests
 
 from idrac_ctl.idrac_manager import IDracManager
 from idrac_ctl.redfish_manager import RedfishManager
@@ -26,21 +27,24 @@ class _FakeResponse:
 
 @pytest.fixture
 def captured_verify(monkeypatch):
-    """Monkeypatch ``requests.get`` to record the ``verify`` kwarg, no network.
+    """Monkeypatch ``requests.Session.get`` to record kwargs, no network.
 
-    Patches the symbol on the ``requests`` module that both managers import, so a
-    call to ``api_get_call`` records the flag instead of opening a socket.
+    Both managers now issue GETs through a pooled keep-alive ``requests.Session``
+    (see ``_http_session``) instead of the module-level ``requests.get``, so the
+    seam to intercept is ``Session.get``. Records the ``verify`` and ``timeout``
+    kwargs plus the id of each Session used, so tests can also assert the
+    connection is reused. No socket is ever opened.
     """
-    seen = {}
+    seen = {"sessions": []}
 
-    def fake_get(url, **kwargs):
+    def fake_get(self, url, **kwargs):  # self == the bound Session instance
         seen["verify"] = kwargs.get("verify")
+        seen["timeout"] = kwargs.get("timeout")
         seen["url"] = url
+        seen["sessions"].append(id(self))
         return _FakeResponse()
 
-    import requests
-
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
     return seen
 
 
@@ -70,6 +74,21 @@ def test_insecure_false_enables_verification(manager_cls, captured_verify):
     mgr = manager_cls(insecure=False)
     mgr.api_get_call("https://bmc.invalid/redfish/v1", hdr=None)
     assert captured_verify["verify"] is True
+
+
+@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+def test_get_carries_timeout_and_reuses_one_session(manager_cls, captured_verify):
+    """Every GET is bounded by a timeout and reuses one pooled Session.
+
+    Connection reuse (keep-alive) is what stops a crawl from wedging a fragile
+    BMC, so two sequential GETs must go through the *same* cached Session.
+    """
+    mgr = manager_cls()
+    mgr.api_get_call("https://bmc.invalid/redfish/v1", hdr=None)
+    mgr.api_get_call("https://bmc.invalid/redfish/v1/Systems", hdr=None)
+
+    assert captured_verify["timeout"] is not None
+    assert len(set(captured_verify["sessions"])) == 1  # one Session, reused
 
 
 def test_internal_verify_flag_is_inverse_of_insecure():
