@@ -69,12 +69,22 @@ setup_info = dict(name='redfish_ctl',
                       "discovery": [
                           "numpy",
                       ],
+                      # Native OTLP output for `exporter --output otlp`. The SDK is
+                      # imported lazily in telemetry/otlp.py, so the core install
+                      # stays dependency-light; this extra pulls the exporter transport.
+                      "otlp": [
+                          "opentelemetry-sdk >= 1.20",
+                          "opentelemetry-exporter-otlp >= 1.20",
+                      ],
                       "dev": [
                           "pytest >= 7",
                           "requests-mock >= 1.10",
                           "ruff",
                           "mypy",
                           "numpy",
+                          # opentelemetry-sdk (not the heavy exporter) is enough to
+                          # unit-test the OTLP MetricsData mapping offline.
+                          "opentelemetry-sdk >= 1.20",
                       ],
                       "schema": [
                           "jsonschema >= 4.18",

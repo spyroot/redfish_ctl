@@ -55,7 +55,7 @@ class Exporter(IDracManager,
             help="scrape once and return the rendered output instead of serving forever")
         cmd_parser.add_argument(
             "--output", dest="exporter_output", default="prometheus",
-            choices=("prometheus", "signalfx"),
+            choices=("prometheus", "signalfx", "otlp"),
             help="output format for --once or push mode")
         cmd_parser.add_argument(
             "--label-bmc-ip", dest="label_bmc_ip", default=None, type=str,
@@ -76,7 +76,17 @@ class Exporter(IDracManager,
         cmd_parser.add_argument(
             "--signalfx-token-env", dest="signalfx_token_env", default="SPLUNK_ACCESS_TOKEN",
             type=str, help="environment variable that holds the SignalFx ingest token")
-        help_text = "serve Redfish telemetry as Prometheus /metrics or SignalFx datapoints"
+        cmd_parser.add_argument(
+            "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
+            help="OTLP collector endpoint for --output otlp; defaults to "
+                 "OTEL_EXPORTER_OTLP_ENDPOINT")
+        cmd_parser.add_argument(
+            "--otlp-protocol", dest="otlp_protocol", default=None,
+            choices=("grpc", "http/protobuf"),
+            help="OTLP transport for --output otlp; defaults to "
+                 "OTEL_EXPORTER_OTLP_PROTOCOL, else grpc")
+        help_text = ("serve Redfish telemetry as Prometheus /metrics, or push SignalFx "
+                     "or OTLP (OpenTelemetry) datapoints")
         return cmd_parser, "exporter", help_text
 
     @staticmethod
@@ -176,8 +186,28 @@ class Exporter(IDracManager,
                 push_signalfx: Optional[bool] = False,
                 signalfx_ingest_url: Optional[str] = None,
                 signalfx_token_env: Optional[str] = "SPLUNK_ACCESS_TOKEN",
+                otlp_endpoint: Optional[str] = None,
+                otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
-        """Scrape once, serve Prometheus, or push SignalFx datapoints."""
+        """Scrape once, serve Prometheus, or push SignalFx/OTLP datapoints."""
+        if exporter_output == "otlp":
+            from . import otlp
+            if once:
+                samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                result = otlp.push_otlp(
+                    samples, endpoint=otlp_endpoint, protocol=otlp_protocol)
+                return CommandResult(
+                    None, None,
+                    {"sample_count": len(samples), "export_result": str(result)}, None)
+
+            def scrape_samples():
+                return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+
+            otlp.run_otlp_loop(
+                scrape_samples, float(interval or 30.0),
+                endpoint=otlp_endpoint, protocol=otlp_protocol)
+            return CommandResult(None, None, None, None)
+
         if once:
             # Resolve and validate the push target BEFORE scraping so a missing
             # token or a bare (non-/v2/datapoint) ingest URL fails fast.

@@ -90,6 +90,32 @@ redfish_ctl exporter \
 For tests and dry runs, use `--once --output signalfx`. That prints the SignalFx datapoint envelope
 without posting anything.
 
+## OTLP (OpenTelemetry)
+
+`--output otlp` pushes the same `hw.*` series natively over OTLP, so `redfish_ctl` drops into an
+existing OpenTelemetry pipeline as just another producer — no Prometheus/Collector hop needed. It
+needs the OpenTelemetry SDK, shipped as an extra:
+
+```bash
+pip install "redfish_ctl[otlp]"
+```
+
+It honors the standard OTel environment variables (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_PROTOCOL` = `grpc` | `http/protobuf`, `OTEL_EXPORTER_OTLP_HEADERS`,
+`OTEL_RESOURCE_ATTRIBUTES`), with `--otlp-endpoint` / `--otlp-protocol` overrides:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+redfish_ctl exporter --vendor supermicro --output otlp --interval 30      # push loop
+redfish_ctl exporter --vendor supermicro --output otlp --once             # push once
+```
+
+The contract is unchanged: metric names and dimension keys are identical to the Prometheus/SignalFx
+outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`) map to
+OTel **resource** attributes; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`)
+map to **datapoint** attributes. Monotonic cumulative counters (fabric byte/frame/error/packet/count
+totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything instantaneous stays a **Gauge**.
+
 ## What Good Looks Like
 
 A Prometheus scrape should include at least one chassis power metric and, on GB300, fabric metrics:
