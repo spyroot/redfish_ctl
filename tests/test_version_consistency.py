@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from redfish_ctl import version as version_mod
 from redfish_ctl.redfish_main import __version__ as cli_version
 
@@ -30,7 +32,10 @@ def test_setup_py_version_matches_version_module():
 
     Runs setup.py in a subprocess so it exercises the real read-from-version.py
     path that names the built artifact — the exact thing that drifted before.
+    setuptools is a build/dev tool, not a runtime dep; skip cleanly where it is
+    absent (e.g. a bare venv) rather than failing with a subprocess error.
     """
+    pytest.importorskip("setuptools")
     out = subprocess.run(
         [sys.executable, "setup.py", "--version"],
         cwd=_REPO_ROOT, capture_output=True, text=True, check=True,

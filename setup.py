@@ -85,6 +85,11 @@ setup_info = dict(name='redfish_ctl',
                           # opentelemetry-sdk (not the heavy exporter) is enough to
                           # unit-test the OTLP MetricsData mapping offline.
                           "opentelemetry-sdk >= 1.20",
+                          # setuptools is a BUILD/DEV tool (not a runtime dep, so it is
+                          # not in requirements.txt). Needed here because the version
+                          # test shells out to `setup.py --version`, and a fresh 3.12
+                          # venv does not bundle setuptools.
+                          "setuptools >= 65",
                       ],
                       "schema": [
                           "jsonschema >= 4.18",
