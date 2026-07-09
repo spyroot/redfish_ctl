@@ -255,6 +255,30 @@ def test_reboot_posts_reset_action_payload_in_mock_mode(
     assert request.json() == {"ResetType": "PowerCycle"}
 
 
+def test_reboot_dry_run_previews_reset_action_without_post(
+    redfish_mock, redfish_service
+):
+    """reboot --dry_run resolves ComputerSystem.Reset but sends no POST."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.ComputerSystemReset,
+        "reboot",
+        reset_type="GracefulRestart",
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["action"] == "#ComputerSystem.Reset"
+    assert result.data["target"] == (
+        "/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset"
+    )
+    assert result.data["payload"] == {"ResetType": "GracefulRestart"}
+    assert result.data["level"] == "destructive"
+    assert result.data["blocked"] is None
+    assert all(request.method != "POST" for request in redfish_service.requests)
+
+
 def test_boot_one_shot_uefi_mode_sets_override_mode_in_mock_mode(
     redfish_mock, redfish_service
 ):
