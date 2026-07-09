@@ -230,3 +230,45 @@ def test_dell_oem_attach_status_posts_discovered_status_action(
         "actions/dellosdeploymentservice.getattachstatus"
     )
     assert redfish_service.last_request.json() == {}
+
+
+def test_dell_oem_network_iso_boot_posts_network_iso_payload(
+    redfish_mock,
+    redfish_service,
+    monkeypatch,
+):
+    """delloem_netios_boot POSTs the network ISO payload to BootToNetworkISO."""
+    monkeypatch.setattr(
+        IDracManager,
+        "fetch_task",
+        lambda self, task_id: {"TaskState": "Completed"},
+    )
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellOemNetIsoBoot,
+        "delloem_netios_boot",
+        ip_addr="192.0.2.20",
+        share_type="CIFS",
+        share_name="//192.0.2.20/isos",
+        remote_image="rocky.iso",
+        remote_username="media-user",
+        remote_password="mock-password",
+        remote_workgroup="lab",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == redfish_service.JOB_ID
+    assert result.data["task_state"] == {"TaskState": "Completed"}
+    assert redfish_service.last_request.path == (
+        "/redfish/v1/dell/systems/system.embedded.1/dellosdeploymentservice/"
+        "actions/dellosdeploymentservice.boottonetworkiso"
+    )
+    assert redfish_service.last_request.json() == {
+        "IPAddress": "192.0.2.20",
+        "ShareType": "CIFS",
+        "ShareName": "//192.0.2.20/isos",
+        "ImageName": "rocky.iso",
+        "UserName": "media-user",
+        "Password": "mock-password",
+        "Workgroup": "lab",
+    }

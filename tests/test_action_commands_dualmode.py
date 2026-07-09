@@ -143,3 +143,31 @@ def test_system_reset_confirm_posts_reset_payload_to_host_action_in_mock_mode(
         "/redfish/v1/systems/system_0/actions/computersystem.reset"
     )
     assert posts[0].json() == {"ResetType": "ForceRestart"}
+
+
+def test_action_list_does_not_post_in_mock_mode(redfish_mock, redfish_service):
+    """action_list is read-only and sends no POST requests in mock mode."""
+    result = redfish_mock.sync_invoke(ApiRequestType.ActionList, "action_list")
+
+    assert isinstance(result, CommandResult)
+    assert result.data
+    assert not [request for request in redfish_service.requests if request.method == "POST"]
+
+
+def test_action_list_returns_dell_action_inventory(redfish_api):
+    """action_list inventories Dell action rows from linked resources."""
+    result = redfish_api.sync_invoke(ApiRequestType.ActionList, "action_list")
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, list)
+    assert result.data
+
+    full_types = {row["FullType"] for row in result.data}
+    assert {
+        "#ComputerSystem.Reset",
+        "#Manager.Reset",
+        "#Chassis.Reset",
+        "#Bios.ResetBios",
+    }.issubset(full_types)
+    assert all(row["Target"] for row in result.data)
+    assert all(row["Level"] for row in result.data)

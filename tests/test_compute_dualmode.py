@@ -120,3 +120,34 @@ def test_compute_update_uses_settings_resource_after_610_without_mutating(
     )
     assert new_requests
     assert {request.method for request in new_requests} == {"GET"}
+
+
+
+
+def test_compute_update_reads_system_resource_for_pre_610_idrac(
+    redfish_mock, redfish_service, monkeypatch
+):
+    """compute-update reads the ComputerSystem resource before iDRAC 6.10."""
+    monkeypatch.setattr(
+        IDracManager,
+        "idrac_manager_version",
+        property(lambda self: "6.00.00.00"),
+    )
+
+    result = redfish_mock.sync_invoke(ApiRequestType.ComputeUpdate, "update")
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data["@odata.id"] == "/redfish/v1/Systems/System.Embedded.1"
+    assert result.data["Id"] == "System.Embedded.1"
+    assert redfish_service.last_request.method == "GET"
+    assert redfish_service.last_request.path.lower() == (
+        "/redfish/v1/systems/system.embedded.1"
+    )
+    assert {
+        request.method
+        for request in redfish_service.requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    } == set()
