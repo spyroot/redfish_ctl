@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from idrac_ctl.cmd_utils import find_ids, from_json_spec, save_if_needed, str2bool
+from redfish_ctl.cmd_utils import find_ids, from_json_spec, save_if_needed, str2bool
 
 
 def test_from_json_spec_reads_file(tmp_path: Path):

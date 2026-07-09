@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from idrac_ctl.cmd_exceptions import InvalidArgument
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 _CONTROLLER = "RAID.Integrated.1-1"
 _VOLUMES_PATH = (

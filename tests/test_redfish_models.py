@@ -2,8 +2,8 @@
 
 Author Mus spyroot@gmail.com
 """
-from idrac_ctl.redfish_respond import RedfishMessage, RedfishRespondMessage
-from idrac_ctl.redfish_respond_error import RedfishError, RedfishErrorMessage
+from redfish_ctl.redfish_respond import RedfishMessage, RedfishRespondMessage
+from redfish_ctl.redfish_respond_error import RedfishError, RedfishErrorMessage
 
 EXTENDED = {
     "@Message.ExtendedInfo": [

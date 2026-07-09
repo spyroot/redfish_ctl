@@ -11,12 +11,12 @@ import io
 
 import pytest
 
-from idrac_ctl.discover import (
+from redfish_ctl.discover import (
     DiscoveredService,
     classify_vendor,
     scan_subnet,
 )
-from idrac_ctl.discover import cli as discover_cli
+from redfish_ctl.discover import cli as discover_cli
 
 # --------------------------------------------------------------------------- #
 # Vendor classifier

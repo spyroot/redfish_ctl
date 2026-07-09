@@ -16,9 +16,9 @@ Public surface:
 
 Author Mus spyroot@gmail.com
 """
-from idrac_ctl.discover.classifier import classify_vendor
-from idrac_ctl.discover.cli import make_http_fetcher
-from idrac_ctl.discover.scanner import DiscoveredService, scan_subnet
+from redfish_ctl.discover.classifier import classify_vendor
+from redfish_ctl.discover.cli import make_http_fetcher
+from redfish_ctl.discover.scanner import DiscoveredService, scan_subnet
 
 __all__ = [
     "classify_vendor",

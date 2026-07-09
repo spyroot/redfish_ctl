@@ -16,8 +16,8 @@ import json
 
 import pytest
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 # The controller + drive the Storage fixture's Drives navigation list points at.
 _CONTROLLER = "RAID.Integrated.1-1"

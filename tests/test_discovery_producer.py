@@ -7,7 +7,7 @@ that cross-repo contract. No iDRAC, no network.
 """
 import numpy as np
 
-from idrac_ctl.discovery.cmd_discovery import Discovery
+from redfish_ctl.discovery.cmd_discovery import Discovery
 
 
 def test_save_url_file_mapping_roundtrip(tmp_path):

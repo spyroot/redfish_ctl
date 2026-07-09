@@ -2,7 +2,7 @@ import logging
 from unittest import TestCase
 from unittest.mock import Mock
 from requests.models import Response
-from idrac_ctl.redfish_manager import RedfishManager
+from redfish_ctl.redfish_manager import RedfishManager
 from tests.test_utils import create_json_resp
 
 the_response = Mock(spec=Response)

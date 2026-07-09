@@ -8,7 +8,7 @@ not a BMC. All network I/O is mocked — no real hosts are touched.
 """
 import requests
 
-from idrac_ctl.discovery.net_scan import expand_cidr, probe_host, scan_segment
+from redfish_ctl.discovery.net_scan import expand_cidr, probe_host, scan_segment
 
 
 class _Resp:

@@ -6,8 +6,8 @@ DateTime) is exercised against real hardware, not here; these stay offline.
 """
 import re
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.manager.cmd_manager_time import build_time_payload
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.manager.cmd_manager_time import build_time_payload
 
 
 def test_payload_none_when_no_write_requested():

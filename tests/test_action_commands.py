@@ -4,7 +4,7 @@ All run against the GB300 corpus via redfish_mock_factory('supermicro'); the moc
 records POSTs so we can assert what fires. These prove the CLI commands wrap
 invoke_action correctly and inherit its safety guard.
 """
-from idrac_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def _post_count(svc):

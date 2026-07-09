@@ -1,8 +1,8 @@
 """Dual-mode-style mock test for the NVLink ports command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_nvlink_ports_returns_empty_list_without_gpu_links(

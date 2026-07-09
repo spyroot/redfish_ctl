@@ -4,7 +4,7 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from idrac_ctl.redfish_query import RedfishQuery
+from redfish_ctl.redfish_query import RedfishQuery
 
 
 def test_empty_query_is_blank():

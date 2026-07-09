@@ -1,8 +1,8 @@
 """Dual-mode test for the system query command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_system_query_returns_system_resource(redfish_api):

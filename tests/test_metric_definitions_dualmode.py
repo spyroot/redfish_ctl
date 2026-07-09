@@ -1,8 +1,8 @@
 """Dual-mode test for the metric-definitions command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_metric_definitions_dualmode_returns_json_list_without_post(request, monkeypatch):

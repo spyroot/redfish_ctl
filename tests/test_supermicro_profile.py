@@ -6,8 +6,8 @@ defaults so an unverified capability is never silently flipped on.
 
 Author Mus spyroot@gmail.com
 """
-from idrac_ctl.vendors import get_vendor
-from idrac_ctl.vendors.base import VendorCapabilities
+from redfish_ctl.vendors import get_vendor
+from redfish_ctl.vendors.base import VendorCapabilities
 
 
 def test_supermicro_oem_prefix_matches_manufacturer():

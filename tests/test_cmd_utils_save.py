@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from idrac_ctl.cmd_utils import save_if_needed
+from redfish_ctl.cmd_utils import save_if_needed
 
 
 def test_save_json_round_trips_payload(tmp_path: Path):

@@ -1,7 +1,7 @@
 """Dual-mode tests for the guarded firmware-update command."""
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 SIMPLE_UPDATE_TARGET = (
     "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"

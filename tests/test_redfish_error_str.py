@@ -7,7 +7,7 @@ human-readable Message (e.g. iLO ``PropertyNotWritableOrUnknown``), and
 (dict has no ``.message``; ``None`` breaks ``join``) and surfaced as the useless
 ``<exception str() failed>``, hiding the real BMC error message.
 """
-from idrac_ctl.redfish_respond_error import RedfishError
+from redfish_ctl.redfish_respond_error import RedfishError
 
 
 def test_str_with_messageid_only_dict():
@@ -42,7 +42,7 @@ def test_exception_carrying_redfish_error_is_readable():
 
     This is the actual bug: previously str(exception) was '<exception str() failed>'.
     """
-    from idrac_ctl.redfish_exceptions import RedfishException
+    from redfish_ctl.redfish_exceptions import RedfishException
     e = RedfishError(400)
     e.message_extended = [{"MessageId": "iLO.2.19.PropertyNotWritableOrUnknown",
                            "MessageArgs": ["SSHKeys"]}]

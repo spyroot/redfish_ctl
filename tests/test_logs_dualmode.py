@@ -1,8 +1,8 @@
 """Dual-mode-style tests for the generic logs command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_logs_reads_limited_hpe_log_entries_without_mutation(

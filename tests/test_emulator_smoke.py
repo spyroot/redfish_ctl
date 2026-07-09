@@ -30,7 +30,7 @@ _skip = pytest.mark.skipif(
 
 
 def _client():
-    from idrac_ctl.idrac_manager import IDracManager
+    from redfish_ctl.idrac_manager import IDracManager
     # host:port parsed from the emulator URL; api_*_call takes full URLs anyway.
     host = _EMU.split("://", 1)[-1]
     return IDracManager(

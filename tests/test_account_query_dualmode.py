@@ -1,8 +1,8 @@
 """Dual-mode tests for the individual account query command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_account_query_returns_manager_account(redfish_api):

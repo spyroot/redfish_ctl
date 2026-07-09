@@ -16,7 +16,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
-from idrac_ctl.discover.classifier import classify_vendor
+from redfish_ctl.discover.classifier import classify_vendor
 
 # The well-known Redfish service root path. Probed read-only.
 REDFISH_ROOT_PATH = "/redfish/v1/"

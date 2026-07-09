@@ -1,9 +1,9 @@
 """Dual-mode tests for boot option and boot-source commands."""
 import json
 
-from idrac_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_boot_options_list_returns_member_uris(redfish_api):

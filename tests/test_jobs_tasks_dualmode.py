@@ -3,10 +3,10 @@ import json
 
 import pytest
 
-import idrac_ctl.tasks.cmd_task_svc  # noqa: F401
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 JOB_ID = "JID_000000000001"
 

@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_dell_lc_service_query_returns_actions(redfish_api):

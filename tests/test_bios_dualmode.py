@@ -1,8 +1,8 @@
 """Dual-mode tests for BIOS pending and registry commands."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType, JobState
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_bios_pending_returns_pending_attributes(redfish_api):

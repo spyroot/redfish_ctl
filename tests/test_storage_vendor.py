@@ -4,7 +4,7 @@ storage-list uses the standard ``{system}/Storage`` subpath. It previously raise
 a 404 on hosts that expose Storage under a different shape; it now returns the
 collection where present and an empty result (no crash) where absent.
 """
-from idrac_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_storage_list_on_ilo(redfish_mock_factory):

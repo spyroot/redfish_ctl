@@ -4,12 +4,12 @@ Covers key validation (RSA ok, DSA blocked, oversize/non-key rejected), the
 dry-run-by-default guard, the remove path, and the refusal on a non-HPE account.
 No real BMC and no network — resolution is mocked, writes are dry-run.
 """
-from idrac_ctl.accounts.cmd_account_sshkey import (
+from redfish_ctl.accounts.cmd_account_sshkey import (
     MAX_SSH_KEY_BYTES,
     AccountImportSSHKey,
     validate_ssh_key,
 )
-from idrac_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 RSA = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ0abcdef user@host"
 

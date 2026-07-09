@@ -6,7 +6,7 @@ but BootSourcesRegistryQuery already starts with ``/`` — producing
 404s. Found by the Codex worker. The constant is an absolute suffix, so callers
 must join WITHOUT an extra slash.
 """
-from idrac_ctl.idrac_shared import IDRAC_API
+from redfish_ctl.idrac_shared import IDRAC_API
 
 
 def test_boot_sources_registry_query_is_absolute_suffix():

@@ -1,10 +1,10 @@
 """Dual-mode tests for the compute settings command."""
 import json
 
-from idrac_ctl.compute.cmd_update import UpdateCompute  # noqa: F401
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.compute.cmd_update import UpdateCompute  # noqa: F401
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_compute_query_returns_system_settings_for_610_plus_in_mock_mode(

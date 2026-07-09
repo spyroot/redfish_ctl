@@ -6,16 +6,17 @@ with open("README.md", "r") as fh:
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
-setup_info = dict(name='idrac_ctl',
+setup_info = dict(name='redfish_ctl',
                   version='1.1.0',
                   author='Mustafa Bayramov',
                   author_email="spyroot@gmail.com",
-                  url="https://github.com/spyroot/idrac_ctl",
+                  url="https://github.com/spyroot/redfish_ctl",
                   description='Standalone command line tool to '
-                              'interact with Dell iDRAC via Redfish REST API.',
+                              'interact with Dell iDRAC and other BMCs via the Redfish REST API.',
                   long_description=long_description,
                   long_description_content_type='text/markdown',
-                  packages=['idrac_ctl', 'redfish_ctl'] + ['idrac_ctl.' + pkg for pkg in find_packages('idrac_ctl')],
+                  # redfish_ctl is the real package; idrac_ctl is a backward-compat alias package.
+                  packages=['redfish_ctl', 'idrac_ctl'] + ['redfish_ctl.' + pkg for pkg in find_packages('redfish_ctl')],
                   license="MIT",
                   python_requires='>=3.10',
                   install_requires=requirements,
@@ -23,9 +24,9 @@ setup_info = dict(name='idrac_ctl',
                       'console_scripts': [
                           # redfish_ctl is the going-forward name; idrac_ctl stays as a
                           # backward-compatible alias (same entry point).
-                          'redfish_ctl = idrac_ctl.idrac_main:idrac_main_ctl',
-                          'idrac_ctl = idrac_ctl.idrac_main:idrac_main_ctl',
-                          'redfish-discover = idrac_ctl.discover.cli:redfish_discover_main',
+                          'redfish_ctl = redfish_ctl.idrac_main:idrac_main_ctl',
+                          'idrac_ctl = redfish_ctl.idrac_main:idrac_main_ctl',
+                          'redfish-discover = redfish_ctl.discover.cli:redfish_discover_main',
                       ]
                   },
                   extras_require={

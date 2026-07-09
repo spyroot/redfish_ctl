@@ -2,9 +2,9 @@
 
 import pytest
 
-import idrac_ctl.telemetry.exporter as exporter_mod
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.telemetry.exporter import (
+import redfish_ctl.telemetry.exporter as exporter_mod
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.telemetry.exporter import (
     MetricSample,
     build_identity_dimensions,
     build_metric_samples,
