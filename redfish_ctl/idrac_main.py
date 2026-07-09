@@ -27,9 +27,9 @@ from .redfish_exceptions import RedfishException
 from .version import __version__
 
 try:
-    from pygments.lexers.data import JsonLexer
+    from pygments.lexers.data import JsonLexer, YamlLexer
 except ImportError:
-    warnings.warn("Failed import json lexer from pygments.")
+    warnings.warn("Failed import json/yaml lexer from pygments.")
 
 from pygments.formatters.terminal256 import Terminal256Formatter
 
@@ -179,6 +179,15 @@ def json_printer(json_data,
                 cls=RedfishActionEncoder
             )
 
+        # --yaml re-serializes the same payload as YAML instead of JSON.
+        _lexer = JsonLexer()
+        if getattr(cmd_args, "yaml", False):
+            import yaml as _yaml
+            _obj = json.loads(json_raw) if isinstance(json_raw, str) else json_raw
+            json_raw = _yaml.safe_dump(
+                _obj, sort_keys=bool(sort), default_flow_style=False)
+            _lexer = YamlLexer()
+
         if len(json_raw) > 0:
             if header is not None and cmd_args.json_only is False:
                 print(header)
@@ -186,7 +195,7 @@ def json_printer(json_data,
             if colorized:
                 colorful = highlight(
                     json_raw,
-                    lexer=JsonLexer(),
+                    lexer=_lexer,
                     formatter=Terminal256Formatter())
                 print(colorful)
             else:
@@ -485,6 +494,10 @@ def idrac_main_ctl():
     output_controllers.add_argument(
         '--json', action='store_true', required=False, default=True,
         help="by default we use json to output to console.")
+    output_controllers.add_argument(
+        '--yaml', action='store_true', required=False, default=False,
+        dest='yaml',
+        help="render the output as YAML instead of JSON.")
     output_controllers.add_argument(
         '--json_only', action='store_true', required=False, default=False,
         help="by default output has different section. "

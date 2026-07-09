@@ -2,9 +2,9 @@
 
 `redfish_ctl` is a standalone command-line tool I built to drive server BMCs entirely through the
 Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
-with JSON-first output (save to file), both synchronous and asynchronous calls, optional server-side
-`$expand` on large collection reads, and a read-first, guarded-write model (mutating commands preview
-with `--dry_run` and require `--confirm`). It is vendor-neutral by design — Dell iDRAC,
+with JSON or YAML output (`--yaml`, and save-to-file), both synchronous and asynchronous calls,
+optional server-side `$expand` on large collection reads, and a read-first, guarded-write model
+(mutating commands preview with `--dry_run` and require `--confirm`). It is vendor-neutral by design — Dell iDRAC,
 Supermicro (including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish — built on
 a product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
 
