@@ -51,6 +51,46 @@ from the process environment, and `SPLUNK_INGEST_URL`, the full
 Use `--once --output signalfx` first to inspect the datapoint envelope
 without posting externally.
 
+## Checking Live Data In Splunk
+
+SignalFx is Splunk Observability Cloud, so the exporter's `signalfx` output pushes
+these metrics straight into Splunk Observability — no extra bridge.
+
+1. Push to your org (realm ingest URL + an access token). `SPLUNK_INGEST_URL` and
+   `SPLUNK_ACCESS_TOKEN` are read from the environment by `idrac_ctl exporter`:
+
+```bash
+export SPLUNK_ACCESS_TOKEN='<org access token>'
+export SPLUNK_INGEST_URL='https://ingest.<realm>.signalfx.com/v2/datapoint'
+idrac_ctl exporter --vendor supermicro --output signalfx --push-signalfx
+```
+
+2. Find the data in Splunk Observability. Under **Metrics -> Metric Finder**, search the
+   metric names this exporter emits: `hw.fabric.*` (NVLink/port link state, BER, RX/TX
+   throughput and errors), `hw.gb300.*` (GPU plus general chassis sensors), and
+   `hw.temperature`, `hw.energy_kwh`, `hw.component_integrity.enabled`. Every datapoint
+   carries these **dimensions** for filtering/grouping: `host`, `chassis`, `gpu`, `port`,
+   `sensor`, `vendor`, `report`.
+
+3. Confirm points are arriving with a chart or SignalFlow query, e.g. fabric receive rate
+   per port on one host:
+
+```
+data('hw.fabric.raw_rx_gbps', filter=filter('host', '<bmc-host>')).publish()
+```
+
+Datapoints land within a few seconds of the push; when the Metric Finder shows the `hw.*`
+names carrying your `host`/`vendor` dimensions, live data is flowing.
+
+For **Splunk Enterprise/Cloud (HEC)** rather than Observability: run the Prometheus
+listener (`idrac_ctl exporter --output prometheus`, no `--once`) and point a Splunk
+OpenTelemetry Collector (prometheus receiver -> `splunk_hec` exporter) at it, which lands
+the same metrics in a HEC index.
+
+> Live verification of the push needs a real `SPLUNK_ACCESS_TOKEN` and your realm's
+> `SPLUNK_INGEST_URL`; without them, use `--once --output signalfx` to validate the
+> datapoint envelope offline.
+
 ## Report Inventory
 
 | Report | Definition type | Definition metrics | Observed rows | Observed value types |
