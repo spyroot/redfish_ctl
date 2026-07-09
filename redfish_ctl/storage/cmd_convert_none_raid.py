@@ -5,7 +5,7 @@ to a Non-RAID state. After the method is successfully executed, the
 DCIM_PhysicalDiskView.RAIDStatus property of that physical disk should
 reflect the new state.
 
-python idrac_ctl.py storage-convert-noraid -c AHCI.Embedded.2-1
+python redfish_ctl.py storage-convert-noraid -c AHCI.Embedded.2-1
 
 Author Mus spyroot@gmail.com
 """

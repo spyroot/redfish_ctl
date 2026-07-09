@@ -46,7 +46,7 @@ class DellLcQuery(IDracManager,
                 data_filter: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes query for dell LC.
-        python idrac_ctl.py chassis
+        python redfish_ctl.py chassis
         :param data_filter:
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query

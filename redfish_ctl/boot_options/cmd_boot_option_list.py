@@ -9,7 +9,7 @@ Doc
 https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v3.3-series/
 idrac9_3.36_redfishapiguide/dellbootsources?guid=guid-4803ff0e-76ad-42c5-a971-820123cd0b83&lang=en-us
 
-python idrac_ctl.py --json boot_source
+python redfish_ctl.py --json boot_source
 
 cmd return list of boot devices.
 

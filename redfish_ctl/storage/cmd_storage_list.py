@@ -3,7 +3,7 @@
 Command provides the option to retrieve list of storage controllers.
 
 Example expanded
-python idrac_ctl.py storage-list -e
+python redfish_ctl.py storage-list -e
 
 Author Mus spyroot@gmail.com
 """

@@ -1,6 +1,6 @@
 """Submit a Redfish test event (EventService.SubmitTestEvent).
 
-    idrac_ctl event-submit-test --message_id Alert.1.0.TestEvent
+    redfish_ctl event-submit-test --message_id Alert.1.0.TestEvent
 
 Fires a synthetic event through the box's EventService so you can verify an
 event subscription / SSE pipeline end to end. Reversible (it just emits one

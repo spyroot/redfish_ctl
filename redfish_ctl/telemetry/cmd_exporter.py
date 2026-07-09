@@ -1,8 +1,8 @@
 """Expose Redfish telemetry as Prometheus or SignalFx metrics.
 
-    idrac_ctl exporter
-    idrac_ctl exporter --once --output prometheus
-    idrac_ctl exporter --once --output signalfx
+    redfish_ctl exporter
+    redfish_ctl exporter --once --output prometheus
+    redfish_ctl exporter --once --output signalfx
 
 The exporter is read-only. It walks modern Redfish telemetry resources and
 normalizes them into the ``hw.*`` metric contract used by the GB300/NV72

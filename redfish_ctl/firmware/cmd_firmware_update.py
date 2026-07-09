@@ -1,7 +1,7 @@
 """Flash firmware via Redfish UpdateService.SimpleUpdate (guarded).
 
-    idrac_ctl firmware-update --image_uri http://host/fw.bin              # dry-run
-    idrac_ctl firmware-update --image_uri http://host/fw.bin --confirm    # flash
+    redfish_ctl firmware-update --image_uri http://host/fw.bin              # dry-run
+    redfish_ctl firmware-update --image_uri http://host/fw.bin --confirm    # flash
 
 Resolves ``#UpdateService.SimpleUpdate`` from the UpdateService's own Actions
 block (no hardcoded id) and POSTs {ImageURI, TransferProtocol?} through the

@@ -1,6 +1,6 @@
 """Read Redfish TelemetryService Triggers (metric alert thresholds).
 
-    idrac_ctl telemetry-triggers
+    redfish_ctl telemetry-triggers
 
 Walks ``/redfish/v1/TelemetryService/Triggers`` -> each Trigger, returning
 {Id, MetricType, MetricProperties, Thresholds, TriggerActions}. Triggers are the

@@ -83,7 +83,7 @@ class QueryAccountService(IDracManager,
                 oem_account_types: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes query command
-        python idrac_ctl.py query
+        python redfish_ctl.py query
 
         :param oem_account_types:  return list of oem account types
         :param account_types: return list account types

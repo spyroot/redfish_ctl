@@ -1,6 +1,6 @@
 """Read per-adapter network Port link state across all Chassis.
 
-    idrac_ctl network-ports
+    redfish_ctl network-ports
 
 Walks ``/redfish/v1/Chassis`` -> each chassis ``NetworkAdapters`` -> each adapter
 -> its ``Ports`` collection, returning {Chassis, Adapter, Port, LinkStatus,

@@ -1,6 +1,6 @@
 """Read Redfish TelemetryService MetricReportDefinitions (what each report contains).
 
-    idrac_ctl metric-definitions
+    redfish_ctl metric-definitions
 
 Walks ``/redfish/v1/TelemetryService/MetricReportDefinitions`` -> each definition,
 returning {Definition, Type, Report, MetricCount}. This is the companion to the

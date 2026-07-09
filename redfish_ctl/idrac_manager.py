@@ -1,6 +1,6 @@
 """iDRAC IDracManager
 
-idrac_ctl interacts with iDRAC via REST API interface.
+redfish_ctl interacts with iDRAC via REST API interface.
 
 Main class command line tools utilizes. Each command must inherit
 from this class. The class itself provides a register pattern where
@@ -69,7 +69,7 @@ from .redfish_manager import CommandResult, RedfishManager
 from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
 from .redfish_task_state import TaskState, TaskStatus
 
-module_logger = logging.getLogger('idrac_ctl.idrac_manager')
+module_logger = logging.getLogger('redfish_ctl.idrac_manager')
 
 
 class IDracManager(RedfishManager):
@@ -364,7 +364,7 @@ class IDracManager(RedfishManager):
 
     def api_get_call(
             self, req: str, hdr: Dict) -> requests.models.Response:
-        """Make api request either with x-auth authentication header or idrac_ctl.
+        """Make api request either with x-auth authentication header or redfish_ctl.
         :param req:  request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
         :return: request.
@@ -466,8 +466,8 @@ class IDracManager(RedfishManager):
         if Task Status or TaskState absent from response UnexpectedResponse raised.
 
         :param resp: a requests.models.Response object.
-        :return:  idrac_ctl.TaskState and idrac_ctl.TaskStatus
-        :raise  idrac_ctl.UnexpectedResponse: If the response body does not
+        :return:  redfish_ctl.TaskState and redfish_ctl.TaskStatus
+        :raise  redfish_ctl.UnexpectedResponse: If the response body does not
             contain a task state.
         """
         try:
@@ -952,7 +952,7 @@ class IDracManager(RedfishManager):
 
     async def api_async_post_call(
             self, loop, req: str, payload: str, hdr: Dict):
-        """Make post api request either with x-auth authentication header or idrac_ctl.
+        """Make post api request either with x-auth authentication header or redfish_ctl.
         :param loop:  asyncio event loop
         :param req:  request
         :param payload:  json payload
@@ -993,7 +993,7 @@ class IDracManager(RedfishManager):
             ignore_error_code: Optional[int] = 0
     ) -> Tuple[requests.models.Response, IdracApiRespond]:
         """Make async patch api request until completion , it issues post with x-auth
-        authentication header or idrac_ctl. Caller can use this in asyncio routine.
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
         :param expected:
         :param ignore_error_code:
@@ -1019,7 +1019,7 @@ class IDracManager(RedfishManager):
             ignore_error_code: Optional[int] = 0
     ) -> Tuple[requests.models.Response, IdracApiRespond]:
         """Make async patch api request until completion , it issues post with x-auth
-        authentication header or idrac_ctl. Caller can use this in asyncio routine.
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
         :param expected:
         :param ignore_error_code:
@@ -1045,7 +1045,7 @@ class IDracManager(RedfishManager):
             ignore_error_code: Optional[int] = 0
     ) -> Tuple[requests.models.Response, IdracApiRespond]:
         """Make async post api request until completion , it issues post with x-auth
-        authentication header or idrac_ctl. Caller can use this in asyncio routine.
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
         :param expected:
         :param r: request.
@@ -1094,7 +1094,7 @@ class IDracManager(RedfishManager):
     async def api_async_patch_call(
             self, loop, req, payload: str, hdr: Dict):
         """Make async post api request either with
-        x-auth authentication header or idrac_ctl.
+        x-auth authentication header or redfish_ctl.
 
         :param loop:  asyncio event loop
         :param req:  request
@@ -1126,7 +1126,7 @@ class IDracManager(RedfishManager):
     async def api_async_delete_call(
             self, loop, req, payload: str, hdr: Dict):
         """Make async delete api request either with
-        x-auth authentication header or idrac_ctl.
+        x-auth authentication header or redfish_ctl.
 
         :param loop:  asyncio event loop
         :param req:  request
@@ -1966,7 +1966,7 @@ class IDracManager(RedfishManager):
                     is_remote_share: Optional[bool] = False,
                     is_reboot: Optional[bool] = False):
         """
-        This idrac_ctl optional parser for all sub command
+        This redfish_ctl optional parser for all sub command
         that most of command share.
         Each sub-command can add additional optional flags and args.
         :param is_async: will add to optional group async

@@ -294,8 +294,8 @@ class Discovery(IDracManager,
                 include_log_entries: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes discovery action command
-        python idrac_ctl discovery
-        python idrac_ctl discovery --network 192.168.254.0/24
+        python redfish_ctl discovery
+        python redfish_ctl discovery --network 192.168.254.0/24
 
         With ``scan_network`` set, this is a credential-less segment scan for
         Redfish BMCs (returns a list of {IP, Vendor, Product, RedfishVersion,

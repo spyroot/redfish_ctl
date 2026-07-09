@@ -47,7 +47,7 @@ class JobDel(IDracManager,
                 **kwargs) -> CommandResult:
         """Executes delete job from iDRAC action
 
-        python idrac_ctl.py del_job --job_id RID_744980379189
+        python redfish_ctl.py del_job --job_id RID_744980379189
 
         :param job_id: iDRAC job_id JID_744718373591
         :param do_async: note async will subscribe to an event loop.

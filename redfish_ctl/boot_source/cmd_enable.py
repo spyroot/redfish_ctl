@@ -5,10 +5,10 @@ so it is used during a boot process. BootSources settings,
 require a system reset to apply.
 
 For example.
-idrac_ctl boot-source-enable --dev NIC.Slot.8-1 --enable yes
+redfish_ctl boot-source-enable --dev NIC.Slot.8-1 --enable yes
 
 Example
-idrac_ctl boot-source-enable --dev NIC.Slot.8-1 --enable yes --reboot
+redfish_ctl boot-source-enable --dev NIC.Slot.8-1 --enable yes --reboot
 
 Enables boot on nic slot 8-1
 

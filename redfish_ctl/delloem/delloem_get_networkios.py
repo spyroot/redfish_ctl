@@ -49,7 +49,7 @@ class GetNetworkIsoAttachStatus(IDracManager,
             "DriversAttachStatus": "NotAttached",
             "ISOAttachStatus": "NotAttached"
         }
-        python idrac_ctl.py chassis
+        python redfish_ctl.py chassis
         :param do_reboot: reboot
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query

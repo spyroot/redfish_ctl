@@ -1,7 +1,7 @@
 """Console entry point for ``redfish-discover``.
 
-This wires the pure pieces (:func:`idrac_ctl.discover.classifier.classify_vendor`
-and :func:`idrac_ctl.discover.scanner.scan_subnet`) into a CLI and renders the
+This wires the pure pieces (:func:`redfish_ctl.discover.classifier.classify_vendor`
+and :func:`redfish_ctl.discover.scanner.scan_subnet`) into a CLI and renders the
 results as a table. Rendering prefers ``rich`` when it is importable and the
 output is a real terminal; otherwise it falls back to a fixed-width plain-text
 table so the tool works in pipes, logs, and CI.
@@ -143,7 +143,7 @@ def make_http_fetcher(
         timeout: float = 2.0) -> AsyncGet:
     """Build an async fetcher that GETs a host's Redfish ServiceRoot.
 
-    Returns an :data:`~idrac_ctl.discover.scanner.AsyncGet`: an ``async`` callable
+    Returns an :data:`~redfish_ctl.discover.scanner.AsyncGet`: an ``async`` callable
     that, given a host, performs ONE bounded, read-only GET of
     ``{scheme}://{host}:{port}/redfish/v1/`` and returns the parsed ServiceRoot
     dict, or ``None`` when the host does not answer with a usable Redfish document
@@ -151,7 +151,7 @@ def make_http_fetcher(
 
     The blocking ``requests`` call runs in a worker thread via
     :func:`asyncio.to_thread`, so awaiting the fetcher never blocks the event loop
-    and :func:`~idrac_ctl.discover.scanner.scan_subnet` can probe many hosts
+    and :func:`~redfish_ctl.discover.scanner.scan_subnet` can probe many hosts
     concurrently. Any transport error (timeout, refused, TLS, DNS) is swallowed
     and reported as ``None`` — one dead host must not abort a subnet scan.
 

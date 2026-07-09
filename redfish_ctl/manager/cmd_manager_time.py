@@ -1,9 +1,9 @@
 """Read or set the BMC (Manager) clock via Redfish ``DateTime``.
 
-    idrac_ctl manager-time                        # read each manager's clock
-    idrac_ctl manager-time --now                  # set to this host's current UTC
-    idrac_ctl manager-time --set 2026-07-02T20:00:00+00:00
-    idrac_ctl manager-time --now --offset +00:00
+    redfish_ctl manager-time                        # read each manager's clock
+    redfish_ctl manager-time --now                  # set to this host's current UTC
+    redfish_ctl manager-time --set 2026-07-02T20:00:00+00:00
+    redfish_ctl manager-time --now --offset +00:00
 
 Reads by default; it **writes only** when ``--now`` or ``--set`` is given (a
 deliberate mutation, same read-first pattern as ``discovery``/``bmc-scan``).

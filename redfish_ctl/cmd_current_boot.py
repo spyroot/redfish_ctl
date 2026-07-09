@@ -57,7 +57,7 @@ class GetCurrentBoot(IDracManager,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Query information for boot settings.
-        Example python idrac_ctl.py get_boot_source --dev "HardDisk.List.1-1"
+        Example python redfish_ctl.py get_boot_source --dev "HardDisk.List.1-1"
 
         :param do_async: note async will subscribe to an event loop.
         :param verbose:

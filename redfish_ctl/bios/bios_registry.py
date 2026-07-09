@@ -1,14 +1,14 @@
 """iDRAC query bios registry
 
 Command provides raw query bios registry.
-idrac_ctl bios-registry --attr_name SystemServiceTag,OldSetupPassword
+redfish_ctl bios-registry --attr_name SystemServiceTag,OldSetupPassword
 
 Will return SystemServiceTag,OldSetupPassword and list of all attributes.
 
 If we only need get values for particular options.
-idrac_ctl --nocolor -d bios-registry --attr_name EnergyPerformanceBias --option_only
+redfish_ctl --nocolor -d bios-registry --attr_name EnergyPerformanceBias --option_only
 
-idrac_ctl bios-registry --attr_list --attr_name SystemServiceTag,OldSetupPassword
+redfish_ctl bios-registry --attr_list --attr_name SystemServiceTag,OldSetupPassword
 
 Author Mus spyroot@gmail.com
 """

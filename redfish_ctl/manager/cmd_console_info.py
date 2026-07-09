@@ -1,6 +1,6 @@
 """Report the console access each Manager exposes (serial / graphical / shell).
 
-    idrac_ctl console-info
+    redfish_ctl console-info
 
 Walks every Manager and reports its ``SerialConsole``, ``GraphicalConsole`` and
 ``CommandShell`` blocks: {Manager, Console, Enabled, ConnectTypes, MaxSessions}.

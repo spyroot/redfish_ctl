@@ -1,7 +1,7 @@
 """Report or enable the host serial console together with BMC Serial-over-LAN.
 
-    idrac_ctl serial-console                       # report current state
-    idrac_ctl serial-console --enable --confirm    # enable BIOS redirection + SOL
+    redfish_ctl serial-console                       # report current state
+    redfish_ctl serial-console --enable --confirm    # enable BIOS redirection + SOL
 
 An out-of-band serial console needs two coupled settings:
 

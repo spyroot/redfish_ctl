@@ -1,7 +1,7 @@
 """Import or remove an authorized SSH public key for an account (HPE iLO OEM).
 
-    idrac_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub --confirm
-    idrac_ctl account-import-sshkey --username test --remove --confirm
+    redfish_ctl account-import-sshkey --username test --key-file ~/.ssh/id_rsa.pub --confirm
+    redfish_ctl account-import-sshkey --username test --remove --confirm
 
 HPE iLO 5 stores per-account authorized SSH keys under ``Oem.Hpe.SSHKeys`` (a list
 of OpenSSH key strings), set by PATCHing the account resource. This is HPE-specific

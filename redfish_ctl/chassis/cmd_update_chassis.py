@@ -8,7 +8,7 @@ data plane are linked either directly or indirectly through this resource.
 A subsystem that operates outside a system's data plane are not
 accessible to software that runs on the system.
 
- idrac_ctl chassis-update
+ redfish_ctl chassis-update
 
 Author Mus spyroot@gmail.com
 """

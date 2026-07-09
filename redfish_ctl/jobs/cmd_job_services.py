@@ -45,7 +45,7 @@ class JobServices(IDracManager,
                 do_capability: Optional[bool]= False,
                 **kwargs) -> CommandResult:
         """Executes query job services.
-        python idrac_ctl.py
+        python redfish_ctl.py
 
         ServiceCapabilities": {
                  "MaxJobs": 256,

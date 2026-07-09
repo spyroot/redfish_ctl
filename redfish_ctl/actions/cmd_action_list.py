@@ -1,6 +1,6 @@
 """List every Redfish action this box exposes, with its risk level.
 
-    idrac_ctl actions
+    redfish_ctl actions
 
 Read-only. Walks the service tree (Systems, Managers, Chassis and their key
 sub-resources, plus the EventService/CertificateService/UpdateService/

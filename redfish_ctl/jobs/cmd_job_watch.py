@@ -56,7 +56,7 @@ class JobWatch(IDracManager,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Watch current job state and monitor progress.
-        python idrac_ctl job-watch --j JID_766061334802
+        python redfish_ctl job-watch --j JID_766061334802
 
         :param job_id: iDRAC job_id JID_744718373591
         :param do_async: note async will subscribe to an event loop.

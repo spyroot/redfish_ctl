@@ -13,7 +13,7 @@ concurrently:
   BMC and is dropped.
 
 Read-only: one GET per host, no credentials, no mutation. Vendor labeling reuses
-the product-neutral classifier from the sibling ``idrac_ctl.discover`` package.
+the product-neutral classifier from the sibling ``redfish_ctl.discover`` package.
 
 Author Mus spyroot@gmail.com
 """

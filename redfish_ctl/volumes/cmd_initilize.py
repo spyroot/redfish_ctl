@@ -54,7 +54,7 @@ class VolumeInit(IDracManager,
                 data_filter: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes query for chassis.
-        python idrac_ctl.py chassis
+        python redfish_ctl.py chassis
         :param vol_id:
         :param dev_id:
         :param data_filter:

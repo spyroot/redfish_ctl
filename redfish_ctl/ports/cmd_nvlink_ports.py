@@ -1,6 +1,6 @@
 """Read GPU NVLink ports + per-port metrics out-of-band.
 
-    idrac_ctl nvlink-ports
+    redfish_ctl nvlink-ports
 
 Walks ``/redfish/v1/Systems`` -> each System ``Processors`` -> each GPU
 Processor -> its ``Ports`` -> each NVLink Port -> the Port ``Metrics`` leaf,

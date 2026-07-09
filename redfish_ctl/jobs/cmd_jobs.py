@@ -9,7 +9,7 @@ Example.
 
 List of scheduled jobs
 
-idrac_ctl.py jobs --scheduled
+redfish_ctl.py jobs --scheduled
 
 Author Mus spyroot@gmail.com
 """

@@ -1,7 +1,7 @@
 """Scan a network segment for Redfish BMCs.
 
-    idrac_ctl bmc-scan --subnet 10.43.3.0/24
-    idrac_ctl bmc-scan --subnet 10.43.3.0/24 --port 443 --timeout 2 --workers 64
+    redfish_ctl bmc-scan --subnet 10.43.3.0/24
+    redfish_ctl bmc-scan --subnet 10.43.3.0/24 --port 443 --timeout 2 --workers 64
 
 Probes every host in the given CIDR with a single unauthenticated
 ``GET https://<ip>/redfish/v1`` (the Redfish ServiceRoot) and reports the BMCs

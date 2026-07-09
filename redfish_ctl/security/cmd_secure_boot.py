@@ -1,6 +1,6 @@
 """Read Redfish SecureBoot state + key databases (PK/KEK/db/dbx).
 
-    idrac_ctl secure-boot
+    redfish_ctl secure-boot
 
 For every ComputerSystem, reads ``Systems/{id}/SecureBoot`` (enable / mode /
 current-boot) and walks its ``SecureBootDatabases`` collection, returning one row

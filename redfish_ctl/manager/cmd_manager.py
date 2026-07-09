@@ -1,7 +1,7 @@
 """iDRAC manager command
 
 Command provides the option to retrieve iDRAC manager view.
-idrac_ctl manager
+redfish_ctl manager
 
 Author Mus spyroot@gmail.com
 """

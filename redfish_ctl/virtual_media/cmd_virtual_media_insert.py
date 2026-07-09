@@ -5,7 +5,7 @@ For example late we can set boot from virtual medial,
 set one shot boot via one_shot cmd and reboot a host.
 
 Example.  Retrieve list of current boot
-python idrac_ctl.py current_boot
+python redfish_ctl.py current_boot
 
 Note BootSourceOverrideEnabled and BootSourceOverrideTarget empty.
 
@@ -44,7 +44,7 @@ Note BootSourceOverrideEnabled and BootSourceOverrideTarget empty.
     "UefiTargetBootSourceOverride": null
 }
 
-python idrac_ctl.py get_virtual_media
+python redfish_ctl.py get_virtual_media
 
 We note that Image is null and not inserted.
 
@@ -68,7 +68,7 @@ We note that Image is null and not inserted.
             "WriteProtected": true
 
 Insert virtual media
-python idrac_ctl.py insert_virtual_media --uri_path http://my_ip/ubuntu-22.04.1-desktop-amd64.iso --device_id 1
+python redfish_ctl.py insert_virtual_media --uri_path http://my_ip/ubuntu-22.04.1-desktop-amd64.iso --device_id 1
 
 Author Mus spyroot@gmail.com
 """

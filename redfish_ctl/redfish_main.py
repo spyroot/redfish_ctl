@@ -1,6 +1,6 @@
-"""Main entry for idrac_ctl
+"""Main entry for redfish_ctl
 
-The main routine for idrac_ctl , ctl tool leverages iDRAC Manager class.
+The main routine for redfish_ctl , ctl tool leverages iDRAC Manager class.
 to interact with Dell IDRAC.
 
 Each command registered dynamically and dispatch to respected execute method
@@ -387,11 +387,11 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
     subparsers = arg_parser.add_subparsers(
         title='main command',
         metavar="main command",
-        help='list of idrac_ctl commands',
+        help='list of redfish_ctl commands',
         dest="subcommand",
         description='''Each action requires choosing
         a main command bios, boot, etc|n
-        Example: idrac_ctl bios\n''',
+        Example: redfish_ctl bios\n''',
         required=True
     )
 
@@ -422,14 +422,14 @@ def redfish_main_ctl():
     """
     logger.setLevel(logging.ERROR)
     parser = argparse.ArgumentParser(
-        prog="idrac_ctl", add_help=True,
+        prog="redfish_ctl", add_help=True,
         description='''iDrac command line tools. |n
                                      It a standalone command line tool provide option to interact with  |n
                                      Dell iDRAC via Redfish REST API. It supports both asynchronous and |n
                                      synchronous options to interact with iDRAC.|n
                                      Author Mus''',
         epilog='''For more detail, for example, documentation. Make sure to check.
-                                             https://github.com/spyroot/idrac_ctl |n
+                                             https://github.com/spyroot/redfish_ctl |n
                                              The example folder container many examples.
                                              Author Mustafa Bayramov spyroot@gmail.com
                                              ''',
@@ -573,5 +573,5 @@ def redfish_main_ctl():
 
 if __name__ == "__main__":
     # Allow running the CLI without the installed console script, e.g.
-    #   python -m idrac_ctl.redfish_main discovery --network 192.168.254.0/24
+    #   python -m redfish_ctl.redfish_main discovery --network 192.168.254.0/24
     redfish_main_ctl()

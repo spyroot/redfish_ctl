@@ -1,13 +1,13 @@
 """Wait for the BMC Redfish service to be reachable (e.g. after a reboot).
 
-    idrac_ctl wait                          # wait up to 300s for the ServiceRoot to respond
-    idrac_ctl wait --timeout 600 --interval 5
-    idrac_ctl wait --reboot-cycle           # wait to go DOWN then come back (confirm a reboot)
+    redfish_ctl wait                          # wait up to 300s for the ServiceRoot to respond
+    redfish_ctl wait --timeout 600 --interval 5
+    redfish_ctl wait --reboot-cycle           # wait to go DOWN then come back (confirm a reboot)
 
 Polls ``GET /redfish/v1/`` until it returns any HTTP status (200/401/403 all mean
 the BMC is up). Vendor-neutral. Use it after ``manager-reboot`` or a power action
 instead of a hand-rolled sleep loop —
-``idrac_ctl manager-reboot && idrac_ctl wait --reboot-cycle``.
+``redfish_ctl manager-reboot && redfish_ctl wait --reboot-cycle``.
 
 Author Mus spyroot@gmail.com
 """

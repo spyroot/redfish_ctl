@@ -1,16 +1,16 @@
 """Capture a BIOS restore point for transactional, rollback-able changes.
 
-    idrac_ctl bios-snapshot --from_spec change.json -f rollback.json
-    idrac_ctl bios-snapshot --attr_name ProcCStates,LogicalProc
-    idrac_ctl bios-snapshot            # snapshot every attribute
+    redfish_ctl bios-snapshot --from_spec change.json -f rollback.json
+    redfish_ctl bios-snapshot --attr_name ProcCStates,LogicalProc
+    redfish_ctl bios-snapshot            # snapshot every attribute
 
 Reads the host's CURRENT ``Bios.Attributes`` and writes them back out as a
 ``{"Attributes": {...}}`` spec — the exact format ``bios-change --from_spec``
 consumes. So a mutation becomes a transaction:
 
-    idrac_ctl bios-snapshot --from_spec change.json -f rollback.json  # restore point
-    idrac_ctl bios-change   --from_spec change.json   on-reset -r     # apply
-    idrac_ctl bios-change   --from_spec rollback.json on-reset -r     # roll back
+    redfish_ctl bios-snapshot --from_spec change.json -f rollback.json  # restore point
+    redfish_ctl bios-change   --from_spec change.json   on-reset -r     # apply
+    redfish_ctl bios-change   --from_spec rollback.json on-reset -r     # roll back
 
 Scope the snapshot to just the attributes you are changing (``--from_spec`` or
 ``--attr_name``) so the restore point is a precise inverse, not a 300-attribute

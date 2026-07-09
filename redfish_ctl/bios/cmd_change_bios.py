@@ -6,7 +6,7 @@ of BIOS options and --attr_value.
 
 Example:
 
-idrac_ctl bios-change --from_spec ./test.spec.json --show on-reset
+redfish_ctl bios-change --from_spec ./test.spec.json --show on-reset
 
 {
         "Attributes": {

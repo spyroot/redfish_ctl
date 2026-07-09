@@ -4,16 +4,16 @@ Command provides the option to retrieve storage information for specific
 controller disk from iDRAC.
 
 Example
-python idrac_ctl.py storage-get --storage_controller NonRAID.Slot.6-1
+python redfish_ctl.py storage-get --storage_controller NonRAID.Slot.6-1
 
 Expanded
-python idrac_ctl.py storage-get --storage_controller NonRAID.Slot.6-1 -e
+python redfish_ctl.py storage-get --storage_controller NonRAID.Slot.6-1 -e
 
 Filter by OEM
-python idrac_ctl.py storage-get -c AHCI.Embedded.2-1 --filter Oem
+python redfish_ctl.py storage-get -c AHCI.Embedded.2-1 --filter Oem
 
 Filter by Drives and Volumes
-python idrac_ctl.py storage-get -c AHCI.Embedded.2-1 --filter Drives,Volumes
+python redfish_ctl.py storage-get -c AHCI.Embedded.2-1 --filter Drives,Volumes
 
 Author Mus spyroot@gmail.com
 """

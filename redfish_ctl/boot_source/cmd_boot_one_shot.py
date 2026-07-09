@@ -80,7 +80,7 @@ class BootOneShot(IDracManager,
                 do_power_on: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Query information for particular boot source device from idrac.
-        Example python idrac_ctl.py get_boot_source --dev "HardDisk.List.1-1"
+        Example python redfish_ctl.py get_boot_source --dev "HardDisk.List.1-1"
 
         VenHw(986D1755-B9D0-4F8D-A0DA-D1DB18672045)
 

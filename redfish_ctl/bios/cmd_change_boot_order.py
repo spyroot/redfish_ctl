@@ -1,7 +1,7 @@
 """iDRAC change boot order and boot options.
 It requires server reboot.
 
-python idrac_ctl.py change-boot-order --from_spec specs/change_boot_order_spec.json
+python redfish_ctl.py change-boot-order --from_spec specs/change_boot_order_spec.json
 
 Author Mus spyroot@gmail.com
 """

@@ -1,8 +1,8 @@
 """Create, update, and delete Redfish accounts (ManagerAccount).
 
-    idrac_ctl account-create --username test --password '***' --role ReadOnly --confirm
-    idrac_ctl account-update --username test --role Operator --confirm
-    idrac_ctl account-delete --username test --confirm
+    redfish_ctl account-create --username test --password '***' --role ReadOnly --confirm
+    redfish_ctl account-update --username test --role Operator --confirm
+    redfish_ctl account-delete --username test --confirm
 
 Vendor-neutral: create POSTs to the AccountService ``Accounts`` collection,
 update PATCHes ``Accounts/<id>``, delete DELETEs it — all standard Redfish that

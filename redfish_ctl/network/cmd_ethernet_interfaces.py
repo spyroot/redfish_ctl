@@ -1,6 +1,6 @@
 """Read Redfish EthernetInterfaces (host + BMC NIC IP/MAC/VLAN config).
 
-    idrac_ctl ethernet-interfaces
+    redfish_ctl ethernet-interfaces
 
 Walks every ComputerSystem and Manager, follows their ``EthernetInterfaces``
 collection, and returns {Source, Id, Name, MACAddress, LinkStatus, SpeedMbps,

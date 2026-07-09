@@ -1,7 +1,7 @@
 """Read Redfish log service entries (system event / IML / SEL / manager logs).
 
-    idrac_ctl logs
-    idrac_ctl logs --limit 20
+    redfish_ctl logs
+    redfish_ctl logs --limit 20
 
 Walks every ComputerSystem and Manager, follows their ``LogServices`` collection
 -> each log service -> its ``Entries``, flattening to {Source, Service, Id,

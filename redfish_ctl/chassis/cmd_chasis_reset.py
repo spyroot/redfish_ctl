@@ -1,6 +1,6 @@
 """iDRAC reset a chassis power state.
 
- idrac_ctl chassis-reset --reset_type ForceOff
+ redfish_ctl chassis-reset --reset_type ForceOff
 
 Author Mus spyroot@gmail.com
 """

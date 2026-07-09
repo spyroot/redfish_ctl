@@ -227,7 +227,7 @@ class RedfishAction:
 
 
 class Singleton(type):
-    """This idrac_ctl class for all action that singleton
+    """This redfish_ctl class for all action that singleton
     """
     _instances = {}
 

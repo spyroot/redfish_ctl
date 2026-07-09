@@ -1,6 +1,6 @@
 """iDRAC Redfish API with Dell OEM extension to detach network iso.
 
-python idrac_ctl.py oem-detach
+python redfish_ctl.py oem-detach
 
 Author Mus spyroot@gmail.com
 """

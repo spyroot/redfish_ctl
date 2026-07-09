@@ -1,10 +1,10 @@
 """iDRAC Redfish API with Dell OEM extension
 to boot from network ISO.
 
-python idrac_ctl.py oem-boot-netios --ip_addr $MYIP \
+python redfish_ctl.py oem-boot-netios --ip_addr $MYIP \
 --share_name sambashare --remote_image ubuntu-22.04.1-desktop-amd64.iso
 
-python idrac_ctl.py oem-attach-status
+python redfish_ctl.py oem-attach-status
 {
     "DriversAttachStatus": "NotAttached",
     "ISOAttachStatus": "Attached"

@@ -4,7 +4,7 @@ This cmd return Dell Boot Sources configuration for
 a particular boot source.
 
 Example.
-idrac_ctl boot-source --dev NIC.Slot.8-1
+redfish_ctl boot-source --dev NIC.Slot.8-1
 
 Author Mus spyroot@gmail.com
 """
@@ -39,7 +39,7 @@ class BootSource(IDracManager,
         :return:
         """
         cmd_parser = cls.base_parser(is_reboot=True, is_file_save=True)
-        # idrac_ctl.py boot-source-get --dev NIC.Slot.8-1
+        # redfish_ctl.py boot-source-get --dev NIC.Slot.8-1
 
         cmd_parser.add_argument(
             '--dev', required=False, dest="boot_source",
@@ -58,7 +58,7 @@ class BootSource(IDracManager,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Query information for particular boot source device from idrac.
-        Example python idrac_ctl.py boot-source-get --dev "HardDisk.List.1-1"
+        Example python redfish_ctl.py boot-source-get --dev "HardDisk.List.1-1"
 
         :param boot_source: a device HardDisk.List.1-1
         :param do_async: note async will subscribe to an event loop.

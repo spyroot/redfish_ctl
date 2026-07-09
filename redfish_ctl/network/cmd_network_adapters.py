@@ -1,6 +1,6 @@
 """Read Redfish NetworkAdapters across all Chassis (NICs + DPUs).
 
-    idrac_ctl network-adapters
+    redfish_ctl network-adapters
 
 Walks ``/redfish/v1/Chassis`` -> each chassis ``NetworkAdapters`` collection ->
 each adapter, returning {Chassis, Id, Model, Manufacturer, DeviceClass,

@@ -1,6 +1,6 @@
 """Inventory vendor OEM extensions across the main resources (vendor-neutral).
 
-    idrac_ctl oem-info
+    redfish_ctl oem-info
 
 Walks every ComputerSystem, Manager, and Chassis, reads each resource's ``Oem``
 block, and reports one row per vendor extension: {Resource, Vendor, Type, Keys}.

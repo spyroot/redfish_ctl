@@ -1,6 +1,6 @@
 """iDRAC command return virtual media.
 
-idrac_ctl get_vm
+redfish_ctl get_vm
 
 Command provides the option to retrieve virtual media from iDRAC
 and serialize back to caller as JSON, YAML, or XML.
@@ -8,7 +8,7 @@ In addition, it automatically registered to the command line ctl tool.
 Similarly to the rest command caller can save to a file and
 consume asynchronously or synchronously.
 
-idrac_ctl get_vm
+redfish_ctl get_vm
 
 - Each command return a result and list of REST Actions.
 - Each command loaded based __init__ hence anyone can extend and add custom command.

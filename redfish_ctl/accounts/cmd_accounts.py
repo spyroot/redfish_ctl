@@ -49,7 +49,7 @@ class QueryAccounts(IDracManager,
                 is_username_only: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes query command
-        python idrac_ctl.py
+        python redfish_ctl.py
 
         :param is_username_only:  filter and only output username,
         :param do_async: note async will subscribe to an event loop.

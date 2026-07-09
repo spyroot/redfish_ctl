@@ -48,7 +48,7 @@ class QueryIDRAC(
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes query command
-        python idrac_ctl.py query
+        python redfish_ctl.py query
 
         :param resource: path to a resource
         :param do_async: note async will subscribe to an event loop.

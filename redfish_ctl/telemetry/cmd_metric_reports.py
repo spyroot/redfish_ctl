@@ -1,7 +1,7 @@
 """Read Redfish TelemetryService MetricReports (out-of-band, incl. GPU/accelerator).
 
-    idrac_ctl metric-reports
-    idrac_ctl metric-reports --report ProcessorMetrics
+    redfish_ctl metric-reports
+    redfish_ctl metric-reports --report ProcessorMetrics
 
 Walks ``/redfish/v1/TelemetryService/MetricReports`` -> each MetricReport ->
 its ``MetricValues``, flattening to {Report, MetricProperty, MetricValue,

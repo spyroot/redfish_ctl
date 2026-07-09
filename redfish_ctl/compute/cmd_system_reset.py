@@ -1,7 +1,7 @@
 """Reset a host ComputerSystem (ComputerSystem.Reset), vendor-neutral + guarded.
 
-    idrac_ctl system-reset --reset_type GracefulRestart            # dry-run preview
-    idrac_ctl system-reset --reset_type GracefulRestart --confirm  # actually reset
+    redfish_ctl system-reset --reset_type GracefulRestart            # dry-run preview
+    redfish_ctl system-reset --reset_type GracefulRestart --confirm  # actually reset
 
 Powers/reboots the host via the ComputerSystem's own ``#ComputerSystem.Reset``
 action, discovered from the resource (no hardcoded Dell path), so it works on the

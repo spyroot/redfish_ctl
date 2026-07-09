@@ -1,6 +1,6 @@
 """Read Redfish Sensors across all Chassis (generic, vendor-neutral).
 
-    idrac_ctl sensors
+    redfish_ctl sensors
 
 Walks ``/redfish/v1/Chassis`` -> each chassis ``Sensors`` collection -> each
 Sensor, returning Chassis/Name/Reading/ReadingUnits/Health. Navigation is by

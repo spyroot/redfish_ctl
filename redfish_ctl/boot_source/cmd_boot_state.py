@@ -1,6 +1,6 @@
 """Infer what a host will boot and its OS-deployment posture.
 
-    idrac_ctl boot-state
+    redfish_ctl boot-state
 
 Synthesizes the boot/OS state from standard Redfish: the host ``System.Boot``
 (mode, override, order), its ``BootOptions`` (what is bootable), and mounted

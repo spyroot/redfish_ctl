@@ -5,16 +5,16 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
 
-idrac_ctl --json bios --filter SystemModelName
-idrac_ctl --json bios --filter systemmodelname
-idrac_ctl --json bios --filter ProcCStates
+redfish_ctl --json bios --filter SystemModelName
+redfish_ctl --json bios --filter systemmodelname
+redfish_ctl --json bios --filter ProcCStates
 
 Piping to JQ.
-idrac_ctl --nocolor bios --filter ProcCStates,SysMemSize | jq '.data'
+redfish_ctl --nocolor bios --filter ProcCStates,SysMemSize | jq '.data'
 
 Filter by multiple attributes, note you search done case in sensitive
 
-idrac_ctl --json bios --filter systemmodelname,ProcCStates
+redfish_ctl --json bios --filter systemmodelname,ProcCStates
 {
     "ProcCStates": "Disabled",
     "systemmodelname": "PowerEdge R740"
@@ -125,7 +125,7 @@ class BiosQuery(IDracManager,
         It supports filtering via coma separate list bios attributes
         or caller can pass a json file
         each attribute read form JSON file that contains a list of keys
-        python idrac_ctl.py --nocolor bios --from_file specs/bios_query.json
+        python redfish_ctl.py --nocolor bios --from_file specs/bios_query.json
 
         :param attr_filter: Filters by BIOS attributes. Each value is a JSON key.
                             If we need a query on multiply param, attr_filter must have a

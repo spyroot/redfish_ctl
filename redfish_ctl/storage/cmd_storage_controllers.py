@@ -13,10 +13,10 @@ On return will hold list of controller in CommandResult.data
  'AHCI.Slot.4-1',
  'AHCI.Embedded.2-1']
 
-python idrac_ctl.py storage
+python redfish_ctl.py storage
 
 Example: filter by controller type
-idrac_ctl.py --json storage --filter AHCI
+redfish_ctl.py --json storage --filter AHCI
 
 [
     "AHCI.Embedded.1-1",

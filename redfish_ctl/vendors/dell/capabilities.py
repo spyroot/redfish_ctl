@@ -2,8 +2,8 @@
 
 Encodes facts from the Dell iDRAC Redfish API docs (query parameters, recurring
 JobService scheduling, lifecycle events). Dell-specific command modules migrate
-into this package incrementally (today they live in ``idrac_ctl/idrac_manager.py``
-and ``idrac_ctl/delloem/``); this profile lets commands gate Dell-only behavior.
+into this package incrementally (today they live in ``redfish_ctl/idrac_manager.py``
+and ``redfish_ctl/delloem/``); this profile lets commands gate Dell-only behavior.
 
 Author Mus spyroot@gmail.com
 """

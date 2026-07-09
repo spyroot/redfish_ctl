@@ -3,7 +3,7 @@
 Command provides the option to eject  virtual disk from iDRAC.
 
 Example:
-    python idrac_ctl.py eject_virtual_media --device_id 1
+    python redfish_ctl.py eject_virtual_media --device_id 1
 
 Will eject virtual device id 1
 

@@ -13,9 +13,9 @@ Requires the SFT-DCMS-SINGLE license active on the BMC. Old X10 BMCs speak only
 SMB1/NT1, so the CIFS server must offer NT1 (see home_automation/serve_media.sh).
 
 Examples:
-    idrac_ctl vm-mount --host 192.168.254.192 --path /dl/ubuntu.iso --user iso --password isopass123
-    idrac_ctl vm-mount --status
-    idrac_ctl vm-mount --unmount
+    redfish_ctl vm-mount --host 192.168.254.192 --path /dl/ubuntu.iso --user iso --password isopass123
+    redfish_ctl vm-mount --status
+    redfish_ctl vm-mount --unmount
 
 Author Mus spyroot@gmail.com
 """

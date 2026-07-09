@@ -1,6 +1,6 @@
 """Read Redfish ComponentIntegrity (SPDM attestation / Root-of-Trust).
 
-    idrac_ctl component-integrity
+    redfish_ctl component-integrity
 
 Walks ``/redfish/v1/ComponentIntegrity`` -> each ComponentIntegrity leaf,
 returning {Id, Type, Version, Enabled, TargetComponentURI, CertificateURI}.
