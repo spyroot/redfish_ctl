@@ -52,6 +52,21 @@ from .idrac_manager import IDracManager
 from .idrac_shared import RedfishAction, RedfishActionEncoder
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 
+
+def _env(*names, default=""):
+    """Return the first non-empty environment variable among ``names``.
+
+    Used to read the going-forward ``REDFISH_*`` endpoint/credential variables while
+    still honoring the legacy ``IDRAC_*`` names during the rename: pass the REDFISH_
+    name first, the IDRAC_ name second, so REDFISH_ wins when both are set.
+    """
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return default
+
+
 try:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 except ImportError:
@@ -413,27 +428,28 @@ def idrac_main_ctl():
 
     credentials = parser.add_argument_group('credentials', '# idrac credentials details.')
 
-    # global args
+    # global args. Endpoint/credentials read the going-forward REDFISH_* env vars
+    # first, falling back to the legacy IDRAC_* names (both work during the rename).
     credentials.add_argument(
         '--idrac_ip', required=False, type=str,
-        default=os.environ.get('IDRAC_IP', ''),
-        help="idrac ip address, by default "
-             "read from environment IDRAC_IP.")
+        default=_env('REDFISH_IP', 'IDRAC_IP'),
+        help="BMC ip address, by default "
+             "read from environment REDFISH_IP (or legacy IDRAC_IP).")
     credentials.add_argument(
         '--idrac_username', required=False, type=str,
-        default=os.environ.get('IDRAC_USERNAME', 'root'),
-        help="idrac ip address, by default "
-             "read from environment IDRAC_USERNAME.")
+        default=_env('REDFISH_USERNAME', 'IDRAC_USERNAME', default='root'),
+        help="BMC username, by default "
+             "read from environment REDFISH_USERNAME (or legacy IDRAC_USERNAME).")
     credentials.add_argument(
         '--idrac_password', required=False, type=str,
-        default=os.environ.get('IDRAC_PASSWORD', ''),
-        help="idrac ip address, by default "
-             "read from environment IDRAC_PASSWORD.")
+        default=_env('REDFISH_PASSWORD', 'IDRAC_PASSWORD'),
+        help="BMC password, by default "
+             "read from environment REDFISH_PASSWORD (or legacy IDRAC_PASSWORD).")
     credentials.add_argument(
         '--idrac_port', required=False, type=int,
-        default=int(os.environ.get('IDRAC_PORT', 443)),
-        help="idrac port address, by default "
-             "read from environment IDRAC_PORT.")
+        default=int(_env('REDFISH_PORT', 'IDRAC_PORT', default='443')),
+        help="BMC port, by default "
+             "read from environment REDFISH_PORT (or legacy IDRAC_PORT).")
     credentials.add_argument(
         '--insecure', action='store_true', required=False, default=False,
         help="skip TLS certificate verification (explicit form of the "
