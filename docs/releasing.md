@@ -22,6 +22,32 @@ python -m pip install .
 redfish_ctl --version
 ```
 
+## Automated release (recommended, tokenless)
+
+The going-forward release path is tag-triggered and needs no PyPI token on anyone's machine. It is
+driven by `.github/workflows/release.yml` using PyPI **Trusted Publishing** (OIDC), which also makes
+PyPI show *verified* project details instead of "unverified".
+
+```bash
+python scripts/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
+git add redfish_ctl/version.py
+git commit -m "Release 1.1.2"
+git push origin main
+git tag v1.1.2 && git push origin v1.1.2   # <- this is what publishes
+```
+
+On the tag push, the workflow verifies the tag equals `redfish_ctl/version.py` (a mismatch or a
+duplicate version fails before upload), builds, `twine check`s, publishes to PyPI via OIDC, and cuts
+a GitHub Release with the artifacts attached. `scripts/bump_version.py` never runs git itself, so the
+tag step stays a deliberate human action.
+
+**One-time PyPI setup** (maintainer, on the web UI): on the `redfish-ctl` project →
+*Settings → Publishing → Add a trusted publisher* → GitHub, owner `spyroot`, repo `redfish_ctl`,
+workflow `release.yml`. After that, no token is needed to release.
+
+The manual steps below remain valid as a fallback (e.g. before the trusted publisher is configured, or
+to publish the one-off `idrac_ctl` deprecation shim under `packaging/idrac_ctl_deprecation/`).
+
 ## Release Checklist
 
 I use this order so a broken package does not reach PyPI:
