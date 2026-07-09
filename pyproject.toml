@@ -1,4 +1,4 @@
-# Tooling configuration for idrac_ctl.
+# Tooling configuration for redfish_ctl.
 #
 # Packaging metadata still lives in setup.py (name, version, entry_points).
 # This file only adds the build backend and the lint/type/test tool config so
@@ -9,7 +9,7 @@ requires = ["setuptools>=67.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]
-# idrac_ctl targets Python 3.10+ (see setup.py python_requires).
+# redfish_ctl targets Python 3.10+ (see setup.py python_requires).
 target-version = "py310"
 line-length = 100
 extend-exclude = ["build", "dist", "venv", ".venv"]
@@ -22,8 +22,8 @@ select = ["F", "E", "W", "I"]
 ignore = ["E501"]
 
 [tool.coverage.run]
-source = ["idrac_ctl"]
-omit = ["idrac_ctl/json_responses/*", "*/tests/*"]
+source = ["redfish_ctl"]
+omit = ["redfish_ctl/json_responses/*", "*/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -40,7 +40,7 @@ check_untyped_defs = false
 testpaths = ["tests"]
 # Collect only the test_*.py convention (skips stray *_test.py scratch files).
 python_files = ["test_*.py"]
-# Make the repo root importable so `import idrac_ctl` resolves to the source
+# Make the repo root importable so `import redfish_ctl` resolves to the source
 # tree regardless of how pytest is launched.
 pythonpath = ["."]
 # Tests that need a reachable iDRAC must be marked @pytest.mark.live; they are

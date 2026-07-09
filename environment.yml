@@ -1,11 +1,11 @@
-# Conda development environment for idrac_ctl.
+# Conda development environment for redfish_ctl.
 #
 # Create:   conda env create -f environment.yml
 # Update:   conda env update -f environment.yml --prune
-# Activate: conda activate idrac_ctl
+# Activate: conda activate redfish_ctl
 #
 # Runtime deps mirror requirements.txt; the rest are dev/test tooling.
-name: idrac_ctl
+name: redfish_ctl
 channels:
   - conda-forge
 dependencies:
@@ -28,5 +28,5 @@ dependencies:
   # Optional TUI ("tui" extra in setup.py): pretty tables for redfish-discover.
   - rich>=13
   - pip:
-      # Install idrac_ctl itself (and anything not on conda-forge) via pip.
+      # Install redfish_ctl itself (and anything not on conda-forge) via pip.
       - -e .
