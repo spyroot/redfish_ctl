@@ -30,6 +30,53 @@ def test_boot_query(redfish_api):
     assert result.data["@odata.id"].endswith("/BootSources")
 
 
+def test_boot_query_falls_back_to_system_boot_when_bootsources_missing(
+    redfish_mock, redfish_service
+):
+    """boot_query falls back to standard ComputerSystem Boot when BootSources 404s."""
+    boot_sources_key = "_redfish_v1_systems_system.embedded.1_bootsources.json"
+    redfish_service._index = dict(redfish_service._index)
+    assert boot_sources_key in redfish_service._index
+    redfish_service._index.pop(boot_sources_key)
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootQuery, "boot_query"
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.discovered is None
+    assert result.extra is None
+    assert result.error is None
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data == {
+        "BootSourceOverrideEnabled": "Disabled",
+        "BootSourceOverrideTarget": "None",
+        "BootSourceOverrideTarget@Redfish.AllowableValues": [
+            "None",
+            "Pxe",
+            "Cd",
+            "Usb",
+            "Hdd",
+            "BiosSetup",
+            "Utilities",
+            "Diags",
+            "SDCard",
+            "UefiTarget",
+            "UefiHttp",
+        ],
+    }
+    paths = [
+        request.path.lower()
+        for request in redfish_service.requests
+    ]
+    boot_sources_path = "/redfish/v1/systems/system.embedded.1/bootsources"
+    system_path = "/redfish/v1/systems/system.embedded.1"
+    boot_sources_idx = paths.index(boot_sources_path)
+    assert system_path in paths[boot_sources_idx + 1:]
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
 def test_current_boot_query_returns_boot_settings(redfish_api):
     """current_boot_query returns the ComputerSystem Boot object."""
     result = redfish_api.sync_invoke(
