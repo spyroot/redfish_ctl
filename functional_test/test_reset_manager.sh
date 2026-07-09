@@ -1,3 +1,3 @@
 #!/bin/bash
 # reset manager object
-python idrac_ctl manager-reboot
+python redfish_ctl manager-reboot

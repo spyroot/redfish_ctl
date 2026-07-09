@@ -1,3 +1,3 @@
 #!/bin/bash
 source ../cluster.env
-python ../../idrac_ctl.py attr --deep
+python ../../redfish_ctl.py attr --deep

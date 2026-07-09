@@ -28,7 +28,7 @@ Each `vendors/<name>/` contains:
 Look up a profile:
 
 ```python
-from idrac_ctl.vendors import get_vendor
+from redfish_ctl.vendors import get_vendor
 caps = get_vendor("dell")           # unknown vendor -> conservative "generic" profile
 if caps.job_scheduling:
     ...
@@ -36,7 +36,7 @@ if caps.job_scheduling:
 
 ## Migration note
 
-Dell command code currently also lives in `idrac_ctl/idrac_manager.py` and
-`idrac_ctl/delloem/`. It migrates into `vendors/dell/` incrementally, alongside the
-planned `idrac_ctl` → `redfish_ctl` rename. The core must never import a vendor
+Dell command code currently also lives in `redfish_ctl/idrac_manager.py` and
+`redfish_ctl/delloem/`. It migrates into `vendors/dell/` incrementally, alongside the
+planned `redfish_ctl` → `redfish_ctl` rename. The core must never import a vendor
 package; vendor packages may depend on the core.

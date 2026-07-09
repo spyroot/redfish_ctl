@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Ubuntu test image and run the offline idrac_ctl suite inside it.
+# Build the Ubuntu test image and run the offline redfish_ctl suite inside it.
 # Confirms Mac/Linux parity (Linux is case-sensitive; macOS is not).
 set -euo pipefail
 

@@ -12,7 +12,7 @@ import glob, json, pathlib
 from tools.redfish_validate import validate_payload, SchemaUnavailable
 
 paths = sorted(glob.glob("tests/idrac_fixtures/*.json")
-               + glob.glob("idrac_ctl/json_responses/*.json"))
+               + glob.glob("redfish_ctl/json_responses/*.json"))
 validated = skipped = 0
 for p in paths:
     payload = json.loads(pathlib.Path(p).read_text())

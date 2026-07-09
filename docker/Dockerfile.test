@@ -1,4 +1,4 @@
-# Ubuntu image that runs the offline idrac_ctl test suite, to confirm the code
+# Ubuntu image that runs the offline redfish_ctl test suite, to confirm the code
 # behaves the same on Linux as on macOS. This matters: requests-mock lowercases
 # paths and Linux is case-SENSITIVE, so a fixture-lookup bug that macOS's
 # case-insensitive filesystem hides would surface here.

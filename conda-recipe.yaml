@@ -1,4 +1,4 @@
-name: idrac_ctl
+name: redfish_ctl
 
 channels:
   - defaults

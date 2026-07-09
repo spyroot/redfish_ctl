@@ -1,3 +1,3 @@
 #!/bin/bash
 source ../device/device.env
-python idrac_ctl.py chassis --filter PowerState
+python redfish_ctl.py chassis --filter PowerState
