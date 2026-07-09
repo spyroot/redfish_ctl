@@ -29,7 +29,7 @@ driven by `.github/workflows/release.yml` using PyPI **Trusted Publishing** (OID
 PyPI show *verified* project details instead of "unverified".
 
 ```bash
-python scripts/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
+python tools/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
 git add redfish_ctl/version.py
 git commit -m "Release 1.1.2"
 git push origin main
@@ -38,7 +38,7 @@ git tag v1.1.2 && git push origin v1.1.2   # <- this is what publishes
 
 On the tag push, the workflow verifies the tag equals `redfish_ctl/version.py` (a mismatch or a
 duplicate version fails before upload), builds, `twine check`s, publishes to PyPI via OIDC, and cuts
-a GitHub Release with the artifacts attached. `scripts/bump_version.py` never runs git itself, so the
+a GitHub Release with the artifacts attached. `tools/bump_version.py` never runs git itself, so the
 tag step stays a deliberate human action.
 
 **One-time PyPI setup** (maintainer, on the web UI): on the `redfish-ctl` project →
