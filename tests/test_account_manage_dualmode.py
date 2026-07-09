@@ -102,3 +102,35 @@ def test_account_delete_dry_run_resolves_target_without_delete(
     assert result.data["target"] == "operator"
     assert result.data["uri"] == ACCOUNT_THREE_PATH
     assert all(request.method != "DELETE" for request in redfish_service.requests)
+
+
+def test_account_delete_confirm_refuses_authenticated_user_without_delete(
+    redfish_mock,
+    redfish_service,
+):
+    """account-delete refuses to delete the logged-in account."""
+    account_two_path = f"{ACCOUNTS_PATH}/2"
+    username = redfish_mock._username
+    redfish_service._overlay[ACCOUNTS_PATH.lower()] = {
+        "@odata.id": ACCOUNTS_PATH,
+        "Members": [{"@odata.id": account_two_path}],
+        "Members@odata.count": 1,
+    }
+    redfish_service._overlay[account_two_path.lower()] = {
+        "@odata.id": account_two_path,
+        "Id": "2",
+        "UserName": username,
+        "RoleId": "Administrator",
+        "Enabled": True,
+    }
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.AccountDelete,
+        "account-delete",
+        acct_user=username,
+        acct_confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error and "self-delete" in result.error
+    assert all(request.method != "DELETE" for request in redfish_service.requests)
