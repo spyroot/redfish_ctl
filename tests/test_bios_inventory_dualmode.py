@@ -81,3 +81,28 @@ def test_bios_inventory_filter_file_selects_list_attributes(
     }
     json.dumps(result.data)
     assert {request.method for request in redfish_service.requests} == {"GET"}
+
+
+def test_bios_inventory_filter_list_saves_filtered_attributes(
+    redfish_mock, redfish_service, tmp_path
+):
+    """A comma-separated BIOS filter returns and saves only matching attributes."""
+    output_file = tmp_path / "bios_filter_save.json"
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosQuery,
+        "bios_inventory",
+        attr_filter="ProcCStates,SysMemSize",
+        filename=str(output_file),
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {
+        "ProcCStates": "Disabled",
+        "SysMemSize": "768 GB",
+    }
+    saved = json.loads(output_file.read_text())
+    assert saved == result.data
+    assert set(saved) == {"ProcCStates", "SysMemSize"}
+    json.dumps(result.data)
+    assert {request.method for request in redfish_service.requests} == {"GET"}
