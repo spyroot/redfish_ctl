@@ -4,9 +4,10 @@ import json
 import pytest
 
 import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
-from redfish_ctl.cmd_exceptions import AuthenticationFailed
+from redfish_ctl.cmd_exceptions import AuthenticationFailed, InvalidArgumentFormat
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.jobs.cmd_jobs import JobList
 from redfish_ctl.redfish_manager import CommandResult
 from tests.test_utils import create_json_resp
 
@@ -195,6 +196,41 @@ def test_job_apply_posts_bios_job_creation_payload_in_mock_mode(
     )
     assert payload["StartTime"] == "TIME_NOW"
     assert payload["EndTime"] == "TIME_NA"
+
+
+def test_create_apply_time_req_rejects_unknown_apply_mode(
+    redfish_mock, redfish_service
+):
+    """Unknown apply-time modes raise instead of returning an empty payload."""
+    with pytest.raises(ValueError, match="Unknown apply time"):
+        redfish_mock.create_apply_time_req(
+            "after-maintenance",
+            start_date="2099-01-01",
+            start_time="01:02:03",
+            default_duration=600,
+        )
+
+    assert redfish_service.requests == []
+
+
+def test_jobs_sources_query_rejects_unknown_job_type_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """Unknown CLI job-type filters raise through the offline command path."""
+    with pytest.raises(InvalidArgumentFormat, match="storage_config unknown job type"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.Jobs,
+            "jobs_sources_query",
+            job_type="storage_config",
+        )
+
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
+def test_jobs_resolve_job_type_rejects_unknown_type():
+    """Unknown job-type helper values raise instead of returning None."""
+    with pytest.raises(ValueError, match="Unknown job type"):
+        JobList.resolve_job_type("storage_config")
 
 
 def test_tasks_list_returns_task_collection_and_actions(redfish_api):
