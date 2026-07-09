@@ -94,6 +94,7 @@ from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
 from .oem.cmd_oem_info import *
 from .manager.cmd_console_info import *
+from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *
 from .chassis.cmd_chassis_query import *
 
