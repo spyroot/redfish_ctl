@@ -1,5 +1,5 @@
 """Offline tests that drive the real Redfish HTTP layer against the captured
-DMTF mockup tree (idrac_ctl/json_responses) via the ``redfish_mock`` fixture.
+DMTF mockup tree (redfish_ctl/json_responses) via the ``redfish_mock`` fixture.
 
 This is the foundation for converting the live (@pytest.mark.live) command tests
 to run without hardware: the same code path that talks to a real iDRAC runs here
