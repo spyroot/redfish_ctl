@@ -63,11 +63,18 @@ setup_info = dict(name='redfish_ctl',
                       ]
                   },
                   extras_require={
+                      # numpy powers the discovery crawl's rest_api_map.npy output
+                      # (imported lazily in discovery/cmd_discovery.py). Optional for
+                      # users; required to run the discovery producer tests.
+                      "discovery": [
+                          "numpy",
+                      ],
                       "dev": [
                           "pytest >= 7",
                           "requests-mock >= 1.10",
                           "ruff",
                           "mypy",
+                          "numpy",
                       ],
                       "schema": [
                           "jsonschema >= 4.18",
