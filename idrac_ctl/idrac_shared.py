@@ -98,6 +98,7 @@ class ApiRequestType(Enum):
     NetworkPorts = auto()
     OemInfo = auto()
     ConsoleInfo = auto()
+    SerialConsoleConfig = auto()
     BiosSnapshot = auto()
     BootState = auto()
     BmcScan = auto()
