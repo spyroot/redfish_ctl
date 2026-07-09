@@ -1,22 +1,24 @@
-# Fixture Capture SOP
+# Contributing Redfish Test Data (Fixtures and Corpora)
 
-This SOP describes how I add Dell iDRAC Redfish fixtures for offline tests.
-The goal is a small, redacted mockup that lets `tests/conftest.py`, the pytest
-mock service, serve real-shaped Redfish resources without contacting hardware.
+This guide explains how to contribute the offline test data `redfish_ctl` runs against: captured
+Redfish resources that let the pytest mock service in `tests/conftest.py` serve real-shaped responses
+for any vendor — Dell iDRAC, Supermicro, HPE iLO, or generic DMTF Redfish — with no hardware in the
+loop. It is written for anyone adding coverage, not just the maintainers.
 
-Default rule: do not capture from production hardware. Use an approved lab iDRAC,
-capture only the read-only resources needed for the test, redact before import,
-and prove the fixture with offline tests before committing it.
+Default rule: never capture from production, or from hardware you are not authorized to read. Use an
+approved lab BMC and a short-lived read-only account, sanitize every file before it enters the repo,
+and prove the data with the offline suite before committing.
 
-There are two capture paths. Use the one that fits:
+Pick the path that matches what you are contributing — the two are deliberately separate:
 
-- **A curated fixture set** (this SOP, below) — a handful of hand-selected, redacted resources for a
-  specific test. Best for a single new command on an already-covered vendor.
-- **A full vendor corpus** (next section) — the whole Redfish tree, crawled with `redfish_ctl`
-  itself, committed under `tests/<vendor>_corpus/`. Best for adding a **new vendor or model**: one
-  full capture lets many later commands be exercised offline with only a thin behavioral test.
+- **Path A — a full BMC crawl.** Capture the *entire* Redfish tree with `redfish_ctl` itself and
+  commit it as a vendor corpus. Best when adding a **new vendor or model**; one capture then backs
+  many later commands with only a thin behavioral test. This is how the Supermicro GB300 and X10
+  corpora were contributed.
+- **Path B — a curated fixture set.** Hand-pick, sanitize, and import only the *handful* of resources
+  one specific test needs. Best when adding or fixing **one command on an already-covered vendor**.
 
-## Contributing a Full Vendor Corpus (crawl the whole tree)
+## Path A — Full BMC crawl (whole tree → vendor corpus)
 
 `redfish_ctl` can capture its own test data. The `discovery` command does a deep crawl of a BMC and
 writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/` —
@@ -58,9 +60,15 @@ exactly the layout the committed corpora use (`tests/supermicro_gb300_corpus/`,
    env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
    ```
 
-The rest of this document is the curated single-fixture path.
+## Path B — Curated fixture set (a few resources → one test)
 
-## Required Tools
+Use this path to add or fix a single command on a vendor the suite already covers. You hand-pick,
+sanitize, and import only the resources that test needs. The commands and file examples below use a
+Dell iDRAC for concreteness, but the same steps apply to any vendor — capture from the approved lab
+BMC, redact, and import under that vendor's fixture directory (`tests/idrac_fixtures/`,
+`tests/supermicro_fixtures/`, `tests/hpe_fixtures/`, `tests/generic_fixtures/`, …).
+
+### Required Tools
 
 - `Redfish-Mockup-Creator`, the DMTF tool from
   [DMTF/Redfish-Mockup-Creator](https://github.com/DMTF/Redfish-Mockup-Creator),
@@ -76,7 +84,7 @@ No API key is required. A capture needs only an approved lab BMC address and a
 temporary BMC account with read-only permission for the resources being captured.
 Never paste credentials into chat, docs, commit messages, logs, or test output.
 
-## Capture
+### Capture
 
 Run the capture from a trusted local shell. `REDFISH_IP`, the endpoint variable read
 by this project and its tests, should point at an approved lab iDRAC. Use a
@@ -114,7 +122,7 @@ raw output outside the repository until redaction and validation are complete.
 Do not pass `--Headers` unless the current task explicitly needs headers and
 you have a redaction plan for auth tokens, cookies, and request IDs.
 
-## Select The Smallest Fixture Set
+### Select The Smallest Fixture Set
 
 Import only the paths needed by the test package. For an S1 test, that usually
 means one collection and one or two leaves, not a full BMC crawl.
@@ -134,7 +142,7 @@ and a `.json` suffix. Do not include query strings in filenames. If a test needs
 an expanded resource, store the expanded shape only when the command actually
 depends on the expanded fields.
 
-## Redact Before Import
+### Redact Before Import
 
 Review every selected JSON file before it enters `tests/idrac_fixtures/`.
 Remove or replace:
@@ -168,7 +176,7 @@ rg -n "$secret_pattern" /tmp/fixture-candidates
 
 This scan is only a guardrail. Read the files yourself before committing them.
 
-## Validate
+### Validate
 
 First prove the JSON parses:
 
@@ -209,7 +217,7 @@ OEM resources often skip validation because no standard DMTF schema exists for
 their private type. That is acceptable when the test asserts the exact command
 behavior that depends on the OEM fields.
 
-## Import
+### Import
 
 Copy only the redacted candidate files into `tests/idrac_fixtures/`. Do not copy
 the whole Mockup Creator tree into the Dell overlay. If the full raw capture is
@@ -224,7 +232,7 @@ The test should assert the command contract:
 - `CommandResult` shape and key fields for read-only commands.
 - No live iDRAC dependency when `REDFISH_IP` is unset.
 
-## Verification Gate
+### Verification Gate
 
 Before committing, run the exact offline gate from a shell with the live variables
 cleared:
