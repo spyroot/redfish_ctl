@@ -48,16 +48,16 @@ redfish_ctl get_vm
 Safety labels:
 
 - **Read**: expected to read state only.
-- **Guarded**: can write, but has a dry-run or confirmation model.
-- **Write**: changes BMC or host state; use only on approved targets.
+- **Guarded**: does not mutate by default; requires `--confirm` or an equivalent apply flag.
+- **Write**: may mutate when invoked, even if an optional preview flag exists.
 
 | Command | What I use it for | Safety |
 |---|---|---|
 | `account` | Read one account resource. | Read |
-| `account-create` | Create a Redfish account (ManagerAccount). | Write |
-| `account-delete` | Delete a Redfish account (self-delete guarded). | Write |
-| `account-import-sshkey` | Import or remove an account's authorized SSH key (HPE iLO OEM). | Write |
-| `account-update` | Update a Redfish account (role, password, enable). | Write |
+| `account-create` | Create a Redfish account (ManagerAccount); requires `--confirm` to write. | Guarded |
+| `account-delete` | Delete a Redfish account (self-delete guarded); requires `--confirm` to write. | Guarded |
+| `account-import-sshkey` | Import or remove an account's authorized SSH key (HPE iLO OEM); requires `--confirm` to write. | Guarded |
+| `account-update` | Update a Redfish account (role, password, enable); requires `--confirm` to write. | Guarded |
 | `account-svc` | Read AccountService. | Read |
 | `accounts` | Read the account collection; `--usernames` prints only usernames. | Read |
 | `actions` | List Redfish actions exposed by the box and their risk levels. | Read |
@@ -94,7 +94,7 @@ Safety labels:
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `ethernet-interfaces` | Read host and manager EthernetInterfaces. | Read |
-| `event-submit-test` | Submit a Redfish test event; `--dry_run` previews the payload. | Guarded |
+| `event-submit-test` | Submit a Redfish test event; `--dry_run` previews the payload. | Write |
 | `exporter` | Expose BMC telemetry as Prometheus text or SignalFx datapoints. | Read |
 | `firmware` | Read firmware view data. | Read |
 | `firmware-update` | Run UpdateService SimpleUpdate; `--dry_run` previews, `--confirm` writes. | Guarded |
@@ -111,7 +111,7 @@ Safety labels:
 | `jobs-service` | Read standard Redfish JobService. | Read |
 | `logs` | Read system and manager log entries. | Read |
 | `manager` | Read manager data. | Read |
-| `manager-reboot` | Reboot the iDRAC manager. | Write |
+| `manager-reboot` | Reboot the BMC manager. | Write |
 | `manager-time` | Read the BMC (Manager) clock; `--now`/`--set` write `DateTime` (read-only by default, no dry-run). | Write |
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
@@ -131,10 +131,10 @@ Safety labels:
 | `privilege-registry` | Read the privilege registry. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
-| `reboot` | Reset the host ComputerSystem through the older direct reset path. | Write |
+| `reboot` | Reset the host ComputerSystem; `--dry_run` previews, but the command writes by default. | Write |
 | `secure-boot` | Read SecureBoot state and key databases. | Read |
 | `sensors` | Read Chassis Sensor collections across vendors (auto `$expand`, per-sensor fallback). | Read |
-| `serial-console` | Report host serial redirection + BMC SOL; `--enable --confirm` sets both (dry-run by default). | Write |
+| `serial-console` | Report host serial redirection + BMC SOL; `--enable --confirm` sets both. | Guarded |
 | `service-api-rs-status` | Read remote service API status. | Read |
 | `service-api-status` | Read service API status. | Read |
 | `storage-controllers` | Read storage controller information. | Read |
@@ -178,11 +178,15 @@ covered by the Dell, Supermicro, HPE, or generic fixture corpora listed in [Vend
 
 ## Mutating Workflow Pattern
 
-Before I run a write, I use the same four phases:
+Commands labeled **Guarded** block or preview writes by default and require an explicit intent flag,
+usually `--confirm`. Commands labeled **Write** can mutate as soon as they are invoked; some still
+offer `--show` or `--dry_run`, but those previews are optional.
+
+Before I run either kind of write, I use the same four phases:
 
 1. Read the current state.
 2. Preview the change when the command supports `--show` or `--dry_run`.
-3. Execute only with an explicit intent flag such as `--confirm`, `--commit`, or `-r`.
+3. Execute only on an approved target with the exact flags I intend to use.
 4. Verify with a read-only command or a job/task watch.
 
 ### BIOS Change From A Spec
@@ -231,9 +235,9 @@ redfish_ctl system-reset --reset_type GracefulRestart --confirm
 redfish_ctl system
 ```
 
-`system-reset` previews by default and performs the reset only when `--confirm` is present. The older
-`reboot` command is still present for direct reset calls and supports `--wait`, but it does not have
-the same dry-run guard.
+`system-reset` previews by default and performs the reset only when `--confirm` is present.
+`reboot` also discovers the host `ComputerSystem.Reset` action, but it performs the reset by default
+unless `--dry_run` is supplied; `--wait` only waits after a real reset.
 
 ### Firmware Update
 
