@@ -3,7 +3,7 @@
 # Confirms Mac/Linux parity (Linux is case-sensitive; macOS is not).
 set -euo pipefail
 
-IMAGE="${IMAGE:-idrac-ctl-test}"
+IMAGE="${IMAGE:-redfish-ctl-test}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$REPO_ROOT"
