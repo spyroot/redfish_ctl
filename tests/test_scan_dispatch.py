@@ -1,6 +1,6 @@
-"""Offline test for the credential-less scan dispatch used by idrac_main.
+"""Offline test for the credential-less scan dispatch used by redfish_main.
 
-In scan mode (bmc-scan, or discovery --network) idrac_main.main() dispatches via
+In scan mode (bmc-scan, or discovery --network) redfish_main.main() dispatches via
 ``redfish_api.invoke(...)`` with EMPTY idrac_ip/username/password — deliberately
 bypassing ``sync_invoke``'s non-empty-credential gate, because a segment scan has
 no target host and needs no credentials. The command-level tests route through
@@ -34,7 +34,7 @@ def _fake_get(url, **_):
 
 
 def _invoke_scan(api_type, name, **scan_kwargs):
-    """Mimic idrac_main scan-mode dispatch: empty creds, invoke() not sync_invoke."""
+    """Mimic redfish_main scan-mode dispatch: empty creds, invoke() not sync_invoke."""
     api = IDracManager(idrac_ip="", idrac_username="", idrac_password="")
     orig, requests.get = requests.get, _fake_get
     try:

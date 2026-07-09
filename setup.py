@@ -24,8 +24,8 @@ setup_info = dict(name='redfish_ctl',
                       'console_scripts': [
                           # redfish_ctl is the going-forward name; idrac_ctl stays as a
                           # backward-compatible alias (same entry point).
-                          'redfish_ctl = redfish_ctl.idrac_main:idrac_main_ctl',
-                          'idrac_ctl = redfish_ctl.idrac_main:idrac_main_ctl',
+                          'redfish_ctl = redfish_ctl.redfish_main:redfish_main_ctl',
+                          'idrac_ctl = redfish_ctl.redfish_main:redfish_main_ctl',
                           'redfish-discover = redfish_ctl.discover.cli:redfish_discover_main',
                       ]
                   },

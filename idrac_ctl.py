@@ -6,6 +6,6 @@ by invoking request from IDRAC Manager.
 
 Author Mus spyroot@gmail.com
 """
-from idrac_ctl.idrac_main import idrac_main_ctl
+from idrac_ctl.redfish_main import redfish_main_ctl
 if __name__ == "__main__":
-    idrac_main_ctl()
+    redfish_main_ctl()

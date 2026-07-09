@@ -1,3 +1,3 @@
-from redfish_ctl.idrac_main import idrac_main_ctl
+from redfish_ctl.redfish_main import redfish_main_ctl
 if __name__ == "__main__":
-    idrac_main_ctl()
+    redfish_main_ctl()
