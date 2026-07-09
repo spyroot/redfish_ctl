@@ -18,6 +18,7 @@ from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_exceptions import RedfishForbidden
 from ..redfish_manager import CommandResult
+from ..redfish_shared import env_first
 
 # Upper bound on how deep recursive_discovery will walk below a top-level
 # resource. Real Redfish trees are far shallower than this; the bound exists
@@ -169,18 +170,21 @@ class Discovery(IDracManager,
         they are not ``requests.RequestException`` and propagate to the caller's
         existing handlers unchanged.
 
-        Tunable via env: ``IDRAC_DISCOVERY_RETRIES`` (default 4),
-        ``IDRAC_DISCOVERY_BACKOFF`` seconds (default 2.0, exponential), and
-        ``IDRAC_DISCOVERY_PACE_MS`` (default 0) to throttle the request rate and
-        be gentle on a fragile BMC.
+        Tunable via env: ``REDFISH_DISCOVERY_RETRIES`` (default 4),
+        ``REDFISH_DISCOVERY_BACKOFF`` seconds (default 2.0, exponential), and
+        ``REDFISH_DISCOVERY_PACE_MS`` (default 0) to throttle the request rate and
+        be gentle on a fragile BMC (legacy ``IDRAC_DISCOVERY_*`` still honored).
 
         :param resource_path: canonical Redfish resource path to fetch.
         :return: the ``base_query`` CommandResult.
         :raises: the last transport exception if all attempts fail.
         """
-        attempts = max(1, int(os.environ.get("IDRAC_DISCOVERY_RETRIES", "4")))
-        backoff = float(os.environ.get("IDRAC_DISCOVERY_BACKOFF", "2.0"))
-        pace = float(os.environ.get("IDRAC_DISCOVERY_PACE_MS", "0")) / 1000.0
+        attempts = max(1, int(env_first(
+            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
+        backoff = float(env_first(
+            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
+        pace = float(env_first(
+            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
         last_exc = None
         for attempt in range(attempts):
             try:

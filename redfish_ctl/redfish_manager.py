@@ -37,6 +37,7 @@ from .redfish_shared import (
     RedfishJson,
     RedfishJsonMessage,
     RedfishJsonSpec,
+    env_first,
 )
 
 """Each command encapsulate result in named tuple"""
@@ -211,16 +212,18 @@ class RedfishManager:
         crawl onto a small reused connection pool, and a urllib3 ``Retry`` adds
         transport-level backoff for transient drops. Verify / auth / timeout
         semantics of the GET itself are unchanged. Tunable via env:
-        ``IDRAC_HTTP_POOL`` (pool size), ``IDRAC_HTTP_RETRIES``,
-        ``IDRAC_HTTP_BACKOFF``. Inherited by IDracManager.
+        ``REDFISH_HTTP_POOL`` (pool size), ``REDFISH_HTTP_RETRIES``,
+        ``REDFISH_HTTP_BACKOFF`` (legacy ``IDRAC_HTTP_*`` still honored).
+        Inherited by IDracManager.
         """
         session = getattr(self, "_session_cache", None)
         if session is None:
             session = requests.Session()
-            pool = int(os.environ.get("IDRAC_HTTP_POOL", "4"))
+            pool = int(env_first("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4"))
             retries = Retry(
-                total=int(os.environ.get("IDRAC_HTTP_RETRIES", "3")),
-                backoff_factor=float(os.environ.get("IDRAC_HTTP_BACKOFF", "0.5")),
+                total=int(env_first("REDFISH_HTTP_RETRIES", "IDRAC_HTTP_RETRIES", default="3")),
+                backoff_factor=float(
+                    env_first("REDFISH_HTTP_BACKOFF", "IDRAC_HTTP_BACKOFF", default="0.5")),
                 status_forcelist=(500, 502, 503, 504),
                 allowed_methods=frozenset(["GET"]),
                 raise_on_status=False,
@@ -247,7 +250,7 @@ class RedfishManager:
             headers.update(hdr)
 
         # Bound every GET so a hung/unreachable BMC can't block forever.
-        timeout = float(os.environ.get("IDRAC_HTTP_TIMEOUT", "30"))
+        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
         # Reuse one pooled keep-alive connection across GETs (see _http_session):
         # opening a fresh TLS connection per request wedges fragile BMCs.
         session = self._http_session()

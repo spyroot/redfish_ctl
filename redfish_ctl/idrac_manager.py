@@ -66,7 +66,7 @@ from .idrac_shared import (
 from .idrac_shared import ResetType as ResetType
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import CommandResult, RedfishManager
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
+from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .redfish_task_state import TaskState, TaskStatus
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
@@ -375,8 +375,8 @@ class IDracManager(RedfishManager):
             headers.update(hdr)
 
         # Bound every GET so a hung/unreachable BMC can't block a crawl or an
-        # unattended telemetry poll forever. Override via IDRAC_HTTP_TIMEOUT.
-        timeout = float(os.environ.get("IDRAC_HTTP_TIMEOUT", "30"))
+        # unattended telemetry poll forever. Override via REDFISH_HTTP_TIMEOUT.
+        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
 
         # Reuse one pooled keep-alive connection across GETs (see _http_session):
         # opening a fresh TLS connection per request wedges fragile BMCs.
