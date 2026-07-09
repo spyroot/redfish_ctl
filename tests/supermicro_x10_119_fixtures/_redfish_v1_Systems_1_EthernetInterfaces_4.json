@@ -1,0 +1,18 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#EthernetInterface.EthernetInterface",
+    "@odata.type": "#EthernetInterface.v1_0_0.EthernetInterface",
+    "@odata.id": "/redfish/v1/Systems/1/EthernetInterfaces/4",
+    "Id": "4",
+    "Name": "OnBoard LAN 4",
+    "Description": "OnBoard #4",
+    "Status": {
+        "State": "Disabled",
+        "Health": "OK"
+    },
+    "MACAddress": "ac:1f:6b:18:a5:b7",
+    "SpeedMbps": 0,
+    "FQDN": "",
+    "NameServers": [
+        ""
+    ]
+}
