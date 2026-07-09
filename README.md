@@ -1,5 +1,6 @@
 # redfish_ctl
 
+[![CI](https://github.com/spyroot/redfish_ctl/actions/workflows/ci.yml/badge.svg)](https://github.com/spyroot/redfish_ctl/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/redfish-ctl.svg)](https://pypi.org/project/redfish-ctl/)
 [![Python versions](https://img.shields.io/pypi/pyversions/redfish-ctl.svg)](https://pypi.org/project/redfish-ctl/)
 [![License: MIT](https://img.shields.io/pypi/l/redfish-ctl.svg)](https://github.com/spyroot/redfish_ctl/blob/main/LICENSE)
