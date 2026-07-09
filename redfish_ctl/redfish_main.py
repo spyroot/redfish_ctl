@@ -417,7 +417,7 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
     return command_name_to_cmd
 
 
-def idrac_main_ctl():
+def redfish_main_ctl():
     """
     """
     logger.setLevel(logging.ERROR)
@@ -573,5 +573,5 @@ def idrac_main_ctl():
 
 if __name__ == "__main__":
     # Allow running the CLI without the installed console script, e.g.
-    #   python -m idrac_ctl.idrac_main discovery --network 192.168.254.0/24
-    idrac_main_ctl()
+    #   python -m idrac_ctl.redfish_main discovery --network 192.168.254.0/24
+    redfish_main_ctl()

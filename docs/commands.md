@@ -11,7 +11,7 @@ backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars 
 
 ## Connection Basics
 
-`idrac_main.py` reads these environment variables when you do not pass explicit connection flags:
+`redfish_main.py` reads these environment variables when you do not pass explicit connection flags:
 
 ```bash
 export REDFISH_IP=10.0.0.42
@@ -21,7 +21,7 @@ export REDFISH_PORT=443
 ```
 
 TLS verification is off by default because lab BMCs commonly use self-signed certificates.
-`--verify-ssl`, defined by the root parser in `idrac_main.py`, opts into certificate verification
+`--verify-ssl`, defined by the root parser in `redfish_main.py`, opts into certificate verification
 when you have a trusted chain.
 
 ## First Reads

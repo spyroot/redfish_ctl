@@ -62,7 +62,7 @@ conda activate redfish_ctl
 
 ## Connect
 
-The CLI reads these environment variables in `idrac_main.py`, so I set them once per shell:
+The CLI reads these environment variables in `redfish_main.py`, so I set them once per shell:
 
 ```bash
 export REDFISH_IP=10.0.0.42

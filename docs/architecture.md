@@ -7,7 +7,7 @@ command module, uses `IDracManager`, and ends in the generic Redfish HTTP client
 is that Redfish stays product-neutral; Dell behavior sits above it.
 
 ```text
-CLI (`idrac_main.py`, argparse)
+CLI (`redfish_main.py`, argparse)
   -> command modules (`cmd_*.py`, `<domain>/cmd_*.py`)
   -> `IDracManager` for iDRAC/Dell behavior and host-system selection
   -> `RedfishManager` for product-neutral HTTP and response parsing

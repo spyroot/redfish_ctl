@@ -4,7 +4,7 @@ Phase 1: `import redfish_ctl` and `from redfish_ctl.<sub> import ...` resolve to
 idrac_ctl modules (same objects). Phase 2: endpoint/credentials read REDFISH_* first,
 falling back to the legacy IDRAC_* names.
 """
-from redfish_ctl.idrac_main import _env
+from redfish_ctl.redfish_main import _env
 
 
 def test_idrac_ctl_is_redfish_ctl_alias():

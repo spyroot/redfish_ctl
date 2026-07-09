@@ -105,7 +105,7 @@ def test_internal_verify_flag_is_inverse_of_insecure():
 def test_cli_verify_ssl_flag_drives_insecure():
     """--verify-ssl off (default) -> insecure skip; on -> verification enabled.
 
-    Mirrors how ``idrac_main.main`` derives the ``insecure`` value it passes to
+    Mirrors how ``redfish_main.main`` derives the ``insecure`` value it passes to
     IDracManager from the parsed ``verify_ssl`` flag, without constructing a real
     client. ``--insecure`` stays a harmless explicit "skip".
     """

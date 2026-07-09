@@ -3,7 +3,7 @@ import argparse
 
 import yaml as _yaml
 
-from redfish_ctl.idrac_main import json_printer
+from redfish_ctl.redfish_main import json_printer
 
 
 def _args(**kw):
