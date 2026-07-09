@@ -24,6 +24,12 @@ Safety labels:
 
 - `exameple_volume_setup.sh` (**Write**) initializes one volume by device and volume id.
   Run: `bash examples/exameple_volume_setup.sh`
+- `example_account_lifecycle.sh` (**Write**) creates, inspects, and deletes a Redfish account
+  (vendor-neutral); dry-run by default, and delete refuses the logged-in account.
+  Run: `bash examples/example_account_lifecycle.sh`
+- `example_account_sshkey.sh` (**Write**) authorizes or clears an account's SSH public key
+  (HPE iLO OEM); dry-run by default.
+  Run: `bash examples/example_account_sshkey.sh`
 - `example_adjust_profile.sh` (**Write**) builds a WorkloadProfile spec, previews it, then applies it
   on reset.
   Run: `bash examples/example_adjust_profile.sh`
@@ -33,11 +39,20 @@ Safety labels:
 - `example_bios_optimize_intel.sh` (**Write**) shows Intel Xeon performance/power BIOS knobs after
   registry lookup.
   Run: `bash examples/example_bios_optimize_intel.sh`
+- `example_bios_transaction.sh` (**Write**) captures a BIOS restore point, applies a change, and
+  rolls back from the snapshot if needed.
+  Run: `bash examples/example_bios_transaction.sh`
 - `example_bios_tuning.sh` (**Write**) changes one BIOS attribute and verifies it after reboot.
   Run: `bash examples/example_bios_tuning.sh`
+- `example_bmc_scan.sh` (**Read**) finds every Redfish BMC on a network segment (unauthenticated
+  discovery) before provisioning.
+  Run: `bash examples/example_bmc_scan.sh`
 - `example_boot_from_iso_one_shot.sh` (**Write**) mounts an ISO as virtual media and sets one-time
   CD boot.
   Run: `bash examples/example_boot_from_iso_one_shot.sh`
+- `example_boot_state.sh` (**Read**) infers what the host will boot (mode, next target, order,
+  staged media) without opening a console.
+  Run: `bash examples/example_boot_state.sh`
 - `example_change_bios.sh` (**Write**) previews and applies a two-attribute BIOS change.
   Run: `bash examples/example_change_bios.sh`
 - `example_console_access.sh` (**Read**) shows Redfish console access metadata and how to reach the
@@ -71,6 +86,9 @@ Safety labels:
 - `example_low_latency_profile.sh` (**Write**) applies the low-latency BIOS profile in
   `specs/realtime.opt.spec.json`.
   Run: `bash examples/example_low_latency_profile.sh`
+- `example_manager_time.sh` (**Write**) reads, and optionally fixes, the BMC (Manager) clock over
+  Redfish before trusting log/SEL timestamps.
+  Run: `bash examples/example_manager_time.sh`
 - `example_provision_boot_iso.sh` (**Write**) mounts an installer ISO and boots from it once.
   Run: `bash examples/example_provision_boot_iso.sh`
 - `example_sensors_read.sh` (**Read**) reads sensors and filters temperatures, fans, power supplies,
@@ -80,6 +98,9 @@ Safety labels:
   BMC over SMB (SMB1 for old X10-era BMCs) and boots it once in UEFI (`UefiUsbCd`) to run an
   unattended install.
   Run: `bash examples/example_supermicro_provision_from_iso.sh`
+- `example_wait.sh` (**Read**) waits for the BMC Redfish service to become reachable (e.g. after a
+  reboot) instead of hand-rolled sleep loops.
+  Run: `bash examples/example_wait.sh`
 - `hpe_ilo_canary.sh` (**Guarded**) starts the HPE iLO emulator and runs read-only commands plus a
   dry-run reset preview.
   Run: `bash examples/hpe_ilo_canary.sh`
