@@ -6,6 +6,7 @@ from idrac_ctl.cmd_exceptions import InvalidArgument
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
 from idrac_ctl.system.cmd_system_config import ExportSystemConfig
+from idrac_ctl.system.cmd_system_import import ImportSystemConfig  # noqa: F401
 from idrac_ctl.system.cmd_system_one_time_boot import ImportOneTimeBoot  # noqa: F401
 
 
@@ -62,6 +63,22 @@ def test_one_time_boot_import_rejects_invalid_shutdown_type_before_post(
             config="unused.xml",
             shutdown_type="power-cycle",
             host_power_state="Off",
+        )
+
+    assert all(request.method != "POST" for request in redfish_service.requests)
+
+
+def test_system_import_missing_config_rejects_before_post(
+    redfish_mock, redfish_service, tmp_path
+):
+    """ImportSystemConfig rejects a missing config path before any Redfish POST."""
+    missing_config = tmp_path / "missing-scp.json"
+
+    with pytest.raises(InvalidArgument, match="Invalid path to a config file"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.ImportSystem,
+            "import_sysconfig",
+            config=str(missing_config),
         )
 
     assert all(request.method != "POST" for request in redfish_service.requests)
