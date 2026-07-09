@@ -13,7 +13,7 @@ import pytest
 
 from idrac_ctl.cmd_exceptions import InvalidArgument
 from idrac_ctl.compute.cmd_power_state import RebootHost
-from idrac_ctl.idrac_shared import IDRAC_API, ApiRequestType
+from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
 
 
@@ -159,9 +159,8 @@ def test_reboot_posts_reset_action_payload_in_mock_mode(
         assert task_id == redfish_service.JOB_ID
         return task_state
 
-    monkeypatch.setattr(
-        IDRAC_API, "COMPUTE_RESET", "/Actions/ComputerSystem.Reset", raising=False
-    )
+    # reboot now discovers #ComputerSystem.Reset from the host system's Actions
+    # block (the COMPUTE_RESET hardcode is gone), so only fetch_task is stubbed.
     monkeypatch.setattr(RebootHost, "fetch_task", fetch_task)
 
     result = redfish_mock.sync_invoke(

@@ -68,6 +68,23 @@ def _has_live_idrac() -> bool:
     return bool(os.environ.get("IDRAC_IP", "").strip())
 
 
+@pytest.fixture(autouse=True)
+def _reset_command_singletons():
+    """Drop cached command-singleton instances between tests.
+
+    idrac_ctl commands use the ``Singleton`` metaclass, and instances memoize
+    per-box state via ``cached_property`` (notably ``idrac_manage_servers``). Left
+    alone, the first vendor a command runs against would freeze that state for the
+    whole session, so a Dell test and a Supermicro test sharing a command class
+    (e.g. ``reboot``) would poison each other depending on collection order. The
+    command ``_registry`` (used for dispatch) is a separate dict and is untouched.
+    """
+    from idrac_ctl.idrac_shared import Singleton
+    Singleton._instances.clear()
+    yield
+    Singleton._instances.clear()
+
+
 def pytest_collection_modifyitems(config, items):
     """Skip ``live`` tests when no iDRAC endpoint is configured."""
     if _has_live_idrac():

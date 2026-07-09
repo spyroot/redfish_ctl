@@ -7,13 +7,10 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
-from ..cmd_exceptions import FailedDiscoverAction
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_exceptions import UnsupportedAction
+from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument, UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
-from ..idrac_shared import IDRAC_JSON
+from ..idrac_shared import IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager import CommandResult
 
 
 class ChassisReset(IDracManager,
@@ -66,14 +63,20 @@ class ChassisReset(IDracManager,
 
         redfish_action = chassis_data.discovered[IDRAC_JSON.Reset]
         target_api = redfish_action.target
-        args = redfish_action._args
-        args_options = args[IDRAC_JSON.ResetType]
 
-        if reset_type not in args_options:
-            raise InvalidArgument(
-                f"Unsupported reset type {reset_type} "
-                f"supported reset options {args_options}."
-            )
+        # Validate the reset type only when the action advertised its allowable
+        # values. Dell inlines ResetType@Redfish.AllowableValues; some boxes
+        # (e.g. the GB300 capture) expose the Reset target with no inline
+        # allowable values, leaving RedfishAction.args None -- defer validation
+        # to the BMC in that case rather than raising.
+        args = redfish_action.args
+        if args and IDRAC_JSON.ResetType in args:
+            args_options = args[IDRAC_JSON.ResetType]
+            if reset_type not in args_options:
+                raise InvalidArgument(
+                    f"Unsupported reset type {reset_type} "
+                    f"supported reset options {args_options}."
+                )
 
         return target_api
 

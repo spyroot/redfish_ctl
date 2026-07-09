@@ -10,11 +10,9 @@ import time
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
 from ..cmd_exceptions import MissingResource
 from ..idrac_manager import IDracManager
-from ..idrac_shared import CliJobTypes, IDRAC_API
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, CliJobTypes, Singleton
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 
@@ -71,6 +69,12 @@ class RebootHost(IDracManager,
             required=False, dest="do_wait",
             default=False, help="wait for reboot.")
 
+        cmd_parser.add_argument(
+            '--dry_run', action='store_true',
+            required=False, dest="dry_run",
+            default=False,
+            help="preview the resolved reset target + payload; POST nothing.")
+
         help_text = "reboots the system"
         return cmd_parser, "reboot", help_text
 
@@ -110,7 +114,7 @@ class RebootHost(IDracManager,
                 for job in scheduled_jobs.data:
                     # reboot and wait for completion.
                     self.logger.info(f"Reboot pending job created: task id {job}")
-                    task_state = self.fetch_task(job)
+                    self.fetch_task(job)
                     _reboot -= 1
             except MissingResource as mr:
                 self.logger.error(str(mr))
@@ -128,79 +132,63 @@ class RebootHost(IDracManager,
                 filename: Optional[str] = "",
                 data_type: Optional[str] = "json",
                 reset_type: Optional[str] = "On",
-                power_state: Optional[str] = "On",
-                boot_source_override: Optional[str] = "",
-                boot_source_override_enabled: Optional[str] = "",
-                boot_source_override_mode: Optional[str] = "",
-                interface_type: Optional[str] = "",
                 do_async: Optional[bool] = False,
                 do_wait: Optional[bool] = False,
+                dry_run: Optional[bool] = False,
                 sleep_time: Optional[int] = 10,
                 max_retry: Optional[int] = 10,
                 **kwargs
                 ) -> CommandResult:
-        """
-        :param do_wait: wait signals to wait and confirm action.
-        :param do_async: will issue asyncio request and won't block
-        :param reset_type: "On, ForceOff, ForceRestart, GracefulShutdown, PushPowerButton, Nmi"
-        :param power_state: On, null
-        :param boot_source_override: "None, Pxe, Floppy,
-                                      Cd, Hdd, BiosSetup, Utilities,
-                                      UefiTarget, SDCard, UefiHttp"
-        :param boot_source_override_enabled: "Once, Continuous, Disabled"
-        :param boot_source_override_mode: UEFI, Legacy
-        :param sleep_time wait for job to start
-        :param max_retry maximum retry.  by default reboot task will wait task to finish.
-        :param interface_type: TCM1_0, TPM2_0, TPM1_
+        """Reboot the host by resetting its ComputerSystem.
+
+        The reset target is DISCOVERED from the host ComputerSystem's own
+        ``#ComputerSystem.Reset`` action (vendor-neutral: works whatever the
+        system id is -- ``System.Embedded.1``, ``System_0``, ...), never a
+        hardcoded path. The POST goes through :meth:`invoke_action`, which
+        carries the shared destructiveness guard.
+
+        ``reboot`` is an explicit reboot request, so it confirms by default and
+        actually fires; pass ``--dry_run`` to preview the resolved target +
+        payload without POSTing anything. See the guarded ``system-reset``
+        command for a reset that previews unless ``--confirm`` is given.
+
+        :param do_wait: wait for the reboot job to complete.
+        :param do_async: issue the request on the asyncio path.
+        :param dry_run: preview the resolved target + payload, POST nothing.
+        :param reset_type: "On, ForceOff, ForceRestart, GracefulRestart,
+                           GracefulShutdown, PushPowerButton, Nmi, PowerCycle"
+        :param sleep_time: wait for the reboot job to start.
+        :param max_retry: maximum retry while waiting for the reboot job.
         :param filename:
         :param data_type:
         :param kwargs:
-        :return:
+        :return: CommandResult; on a real fire ``.data`` carries the task id/state,
+                 on a dry-run it carries the resolved target + payload.
         """
-        headers = {}
-        if data_type == "json":
-            headers.update(self.json_content_type)
+        self.logger.info(f"issuing reset request ResetType={reset_type}")
 
-        system_state = self.sync_invoke(
-            ApiRequestType.SystemQuery, "system_query"
+        cmd_result = self.invoke_action(
+            self.idrac_manage_servers,
+            "Reset",
+            payload={"ResetType": reset_type},
+            full_action_type="#ComputerSystem.Reset",
+            do_async=do_async,
+            expected_status=202,
+            dry_run=bool(dry_run),
+            confirm=True,
         )
 
-        system_actions = system_state.data['Actions']
-        allowed_reset_types = []
+        data = cmd_result.data if isinstance(cmd_result.data, dict) else {}
+        fired = cmd_result.error is None and not data.get("dry_run")
 
-        # PowerCycle
-        target = f"{self.idrac_manage_servers}{IDRAC_API.COMPUTE_RESET}"
-
-        if '#ComputerSystem.Reset' in system_actions:
-            ra = system_actions[
-                '#ComputerSystem.Reset'
-            ]
-            allowed_reset_types = ra[
-                'ResetType@Redfish.AllowableValues'
-            ]
-            if 'target' in ra:
-                target = ra['target']
-
-        if reset_type not in allowed_reset_types:
-            raise InvalidArgument(
-                f"Invalid reset type {reset_type}, "
-                f"supported reset types {allowed_reset_types}")
-
-        payload = {
-            'ResetType': reset_type
-        }
-
-        self.logger.info(f"issuing reset request {payload}")
-
-        cmd_result, api_resp = self.base_post(target, payload=payload, expected_status=202)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
-            task_id = cmd_result.data['task_id']
+        # A real fire returns a Redfish task; surface its state like before.
+        if fired and data.get("task_id"):
+            task_id = data["task_id"]
             self.logger.info(f"received task id {task_id}, fetch task state")
-            task_state = self.fetch_task(task_id)
-            cmd_result.data['task_state'] = task_state
-            cmd_result.data['task_id'] = task_id
+            data["task_state"] = self.fetch_task(task_id)
+            data["task_id"] = task_id
 
-        if do_wait:
+        if do_wait and fired:
             self.wait_for_reboot(sleep_time, max_retry)
 
         return cmd_result
