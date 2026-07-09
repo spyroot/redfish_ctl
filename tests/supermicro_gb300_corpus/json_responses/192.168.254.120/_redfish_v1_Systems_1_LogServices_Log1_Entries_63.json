@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.type": "#LogEntry.v1_3_0.LogEntry",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/Log1/Entries/63",
+    "Id": "63",
+    "Name": "Log Entry 63",
+    "EntryType": "Event",
+    "Created": "2018-08-12T12:51:20+00:00",
+    "EntryCode": "Assert",
+    "SensorType": "Memory",
+    "SensorNumber": 0,
+    "Message": "[ OEM ] Correctable ECC @DIMMB1",
+    "MessageArgs": [
+        "ArrayOfMessageArgs"
+    ],
+    "Links": {
+        "Oem": {}
+    },
+    "Oem": {
+        "Supermicro": {
+            "@odata.type": "#SmcLogEntryExtensions.v1_0_0.LogEntry",
+            "RawEventData": {
+                "EventDirAndType": "0x6F",
+                "SensorType": "0x0C",
+                "SensorName": "OEM",
+                "EventData1": "0xA0",
+                "EventData2": "0x2A",
+                "EventData3": "0x80"
+            }
+        }
+    }
+}

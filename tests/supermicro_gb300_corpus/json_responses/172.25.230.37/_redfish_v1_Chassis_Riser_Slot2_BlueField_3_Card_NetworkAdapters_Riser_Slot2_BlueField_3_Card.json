@@ -1,0 +1,27 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/NetworkAdapters/Riser_Slot2_BlueField_3_Card",
+  "@odata.type": "#NetworkAdapter.v1_9_0.NetworkAdapter",
+  "Actions": {
+    "#NetworkAdapter.Reset": {
+      "ResetType@Redfish.AllowableValues": [
+        "ForceRestart"
+      ],
+      "target": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/NetworkAdapters/Riser_Slot2_BlueField_3_Card/Actions/NetworkAdapter.Reset"
+    }
+  },
+  "Controllers": [],
+  "Id": "Riser_Slot2_BlueField_3_Card",
+  "Manufacturer": "Nvidia",
+  "Model": "BlueField-3 DPU",
+  "Name": "Riser_Slot2_BlueField_3_Card",
+  "PartNumber": "900-9D3B6-00CN-PA0",
+  "Ports": {
+    "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/NetworkAdapters/Riser_Slot2_BlueField_3_Card/Ports"
+  },
+  "SerialNumber": "MT2502602V6R",
+  "Status": {
+    "Conditions": [],
+    "HealthRollup": "OK",
+    "State": "Enabled"
+  }
+}

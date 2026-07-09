@@ -1,0 +1,931 @@
+{
+  "@odata.id": "/redfish/v1/TelemetryService/MetricReports/HGX_CpuProcessorMetrics_0",
+  "@odata.type": "#MetricReport.v1_4_2.MetricReport",
+  "Id": "HGX_CpuProcessorMetrics_0",
+  "MetricReportDefinition": {
+    "@odata.id": "/redfish/v1/TelemetryService/MetricReportDefinitions/HGX_CpuProcessorMetrics_0"
+  },
+  "MetricValues": [
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/ProcessorMetrics#/Oem/Nvidia/MemoryPageRetirementCount",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.759+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/ProcessorMetrics#/Oem/Nvidia/MemoryPageRetirementCount",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.248+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CpuFreq_0",
+      "MetricValue": "3375000000.000000",
+      "Timestamp": "2026-06-29T08:05:10.347+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_MemCntl_0_Freq_0",
+      "MetricValue": "3200000000.000000",
+      "Timestamp": "2026-06-29T08:05:10.761+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CpuFreq_0",
+      "MetricValue": "3339000000.000000",
+      "Timestamp": "2026-06-29T08:05:10.769+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_MemCntl_0_Freq_0",
+      "MetricValue": "3200000000.000000",
+      "Timestamp": "2026-06-29T08:05:10.250+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_0",
+      "MetricValue": "9.490000",
+      "Timestamp": "2026-06-29T08:05:10.348+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_1",
+      "MetricValue": "11.380000",
+      "Timestamp": "2026-06-29T08:05:10.352+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_10",
+      "MetricValue": "11.760000",
+      "Timestamp": "2026-06-29T08:05:10.435+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_11",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.437+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_12",
+      "MetricValue": "9.540000",
+      "Timestamp": "2026-06-29T08:05:10.439+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_13",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.442+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_14",
+      "MetricValue": "12.150000",
+      "Timestamp": "2026-06-29T08:05:10.445+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_15",
+      "MetricValue": "11.230000",
+      "Timestamp": "2026-06-29T08:05:10.448+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_16",
+      "MetricValue": "14.100000",
+      "Timestamp": "2026-06-29T08:05:10.450+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_17",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.453+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_18",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.654+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_19",
+      "MetricValue": "4.560000",
+      "Timestamp": "2026-06-29T08:05:10.656+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_2",
+      "MetricValue": "9.070000",
+      "Timestamp": "2026-06-29T08:05:10.355+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_20",
+      "MetricValue": "14.640000",
+      "Timestamp": "2026-06-29T08:05:10.658+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_21",
+      "MetricValue": "14.620000",
+      "Timestamp": "2026-06-29T08:05:10.660+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_22",
+      "MetricValue": "9.800000",
+      "Timestamp": "2026-06-29T08:05:10.662+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_23",
+      "MetricValue": "14.960000",
+      "Timestamp": "2026-06-29T08:05:10.665+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_24",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.667+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_25",
+      "MetricValue": "17.160000",
+      "Timestamp": "2026-06-29T08:05:10.669+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_26",
+      "MetricValue": "8.700000",
+      "Timestamp": "2026-06-29T08:05:10.672+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_27",
+      "MetricValue": "22.790000",
+      "Timestamp": "2026-06-29T08:05:10.674+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_28",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.676+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_29",
+      "MetricValue": "9.580000",
+      "Timestamp": "2026-06-29T08:05:10.678+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_3",
+      "MetricValue": "6.320000",
+      "Timestamp": "2026-06-29T08:05:10.357+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_30",
+      "MetricValue": "12.850000",
+      "Timestamp": "2026-06-29T08:05:10.680+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_31",
+      "MetricValue": "14.040000",
+      "Timestamp": "2026-06-29T08:05:10.682+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_32",
+      "MetricValue": "13.720000",
+      "Timestamp": "2026-06-29T08:05:10.684+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_33",
+      "MetricValue": "12.070000",
+      "Timestamp": "2026-06-29T08:05:10.686+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_34",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.687+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_35",
+      "MetricValue": "14.650000",
+      "Timestamp": "2026-06-29T08:05:10.689+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_36",
+      "MetricValue": "10.840000",
+      "Timestamp": "2026-06-29T08:05:10.691+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_37",
+      "MetricValue": "10.070000",
+      "Timestamp": "2026-06-29T08:05:10.693+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_38",
+      "MetricValue": "4.080000",
+      "Timestamp": "2026-06-29T08:05:10.695+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_39",
+      "MetricValue": "21.470000",
+      "Timestamp": "2026-06-29T08:05:10.697+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_4",
+      "MetricValue": "13.220000",
+      "Timestamp": "2026-06-29T08:05:10.419+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_40",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.699+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_41",
+      "MetricValue": "14.930000",
+      "Timestamp": "2026-06-29T08:05:10.700+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_42",
+      "MetricValue": "7.370000",
+      "Timestamp": "2026-06-29T08:05:10.702+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_43",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.704+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_44",
+      "MetricValue": "22.830000",
+      "Timestamp": "2026-06-29T08:05:10.706+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_45",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.708+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_46",
+      "MetricValue": "12.520000",
+      "Timestamp": "2026-06-29T08:05:10.710+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_47",
+      "MetricValue": "16.520000",
+      "Timestamp": "2026-06-29T08:05:10.711+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_48",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.714+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_49",
+      "MetricValue": "8.530000",
+      "Timestamp": "2026-06-29T08:05:10.716+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_5",
+      "MetricValue": "17.980000",
+      "Timestamp": "2026-06-29T08:05:10.422+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_50",
+      "MetricValue": "3.820000",
+      "Timestamp": "2026-06-29T08:05:10.718+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_51",
+      "MetricValue": "10.180000",
+      "Timestamp": "2026-06-29T08:05:10.719+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_52",
+      "MetricValue": "21.810000",
+      "Timestamp": "2026-06-29T08:05:10.721+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_53",
+      "MetricValue": "13.370000",
+      "Timestamp": "2026-06-29T08:05:10.723+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_54",
+      "MetricValue": "10.260000",
+      "Timestamp": "2026-06-29T08:05:10.725+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_55",
+      "MetricValue": "13.380000",
+      "Timestamp": "2026-06-29T08:05:10.727+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_56",
+      "MetricValue": "22.830000",
+      "Timestamp": "2026-06-29T08:05:10.729+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_57",
+      "MetricValue": "14.100000",
+      "Timestamp": "2026-06-29T08:05:10.730+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_58",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.732+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_59",
+      "MetricValue": "10.870000",
+      "Timestamp": "2026-06-29T08:05:10.734+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_6",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.425+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_60",
+      "MetricValue": "12.160000",
+      "Timestamp": "2026-06-29T08:05:10.736+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_61",
+      "MetricValue": "17.360000",
+      "Timestamp": "2026-06-29T08:05:10.738+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_62",
+      "MetricValue": "19.230000",
+      "Timestamp": "2026-06-29T08:05:10.739+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_63",
+      "MetricValue": "14.150000",
+      "Timestamp": "2026-06-29T08:05:10.741+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_64",
+      "MetricValue": "20.370000",
+      "Timestamp": "2026-06-29T08:05:10.743+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_65",
+      "MetricValue": "9.450000",
+      "Timestamp": "2026-06-29T08:05:10.745+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_66",
+      "MetricValue": "8.180000",
+      "Timestamp": "2026-06-29T08:05:10.747+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_67",
+      "MetricValue": "9.970000",
+      "Timestamp": "2026-06-29T08:05:10.749+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_68",
+      "MetricValue": "21.060000",
+      "Timestamp": "2026-06-29T08:05:10.750+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_69",
+      "MetricValue": "8.670000",
+      "Timestamp": "2026-06-29T08:05:10.752+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_7",
+      "MetricValue": "9.630000",
+      "Timestamp": "2026-06-29T08:05:10.427+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_70",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.754+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_71",
+      "MetricValue": "10.260000",
+      "Timestamp": "2026-06-29T08:05:10.757+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_8",
+      "MetricValue": "10.020000",
+      "Timestamp": "2026-06-29T08:05:10.430+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_CPU_0_CoreUtil_9",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.432+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_0",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.770+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_1",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.772+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_10",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.789+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_11",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.791+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_12",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.793+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_13",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.794+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_14",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.796+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_15",
+      "MetricValue": "11.230000",
+      "Timestamp": "2026-06-29T08:05:10.798+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_16",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.800+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_17",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.802+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_18",
+      "MetricValue": "13.290000",
+      "Timestamp": "2026-06-29T08:05:10.804+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_19",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.806+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_2",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.774+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_20",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.808+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_21",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.810+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_22",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.811+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_23",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.813+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_24",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.815+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_25",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.817+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_26",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.820+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_27",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.821+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_28",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.823+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_29",
+      "MetricValue": "5.290000",
+      "Timestamp": "2026-06-29T08:05:10.826+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_3",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.776+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_30",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.827+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_31",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.829+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_32",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.831+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_33",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.832+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_34",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.834+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_35",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.836+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_36",
+      "MetricValue": "6.150000",
+      "Timestamp": "2026-06-29T08:05:10.838+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_37",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.839+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_38",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.841+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_39",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.172+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_4",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.777+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_40",
+      "MetricValue": "2.720000",
+      "Timestamp": "2026-06-29T08:05:10.175+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_41",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.177+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_42",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.179+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_43",
+      "MetricValue": "1.920000",
+      "Timestamp": "2026-06-29T08:05:10.181+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_44",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.183+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_45",
+      "MetricValue": "1.730000",
+      "Timestamp": "2026-06-29T08:05:10.186+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_46",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.188+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_47",
+      "MetricValue": "4.680000",
+      "Timestamp": "2026-06-29T08:05:10.190+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_48",
+      "MetricValue": "5.030000",
+      "Timestamp": "2026-06-29T08:05:10.193+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_49",
+      "MetricValue": "5.820000",
+      "Timestamp": "2026-06-29T08:05:10.195+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_5",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.779+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_50",
+      "MetricValue": "7.590000",
+      "Timestamp": "2026-06-29T08:05:10.197+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_51",
+      "MetricValue": "6.050000",
+      "Timestamp": "2026-06-29T08:05:10.199+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_52",
+      "MetricValue": "8.260000",
+      "Timestamp": "2026-06-29T08:05:10.202+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_53",
+      "MetricValue": "21.400000",
+      "Timestamp": "2026-06-29T08:05:10.204+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_54",
+      "MetricValue": "5.510000",
+      "Timestamp": "2026-06-29T08:05:10.207+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_55",
+      "MetricValue": "5.450000",
+      "Timestamp": "2026-06-29T08:05:10.209+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_56",
+      "MetricValue": "4.880000",
+      "Timestamp": "2026-06-29T08:05:10.212+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_57",
+      "MetricValue": "4.890000",
+      "Timestamp": "2026-06-29T08:05:10.215+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_58",
+      "MetricValue": "8.170000",
+      "Timestamp": "2026-06-29T08:05:10.217+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_59",
+      "MetricValue": "7.990000",
+      "Timestamp": "2026-06-29T08:05:10.219+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_6",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.779+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_60",
+      "MetricValue": "9.100000",
+      "Timestamp": "2026-06-29T08:05:10.221+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_61",
+      "MetricValue": "7.940000",
+      "Timestamp": "2026-06-29T08:05:10.224+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_62",
+      "MetricValue": "10.140000",
+      "Timestamp": "2026-06-29T08:05:10.226+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_63",
+      "MetricValue": "7.900000",
+      "Timestamp": "2026-06-29T08:05:10.228+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_64",
+      "MetricValue": "9.400000",
+      "Timestamp": "2026-06-29T08:05:10.230+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_65",
+      "MetricValue": "6.670000",
+      "Timestamp": "2026-06-29T08:05:10.233+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_66",
+      "MetricValue": "7.960000",
+      "Timestamp": "2026-06-29T08:05:10.235+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_67",
+      "MetricValue": "8.900000",
+      "Timestamp": "2026-06-29T08:05:10.236+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_68",
+      "MetricValue": "6.870000",
+      "Timestamp": "2026-06-29T08:05:10.240+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_69",
+      "MetricValue": "6.210000",
+      "Timestamp": "2026-06-29T08:05:10.242+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_7",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.782+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_70",
+      "MetricValue": "7.030000",
+      "Timestamp": "2026-06-29T08:05:10.244+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_71",
+      "MetricValue": "10.760000",
+      "Timestamp": "2026-06-29T08:05:10.245+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_8",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.784+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_CPU_0_CoreUtil_9",
+      "MetricValue": "0.000000",
+      "Timestamp": "2026-06-29T08:05:10.787+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_Vreg_0_CpuVoltage_0",
+      "MetricValue": "1.081000",
+      "Timestamp": "2026-06-29T08:05:10.764+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_0/Sensors/ProcessorModule_0_Vreg_0_SocVoltage_0",
+      "MetricValue": "0.875000",
+      "Timestamp": "2026-06-29T08:05:10.766+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_Vreg_0_CpuVoltage_0",
+      "MetricValue": "1.081000",
+      "Timestamp": "2026-06-29T08:05:10.254+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Chassis/HGX_CPU_1/Sensors/ProcessorModule_1_Vreg_0_SocVoltage_0",
+      "MetricValue": "0.875000",
+      "Timestamp": "2026-06-29T08:05:10.257+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_SysBus_0_NVLink_0#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.342+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_SysBus_0_NVLink_1#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.345+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/ProcessorMetrics#/Oem/Nvidia/PowerBreakPerformanceState",
+      "MetricValue": "Normal",
+      "Timestamp": "2026-06-29T08:05:10.302+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/ProcessorMetrics#/Oem/Nvidia/EDPViolationState",
+      "MetricValue": "Normal",
+      "Timestamp": "2026-06-29T08:05:10.304+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/ProcessorMetrics#/Oem/Nvidia/MemorySpareChannelPresence",
+      "MetricValue": "true",
+      "Timestamp": "2026-06-29T08:05:10.313+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_0#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.320+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_1#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.323+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_2#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.325+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_3#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.328+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_4#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.330+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_5#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.332+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_6#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.333+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_7#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.336+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_8#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.337+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_1/Ports/ProcessorModule_1_PCIeBus_0_PCIeLink_9#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.339+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_SysBus_0_NVLink_0#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.298+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_SysBus_0_NVLink_1#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.300+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/ProcessorMetrics#/Oem/Nvidia/PowerBreakPerformanceState",
+      "MetricValue": "Normal",
+      "Timestamp": "2026-06-29T08:05:10.260+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/ProcessorMetrics#/Oem/Nvidia/EDPViolationState",
+      "MetricValue": "Normal",
+      "Timestamp": "2026-06-29T08:05:10.263+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/ProcessorMetrics#/Oem/Nvidia/MemorySpareChannelPresence",
+      "MetricValue": "true",
+      "Timestamp": "2026-06-29T08:05:10.276+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_0#/Status/State",
+      "MetricValue": "Enabled",
+      "Timestamp": "2026-06-29T08:05:10.279+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_1#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.281+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_2#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.283+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_3#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.284+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_4#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.286+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_5#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.289+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_6#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.291+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_7#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.293+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_8#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.294+00:00"
+    },
+    {
+      "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/CPU_0/Ports/ProcessorModule_0_PCIeBus_0_PCIeLink_9#/Status/State",
+      "MetricValue": "Disabled",
+      "Timestamp": "2026-06-29T08:05:10.296+00:00"
+    }
+  ],
+  "Name": "HGX_CpuProcessorMetrics_0"
+}

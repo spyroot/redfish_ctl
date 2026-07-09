@@ -1,0 +1,14 @@
+{
+  "@odata.id": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/ProcessorResetMetrics",
+  "@odata.type": "#NvidiaProcessorResetMetrics.v1_0_0.NvidiaProcessorResetMetrics",
+  "ConventionalResetEntryCount": 4,
+  "ConventionalResetExitCount": 1,
+  "FundamentalResetEntryCount": 3,
+  "FundamentalResetExitCount": 3,
+  "IRoTResetExitCount": 0,
+  "Id": "ProcessorResetMetrics",
+  "LastResetType": "Fundamental",
+  "Name": "GPU_3 Processor Reset Metrics",
+  "PF_FLR_ResetEntryCount": 5,
+  "PF_FLR_ResetExitCount": 5
+}

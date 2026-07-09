@@ -1,0 +1,15 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/ThermalSubsystem/ThermalMetrics",
+  "@odata.type": "#ThermalMetrics.v1_0_0.ThermalMetrics",
+  "Id": "ThermalMetrics",
+  "Name": "Chassis Thermal Metrics",
+  "TemperatureReadingsCelsius": [
+    {
+      "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/Sensors/BF3_Slot_2_Temp",
+      "DataSourceUri": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/Sensors/BF3_Slot_2_Temp",
+      "DeviceName": "BF3_Slot_2_Temp",
+      "PhysicalContext": "NetworkingDevice",
+      "Reading": 52.0
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "@odata.id": "/redfish/v1/TelemetryService/MetricReportDefinitions/PlatformEnvironmentMetrics_0",
+  "@odata.type": "#MetricReportDefinition.v1_4_1.MetricReportDefinition",
+  "Id": "PlatformEnvironmentMetrics_0",
+  "MetricProperties": [
+    "/redfish/v1/Chassis/BMC_0/Sensors/BMC_0_DCSCM_Temp_0",
+    "/redfish/v1/Chassis/HGX_Chassis_0/Sensors/{BSWild}",
+    "/redfish/v1/Chassis/IO_Board_{IWild}/Sensors/IO_Board_{IWild}_CX7_0_Temp_0",
+    "/redfish/v1/Chassis/IO_Board_{IWild}/Sensors/IO_Board_{IWild}_CX7_1_Temp_0",
+    "/redfish/v1/Chassis/NVME_M2_0/Sensors/NVME_M2_0_Temp_0",
+    "/redfish/v1/Chassis/PDB_0/Sensors/{PDBWild}",
+    "/redfish/v1/Chassis/Riser_Slot{BFWild}_BlueField_3_SmartNIC_Main_Card/Sensors/{BFSWild}",
+    "/redfish/v1/Chassis/StorageBackplane_{SBWild}/Sensors/StorageBackplane_{SBWild}_SSD_{SBDWild}_Temp_0"
+  ],
+  "MetricReport": {
+    "@odata.id": "/redfish/v1/TelemetryService/MetricReports/PlatformEnvironmentMetrics_0"
+  },
+  "MetricReportDefinitionType": "OnRequest",
+  "Name": "PlatformEnvironmentMetrics_0",
+  "ReportActions": [
+    "LogToMetricReportsCollection"
+  ],
+  "ReportUpdates": "Overwrite",
+  "Status": {
+    "State": "Enabled"
+  },
+  "Wildcards": [
+    {
+      "Name": "BSWild",
+      "Values": [
+        "Chassis_0_FAN_1_FRONT",
+        "Chassis_0_FAN_1_REAR",
+        "Chassis_0_FAN_2_FRONT",
+        "Chassis_0_FAN_2_REAR",
+        "Chassis_0_FAN_3_FRONT",
+        "Chassis_0_FAN_3_REAR",
+        "Chassis_0_FAN_4_FRONT",
+        "Chassis_0_FAN_4_REAR",
+        "Chassis_0_FAN_5_FRONT",
+        "Chassis_0_FAN_5_REAR",
+        "Chassis_0_FAN_6_FRONT",
+        "Chassis_0_FAN_6_REAR",
+        "Chassis_0_FAN_7_FRONT",
+        "Chassis_0_FAN_7_REAR",
+        "Chassis_0_FAN_8_FRONT",
+        "Chassis_0_FAN_8_REAR",
+        "Chassis_0_Front_IO_Temp_0",
+        "Chassis_0_LeakDetector_0_ColdPlate",
+        "Chassis_0_LeakDetector_0_Manifold",
+        "Chassis_0_LeakDetector_1_ColdPlate",
+        "Chassis_0_LeakDetector_1_Manifold",
+        "Chassis_0_TotalHSC_Power_0"
+      ]
+    },
+    {
+      "Name": "IWild",
+      "Values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "Name": "PDBWild",
+      "Values": [
+        "PDB_0_HSC_0_Pwr_0",
+        "PDB_0_HSC_0_Temp_0",
+        "PDB_0_HSC_0_Volt_In_0",
+        "PDB_0_HSC_0_Volt_Out_0",
+        "PDB_0_HSC_1_Pwr_0",
+        "PDB_0_HSC_1_Temp_0",
+        "PDB_0_HSC_1_Volt_In_0",
+        "PDB_0_HSC_1_Volt_Out_0",
+        "PDB_0_Inlet_Temp_0",
+        "PDB_0_Vreg_0_Temp_0",
+        "PDB_0_Vreg_0_Temp_1",
+        "PDB_0_Vreg_1_Temp_0",
+        "PDB_0_Vreg_1_Temp_1"
+      ]
+    },
+    {
+      "Name": "BFWild",
+      "Values": [
+        "2"
+      ]
+    },
+    {
+      "Name": "BFSWild",
+      "Values": [
+        "BF3_Slot_{BFWild}_Temp"
+      ]
+    },
+    {
+      "Name": "SBWild",
+      "Values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "Name": "SBDWild",
+      "Values": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ]
+    }
+  ]
+}

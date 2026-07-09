@@ -1,0 +1,11 @@
+{
+  "@odata.id": "/redfish/v1/Systems/System_0/BootOptions/Boot0005",
+  "@odata.type": "#BootOption.v1_0_4.BootOption",
+  "BootOptionEnabled": true,
+  "BootOptionReference": "Boot0005",
+  "Description": "ubuntu",
+  "DisplayName": "ubuntu",
+  "Id": "Boot0005",
+  "Name": "Boot0005",
+  "UefiDevicePath": "HD(1,GPT,2CBCE0A5-02D3-4CE9-B795-1758762D09C5,0x800,0x219800)/\\EFI\\ubuntu\\shimaa64.efi"
+}

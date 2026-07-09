@@ -1,0 +1,50 @@
+{
+  "@odata.id": "/redfish/v1/ComponentIntegrity",
+  "@odata.type": "#ComponentIntegrityCollection.ComponentIntegrityCollection",
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/IRoT_BF3_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/IRoT_CX8_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/IRoT_CX8_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/IRoT_CX8_2"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/IRoT_CX8_3"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_ERoT_BMC_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_ERoT_CPU_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_ERoT_CPU_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_ERoT_FPGA_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_ERoT_FPGA_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_IRoT_GPU_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_IRoT_GPU_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_IRoT_GPU_2"
+    },
+    {
+      "@odata.id": "/redfish/v1/ComponentIntegrity/HGX_IRoT_GPU_3"
+    }
+  ],
+  "Members@odata.count": 14,
+  "Name": "ComponentIntegrity Collection"
+}

@@ -1,0 +1,20 @@
+{
+  "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory",
+  "@odata.type": "#SoftwareInventoryCollection.SoftwareInventoryCollection",
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory/HGX_Driver_GPU_0"
+    },
+    {
+      "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory/HGX_Driver_GPU_1"
+    },
+    {
+      "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory/HGX_Driver_GPU_2"
+    },
+    {
+      "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory/HGX_Driver_GPU_3"
+    }
+  ],
+  "Members@odata.count": 4,
+  "Name": "Software Inventory Collection"
+}

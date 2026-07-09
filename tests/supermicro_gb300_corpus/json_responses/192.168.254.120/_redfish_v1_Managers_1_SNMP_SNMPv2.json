@@ -1,0 +1,10 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#SNMPv2.SNMPv2",
+    "@odata.type": "#SNMPv2.v1_0_0.SNMPv2",
+    "@odata.id": "/redfish/v1/Managers/1/SNMP/SNMPv2",
+    "Id": "1",
+    "Name": "SNMPv2",
+    "Snmpv2Enabled": true,
+    "ROCommunity": "public",
+    "RWCommunity": "private"
+}

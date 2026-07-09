@@ -1,0 +1,17 @@
+{
+  "@Redfish.Settings": {
+    "@odata.type": "#Settings.v1_3_3.Settings",
+    "SettingsObject": {
+      "@odata.id": "/redfish/v1/Chassis/HGX_IRoT_GPU_2/Oem/NvidiaRoT/RoTProtectedComponents/HGX_GPU_2/Settings"
+    }
+  },
+  "@odata.id": "/redfish/v1/Chassis/HGX_IRoT_GPU_2/Oem/NvidiaRoT/RoTProtectedComponents/HGX_GPU_2",
+  "@odata.type": "#NvidiaRoTProtectedComponent.v1_0_0.NvidiaRoTProtectedComponent",
+  "BootStatusCode": "0x01000000000011a306bc06f00300201200000000080a0600",
+  "Id": "HGX_GPU_2",
+  "ImageSlots": {
+    "@odata.id": "/redfish/v1/Chassis/HGX_IRoT_GPU_2/Oem/NvidiaRoT/RoTProtectedComponents/HGX_GPU_2/ImageSlots"
+  },
+  "Name": "HGX_IRoT_GPU_2 RoTProtectedComponent HGX_GPU_2",
+  "RoTProtectedComponentType": "AP"
+}

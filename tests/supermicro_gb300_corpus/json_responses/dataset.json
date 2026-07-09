@@ -1,0 +1,41 @@
+{
+    "mirrors": [
+        {
+            "spec": "http://35.202.223.94/igc/datasets/dataset.json"
+        },
+        {
+            "train_dataset": "http://35.202.223.94/igc/datasets/igc.tar.gz"
+        },
+        {
+            "json_data": "http://35.202.223.94/igc/datasets/json_data.tar.gz"
+        },
+        {
+            "tokenizer": "http://35.202.223.94/igc/datasets/tokenizer.tar.gz"
+        }
+    ],
+    "resources": [
+        [
+            "dataset.json",
+            "",
+            "spec"
+        ],
+        [
+            "igc.tar.gz",
+            "",
+            "train_dataset"
+        ],
+        [
+            "json_data.tar.gz",
+            "a639015e517b95d8849eb02ab3307dd3",
+            "json_data"
+        ],
+        [
+            "tokenizer.tar.gz",
+            "",
+            "tokenizer"
+        ]
+    ],
+    "tokenizer": {
+        "num_tokens": 50257
+    }
+}

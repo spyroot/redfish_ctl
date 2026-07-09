@@ -1,0 +1,29 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.etag": "W/\"D8FEA019\"",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/IML/Entries/89",
+    "@odata.type": "#LogEntry.v1_11_0.LogEntry",
+    "Id": "89",
+    "Created": "2024-01-29T14:03:17Z",
+    "EntryType": "Oem",
+    "Message": "Maintenance note: Starting F10 GUI",
+    "Name": "Integrated Management Log",
+    "Oem": {
+        "Hpe": {
+            "@odata.context": "/redfish/v1/$metadata#HpeLogEntry.HpeLogEntry",
+            "@odata.type": "#HpeLogEntry.v2_4_0.HpeLogEntry",
+            "Categories": [
+                "Maintenance"
+            ],
+            "Class": 33,
+            "ClassDescription": "Maintenance",
+            "Code": 2,
+            "Count": 1,
+            "EventNumber": 198,
+            "Severity": "Informational",
+            "Updated": "2024-01-29T14:03:17Z"
+        }
+    },
+    "OemRecordFormat": "Hpe-IML",
+    "Severity": "OK"
+}

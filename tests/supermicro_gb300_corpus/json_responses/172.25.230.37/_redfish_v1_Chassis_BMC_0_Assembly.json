@@ -1,0 +1,38 @@
+{
+  "@odata.id": "/redfish/v1/Chassis/BMC_0/Assembly",
+  "@odata.type": "#Assembly.v1_3_0.Assembly",
+  "Assemblies": [
+    {
+      "@odata.id": "/redfish/v1/Chassis/BMC_0/Assembly#/Assemblies/0",
+      "Location": {
+        "PartLocation": {
+          "LocationType": "Embedded"
+        }
+      },
+      "MemberId": "0",
+      "Model": "AOM-SCM-GB-101",
+      "Name": "BMC Board FRU Assembly0",
+      "PartNumber": "AOM-SCM-GB-P",
+      "ProductionDate": "2025-07-19T01:12:00Z",
+      "SerialNumber": "HA256S015664",
+      "Vendor": "Supermicro"
+    },
+    {
+      "@odata.id": "/redfish/v1/Chassis/BMC_0/Assembly#/Assemblies/1",
+      "Location": {
+        "PartLocation": {
+          "LocationType": "Embedded"
+        }
+      },
+      "MemberId": "1",
+      "Model": "ARS-GB200-NVL72-LC",
+      "Name": "BMC Product FRU Assembly1",
+      "PartNumber": "ARS-121GL-NB3-LCC-R1",
+      "SerialNumber": "S964512X5913271",
+      "Vendor": "Supermicro",
+      "Version": "$PRODUCT_VERSION"
+    }
+  ],
+  "Id": "Assembly",
+  "Name": "Assembly data for BMC_0"
+}

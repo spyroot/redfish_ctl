@@ -1,0 +1,11 @@
+{
+  "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers",
+  "@odata.type": "#StorageControllerCollection.StorageControllerCollection",
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_210"
+    }
+  ],
+  "Members@odata.count": 1,
+  "Name": "Storage Controller Collection"
+}

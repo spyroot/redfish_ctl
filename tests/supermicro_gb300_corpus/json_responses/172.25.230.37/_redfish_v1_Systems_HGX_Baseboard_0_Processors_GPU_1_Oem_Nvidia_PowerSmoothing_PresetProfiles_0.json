@@ -1,0 +1,10 @@
+{
+  "@odata.id": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing/PresetProfiles/0",
+  "@odata.type": "#NvidiaPowerSmoothingPresetProfile.v1_0_0.NvidiaPowerSmoothingPresetProfile",
+  "Id": "0",
+  "Name": "GPU_1 PowerSmoothing PresetProfile 0",
+  "RampDownHysteresisSeconds": 10.0,
+  "RampDownWattsPerSecond": 20.0,
+  "RampUpWattsPerSecond": 20.0,
+  "TMPFloorPercent": 89.990234375
+}

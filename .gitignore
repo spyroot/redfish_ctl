@@ -196,8 +196,10 @@ dmypy.json
 /old/
 /old/jsons/
 
-# Downloaded vendor firmware blobs and local scratch (large / machine-specific)
-bios_firmware/
+# Local scratch scripts (machine-specific; not corpus data)
 clean.sh
 mount_media.sh
 tests/popen_test.py
+
+# De-duplicated corpus: the redundant orig/ backup tree is never committed
+tests/supermicro_gb300_corpus/json_responses/orig/
