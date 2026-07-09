@@ -65,11 +65,21 @@ class Sensors(IDracManager,
             sensors_uri = link.get("@odata.id") if isinstance(link, dict) else None
             if not sensors_uri:
                 continue
-            try:
-                coll = self.base_query(sensors_uri, do_async=do_async,
-                                       do_expanded=do_expanded).data or {}
-            except Exception:
-                continue
+            # Prefer $expand: one GET returns every sensor with its Reading, so a
+            # large chassis tree -- e.g. a 42-chassis GB300 -- does not fan out into
+            # hundreds of per-sensor GETs (that walk times out). Fall back to a plain
+            # GET when a BMC rejects $expand (some OpenBMC/iLO builds 400 on it); the
+            # per-member loop below then fetches each sensor individually.
+            coll = {}
+            for want_expand in (True, False):
+                if want_expand is False and do_expanded:
+                    break  # caller forced expand; don't fall back to slow per-member
+                try:
+                    coll = self.base_query(sensors_uri, do_async=do_async,
+                                           do_expanded=want_expand).data or {}
+                    break
+                except Exception:
+                    coll = {}
             for member in coll.get("Members", []):
                 if not isinstance(member, dict):
                     continue
