@@ -155,8 +155,14 @@ class BootOneShot(IDracManager,
             uefi_target if uefi_target is not None else "(none)",
         )
 
+        # One-time boot must ARM the override, not just name a target: Redfish
+        # ignores BootSourceOverrideTarget unless BootSourceOverrideEnabled is set.
+        # "None" clears the override (Disabled); any real device arms it once.
+        override_enabled = "Disabled" if device == "None" else "Once"
+
         payload = {
             "Boot": {
+                "BootSourceOverrideEnabled": override_enabled,
                 "BootSourceOverrideTarget": device,
                 "BootSourceOverrideMode": mode,
                 "UefiTargetBootSourceOverride": uefi_target

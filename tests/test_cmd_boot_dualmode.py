@@ -127,7 +127,12 @@ def test_boot_one_shot_patches_requested_target_in_mock_mode(
     request = redfish_service.last_request
     assert request.method == "PATCH"
     assert request.path.lower() == "/redfish/v1/systems/system.embedded.1"
-    assert request.json() == {"Boot": {"BootSourceOverrideTarget": "Pxe"}}
+    assert request.json() == {
+        "Boot": {
+            "BootSourceOverrideEnabled": "Once",
+            "BootSourceOverrideTarget": "Pxe",
+        }
+    }
 
     current = redfish_mock.sync_invoke(
         ApiRequestType.CurrentBoot, "current_boot_query"
@@ -197,6 +202,7 @@ def test_boot_one_shot_uefi_mode_sets_override_mode_in_mock_mode(
     assert request.method == "PATCH"
     assert request.json() == {
         "Boot": {
+            "BootSourceOverrideEnabled": "Once",
             "BootSourceOverrideTarget": "Cd",
             "BootSourceOverrideMode": "UEFI",
         }
@@ -218,6 +224,7 @@ def test_boot_one_shot_legacy_mode_sets_override_mode_in_mock_mode(
     assert result.data["Status"] == "ok"
     assert redfish_service.last_request.json() == {
         "Boot": {
+            "BootSourceOverrideEnabled": "Once",
             "BootSourceOverrideTarget": "Cd",
             "BootSourceOverrideMode": "Legacy",
         }

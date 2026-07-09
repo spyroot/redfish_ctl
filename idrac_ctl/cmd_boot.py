@@ -12,10 +12,10 @@ import asyncio
 from abc import abstractmethod
 from typing import Optional
 
-from .cmd_utils import find_ids
-from .cmd_utils import save_if_needed
+from .cmd_exceptions import ResourceNotFound
+from .cmd_utils import find_ids, save_if_needed
 from .idrac_manager import IDracManager
-from .idrac_shared import Singleton, ApiRequestType
+from .idrac_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
@@ -73,18 +73,26 @@ class BootQuery(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
+        # Dell exposes a proprietary BootSources collection; standard Redfish
+        # (Supermicro/OpenBMC, HPE) does not, so BootSources 404s there. Try Dell's
+        # path, then fall back to the ComputerSystem's standard Boot object.
         r = f"https://{self.idrac_ip}{self.idrac_manage_servers}/BootSources"
 
-        if not do_async:
-            response = self.api_get_call(r, headers)
-            self.default_error_handler(response)
-        else:
-            loop = asyncio.get_event_loop()
-            response = loop.run_until_complete(
-                self.api_async_get_until_complete(r, headers)
-            )
+        try:
+            if not do_async:
+                response = self.api_get_call(r, headers)
+                self.default_error_handler(response)
+            else:
+                loop = asyncio.get_event_loop()
+                response = loop.run_until_complete(
+                    self.api_async_get_until_complete(r, headers)
+                )
+            data = response.json()
+        except ResourceNotFound:
+            system = self.base_query(
+                self.idrac_manage_servers, do_async=do_async).data or {}
+            data = system.get("Boot", system)
 
-        data = response.json()
         save_if_needed(filename, data)
 
         # extra data
