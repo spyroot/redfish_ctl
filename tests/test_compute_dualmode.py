@@ -1,6 +1,7 @@
 """Dual-mode tests for the compute settings command."""
 import json
 
+from idrac_ctl.compute.cmd_update import UpdateCompute  # noqa: F401
 from idrac_ctl.idrac_manager import IDracManager
 from idrac_ctl.idrac_shared import ApiRequestType
 from idrac_ctl.redfish_manager import CommandResult
@@ -56,3 +57,32 @@ def test_compute_query_uses_system_resource_before_610(
         redfish_service.last_request.path.lower()
         == "/redfish/v1/systems/system.embedded.1"
     )
+
+
+def test_compute_update_uses_system_resource_before_610_without_mutating(
+    redfish_api, redfish_service, monkeypatch
+):
+    """compute-update reads the ComputerSystem resource before the Settings URI is available."""
+    monkeypatch.setattr(
+        IDracManager,
+        "idrac_manager_version",
+        property(lambda self: "6.00.00.00"),
+    )
+    request_count = len(redfish_service.requests)
+
+    result = redfish_api.sync_invoke(ApiRequestType.ComputeUpdate, "update")
+    new_requests = redfish_service.requests[request_count:]
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data["@odata.id"] == "/redfish/v1/Systems/System.Embedded.1"
+    assert result.data["Id"] == "System.Embedded.1"
+    assert result.error is None
+    assert redfish_service.last_request.method == "GET"
+    assert (
+        redfish_service.last_request.path.lower()
+        == "/redfish/v1/systems/system.embedded.1"
+    )
+    assert new_requests
+    assert {request.method for request in new_requests} == {"GET"}
