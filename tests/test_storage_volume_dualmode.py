@@ -192,20 +192,12 @@ def test_volume_init_posts_fast_initialize_to_discovered_action_in_mock_mode(
     """volume-init builds a Fast Initialize request from the discovered action."""
     _seed_volume_initialize_action(redfish_service)
 
-    try:
-        result = redfish_mock.sync_invoke(
-            ApiRequestType.VolumeInit,
-            "chassis_service_query",
-            dev_id=_CONTROLLER,
-            vol_id=_VOLUME_ID,
-        )
-    except ValueError as exc:
-        assert str(exc) == "Unknown data type."
-        _assert_volume_init_post(redfish_service)
-        pytest.xfail(
-            "VolumeInit posts the expected request but still passes "
-            "base_post's return tuple to parse_task_id."
-        )
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.VolumeInit,
+        "chassis_service_query",
+        dev_id=_CONTROLLER,
+        vol_id=_VOLUME_ID,
+    )
 
     assert isinstance(result, CommandResult)
     assert result.error is None

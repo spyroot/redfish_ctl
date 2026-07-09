@@ -29,6 +29,10 @@ _CONVERT_TO_RAID_PATH = (
     "/redfish/v1/Dell/Systems/System.Embedded.1/DellRaidService/"
     "Actions/DellRaidService.ConvertToRAID"
 )
+_CONVERT_TO_NONRAID_PATH = (
+    "/redfish/v1/Dell/Systems/System.Embedded.1/DellRaidService/"
+    "Actions/DellRaidService.ConvertToNonRAID"
+)
 
 
 def _post_requests(service):
@@ -42,6 +46,15 @@ def _assert_convert_to_raid_post(service, pd_array):
     assert len(posts) == 1
     request = posts[0]
     assert request.path.lower() == _CONVERT_TO_RAID_PATH.lower()
+    assert request.json() == {"PDArray": pd_array}
+
+
+def _assert_convert_to_nonraid_post(service, pd_array):
+    """Assert ConvertNoneRaid sent the expected Dell RAID action request."""
+    posts = _post_requests(service)
+    assert len(posts) == 1
+    request = posts[0]
+    assert request.path.lower() == _CONVERT_TO_NONRAID_PATH.lower()
     assert request.json() == {"PDArray": pd_array}
 
 
@@ -153,6 +166,25 @@ def test_storage_convert_noraid_skips_post_when_disks_are_nonraid_in_mock_mode(
     assert all(request.method != "POST" for request in redfish_service.requests)
 
 
+def test_storage_convert_noraid_posts_raid_pdarray_in_mock_mode(
+    redfish_mock, redfish_service
+):
+    """storage-convert-noraid builds a ConvertToNonRAID request for RAID disks."""
+    _seed_drive(redfish_service, "Online")
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.ConvertNoneRaid,
+        "convert_none_raid",
+        controller=_CONTROLLER,
+        exclude_filter="",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["task_id"] == redfish_service.JOB_ID
+    _assert_convert_to_nonraid_post(redfish_service, ["Disk.Bay.0"])
+
+
 def test_storage_convert_to_raid_skips_post_when_no_nonraid_disks_in_mock_mode(
     redfish_mock, redfish_service
 ):
@@ -177,20 +209,12 @@ def test_storage_convert_to_raid_posts_nonraid_pdarray_in_mock_mode(
     """storage-convert-raid builds a ConvertToRAID request for NonRAID disks."""
     _seed_drive(redfish_service, "NonRAID")
 
-    try:
-        result = redfish_mock.sync_invoke(
-            ApiRequestType.ConvertToRaid,
-            "convert_none_raid",
-            controller=_CONTROLLER,
-            exclude_filter="",
-        )
-    except ValueError as exc:
-        assert str(exc) == "Unknown data type."
-        _assert_convert_to_raid_post(redfish_service, ["Disk.Bay.0"])
-        pytest.xfail(
-            "ConvertToRaid posts the expected request but still passes "
-            "base_post's return tuple to parse_task_id."
-        )
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.ConvertToRaid,
+        "convert_none_raid",
+        controller=_CONTROLLER,
+        exclude_filter="",
+    )
 
     assert isinstance(result, CommandResult)
     assert result.error is None
