@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When I connect to a new BMC, I run `idrac_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before I ask for deeper inventory or stage any change.
 
-The table below follows the 92 command names imported by `idrac_ctl/__init__.py`. Run
+The table below follows the 103 command names imported by `idrac_ctl/__init__.py`. Run
 `idrac_ctl <command> --help` for flags on your installed version.
 
 ## Connection Basics
@@ -53,6 +53,10 @@ Safety labels:
 | Command | What I use it for | Safety |
 |---|---|---|
 | `account` | Read one account resource. | Read |
+| `account-create` | Create a Redfish account (ManagerAccount). | Write |
+| `account-delete` | Delete a Redfish account (self-delete guarded). | Write |
+| `account-import-sshkey` | Import or remove an account's authorized SSH key (HPE iLO OEM). | Write |
+| `account-update` | Update a Redfish account (role, password, enable). | Write |
 | `account-svc` | Read AccountService. | Read |
 | `accounts` | Read the account collection; `--usernames` prints only usernames. | Read |
 | `actions` | List Redfish actions exposed by the box and their risk levels. | Read |
@@ -64,7 +68,9 @@ Safety labels:
 | `bios-clear-pending` | Clear pending BIOS values. | Write |
 | `bios-pending` | Read pending BIOS values. | Read |
 | `bios-registry` | Read BIOS registry metadata, choices, and writable attributes. | Read |
-| `boot` | Read boot source data. | Read |
+| `bios-snapshot` | Capture a BIOS restore point for rollback-able changes. | Read |
+| `bmc-scan` | Scan a network segment for Redfish BMCs. | Read |
+| `boot` | Read boot source data (vendor-neutral: falls back to the ComputerSystem `Boot` object). | Read |
 | `boot-one-shot` | Set a one-time boot target and optionally reboot or power on. | Write |
 | `boot-options` | Read boot option members. | Read |
 | `boot-options-clear` | Clear pending boot option values. | Write |
@@ -75,6 +81,7 @@ Safety labels:
 | `boot-source-registry` | Read boot source registry data. | Read |
 | `boot-source-update` | Stage boot source settings. | Write |
 | `boot-sources` | List boot source members. | Read |
+| `boot-state` | Infer what the host will boot (target/order/media). | Read |
 | `change-boot-order` | Change boot order and boot options. | Write |
 | `chassis` | Read chassis services. | Read |
 | `chassis-reset` | Change chassis power state. | Write |
@@ -125,7 +132,8 @@ Safety labels:
 | `raid` | Read RAID service data. | Read |
 | `reboot` | Reset the host ComputerSystem through the older direct reset path. | Write |
 | `secure-boot` | Read SecureBoot state and key databases. | Read |
-| `sensors` | Read Chassis Sensor collections across vendors. | Read |
+| `sensors` | Read Chassis Sensor collections across vendors (auto `$expand`, per-sensor fallback). | Read |
+| `serial-console` | Report host serial redirection + BMC SOL; `--enable --confirm` sets both (dry-run by default). | Write |
 | `service-api-rs-status` | Read remote service API status. | Read |
 | `service-api-status` | Read service API status. | Read |
 | `storage-controllers` | Read storage controller information. | Read |
@@ -142,9 +150,11 @@ Safety labels:
 | `task-watch` | Watch task progress. | Read |
 | `tasks` | Read the task collection. | Read |
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
+| `vm-mount` | Mount/unmount an ISO via Supermicro OEM virtual media (CfgCD). | Write |
 | `volume-get` | Read one volume from a storage device. | Read |
 | `volume-init` | Initialize a volume. | Write |
 | `volumes` | Read virtual disk data. | Read |
+| `wait` | Wait for the BMC Redfish service to be reachable (e.g. after a reboot). | Read |
 
 ## Vendor-Neutral Telemetry Reads
 
