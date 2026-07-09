@@ -423,15 +423,13 @@ def redfish_main_ctl():
     logger.setLevel(logging.ERROR)
     parser = argparse.ArgumentParser(
         prog="redfish_ctl", add_help=True,
-        description='''iDrac command line tools. |n
-                                     It a standalone command line tool provide option to interact with  |n
-                                     Dell iDRAC via Redfish REST API. It supports both asynchronous and |n
-                                     synchronous options to interact with iDRAC.|n
-                                     Author Mus''',
-        epilog='''For more detail, for example, documentation. Make sure to check.
-                                             https://github.com/spyroot/redfish_ctl |n
-                                             The example folder container many examples.
-                                             Author Mustafa Bayramov spyroot@gmail.com
+        description='''redfish_ctl - a vendor-neutral command-line tool to drive server BMCs |n
+                                     over the Redfish REST API: Dell iDRAC, Supermicro, HPE iLO, and |n
+                                     generic DMTF Redfish. Supports both synchronous and asynchronous |n
+                                     calls. (idrac_ctl remains a backward-compatible alias.)''',
+        epilog='''Docs and examples: https://github.com/spyroot/redfish_ctl |n
+                                             The examples/ folder contains many ready-to-run scripts. |n
+                                             Author: Mustafa Bayramov <spyroot@gmail.com>
                                              ''',
         formatter_class=CustomArgumentDefaultsHelpFormatter)
 

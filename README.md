@@ -58,7 +58,7 @@ export REDFISH_USERNAME=root
 export REDFISH_PASSWORD='your-password'
 
 # 3. Read something safe
-redfish_ctl --version          # -> redfish_ctl 1.1.1
+redfish_ctl --version          # prints the installed version
 redfish_ctl system             # host ComputerSystem (Id, Name, PowerState)
 redfish_ctl sensors            # temperatures, power, fans, voltages
 redfish_ctl system --yaml      # same data as YAML instead of JSON
@@ -101,6 +101,10 @@ export REDFISH_USERNAME=root
 export REDFISH_PASSWORD='your-password'
 export REDFISH_PORT=443
 ```
+
+Any of these can be overridden per-invocation by a CLI flag. The flags keep their legacy names —
+`--idrac_ip`, `--idrac_username`, `--idrac_password`, `--idrac_port` — so existing scripts don't
+break; the `REDFISH_*` env vars above are the preferred way to configure the connection.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.
@@ -157,6 +161,23 @@ redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --d
 
 Use `--confirm` only when you mean to perform a guarded action such as `system-reset` or
 `firmware-update`.
+
+## Troubleshooting
+
+First-run problems are almost always the connection, not the command:
+
+- **`AuthenticationFailed` / HTTP 401** — wrong username or password, or an empty `REDFISH_PASSWORD`.
+  Re-check the three env vars; many BMCs also lock the account after repeated failures.
+- **TLS / self-signed certificate errors** — expected on most BMCs. TLS verification is *off* by
+  default, so this usually means you passed `--verify-ssl` against a BMC without a trusted chain;
+  drop the flag, or point it at a BMC whose certificate you trust.
+- **Connection timeout / refused / no route** — the BMC IP is unreachable, on a different network,
+  or Redfish is on a non-default port. Confirm reachability (`ping`, `curl -k https://$REDFISH_IP/redfish/v1`)
+  and set `REDFISH_PORT` if it isn't 443. After a reboot, `redfish_ctl wait` blocks until the BMC answers again.
+- **A command exists but returns little on your hardware** — Redfish trees differ by vendor and
+  model. Use `redfish_ctl discovery` to see what your BMC actually exposes.
+- **More detail** — add `--debug` (or `--verbose`) to any command to see the Redfish requests and
+  responses behind it.
 
 ## More Docs
 
