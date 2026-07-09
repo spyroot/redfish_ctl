@@ -111,6 +111,7 @@ Safety labels:
 | `jobs-service` | Read standard Redfish JobService. | Read |
 | `logs` | Read system and manager log entries. | Read |
 | `manager` | Read manager data. | Read |
+| `manager-network` | Read BMC ManagerNetworkProtocol service state, including HTTP/HTTPS/IPMI/SSH and NTP. | Read |
 | `manager-reboot` | Reboot the BMC manager. | Write |
 | `manager-time` | Read the BMC (Manager) clock; `--now`/`--set` write `DateTime` (read-only by default, no dry-run). | Write |
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
