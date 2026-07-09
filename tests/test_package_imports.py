@@ -11,11 +11,11 @@ import pkgutil
 
 import pytest
 
-import idrac_ctl
+import redfish_ctl
 
 
 def _iter_module_names():
-    for mod in pkgutil.walk_packages(idrac_ctl.__path__, prefix="idrac_ctl."):
+    for mod in pkgutil.walk_packages(redfish_ctl.__path__, prefix="redfish_ctl."):
         yield mod.name
 
 
@@ -27,7 +27,7 @@ def test_module_imports(module_name: str):
 
 def test_bios_change_command_is_registered():
     """The de-duplicated bios change module still exposes its command class."""
-    from idrac_ctl.bios.cmd_change_bios import BiosChangeSettings
-    from idrac_ctl.idrac_manager import IDracManager
+    from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
+    from redfish_ctl.idrac_manager import IDracManager
 
     assert issubclass(BiosChangeSettings, IDracManager)

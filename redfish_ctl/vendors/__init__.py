@@ -4,7 +4,7 @@ Each vendor gets its own subdirectory under ``vendors/`` so vendor specifics are
 clearly separated from the product-neutral core. Importing this package registers
 every vendor's capability profile. See README.md for the convention.
 
-    from idrac_ctl.vendors import get_vendor
+    from redfish_ctl.vendors import get_vendor
     caps = get_vendor("dell")
     if caps.job_scheduling:
         ...

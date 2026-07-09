@@ -6,10 +6,10 @@ dead. These pin the success/raise mapping. No network.
 """
 import pytest
 
-from idrac_ctl.cmd_exceptions import ResourceNotFound
-from idrac_ctl.redfish_exceptions import RedfishForbidden, RedfishUnauthorized
-from idrac_ctl.redfish_manager import RedfishManager
-from idrac_ctl.redfish_shared import RedfishApiRespond
+from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.redfish_exceptions import RedfishForbidden, RedfishUnauthorized
+from redfish_ctl.redfish_manager import RedfishManager
+from redfish_ctl.redfish_shared import RedfishApiRespond
 
 
 class _Resp:

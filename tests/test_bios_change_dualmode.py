@@ -1,8 +1,8 @@
 """Dual-mode tests for BIOS snapshot and show-only BIOS changes."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def _write_bios_spec(tmp_path, attributes):

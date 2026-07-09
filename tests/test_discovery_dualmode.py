@@ -1,9 +1,9 @@
 """Dual-mode test for the Redfish discovery command."""
 import json
 
-from idrac_ctl.discovery.cmd_discovery import Discovery
-from idrac_ctl.idrac_shared import ApiRequestType, Singleton
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.discovery.cmd_discovery import Discovery
+from redfish_ctl.idrac_shared import ApiRequestType, Singleton
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_discovery_reads_service_root_in_mock_mode(

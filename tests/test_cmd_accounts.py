@@ -17,9 +17,9 @@ from unittest import TestCase
 
 import pytest
 
-from idrac_ctl.idrac_manager import CommandResult, IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_shared import RedfishJson
+from redfish_ctl.idrac_manager import CommandResult, IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_shared import RedfishJson
 
 logging.basicConfig()
 log = logging.getLogger("LOG")

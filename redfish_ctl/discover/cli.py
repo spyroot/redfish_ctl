@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Sequence, TextIO
 
 import requests
 
-from idrac_ctl.discover.scanner import (
+from redfish_ctl.discover.scanner import (
     REDFISH_ROOT_PATH,
     AsyncGet,
     DiscoveredService,

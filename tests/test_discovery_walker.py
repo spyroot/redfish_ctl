@@ -19,14 +19,14 @@ Author Mus spyroot@gmail.com
 import pytest
 import requests
 
-from idrac_ctl.discovery import cmd_discovery
-from idrac_ctl.discovery.cmd_discovery import (
+from redfish_ctl.discovery import cmd_discovery
+from redfish_ctl.discovery.cmd_discovery import (
     DEFAULT_DISCOVERY_MAX_DEPTH,
     LOG_ENTRY_MEMBER_RE,
     Discovery,
 )
-from idrac_ctl.redfish_exceptions import RedfishForbidden, RedfishNotFound
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_exceptions import RedfishForbidden, RedfishNotFound
+from redfish_ctl.redfish_manager import CommandResult
 
 
 class _FakeGraph:

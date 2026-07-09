@@ -1,8 +1,8 @@
 """Dual-mode tests for the vendor-neutral oem-info command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_oem_info_dualmode_reports_dell_oem_rows_without_mutation(

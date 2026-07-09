@@ -23,7 +23,7 @@ from typing import List, Optional
 
 import requests
 
-from idrac_ctl.discover.classifier import classify_vendor
+from redfish_ctl.discover.classifier import classify_vendor
 
 # Well-known Redfish service root; probed read-only and unauthenticated.
 REDFISH_ROOT_PATH = "/redfish/v1"

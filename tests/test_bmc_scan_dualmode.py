@@ -1,9 +1,9 @@
 """Dual-mode tests for the credential-less BMC segment scan command."""
 import json
 
-from idrac_ctl.discovery import cmd_bmc_scan
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.discovery import cmd_bmc_scan
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_bmc_scan_uses_mocked_segment_scan_without_redfish_requests(

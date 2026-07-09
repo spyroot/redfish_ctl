@@ -6,7 +6,7 @@ a DESTRUCTIVE/IRREVERSIBLE action must NOT POST without explicit confirm. All ru
 against tests/supermicro_fixtures/ through the real requests path; the mock
 records every POST so we can assert exactly what did (or did not) fire.
 """
-from idrac_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.actions.action_policy import Destructiveness, classify
 
 
 def _post_count(svc):

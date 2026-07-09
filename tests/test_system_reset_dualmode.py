@@ -2,9 +2,9 @@
 
 import pytest
 
-from idrac_ctl.compute.cmd_system_reset import SystemReset
-from idrac_ctl.idrac_shared import ApiRequestType, Singleton
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.compute.cmd_system_reset import SystemReset
+from redfish_ctl.idrac_shared import ApiRequestType, Singleton
+from redfish_ctl.redfish_manager import CommandResult
 
 RESET_TARGET = (
     "/redfish/v1/systems/system.embedded.1/actions/computersystem.reset"

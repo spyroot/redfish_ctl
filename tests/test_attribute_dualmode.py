@@ -1,9 +1,9 @@
 """Dual-mode tests for iDRAC manager attribute commands."""
 import json
 
-from idrac_ctl.attribute.cmd_attribute_clear_pending import AttributeClearPending
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.attribute.cmd_attribute_clear_pending import AttributeClearPending
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_attribute_inventory_returns_manager_attributes(redfish_api):

@@ -1,8 +1,8 @@
 """Dual-mode test for the read-only secure-boot command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_secure_boot_returns_fixture_database_rows_without_mutation(

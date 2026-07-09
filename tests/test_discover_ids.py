@@ -8,8 +8,8 @@ returning ALL members so callers can stop assuming a singleton. No network.
 """
 import pytest
 
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager import CommandResult
 
 
 class TestMemberIds:

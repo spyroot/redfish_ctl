@@ -3,11 +3,11 @@ import json
 
 import pytest
 
-from idrac_ctl.chassis.cmd_chasis_reset import ChassisReset
-from idrac_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
-from idrac_ctl.cmd_exceptions import InvalidArgumentFormat
-from idrac_ctl.idrac_shared import ApiRequestType, PowerState, RedfishAction
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.chassis.cmd_chasis_reset import ChassisReset
+from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
+from redfish_ctl.cmd_exceptions import InvalidArgumentFormat
+from redfish_ctl.idrac_shared import ApiRequestType, PowerState, RedfishAction
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_chassis_query_returns_idrac_chassis_collection(redfish_api):

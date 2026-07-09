@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import pytest
 
-from idrac_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_manager import IDracManager
 
 logging.basicConfig()
 log = logging.getLogger("LOG")

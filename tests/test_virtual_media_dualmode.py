@@ -1,9 +1,9 @@
 """Dual-mode tests for virtual-media commands."""
 import json
 
-from idrac_ctl.idrac_manager import IDracManager
-from idrac_ctl.idrac_shared import ApiRequestType, IdracApiRespond
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType, IdracApiRespond
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_virtual_media_query_returns_collection(redfish_api):

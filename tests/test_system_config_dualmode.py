@@ -2,12 +2,12 @@
 
 import pytest
 
-from idrac_ctl.cmd_exceptions import InvalidArgument
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
-from idrac_ctl.system.cmd_system_config import ExportSystemConfig
-from idrac_ctl.system.cmd_system_import import ImportSystemConfig  # noqa: F401
-from idrac_ctl.system.cmd_system_one_time_boot import ImportOneTimeBoot  # noqa: F401
+from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.system.cmd_system_config import ExportSystemConfig
+from redfish_ctl.system.cmd_system_import import ImportSystemConfig  # noqa: F401
+from redfish_ctl.system.cmd_system_one_time_boot import ImportOneTimeBoot  # noqa: F401
 
 
 def test_system_export_posts_expected_payload_in_mock_mode(

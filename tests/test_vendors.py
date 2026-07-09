@@ -2,8 +2,8 @@
 
 Author Mus spyroot@gmail.com
 """
-from idrac_ctl.vendors import all_vendors, get_vendor
-from idrac_ctl.vendors.base import VendorCapabilities
+from redfish_ctl.vendors import all_vendors, get_vendor
+from redfish_ctl.vendors.base import VendorCapabilities
 
 
 def test_dell_profile_registered_with_doc_facts():

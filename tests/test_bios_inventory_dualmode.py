@@ -13,8 +13,8 @@ Author Mus spyroot@gmail.com
 """
 import json
 
-from idrac_ctl.idrac_shared import IDRAC_API, ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import IDRAC_API, ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_idrac_api_has_bios_member():

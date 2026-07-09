@@ -1,8 +1,8 @@
 """Dual-mode tests for the manager reset command."""
 
-from idrac_ctl.idrac_shared import ApiRequestType, JobState
-from idrac_ctl.manager.cmd_manager_reset import ManagerReset
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.manager.cmd_manager_reset import ManagerReset
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_manager_reset_posts_graceful_restart_in_mock_mode(

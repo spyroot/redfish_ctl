@@ -7,14 +7,14 @@ no network — writes are mocked or dry-run.
 """
 import pytest
 
-from idrac_ctl.accounts.cmd_account_manage import (
+from redfish_ctl.accounts.cmd_account_manage import (
     DEFAULT_ROLE,
     AccountDelete,
     _mask,
     build_create_payload,
     build_update_payload,
 )
-from idrac_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_build_create_payload():

@@ -3,9 +3,9 @@
 Read/status is non-mutating; --enable previews unless --confirm is given. These run
 offline against the mock and assert that neither path sends a PATCH without --confirm.
 """
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
-from idrac_ctl.serial_console.cmd_serial_console import (  # noqa: F401
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.serial_console.cmd_serial_console import (  # noqa: F401
     SerialConsoleConfig,
 )
 

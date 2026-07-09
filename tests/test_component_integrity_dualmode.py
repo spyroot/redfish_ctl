@@ -1,8 +1,8 @@
 """Dual-mode tests for the ComponentIntegrity query command."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_component_integrity_absent_collection_returns_empty_list(

@@ -9,8 +9,8 @@ Author Mus spyroot@gmail.com
 """
 from requests.models import Response
 
-from idrac_ctl.redfish_manager import RedfishManager
-from idrac_ctl.redfish_respond import RedfishRespondMessage
+from redfish_ctl.redfish_manager import RedfishManager
+from redfish_ctl.redfish_respond import RedfishRespondMessage
 from tests.test_utils import create_json_resp
 
 

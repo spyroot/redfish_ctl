@@ -1,15 +1,15 @@
-"""Shared pytest fixtures and collection rules for idrac_ctl tests.
+"""Shared pytest fixtures and collection rules for redfish_ctl tests.
 
 The default unit suite runs fully offline. Tests that talk to a real iDRAC
 must be marked ``@pytest.mark.live``; those are skipped automatically unless
 ``IDRAC_IP`` is present in the environment, so ``pytest`` is green on a laptop
 or in CI without any hardware.
 
-Import-path note: the repo root directory is itself named ``idrac_ctl`` and
-ships a re-export shim (``./__init__.py`` does ``from .idrac_ctl import *``).
+Import-path note: the repo root directory is itself named ``redfish_ctl`` and
+ships a re-export shim (``./__init__.py`` does ``from .redfish_ctl import *``).
 If the repo's *parent* directory ends up on ``sys.path`` first, ``import
-idrac_ctl`` resolves to that shim instead of the real nested package, and
-submodules like ``idrac_ctl.cmd_utils`` become unreachable. We pin the source
+redfish_ctl`` resolves to that shim instead of the real nested package, and
+submodules like ``redfish_ctl.cmd_utils`` become unreachable. We pin the source
 tree as the first entry and drop the parent so the nested package always wins.
 
 Author Mus spyroot@gmail.com
@@ -25,10 +25,10 @@ _PARENT = os.path.dirname(_REPO_ROOT)
 
 # Captured DMTF Redfish mockup tree shipped in the package. Filenames map 1:1 to
 # Redfish URLs: /redfish/v1/Managers -> _redfish_v1_Managers.json
-_FIXTURE_DIR = Path(_REPO_ROOT) / "idrac_ctl" / "json_responses"
+_FIXTURE_DIR = Path(_REPO_ROOT) / "redfish_ctl" / "json_responses"
 
 # Drop the parent dir so the repo-root re-export shim cannot shadow the real
-# nested package under the bare name ``idrac_ctl``.
+# nested package under the bare name ``redfish_ctl``.
 while _PARENT in sys.path:
     sys.path.remove(_PARENT)
 # Search the source tree first.
@@ -36,30 +36,30 @@ if _REPO_ROOT in sys.path:
     sys.path.remove(_REPO_ROOT)
 sys.path.insert(0, _REPO_ROOT)
 
-# Eagerly bind the bare name ``idrac_ctl`` to the real nested package and cache
+# Eagerly bind the bare name ``redfish_ctl`` to the real nested package and cache
 # it in sys.modules now, while the parent dir is off the path. pytest may re-add
 # the parent during collection, but a cached module wins over any later lookup,
 # so lazy imports inside fixtures/tests cannot resolve the repo-root shim.
 import importlib.util  # noqa: E402
 
-_nested_init = os.path.join(_REPO_ROOT, "idrac_ctl", "__init__.py")
+_nested_init = os.path.join(_REPO_ROOT, "redfish_ctl", "__init__.py")
 try:
-    _pkg = importlib.import_module("idrac_ctl")
+    _pkg = importlib.import_module("redfish_ctl")
     _correct = getattr(_pkg, "__file__", "") == _nested_init
 except Exception:
-    # e.g. a sibling repo dir named idrac_ctl (a git worktree next to the repo)
+    # e.g. a sibling repo dir named redfish_ctl (a git worktree next to the repo)
     # or the repo-root re-export shim raising on its relative import.
     _correct = False
     _pkg = None
 if not _correct:
     # Wrong/failed import: force-load THIS tree's nested package by path.
-    sys.modules.pop("idrac_ctl", None)
+    sys.modules.pop("redfish_ctl", None)
     spec = importlib.util.spec_from_file_location(
-        "idrac_ctl", _nested_init,
+        "redfish_ctl", _nested_init,
         submodule_search_locations=[os.path.dirname(_nested_init)],
     )
     _pkg = importlib.util.module_from_spec(spec)
-    sys.modules["idrac_ctl"] = _pkg
+    sys.modules["redfish_ctl"] = _pkg
     spec.loader.exec_module(_pkg)
 
 
@@ -72,14 +72,14 @@ def _has_live_idrac() -> bool:
 def _reset_command_singletons():
     """Drop cached command-singleton instances between tests.
 
-    idrac_ctl commands use the ``Singleton`` metaclass, and instances memoize
+    redfish_ctl commands use the ``Singleton`` metaclass, and instances memoize
     per-box state via ``cached_property`` (notably ``idrac_manage_servers``). Left
     alone, the first vendor a command runs against would freeze that state for the
     whole session, so a Dell test and a Supermicro test sharing a command class
     (e.g. ``reboot``) would poison each other depending on collection order. The
     command ``_registry`` (used for dispatch) is a separate dict and is untouched.
     """
-    from idrac_ctl.idrac_shared import Singleton
+    from redfish_ctl.idrac_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -139,7 +139,7 @@ def _url_to_fixture(path: str, index=None):
 class MockRedfishService:
     """A small stateful Redfish service backed by the captured DMTF mockup tree.
 
-    Serves GET from ``idrac_ctl/json_responses`` (with an in-memory overlay so a
+    Serves GET from ``redfish_ctl/json_responses`` (with an in-memory overlay so a
     PATCH is visible to a later GET), and gives plausible spec-shaped answers for
     the mutating verbs so command tests can assert the request the client *sends*:
 
@@ -226,7 +226,7 @@ class MockRedfishService:
 
 
 def _make_idrac(idrac_ip, username, password):
-    from idrac_ctl.idrac_manager import IDracManager
+    from redfish_ctl.idrac_manager import IDracManager
     return IDracManager(
         idrac_ip=idrac_ip,
         idrac_username=username,
@@ -246,7 +246,7 @@ def _reset_command_singletons():
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
     Clearing the instance registry before each test isolates them.
     """
-    from idrac_ctl.idrac_shared import Singleton
+    from redfish_ctl.idrac_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()

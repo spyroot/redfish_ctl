@@ -11,9 +11,9 @@ import json
 
 import pytest
 
-from idrac_ctl.bios.cmd_change_bios import BiosChangeSettings
-from idrac_ctl.cmd_exceptions import InvalidJsonSpec
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
+from redfish_ctl.cmd_exceptions import InvalidJsonSpec
+from redfish_ctl.redfish_manager import CommandResult
 
 
 @pytest.fixture

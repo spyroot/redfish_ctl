@@ -1,8 +1,8 @@
 """Dual-mode tests for account service read commands."""
 import json
 
-from idrac_ctl.idrac_shared import ApiRequestType
-from idrac_ctl.redfish_manager import CommandResult
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_account_service_query_returns_service_document(redfish_api):

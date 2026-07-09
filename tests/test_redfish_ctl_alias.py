@@ -4,21 +4,21 @@ Phase 1: `import redfish_ctl` and `from redfish_ctl.<sub> import ...` resolve to
 idrac_ctl modules (same objects). Phase 2: endpoint/credentials read REDFISH_* first,
 falling back to the legacy IDRAC_* names.
 """
-from idrac_ctl.idrac_main import _env
+from redfish_ctl.idrac_main import _env
 
 
-def test_redfish_ctl_is_idrac_ctl_alias():
-    """`import redfish_ctl` resolves to the same package object as idrac_ctl."""
+def test_idrac_ctl_is_redfish_ctl_alias():
+    """`import idrac_ctl` resolves to the same package object as redfish_ctl."""
     import idrac_ctl
     import redfish_ctl
-    assert redfish_ctl is idrac_ctl
+    assert idrac_ctl is redfish_ctl
 
 
-def test_redfish_ctl_submodule_is_same_object():
-    """`from redfish_ctl.<sub> import X` returns the identical object as idrac_ctl's."""
-    from redfish_ctl.redfish_manager import CommandResult as aliased
+def test_idrac_ctl_submodule_is_same_object():
+    """`from idrac_ctl.<sub> import X` returns the identical object as redfish_ctl's."""
+    from idrac_ctl.redfish_manager import CommandResult as aliased
 
-    from idrac_ctl.redfish_manager import CommandResult as real
+    from redfish_ctl.redfish_manager import CommandResult as real
     assert aliased is real
 
 
