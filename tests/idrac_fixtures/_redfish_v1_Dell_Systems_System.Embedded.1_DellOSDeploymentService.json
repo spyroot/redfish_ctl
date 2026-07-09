@@ -19,6 +19,9 @@
     },
     "#DellOSDeploymentService.GetNetworkISOImageConnectionInfo": {
       "target": "/redfish/v1/Dell/Systems/System.Embedded.1/DellOSDeploymentService/Actions/DellOSDeploymentService.GetNetworkISOImageConnectionInfo"
+    },
+    "#DellOSDeploymentService.BootToNetworkISO": {
+      "target": "/redfish/v1/Dell/Systems/System.Embedded.1/DellOSDeploymentService/Actions/DellOSDeploymentService.BootToNetworkISO"
     }
   }
 }
