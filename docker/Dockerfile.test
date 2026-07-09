@@ -29,5 +29,5 @@ RUN pip install --no-cache-dir -e ".[dev]" pytest-cov
 CMD ["pytest", "-q"]
 
 # Manual equivalent of run-tests.sh:
-#   docker build -f docker/Dockerfile.test -t idrac-ctl-test .
-#   docker run --rm idrac-ctl-test
+#   docker build -f docker/Dockerfile.test -t redfish-ctl-test .
+#   docker run --rm redfish-ctl-test
