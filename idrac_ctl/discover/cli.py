@@ -19,7 +19,14 @@ import asyncio
 import sys
 from typing import Any, Dict, List, Optional, Sequence, TextIO
 
-from idrac_ctl.discover.scanner import DiscoveredService, scan_subnet
+import requests
+
+from idrac_ctl.discover.scanner import (
+    REDFISH_ROOT_PATH,
+    AsyncGet,
+    DiscoveredService,
+    scan_subnet,
+)
 
 # Column order for both renderers; (header, record-key) pairs.
 _COLUMNS = (
@@ -126,6 +133,60 @@ async def _default_get(_ip: str) -> Optional[Dict[str, Any]]:
     the CLI without wiring a fetcher is safe and inert.
     """
     return None
+
+
+def make_http_fetcher(
+        *,
+        scheme: str = "https",
+        port: int = 443,
+        verify_tls: bool = False,
+        timeout: float = 2.0) -> AsyncGet:
+    """Build an async fetcher that GETs a host's Redfish ServiceRoot.
+
+    Returns an :data:`~idrac_ctl.discover.scanner.AsyncGet`: an ``async`` callable
+    that, given a host, performs ONE bounded, read-only GET of
+    ``{scheme}://{host}:{port}/redfish/v1/`` and returns the parsed ServiceRoot
+    dict, or ``None`` when the host does not answer with a usable Redfish document
+    (unreachable, non-200, or a body that is not a JSON object).
+
+    The blocking ``requests`` call runs in a worker thread via
+    :func:`asyncio.to_thread`, so awaiting the fetcher never blocks the event loop
+    and :func:`~idrac_ctl.discover.scanner.scan_subnet` can probe many hosts
+    concurrently. Any transport error (timeout, refused, TLS, DNS) is swallowed
+    and reported as ``None`` — one dead host must not abort a subnet scan.
+
+    :param scheme: ``https`` (default) or ``http``.
+    :param port: TCP port of the Redfish service (default ``443``).
+    :param verify_tls: verify the server certificate. Defaults to ``False``
+        because BMCs ship self-signed certs; pass ``True`` behind a trusted CA.
+    :param timeout: per-request timeout in seconds (default ``2.0``), bounding how
+        long a single probe can hang.
+
+    No credentials are sent — discovery reads only the unauthenticated service
+    root. Building the fetcher opens no socket; I/O happens solely when the
+    returned callable is awaited, which keeps import/construction offline-safe.
+    """
+    url_template = f"{scheme}://{{host}}:{port}{REDFISH_ROOT_PATH}"
+
+    async def _get(ip: str) -> Optional[Dict[str, Any]]:
+        url = url_template.format(host=ip)
+
+        def _blocking_get() -> Optional[Dict[str, Any]]:
+            response = requests.get(url, verify=verify_tls, timeout=timeout)
+            if response.status_code != 200:
+                return None
+            try:
+                payload = response.json()
+            except ValueError:
+                return None
+            return payload if isinstance(payload, dict) else None
+
+        try:
+            return await asyncio.to_thread(_blocking_get)
+        except Exception:
+            return None
+
+    return _get
 
 
 def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:

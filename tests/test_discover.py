@@ -261,3 +261,109 @@ def test_main_with_default_fetcher_discovers_nothing(capsys):
     rc = discover_cli.redfish_discover_main(["10.0.0.5"])
     assert rc == 0
     assert "No Redfish services discovered." in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- #
+# HTTP fetcher factory (make_http_fetcher) — requests.get is monkeypatched, so
+# no socket is ever opened.
+# --------------------------------------------------------------------------- #
+
+class _FakeResponse:
+    """Stand-in for ``requests.Response`` for the fetcher tests."""
+
+    def __init__(self, status_code=200, payload=None, raise_json=False):
+        self.status_code = status_code
+        self._payload = payload
+        self._raise_json = raise_json
+
+    def json(self):
+        if self._raise_json:
+            raise ValueError("no JSON body")
+        return self._payload
+
+
+def _patch_requests_get(monkeypatch, response=None, exc=None):
+    """Patch ``discover_cli.requests.get`` and record the call args.
+
+    Returns a ``calls`` list that captures ``(url, kwargs)`` for each GET so a
+    test can assert the fetcher hit ``/redfish/v1/`` with the expected
+    ``verify``/``timeout``.
+    """
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        if exc is not None:
+            raise exc
+        return response
+
+    monkeypatch.setattr(discover_cli.requests, "get", fake_get)
+    return calls
+
+
+def test_make_http_fetcher_hits_redfish_root_with_verify_and_timeout(monkeypatch):
+    """The fetcher GETs https://{host}:443/redfish/v1/ with verify+timeout set."""
+    root = {"Vendor": "Dell", "RedfishVersion": "1.11.0"}
+    calls = _patch_requests_get(monkeypatch, response=_FakeResponse(payload=root))
+
+    fetch = discover_cli.make_http_fetcher()
+    result = asyncio.run(fetch("10.0.0.7"))
+
+    assert result == root
+    assert len(calls) == 1
+    url, kwargs = calls[0]
+    assert url == "https://10.0.0.7:443/redfish/v1/"
+    assert kwargs["verify"] is False
+    assert kwargs["timeout"] == 2.0
+
+
+def test_make_http_fetcher_honours_scheme_port_verify_timeout(monkeypatch):
+    """Custom scheme/port/verify/timeout flow through to the request."""
+    calls = _patch_requests_get(
+        monkeypatch, response=_FakeResponse(payload={"Vendor": "Hpe"})
+    )
+
+    fetch = discover_cli.make_http_fetcher(
+        scheme="http", port=8000, verify_tls=True, timeout=5.5
+    )
+    asyncio.run(fetch("host.example"))
+
+    url, kwargs = calls[0]
+    assert url == "http://host.example:8000/redfish/v1/"
+    assert kwargs["verify"] is True
+    assert kwargs["timeout"] == 5.5
+
+
+def test_make_http_fetcher_non_200_returns_none(monkeypatch):
+    """A non-200 status means "not a usable service root" -> None."""
+    _patch_requests_get(monkeypatch, response=_FakeResponse(status_code=404))
+    fetch = discover_cli.make_http_fetcher()
+    assert asyncio.run(fetch("10.0.0.8")) is None
+
+
+def test_make_http_fetcher_non_dict_body_returns_none(monkeypatch):
+    """A 200 whose body is not a JSON object is rejected as unusable."""
+    _patch_requests_get(monkeypatch, response=_FakeResponse(payload=["not", "a", "dict"]))
+    fetch = discover_cli.make_http_fetcher()
+    assert asyncio.run(fetch("10.0.0.9")) is None
+
+
+def test_make_http_fetcher_invalid_json_returns_none(monkeypatch):
+    """A 200 with a non-JSON body returns None instead of raising."""
+    _patch_requests_get(monkeypatch, response=_FakeResponse(raise_json=True))
+    fetch = discover_cli.make_http_fetcher()
+    assert asyncio.run(fetch("10.0.0.10")) is None
+
+
+def test_make_http_fetcher_swallows_transport_errors(monkeypatch):
+    """A connection/timeout error on one host is reported as None, not raised."""
+    _patch_requests_get(monkeypatch, exc=ConnectionError("refused"))
+    fetch = discover_cli.make_http_fetcher()
+    assert asyncio.run(fetch("10.0.0.11")) is None
+
+
+def test_make_http_fetcher_builds_without_touching_network(monkeypatch):
+    """Constructing the fetcher performs no GET; I/O happens only on await."""
+    calls = _patch_requests_get(monkeypatch, response=_FakeResponse(payload={}))
+    discover_cli.make_http_fetcher()
+    assert calls == []
