@@ -1,6 +1,8 @@
 """Dual-mode tests for the compute settings command."""
 import json
 
+import pytest
+
 from redfish_ctl.compute.cmd_update import UpdateCompute  # noqa: F401
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
@@ -83,6 +85,38 @@ def test_compute_update_uses_system_resource_before_610_without_mutating(
     assert (
         redfish_service.last_request.path.lower()
         == "/redfish/v1/systems/system.embedded.1"
+    )
+    assert new_requests
+    assert {request.method for request in new_requests} == {"GET"}
+
+
+@pytest.mark.parametrize("manager_version", ["7.00.00.00", "8.00.00.00"])
+def test_compute_update_uses_settings_resource_after_610_without_mutating(
+    redfish_api, redfish_service, monkeypatch, manager_version
+):
+    """compute-update reads the ComputerSystem Settings resource on iDRAC 7.x and 8.x."""
+    monkeypatch.setattr(
+        IDracManager,
+        "idrac_manager_version",
+        property(lambda self: manager_version),
+    )
+    request_count = len(redfish_service.requests)
+
+    result = redfish_api.sync_invoke(ApiRequestType.ComputeUpdate, "update")
+    new_requests = redfish_service.requests[request_count:]
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(result.data, dict)
+    json.dumps(result.data)
+    assert result.data["@odata.id"] == (
+        "/redfish/v1/Systems/System.Embedded.1/Settings"
+    )
+    assert result.data["@odata.type"].startswith("#ComputerSystem.")
+    assert result.data["Id"] == "Settings"
+    assert result.error is None
+    assert redfish_service.last_request.method == "GET"
+    assert redfish_service.last_request.path.lower() == (
+        "/redfish/v1/systems/system.embedded.1/settings"
     )
     assert new_requests
     assert {request.method for request in new_requests} == {"GET"}
