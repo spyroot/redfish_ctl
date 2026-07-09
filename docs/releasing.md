@@ -41,7 +41,9 @@ env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
 ruff check <changed files>
 ```
 
-Check the version in `setup.py`, the single packaging source of truth:
+The single source of truth for the version is `redfish_ctl/version.py` (imported by the CLI for
+`--version`); `setup.py` reads that file so the wheel name and the CLI version can never drift.
+Confirm the value setup.py will stamp on the artifact:
 
 ```bash
 python setup.py --version

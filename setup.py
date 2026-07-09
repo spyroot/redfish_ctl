@@ -6,8 +6,15 @@ with open("README.md", "r") as fh:
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
+# Single source of truth for the version: redfish_ctl/version.py, which the CLI
+# also imports for `--version`. Read it here (without importing the package, so
+# the build stays dependency-free) to keep the wheel name and CLI version in sync.
+_version = {}
+with open('redfish_ctl/version.py') as _vf:
+    exec(_vf.read(), _version)
+
 setup_info = dict(name='redfish_ctl',
-                  version='1.1.0',
+                  version=_version['__version__'],
                   author='Mustafa Bayramov',
                   author_email="spyroot@gmail.com",
                   url="https://github.com/spyroot/redfish_ctl",
