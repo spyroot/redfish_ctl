@@ -1,5 +1,9 @@
 # redfish_ctl
 
+[![PyPI version](https://img.shields.io/pypi/v/redfish-ctl.svg)](https://pypi.org/project/redfish-ctl/)
+[![Python versions](https://img.shields.io/pypi/pyversions/redfish-ctl.svg)](https://pypi.org/project/redfish-ctl/)
+[![License: MIT](https://img.shields.io/pypi/l/redfish-ctl.svg)](https://github.com/spyroot/redfish_ctl/blob/main/LICENSE)
+
 `redfish_ctl` is a standalone command-line tool I built to drive server BMCs entirely through the
 Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
 with JSON or YAML output (`--yaml`, and save-to-file), both synchronous and asynchronous calls,
@@ -41,6 +45,33 @@ What it does across the whole server lifecycle:
 > `IDRAC_IP`/`IDRAC_USERNAME`/`IDRAC_PASSWORD`/`IDRAC_PORT` env vars all keep working.
 
 Author: Mus <spyroot@gmail.com>
+
+## Quick start
+
+```bash
+# 1. Install (Python 3.10+)
+python -m pip install redfish_ctl
+
+# 2. Point it at a BMC (once per shell)
+export REDFISH_IP=10.0.0.42
+export REDFISH_USERNAME=root
+export REDFISH_PASSWORD='your-password'
+
+# 3. Read something safe
+redfish_ctl --version          # -> redfish_ctl 1.1.1
+redfish_ctl system             # host ComputerSystem (Id, Name, PowerState)
+redfish_ctl sensors            # temperatures, power, fans, voltages
+redfish_ctl system --yaml      # same data as YAML instead of JSON
+redfish_ctl --help             # every subcommand
+```
+
+Reads are safe. Commands that change hardware (power, BIOS, boot, storage, virtual media, firmware)
+follow a read-first, guarded-write model — they preview with `--dry_run` and only act with
+`--confirm`. See [Mutating Commands](#mutating-commands) below.
+
+> **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
+> and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
+> `idrac_ctl` PyPI package (≤ 1.0.13) is the pre-rename tool; new work should `pip install redfish_ctl`.
 
 ## Install
 
