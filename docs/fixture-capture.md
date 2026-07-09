@@ -34,27 +34,30 @@ exactly the layout the committed corpora use (`tests/supermicro_gb300_corpus/`,
    redfish_ctl discovery                        # writes ~/.json_responses/<ip>/
    ```
 
-2. **Sanitize the whole tree before it goes near the repo.** A full crawl contains identifiers, so
-   this is mandatory for a public contribution — apply the same rules as [Redact Before
-   Import](#redact-before-import) across every file, and **rename the `<ip>` directory to a
-   documentation address** (e.g. `203.0.113.10`, `198.51.100.x`) so no real management IP is
-   committed. Run the secret scan in that section over the entire captured directory, then read the
-   files yourself.
+2. **Sanitize the tree — this is mandatory** (a full crawl carries identifiers). Run the bundled
+   redactor, which replaces the source management IP with an RFC 5737 documentation address, renames
+   the `<ip>` directory, and scrubs identifier fields (serial/service tag, asset tag, UUID, MAC,
+   hostname). It writes a clean copy straight into a corpus directory matching the existing
+   convention (`tests/<vendor>_<model>_corpus/json_responses/<placeholder-ip>/`):
 
-3. **Place the sanitized tree** under a new corpus directory matching the existing convention:
-
-   ```text
-   tests/<vendor>_<model>_corpus/json_responses/<placeholder-ip>/_redfish_v1_....json
+   ```bash
+   python tools/redact_corpus.py ~/.json_responses/<ip> \
+     --out tests/<vendor>_<model>_corpus/json_responses
    ```
 
-4. **Add a thin corpus-backed test** (see `tests/test_supermicro_gb300_corpus.py` and
+   It reports only counts (never values) and skips `.npy` maps (regenerate those from the redacted
+   tree or leave them out). Treat it as a **first pass, not a guarantee**: then apply the [Redact
+   Before Import](#redact-before-import) rules by hand for anything vendor-specific, run that
+   section's secret scan over the output, and read the files yourself before committing.
+
+3. **Add a thin corpus-backed test** (see `tests/test_supermicro_gb300_corpus.py` and
    `tests/test_supermicro_x10_fixtures.py`) that loads the corpus and asserts a command's contract
    against it — URL/payload for mutations, `CommandResult` shape for reads — with no live BMC.
 
-5. **Binaries go to Git LFS automatically** — `.gitattributes` already routes `*.npy`, `*.zip`,
+4. **Binaries go to Git LFS automatically** — `.gitattributes` already routes `*.npy`, `*.zip`,
    `*.exe`, and firmware trees to LFS; the Redfish JSON stays as plain committed text.
 
-6. **Gate before committing** — the offline suite must stay green with the live variables cleared:
+5. **Gate before committing** — the offline suite must stay green with the live variables cleared:
 
    ```bash
    env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
