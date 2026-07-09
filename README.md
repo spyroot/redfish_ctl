@@ -188,6 +188,7 @@ First-run problems are almost always the connection, not the command:
   profile examples.
 - [Vendors](docs/vendors.md) - Dell, Supermicro, HPE, and generic Redfish support.
 - [Testing](docs/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
+- [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
 - [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
 - [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
 - [Telemetry exporter](docs/telemetry-exporter.md) - BMC metrics for Prometheus and SignalFx.

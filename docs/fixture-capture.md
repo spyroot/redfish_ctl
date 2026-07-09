@@ -8,6 +8,58 @@ Default rule: do not capture from production hardware. Use an approved lab iDRAC
 capture only the read-only resources needed for the test, redact before import,
 and prove the fixture with offline tests before committing it.
 
+There are two capture paths. Use the one that fits:
+
+- **A curated fixture set** (this SOP, below) — a handful of hand-selected, redacted resources for a
+  specific test. Best for a single new command on an already-covered vendor.
+- **A full vendor corpus** (next section) — the whole Redfish tree, crawled with `redfish_ctl`
+  itself, committed under `tests/<vendor>_corpus/`. Best for adding a **new vendor or model**: one
+  full capture lets many later commands be exercised offline with only a thin behavioral test.
+
+## Contributing a Full Vendor Corpus (crawl the whole tree)
+
+`redfish_ctl` can capture its own test data. The `discovery` command does a deep crawl of a BMC and
+writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/` —
+exactly the layout the committed corpora use (`tests/supermicro_gb300_corpus/`,
+`tests/supermicro_x10_fixtures/`). To contribute coverage for a BMC this project has not seen:
+
+1. **Crawl an approved lab BMC** (read-only; never production, never someone else's hardware):
+
+   ```bash
+   export REDFISH_IP=<approved-lab-bmc>
+   export REDFISH_USERNAME=<short-lived-readonly-account>
+   export REDFISH_PASSWORD=<password>          # keep out of shell history
+   redfish_ctl discovery                        # writes ~/.json_responses/<ip>/
+   ```
+
+2. **Sanitize the whole tree before it goes near the repo.** A full crawl contains identifiers, so
+   this is mandatory for a public contribution — apply the same rules as [Redact Before
+   Import](#redact-before-import) across every file, and **rename the `<ip>` directory to a
+   documentation address** (e.g. `203.0.113.10`, `198.51.100.x`) so no real management IP is
+   committed. Run the secret scan in that section over the entire captured directory, then read the
+   files yourself.
+
+3. **Place the sanitized tree** under a new corpus directory matching the existing convention:
+
+   ```text
+   tests/<vendor>_<model>_corpus/json_responses/<placeholder-ip>/_redfish_v1_....json
+   ```
+
+4. **Add a thin corpus-backed test** (see `tests/test_supermicro_gb300_corpus.py` and
+   `tests/test_supermicro_x10_fixtures.py`) that loads the corpus and asserts a command's contract
+   against it — URL/payload for mutations, `CommandResult` shape for reads — with no live BMC.
+
+5. **Binaries go to Git LFS automatically** — `.gitattributes` already routes `*.npy`, `*.zip`,
+   `*.exe`, and firmware trees to LFS; the Redfish JSON stays as plain committed text.
+
+6. **Gate before committing** — the offline suite must stay green with the live variables cleared:
+
+   ```bash
+   env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
+   ```
+
+The rest of this document is the curated single-fixture path.
+
 ## Required Tools
 
 - `Redfish-Mockup-Creator`, the DMTF tool from
