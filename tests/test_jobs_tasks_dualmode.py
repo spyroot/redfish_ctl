@@ -4,9 +4,11 @@ import json
 import pytest
 
 import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
+from redfish_ctl.cmd_exceptions import AuthenticationFailed
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from tests.test_utils import create_json_resp
 
 JOB_ID = "JID_000000000001"
 
@@ -234,6 +236,30 @@ def test_get_task_returns_completed_job_state_without_polling(redfish_api):
 
     assert isinstance(result, CommandResult)
     assert result.data.value == "Completed"
+
+
+def test_fetch_task_raises_authentication_failed_on_task_poll_401(
+    redfish_api, monkeypatch
+):
+    """fetch_task stops immediately when TaskService rejects polling auth."""
+    task_get_urls = []
+
+    def get_job(self, task_id):
+        assert task_id == JOB_ID
+        return {"JobState": "Running"}
+
+    def api_get_call(self, url, hdr=None):
+        assert url.endswith(f"/redfish/v1/TaskService/Tasks/{JOB_ID}")
+        task_get_urls.append(url)
+        return create_json_resp({"error": "unauthorized"}, status_code=401)
+
+    monkeypatch.setattr(IDracManager, "get_job", get_job)
+    monkeypatch.setattr(IDracManager, "api_get_call", api_get_call)
+
+    with pytest.raises(AuthenticationFailed):
+        redfish_api.fetch_task(JOB_ID, sleep_time=0)
+
+    assert len(task_get_urls) == 1
 
 
 def test_job_watch_returns_completed_job_state(redfish_api):
