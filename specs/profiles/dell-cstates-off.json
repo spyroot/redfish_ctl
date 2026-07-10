@@ -1,0 +1,11 @@
+{
+  "name": "dell-cstates-off",
+  "vendor": "dell",
+  "model": "PowerEdge",
+  "description": "Disable processor C-states for latency-sensitive workloads that cannot tolerate deep-sleep wakeup jitter.",
+  "risk": "medium",
+  "notes": "Trades idle power savings for lower and more predictable latency. ProcCStates is an Enumeration (Enabled/Disabled) in the Dell BIOS registry.",
+  "attributes": {
+    "ProcCStates": "Disabled"
+  }
+}

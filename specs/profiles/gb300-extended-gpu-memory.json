@@ -1,0 +1,11 @@
+{
+  "name": "gb300-extended-gpu-memory",
+  "vendor": "supermicro",
+  "model": "GB300",
+  "description": "Enable Extended GPU Memory (EGM) so the GPU can coherently address Grace CPU memory on Grace-Blackwell nodes, expanding the usable memory pool for large models.",
+  "risk": "medium",
+  "notes": "Staged as a BIOS change and applied on the next host reset. EGM is a Boolean attribute in the GB300 BiosAttributeRegistry (default false).",
+  "attributes": {
+    "EGM": true
+  }
+}

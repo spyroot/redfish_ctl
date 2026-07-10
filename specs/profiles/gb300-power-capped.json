@@ -1,0 +1,11 @@
+{
+  "name": "gb300-power-capped",
+  "vendor": "supermicro",
+  "model": "GB300",
+  "description": "Enforce BMC input power capping on a 1-second timescale instead of the 50 ms default, smoothing power draw for rack-level power budgeting.",
+  "risk": "medium",
+  "notes": "Staged as a BIOS change and applied on the next host reset. ServerPowerControl and its allowable values are verified against the GB300 BiosAttributeRegistry.",
+  "attributes": {
+    "ServerPowerControl": "InputPowerCappingUsing1sTimescale"
+  }
+}
