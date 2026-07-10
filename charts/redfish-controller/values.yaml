@@ -1,0 +1,36 @@
+image:
+  repository: spyroot/redfish-ctl-controller
+  tag: v1.2.0
+  pullPolicy: IfNotPresent
+
+controller:
+  pollInterval: 30s
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""
+
+mockBmc:
+  enabled: false
+  image:
+    repository: spyroot/redfish-ctl-mock-bmc
+    tag: v1.2.0
+    pullPolicy: IfNotPresent
+  corpusDir: /corpus/172.25.230.37
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
