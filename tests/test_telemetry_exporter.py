@@ -1,10 +1,13 @@
 """Offline tests for the Redfish telemetry exporter contract."""
 
 import argparse
+import json
+from pathlib import Path
 
 import pytest
 
 import redfish_ctl.telemetry.exporter as exporter_mod
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
@@ -19,6 +22,45 @@ from redfish_ctl.telemetry.exporter import (
 )
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
+GB300_CORPUS = (
+    Path(__file__).parent
+    / "supermicro_gb300_corpus"
+    / "json_responses"
+    / "172.25.230.37"
+)
+GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
+
+
+def _gb300_fixture_for_path(path):
+    name = "_" + path.strip("/").replace("/", "_") + ".json"
+    return GB300_INDEX.get(name.lower())
+
+
+@pytest.fixture
+def gb300_exporter_manager():
+    """Serve the committed GB300 crawl over requests-mock."""
+    requests_mock = pytest.importorskip("requests_mock")
+    requests = []
+
+    def get_cb(request, context):
+        requests.append(request)
+        fixture = _gb300_fixture_for_path(request.path)
+        if fixture is None:
+            context.status_code = 404
+            return json.dumps({"error": f"no fixture for {request.path}"})
+        context.status_code = 200
+        return fixture.read_text()
+
+    with requests_mock.Mocker() as mocker:
+        mocker.get(requests_mock.ANY, text=get_cb)
+        manager = IDracManager(
+            idrac_ip="mock-gb300",
+            idrac_username="root",
+            idrac_password="mock",
+            insecure=True,
+            is_debug=False,
+        )
+        yield manager, requests
 
 
 def test_identity_dimensions_follow_nv72_slot_contract():
@@ -284,6 +326,52 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes"} <= metrics
     assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
     assert all(recorded.method != "POST" for recorded in service.requests)
+
+
+def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manager):
+    """Exporter output includes EnvironmentMetrics rows for every GB300 resource."""
+    manager, requests = gb300_exporter_manager
+
+    result = manager.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        label_bmc_ip="172.25.230.37",
+        vendor="supermicro",
+    )
+
+    gauges = result.data["gauge"]
+    processor_power = [
+        point for point in gauges
+        if point["metric"] == "hw.gpu.power"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Processor"
+        and point["dimensions"].get("resource") == "GPU_0"
+    ]
+    memory_power = [
+        point for point in gauges
+        if point["metric"] == "hw.power"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Memory"
+        and point["dimensions"].get("resource") == "GPU_0_DRAM_0"
+    ]
+    processor_energy = [
+        point for point in gauges
+        if point["metric"] == "hw.energy_kwh"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Processor"
+        and point["dimensions"].get("resource") == "GPU_0"
+    ]
+
+    assert processor_power[0]["value"] == pytest.approx(231.939)
+    assert memory_power[0]["value"] == pytest.approx(34.458)
+    assert processor_energy[0]["value"] == pytest.approx(63.95437164505238)
+    assert {
+        request.method
+        for request in requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    } == set()
 
 
 def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkeypatch):
