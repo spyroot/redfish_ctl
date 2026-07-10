@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-bmc
+  namespace: redfish-sandbox
   labels:
     app.kubernetes.io/name: mock-bmc
     app.kubernetes.io/component: redfish-sandbox
@@ -62,6 +63,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-bmc
+  namespace: redfish-sandbox
   labels:
     app.kubernetes.io/name: mock-bmc
     app.kubernetes.io/component: redfish-sandbox
