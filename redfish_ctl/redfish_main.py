@@ -107,6 +107,7 @@ _QUERY_CAPABILITY_FLAGS = (
     ("$top", "top", "query_top"),
     ("only", "only", "query_only"),
 )
+FLEET_COMMANDS = {"fleet"}
 
 
 def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
@@ -329,6 +330,11 @@ def _validate_redfish_query_for_vendor(
         raise InvalidArgument(str(err)) from err
 
 
+def is_fleet_command(args) -> bool:
+    """True when the command manages its own per-node connections."""
+    return getattr(args, "subcommand", None) in FLEET_COMMANDS
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     """Main entry point
     """
@@ -353,7 +359,8 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # (it would try to connect to a host we do not have).
     scan_mode = is_network_scan(cmd_args)
     local_mode = is_local_command(cmd_args)
-    connectionless_mode = scan_mode or local_mode
+    fleet_mode = is_fleet_command(cmd_args)
+    connectionless_mode = scan_mode or local_mode or fleet_mode
     if not connectionless_mode:
         _ = redfish_api.check_api_version()
 
@@ -629,7 +636,11 @@ def redfish_main_ctl():
     # A network-segment scan (bmc-scan, or discovery --network) has no single
     # target host and uses no credentials, so it skips the IDRAC_IP/credential
     # gate that every host-targeted command requires.
-    if not is_network_scan(args) and not is_local_command(args):
+    if (
+        not is_network_scan(args)
+        and not is_local_command(args)
+        and not is_fleet_command(args)
+    ):
         if args.idrac_ip is None or len(args.idrac_ip) == 0:
             print(
                 "Please indicate the idrac ip. "
