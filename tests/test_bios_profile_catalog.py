@@ -1,4 +1,4 @@
-"""Tests for the read-only BIOS profile catalog command."""
+"""Tests for the BIOS profile catalog, diff, and guarded apply command."""
 
 import json
 import os
@@ -122,6 +122,68 @@ def test_bios_profile_diff_compares_profile_to_current_bios(
     assert {request.method for request in redfish_service.requests} == {"GET"}
 
 
+def test_bios_profile_apply_defaults_to_dry_run_with_snapshot(
+        redfish_mock, redfish_service):
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosProfile,
+        "bios-profile",
+        action="apply",
+        profile_name="dell-cstates-off",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["profile"] == "dell-cstates-off"
+    assert result.data["change"] == {"Attributes": {"ProcCStates": "Disabled"}}
+    assert result.data["rollback"] == {"Attributes": {"ProcCStates": "Disabled"}}
+    assert result.data["staged"] == {
+        "Attributes": {"ProcCStates": "Disabled"},
+        "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
+    }
+    assert [
+        request
+        for request in redfish_service.requests
+        if request.method in {"PATCH", "POST", "DELETE"}
+    ] == []
+
+
+def test_bios_profile_apply_confirm_stages_bios_settings(
+        redfish_mock, redfish_service):
+    redfish_service._overlay[
+        "/redfish/v1/Systems/System.Embedded.1/Bios/Settings"
+    ] = {"Attributes": {}}
+    redfish_service._overlay[
+        "/redfish/v1/systems/system.embedded.1/bios/settings"
+    ] = {"Attributes": {}}
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosProfile,
+        "bios-profile",
+        action="apply",
+        profile_name="dell-cstates-off",
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is False
+    assert result.data["profile"] == "dell-cstates-off"
+    assert result.data["change"] == {"Attributes": {"ProcCStates": "Disabled"}}
+    assert result.data["rollback"] == {"Attributes": {"ProcCStates": "Disabled"}}
+
+    patch_requests = [
+        request for request in redfish_service.requests
+        if request.method == "PATCH"
+    ]
+    assert len(patch_requests) == 1
+    assert patch_requests[0].path.lower().endswith("/bios/settings")
+    assert patch_requests[0].json() == {
+        "Attributes": {"ProcCStates": "Disabled"},
+        "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
+    }
+
+
 def test_bios_profile_missing_directory_lists_empty(redfish_mock, tmp_path):
     missing_dir = tmp_path / "missing-profiles"
 
@@ -208,4 +270,40 @@ def test_bios_profile_diff_cli_requires_bmc_connection():
     )
 
     assert result.returncode == 1
-    assert "Please indicate the idrac ip" in result.stdout
+    assert "Please indicate the idrac ip." in result.stdout
+
+
+def test_bios_profile_apply_cli_requires_bmc_credentials():
+    env = os.environ.copy()
+    for name in (
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
+            "IDRAC_IP",
+            "IDRAC_USERNAME",
+            "IDRAC_PASSWORD",
+    ):
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "redfish_ctl.redfish_main",
+            "--json_only",
+            "--nocolor",
+            "bios-profile",
+            "apply",
+            "dell-cstates-off",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Please indicate the idrac ip." in result.stdout

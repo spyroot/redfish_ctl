@@ -32,7 +32,8 @@ redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 schema described in [BIOS tuning profiles](../specs/profiles/README.md). Each profile lists the BIOS
 attributes to stage and must match a captured vendor registry before it is accepted by the test suite.
 
-`bios-profile`, the CLI's read-only catalog command, reads that directory without contacting a BMC:
+`bios-profile`, the CLI's named-profile command, reads that directory for `list` and `show` without
+contacting a BMC:
 
 ```bash
 redfish_ctl bios-profile list
@@ -57,11 +58,10 @@ redfish_ctl bios-profile apply gb300-power-capped --dry_run
 redfish_ctl bios-profile apply gb300-power-capped --confirm
 ```
 
-The current catalog command ships the read-only `list` and `show` actions. Until the `diff` and
-guarded `apply` actions are available in your installed version, use `bios-profile show <name>` to
-review the profile and then use the existing `bios-change --from_spec ... --show` path for previews.
-Applying a profile stages BIOS settings and can require a host reset; only run the apply step during
-an approved maintenance window.
+The current catalog command ships `list`, `show`, and guarded `apply`. Until `diff` is available in
+your installed version, use `bios-profile show <name>` plus a read-only `bios --filter ...` check to
+compare current values. Applying a profile stages BIOS settings and can require a host reset; only run
+the apply step during an approved maintenance window.
 
 ## Included Examples
 
