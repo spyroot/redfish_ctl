@@ -129,6 +129,7 @@ Safety labels:
 | `oem-net-ios-status` | Read Dell OEM network ISO status. | Read |
 | `oem-net-iso-task` | Read Dell OEM OS deployment task data. | Read |
 | `pci` | Read PCI device or function data. | Read |
+| `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
 | `privilege-registry` | Read the privilege registry. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
@@ -167,6 +168,7 @@ redfish_ctl metric-definitions
 redfish_ctl metric-reports
 redfish_ctl telemetry-triggers
 redfish_ctl thermal
+redfish_ctl power
 redfish_ctl network-adapters
 redfish_ctl network-ports
 redfish_ctl ethernet-interfaces

@@ -79,6 +79,7 @@ from .chassis.cmd_chassis_query import *
 from .chassis.cmd_chasis_reset import *
 from .sensors.cmd_sensors import *
 from .thermal.cmd_thermal import *
+from .power.cmd_power import *
 from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_exporter import *
