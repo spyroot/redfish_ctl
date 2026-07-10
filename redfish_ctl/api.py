@@ -1,4 +1,4 @@
-"""Typed read helpers for embedding redfish_ctl in services."""
+"""Typed helpers for embedding redfish_ctl in services."""
 
 from __future__ import annotations
 
@@ -155,6 +155,19 @@ class NtpSetResult:
     skipped: tuple[NtpSkipped, ...]
     applied: tuple[NtpApplied, ...]
     note: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class RebootResult:
+    """Typed host reset result from the reboot command."""
+
+    reset_type: str | None
+    dry_run: bool
+    target: str | None
+    payload: Mapping[str, Any]
+    task_id: str | None
+    task_state: Any
     raw: Mapping[str, Any]
 
 
@@ -365,5 +378,37 @@ def set_ntp(
         skipped=skipped,
         applied=applied,
         note=note if isinstance(note, str) else None,
+        raw=data,
+    )
+
+
+def reboot(
+    manager: SyncInvoker,
+    *,
+    reset_type: str = "GracefulRestart",
+    confirm: bool = False,
+    wait: bool = False,
+    async_call: bool = False,
+) -> RebootResult:
+    """Preview or execute a host ComputerSystem reset through reboot."""
+    data = _mapping(
+        _invoke(
+            manager,
+            ApiRequestType.ComputerSystemReset,
+            "reboot",
+            reset_type=reset_type,
+            dry_run=not confirm,
+            do_wait=bool(wait and confirm),
+            do_async=async_call,
+        )
+    )
+    payload = _mapping(data.get("payload"))
+    return RebootResult(
+        reset_type=payload.get("ResetType") or reset_type,
+        dry_run=bool(data.get("dry_run", not confirm)),
+        target=data.get("target"),
+        payload=payload,
+        task_id=data.get("task_id"),
+        task_state=data.get("task_state"),
         raw=data,
     )
