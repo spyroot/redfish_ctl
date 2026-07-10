@@ -5,6 +5,8 @@ Author: Mus <spyroot@gmail.com>
 BIOS profiles are how I make repeatable host tuning safe enough to review. The pattern is always:
 inspect the registry, preview the change, stage it, then verify after the reset.
 
+The spec files used below are indexed with vendor and safety labels in [Specs](../specs/README.md).
+
 ## The Safe Pattern
 
 ```bash

@@ -18,92 +18,52 @@ Safety labels:
 
 - **Read**: reads BMC state only.
 - **Guarded**: previews or depends on a guarded command.
-- **Write**: changes BMC or host state.
+- **Write**: changes BMC or host state when the script reaches that step.
+
+Platform/vendor labels:
+
+- **Dell/iDRAC**: uses Dell-shaped ids, Dell OEM actions, or iDRAC manager attributes.
+- **Supermicro/GB300**: uses Supermicro OEM Redfish paths or GB300-era provisioning patterns.
+- **HPE iLO**: uses HPE iLO OEM paths or the HPE iLO emulator.
+- **generic/vendor-neutral**: uses standard Redfish commands or vendor-neutral `redfish_ctl` paths.
+- **CPU/platform**: BIOS tuning depends on processor, platform generation, or firmware registry names.
 
 ## Index
 
-- `exameple_volume_setup.sh` (**Write**) initializes one volume by device and volume id.
-  Run: `bash examples/exameple_volume_setup.sh`
-- `example_account_lifecycle.sh` (**Write**) creates, inspects, and deletes a Redfish account
-  (vendor-neutral); dry-run by default, and delete refuses the logged-in account.
-  Run: `bash examples/example_account_lifecycle.sh`
-- `example_account_sshkey.sh` (**Write**) authorizes or clears an account's SSH public key
-  (HPE iLO OEM); dry-run by default.
-  Run: `bash examples/example_account_sshkey.sh`
-- `example_adjust_profile.sh` (**Write**) builds a WorkloadProfile spec, previews it, then applies it
-  on reset.
-  Run: `bash examples/example_adjust_profile.sh`
-- `example_bios_optimize_amd.sh` (**Write**) shows AMD EPYC NUMA/performance BIOS knobs after
-  registry lookup.
-  Run: `bash examples/example_bios_optimize_amd.sh`
-- `example_bios_optimize_intel.sh` (**Write**) shows Intel Xeon performance/power BIOS knobs after
-  registry lookup.
-  Run: `bash examples/example_bios_optimize_intel.sh`
-- `example_bios_transaction.sh` (**Write**) captures a BIOS restore point, applies a change, and
-  rolls back from the snapshot if needed.
-  Run: `bash examples/example_bios_transaction.sh`
-- `example_bios_tuning.sh` (**Write**) changes one BIOS attribute and verifies it after reboot.
-  Run: `bash examples/example_bios_tuning.sh`
-- `example_bmc_scan.sh` (**Read**) finds every Redfish BMC on a network segment (unauthenticated
-  discovery) before provisioning.
-  Run: `bash examples/example_bmc_scan.sh`
-- `example_boot_from_iso_one_shot.sh` (**Write**) mounts an ISO as virtual media and sets one-time
-  CD boot.
-  Run: `bash examples/example_boot_from_iso_one_shot.sh`
-- `example_boot_state.sh` (**Read**) infers what the host will boot (mode, next target, order,
-  staged media) without opening a console.
-  Run: `bash examples/example_boot_state.sh`
-- `example_change_bios.sh` (**Write**) previews and applies a two-attribute BIOS change.
-  Run: `bash examples/example_change_bios.sh`
-- `example_console_access.sh` (**Read**) shows Redfish console access metadata and how to reach the
-  console out of band.
-  Run: `bash examples/example_console_access.sh`
-- `example_convert_noraid.sh` (**Write**) converts RAID-capable disks under one controller to
-  non-RAID.
-  Run: `bash examples/example_convert_noraid.sh`
-- `example_custom_profile.sh` (**Write**) builds a custom BIOS spec, previews it, then applies it.
-  Run: `bash examples/example_custom_profile.sh`
-- `example_dell_network_cif_ios.sh` (**Write**) boots a Dell host from a CIFS-backed network ISO.
-  Run: `bash examples/example_dell_network_cif_ios.sh`
-- `example_dell_system_profile.sh` (**Write**) applies a Dell `SysProfile` or newer
-  `WorkloadProfile`.
-  Run: `bash examples/example_dell_system_profile.sh`
-- `example_discover_host.sh` (**Read**) runs a quick inventory/discovery pass on an unknown host.
-  Run: `bash examples/example_discover_host.sh`
-- `example_enable_secure_boot.sh` (**Write**) reads Secure Boot state, enables the BIOS attribute,
-  then verifies databases.
-  Run: `bash examples/example_enable_secure_boot.sh`
-- `example_export_import.sh` (**Write**) exports system config, imports an edited config, and
-  verifies a BIOS field.
-  Run: `bash examples/example_export_import.sh`
-- `example_fast_boot.sh` (**Write**) enables faster boot-related BIOS settings where supported.
-  Run: `bash examples/example_fast_boot.sh`
-- `example_inventory_walk.sh` (**Read**) reads system, chassis, PCI, storage, drives, and current
-  boot state.
-  Run: `bash examples/example_inventory_walk.sh`
-- `example_jobs.sh` (**Write**) reads jobs, watches one job, then deletes one approved job.
-  Run: `bash examples/example_jobs.sh`
-- `example_low_latency_profile.sh` (**Write**) applies the low-latency BIOS profile in
-  `specs/realtime.opt.spec.json`.
-  Run: `bash examples/example_low_latency_profile.sh`
-- `example_manager_time.sh` (**Write**) reads, and optionally fixes, the BMC (Manager) clock over
-  Redfish before trusting log/SEL timestamps.
-  Run: `bash examples/example_manager_time.sh`
-- `example_provision_boot_iso.sh` (**Write**) mounts an installer ISO and boots from it once.
-  Run: `bash examples/example_provision_boot_iso.sh`
-- `example_sensors_read.sh` (**Read**) reads sensors and filters temperatures, fans, power supplies,
-  and voltages with `jq`.
-  Run: `bash examples/example_sensors_read.sh`
-- `example_supermicro_provision_from_iso.sh` (**Write**) mounts an OS installer ISO on a Supermicro
-  BMC over SMB (SMB1 for old X10-era BMCs) and boots it once in UEFI (`UefiUsbCd`) to run an
-  unattended install.
-  Run: `bash examples/example_supermicro_provision_from_iso.sh`
-- `example_wait.sh` (**Read**) waits for the BMC Redfish service to become reachable (e.g. after a
-  reboot) instead of hand-rolled sleep loops.
-  Run: `bash examples/example_wait.sh`
-- `hpe_ilo_canary.sh` (**Guarded**) starts the HPE iLO emulator and runs read-only commands plus a
-  dry-run reset preview.
-  Run: `bash examples/hpe_ilo_canary.sh`
+Run examples from the repository root with `bash examples/<script>`.
+
+| Example | Platform/vendor | Safety | Purpose |
+|---|---|---|---|
+| `exameple_volume_setup.sh` | Dell/iDRAC | Write | Initialize one volume by device and volume id. |
+| `example_account_lifecycle.sh` | generic/vendor-neutral | Write | Create, inspect, update, and delete a Redfish account. |
+| `example_account_sshkey.sh` | HPE iLO | Write | Authorize or clear an account SSH public key through HPE OEM data. |
+| `example_adjust_profile.sh` | Dell/iDRAC, CPU/platform | Write | Build, preview, and apply a `WorkloadProfile` BIOS spec. |
+| `example_bios_optimize_amd.sh` | CPU/platform | Write | Show AMD EPYC NUMA/performance BIOS knobs after registry lookup. |
+| `example_bios_optimize_intel.sh` | CPU/platform | Write | Show Intel Xeon performance/power BIOS knobs after registry lookup. |
+| `example_bios_transaction.sh` | generic/vendor-neutral | Write | Capture a BIOS restore point, apply a change, and roll back if needed. |
+| `example_bios_tuning.sh` | CPU/platform | Write | Change one BIOS attribute and verify it after reboot. |
+| `example_bmc_scan.sh` | generic/vendor-neutral | Read | Find Redfish BMCs on a network segment before provisioning. |
+| `example_boot_from_iso_one_shot.sh` | generic/vendor-neutral | Write | Mount an ISO as virtual media and set one-time CD boot. |
+| `example_boot_state.sh` | generic/vendor-neutral | Read | Infer boot mode, next target, boot order, and staged media. |
+| `example_change_bios.sh` | CPU/platform | Write | Preview and apply a two-attribute BIOS change. |
+| `example_console_access.sh` | generic/vendor-neutral | Read | Show Redfish console metadata and out-of-band console options. |
+| `example_convert_noraid.sh` | Dell/iDRAC | Write | Convert RAID-capable disks under one controller to non-RAID. |
+| `example_custom_profile.sh` | CPU/platform | Write | Build a custom BIOS spec, preview it, and apply it. |
+| `example_dell_network_cif_ios.sh` | Dell/iDRAC | Write | Boot a Dell host from a CIFS-backed network ISO. |
+| `example_dell_system_profile.sh` | Dell/iDRAC, CPU/platform | Write | Apply a Dell `SysProfile` or newer `WorkloadProfile`. |
+| `example_discover_host.sh` | generic/vendor-neutral | Read | Run inventory and discovery reads on an unknown host. |
+| `example_enable_secure_boot.sh` | generic/vendor-neutral, CPU/platform | Write | Stage Secure Boot and verify databases. |
+| `example_export_import.sh` | Dell/iDRAC | Write | Export system config, import an edited config, and verify a BIOS field. |
+| `example_fast_boot.sh` | CPU/platform | Write | Enable faster boot-related BIOS settings where supported. |
+| `example_inventory_walk.sh` | generic/vendor-neutral | Read | Read system, chassis, PCI, storage, drives, and boot state. |
+| `example_jobs.sh` | Dell/iDRAC | Write | Read jobs, watch one job, then delete one approved job. |
+| `example_low_latency_profile.sh` | CPU/platform | Write | Apply the low-latency BIOS profile from `specs/realtime.opt.spec.json`. |
+| `example_manager_time.sh` | generic/vendor-neutral | Write | Read or set the BMC manager clock before trusting log timestamps. |
+| `example_provision_boot_iso.sh` | generic/vendor-neutral | Write | Mount an installer ISO and boot from it once. |
+| `example_sensors_read.sh` | generic/vendor-neutral | Read | Read and filter temperatures, fans, power supplies, and voltages. |
+| `example_supermicro_provision_from_iso.sh` | Supermicro/GB300 | Write | Mount Supermicro virtual media and boot once. |
+| `example_wait.sh` | generic/vendor-neutral | Write | Wait for Redfish service recovery around a BMC manager reboot. |
+| `hpe_ilo_canary.sh` | HPE iLO | Guarded | Run read-only commands and a dry-run reset against the iLO emulator. |
 
 For BIOS profile flow, see [BIOS profiles](../docs/bios-profiles.md). For every command name, see
-[Command reference](../docs/commands.md).
+[Command reference](../docs/commands.md). JSON specs are indexed in [Specs](../specs/README.md).
