@@ -88,6 +88,7 @@ class ApiRequestType(Enum):
     EnvironmentMetrics = auto()
     ProcessorMetrics = auto()
     MemoryMetrics = auto()
+    GpuMetrics = auto()
     MetricReports = auto()
     MetricReportDefinitions = auto()
     ComponentIntegrity = auto()

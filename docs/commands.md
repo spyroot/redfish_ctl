@@ -101,6 +101,7 @@ Safety labels:
 | `firmware-update` | Run UpdateService SimpleUpdate; `--dry_run` previews, `--confirm` writes. | Guarded |
 | `firmware_inventory` | Read firmware inventory. | Read |
 | `get_vm` | Read virtual media. | Read |
+| `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
 | `insert_vm` | Insert virtual media from a URI. | Write |
 | `job` | Read one Dell job. | Read |
 | `job-apply` | Apply pending jobs. | Write |
