@@ -132,6 +132,7 @@ Safety labels:
 | `oem-net-iso-task` | Read Dell OEM OS deployment task data. | Read |
 | `pci` | Read PCI device or function data. | Read |
 | `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
+| `power-smoothing` | Read NVIDIA GPU PowerSmoothing current state, preset profiles, and admin override profile setpoints. | Read |
 | `privilege-registry` | Read the privilege registry. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
