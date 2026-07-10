@@ -171,6 +171,7 @@ def build_metric_samples(
         sensor_rows: Iterable[Mapping],
         nvlink_rows: Iterable[Mapping],
         metric_report_rows: Iterable[Mapping],
+        leak_detection_rows: Iterable[Mapping] = (),
         network_rows: Iterable[Mapping] = (),
         component_integrity_rows: Iterable[Mapping] = ()) -> list[MetricSample]:
     """Build exporter samples from normalized Redfish command rows."""
@@ -179,6 +180,7 @@ def build_metric_samples(
     samples.extend(samples_from_sensor_rows(sensor_rows, identity))
     samples.extend(samples_from_nvlink_rows(nvlink_rows, identity))
     samples.extend(samples_from_metric_report_rows(metric_report_rows, identity))
+    samples.extend(samples_from_leak_detection_rows(leak_detection_rows, identity))
     samples.extend(samples_from_network_rows(network_rows, identity))
     samples.extend(samples_from_component_integrity_rows(component_integrity_rows, identity))
     return samples
@@ -290,6 +292,34 @@ def samples_from_metric_report_rows(
                     dims[key] = str(prop_info[key])
         dims["report"] = str(row.get("Report") or "unknown")
         samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
+    return samples
+
+
+def samples_from_leak_detection_rows(
+        rows: Iterable[Mapping],
+        identity: Mapping[str, str]) -> list[MetricSample]:
+    """Map LeakDetector rows into per-detector leak-state gauges."""
+    samples = []
+    for row in rows:
+        value = _leak_state_value(row.get("DetectorState"))
+        if value is None:
+            continue
+        chassis = str(row.get("Chassis") or "unknown")
+        detector = str(row.get("Id") or row.get("Name") or row.get("Uri") or "detector")
+        dims = _with_dims(
+            identity,
+            source="leak-detector",
+            chassis=chassis,
+            detector=_dim_value(detector),
+            detector_state=_dim_value(row.get("DetectorState")),
+        )
+        if row.get("LeakDetectorType"):
+            dims["detector_type"] = _dim_value(row["LeakDetectorType"])
+        if row.get("Health"):
+            dims["health"] = _dim_value(row["Health"])
+        if row.get("State"):
+            dims["state"] = _dim_value(row["State"])
+        samples.append(_sample("hw.leak.state", value, dims, None))
     return samples
 
 
@@ -492,6 +522,22 @@ def _as_float(value) -> Optional[float]:
             return 0.0
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _leak_state_value(value) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    state = re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
+    clear_states = {
+        "ok",
+        "normal",
+        "none",
+        "absent",
+        "notdetected",
+        "noleak",
+        "noleakdetected",
+    }
+    return 0.0 if state in clear_states else 1.0
 
 
 def _sample(metric: str,
