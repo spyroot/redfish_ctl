@@ -26,6 +26,43 @@ redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 `bios-change`, defined in `redfish_ctl/bios/cmd_change_bios.py`, requires an apply mode:
 `on-reset`, `auto-boot`, or `maintenance`. `--show` previews the payload and does not apply changes.
 
+## Named Profile Catalog
+
+`specs/profiles/`, the committed named-profile directory, holds vendor-scoped JSON profiles with the
+schema described in [BIOS tuning profiles](../specs/profiles/README.md). Each profile lists the BIOS
+attributes to stage and must match a captured vendor registry before it is accepted by the test suite.
+
+`bios-profile`, the CLI's read-only catalog command, reads that directory without contacting a BMC:
+
+```bash
+redfish_ctl bios-profile list
+redfish_ctl bios-profile show gb300-power-capped
+```
+
+Use the catalog by operator purpose first, then inspect the exact attributes before staging anything:
+
+| Profile | Target | Operator purpose | Key attribute |
+|---|---|---|---|
+| `gb300-power-capped` | Supermicro GB300 | Smooth rack-level power draw by using a 1 s input-power capping timescale. | `ServerPowerControl=InputPowerCappingUsing1sTimescale` |
+| `gb300-extended-gpu-memory` | Supermicro GB300 | Enable Extended GPU Memory so Grace CPU memory can expand the usable memory pool for large model runs. | `EGM=true` |
+| `dell-cstates-off` | Dell PowerEdge | Reduce wakeup jitter for latency-sensitive workloads that can trade away idle power savings. | `ProcCStates=Disabled` |
+
+The intended named-profile workflow is read, compare, then stage:
+
+```bash
+redfish_ctl bios-profile list
+redfish_ctl bios-profile show gb300-power-capped
+redfish_ctl bios-profile diff gb300-power-capped
+redfish_ctl bios-profile apply gb300-power-capped --dry_run
+redfish_ctl bios-profile apply gb300-power-capped --confirm
+```
+
+The current catalog command ships the read-only `list` and `show` actions. Until the `diff` and
+guarded `apply` actions are available in your installed version, use `bios-profile show <name>` to
+review the profile and then use the existing `bios-change --from_spec ... --show` path for previews.
+Applying a profile stages BIOS settings and can require a host reset; only run the apply step during
+an approved maintenance window.
+
 ## Included Examples
 
 | Example | What it does |
