@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-> Status: design only. The CLI works without this service.
+> Status: read-only core exists. The CLI works without this service.
 
 For one server, I use `redfish_ctl` directly. For a fleet, I want one service that can reach the BMC
 network, keep desired state, read observed state, and reconcile the two. Clients should not all need
@@ -15,6 +15,8 @@ The CLI already has the pieces I would reuse:
 - `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, for product-neutral HTTP.
 - `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, for Dell/iDRAC behavior and host-system
   selection.
+- `redfish_ctl.proxy`, defined under `redfish_ctl/proxy/`, for the first dependency-light read proxy
+  core and optional FastAPI route binding.
 - Vendor-neutral reads such as `sensors`, `network-adapters`, `metric-reports`, `logs`,
   `secure-boot`, and `oem-info`.
 - Four offline corpora: Dell, Supermicro GB300, HPE iLO, and generic DMTF Redfish.
@@ -38,6 +40,29 @@ clients / kubectl / CI
 
 A Kubernetes CustomResourceDefinition (CRD), installed later by an operator, could expose the same
 model to cluster users. The first useful version can be smaller: an API, a database, and workers.
+
+## Read-Only Core
+
+The first code increment is `redfish_ctl.proxy`, a dependency-light package in the Python source tree.
+It keeps an in-memory `NodeRegistry`, accepts a caller-provided manager factory, and shapes existing
+read commands into service responses. `NodeConfig.username` and `NodeConfig.password`, connection-only
+fields defined by the registry entry, are omitted from list responses.
+
+The optional FastAPI adapter, defined in `redfish_ctl/proxy/fastapi_app.py`, imports FastAPI only when
+`create_app()` is called. That keeps the CLI install dependency-light while still providing the route
+binding for deployments that install an ASGI runtime.
+
+| Method | Path | Backing read |
+| --- | --- | --- |
+| `GET` | `/nodes` | Sanitized `NodeRegistry` inventory |
+| `GET` | `/nodes/{node_id}` | `redfish_ctl.api.get_system()` + `get_thermal()` |
+| `GET` | `/nodes/{node_id}/sensors` | `sensors` command via `redfish_ctl.api.get_sensors()` |
+| `GET` | `/nodes/{node_id}/gpu-metrics` | `gpu-metrics` command |
+| `GET` | `/nodes/{node_id}/bios?attr_filter=...` | `bios` command |
+
+These routes are read-only. They do not create desired state, patch BMC resources, or run Redfish
+actions. The manager factory is intentionally supplied by the embedding service so credentials can
+come from a secret store without being serialized into proxy responses.
 
 ## Stored State
 
@@ -96,13 +121,15 @@ scale.
 
 ## First Useful Version
 
-The first version I would build:
+The read-only core now covers:
 
 - register a server,
 - read observed state,
-- set desired power and boot override,
 - list servers,
-- reconcile one server at a time with SQLite or Postgres.
+- expose sensor, GPU metric, and BIOS reads through GET endpoints.
+
+The next useful version should add persistent storage, desired power and boot override fields, and a
+reconcile loop that handles one server at a time with SQLite or Postgres.
 
 Bounded concurrency, simulator-backed benchmarks, and 1,000-node gates are separate work; see
 [Scaling and benchmarks](scaling-and-benchmarks.md). The current offline and emulator test lanes are
