@@ -12,6 +12,7 @@ from ..redfish_manager import CommandResult
 
 PROFILE_DIR = Path(__file__).resolve().parents[2] / "specs" / "profiles"
 SUMMARY_KEYS = ("name", "vendor", "model", "description", "risk")
+PROFILE_ID_KEYS = ("name", "vendor", "model", "risk")
 
 
 class BiosProfile(IDracManager,
@@ -31,14 +32,14 @@ class BiosProfile(IDracManager,
         cmd_parser.add_argument(
             "action",
             nargs="?",
-            choices=("list", "show"),
+            choices=("list", "show", "diff"),
             default="list",
             help="catalog action to run",
         )
         cmd_parser.add_argument(
             "profile_name",
             nargs="?",
-            help="profile name for the show action",
+            help="profile name for the show or diff action",
         )
         return (
             cmd_parser,
@@ -65,12 +66,73 @@ class BiosProfile(IDracManager,
     def _summary(profile):
         return {key: profile.get(key) for key in SUMMARY_KEYS}
 
+    @staticmethod
+    def _profile_identity(profile):
+        return {key: profile.get(key) for key in PROFILE_ID_KEYS}
+
     @classmethod
     def _find_profile(cls, profiles, profile_name):
         for profile in profiles:
             if profile.get("name") == profile_name:
                 return profile
         return None
+
+    @staticmethod
+    def _attributes_from_bios_result(result):
+        data = result.data if isinstance(result.data, dict) else {}
+        attributes = data.get("Attributes")
+        if isinstance(attributes, dict):
+            return attributes
+        return data
+
+    @classmethod
+    def _diff_profile(cls, profile, current_attributes):
+        rows = []
+        summary = {
+            "total": 0,
+            "matching": 0,
+            "different": 0,
+            "missing": 0,
+        }
+        for attribute, desired in profile.get("attributes", {}).items():
+            missing = attribute not in current_attributes
+            current = current_attributes.get(attribute)
+            if missing:
+                status = "missing"
+            elif current == desired:
+                status = "matching"
+            else:
+                status = "different"
+            summary["total"] += 1
+            summary[status] += 1
+            rows.append({
+                "attribute": attribute,
+                "current": current,
+                "desired": desired,
+                "status": status,
+            })
+
+        return {
+            "profile": cls._profile_identity(profile),
+            "matches": (
+                summary["different"] == 0
+                and summary["missing"] == 0
+            ),
+            "summary": summary,
+            "attributes": rows,
+        }
+
+    def _read_current_attributes(self, profile, verbose, do_async):
+        attribute_names = ",".join(profile.get("attributes", {}).keys())
+        result = self.sync_invoke(
+            ApiRequestType.BiosQuery,
+            "bios_inventory",
+            attr_only=True,
+            attr_filter=attribute_names,
+            verbose=verbose,
+            do_async=do_async,
+        )
+        return self._attributes_from_bios_result(result)
 
     def execute(self,
                 action: Optional[str] = "list",
@@ -86,14 +148,22 @@ class BiosProfile(IDracManager,
         profiles = self._profiles(profile_dir)
         error = None
 
-        if action == "show":
+        if action in {"show", "diff"}:
             if not profile_name:
                 data = {}
-                error = "profile name is required for show"
+                error = f"profile name is required for {action}"
             else:
-                data = self._find_profile(profiles, profile_name) or {}
-                if not data:
+                profile = self._find_profile(profiles, profile_name)
+                if not profile:
+                    data = {}
                     error = f"profile not found: {profile_name}"
+                elif action == "show":
+                    data = profile
+                else:
+                    current_attributes = self._read_current_attributes(
+                        profile, verbose, do_async
+                    )
+                    data = self._diff_profile(profile, current_attributes)
         else:
             data = [self._summary(profile) for profile in profiles]
 

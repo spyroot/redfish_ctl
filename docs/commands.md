@@ -68,7 +68,7 @@ Safety labels:
 | `bios-change` | Stage BIOS attributes from a spec or attribute pair. | Write |
 | `bios-clear-pending` | Clear pending BIOS values. | Write |
 | `bios-pending` | Read pending BIOS values. | Read |
-| `bios-profile` | List committed BIOS tuning profiles or show one full profile. | Read |
+| `bios-profile` | List committed BIOS tuning profiles, show one full profile, or diff a profile against current BIOS attributes. | Read |
 | `bios-registry` | Read BIOS registry metadata, choices, and writable attributes. | Read |
 | `bios-snapshot` | Capture a BIOS restore point for rollback-able changes. | Read |
 | `bmc-scan` | Scan a network segment for Redfish BMCs. | Read |

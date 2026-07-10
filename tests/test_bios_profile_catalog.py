@@ -63,6 +63,65 @@ def test_bios_profile_show_returns_full_profile(redfish_mock):
     assert result.data["attributes"] == {"EGM": True}
 
 
+def test_bios_profile_diff_compares_profile_to_current_bios(
+        redfish_mock, redfish_service, tmp_path):
+    profile_dir = tmp_path / "profiles"
+    profile_dir.mkdir()
+    (profile_dir / "dell-low-latency.json").write_text(json.dumps({
+        "name": "dell-low-latency",
+        "vendor": "dell",
+        "model": "PowerEdge",
+        "description": "Test profile that changes one current BIOS value.",
+        "risk": "medium",
+        "attributes": {
+            "ProcCStates": "Enabled",
+            "SriovGlobalEnable": "Enabled",
+        },
+    }))
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosProfile,
+        "bios-profile",
+        action="diff",
+        profile_name="dell-low-latency",
+        profile_dir=profile_dir,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data == {
+        "profile": {
+            "name": "dell-low-latency",
+            "vendor": "dell",
+            "model": "PowerEdge",
+            "risk": "medium",
+        },
+        "matches": False,
+        "summary": {
+            "total": 2,
+            "matching": 1,
+            "different": 1,
+            "missing": 0,
+        },
+        "attributes": [
+            {
+                "attribute": "ProcCStates",
+                "current": "Disabled",
+                "desired": "Enabled",
+                "status": "different",
+            },
+            {
+                "attribute": "SriovGlobalEnable",
+                "current": "Enabled",
+                "desired": "Enabled",
+                "status": "matching",
+            },
+        ],
+    }
+    assert redfish_service.requests
+    assert {request.method for request in redfish_service.requests} == {"GET"}
+
+
 def test_bios_profile_missing_directory_lists_empty(redfish_mock, tmp_path):
     missing_dir = tmp_path / "missing-profiles"
 
@@ -114,3 +173,39 @@ def test_bios_profile_cli_runs_without_bmc_credentials():
     payload = json.loads(result.stdout)
     assert payload["data"]["name"] == "dell-cstates-off"
     assert payload["data"]["attributes"] == {"ProcCStates": "Disabled"}
+
+
+def test_bios_profile_diff_cli_requires_bmc_connection():
+    env = os.environ.copy()
+    for name in (
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
+            "IDRAC_IP",
+            "IDRAC_USERNAME",
+            "IDRAC_PASSWORD",
+    ):
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "redfish_ctl.redfish_main",
+            "--json_only",
+            "--nocolor",
+            "bios-profile",
+            "diff",
+            "dell-cstates-off",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Please indicate the idrac ip" in result.stdout
