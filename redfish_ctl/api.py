@@ -171,6 +171,40 @@ class RebootResult:
     raw: Mapping[str, Any]
 
 
+@dataclass(frozen=True)
+class BiosProfileAttributeDiff:
+    """One BIOS attribute comparison row from bios-profile diff."""
+
+    attribute: str | None
+    current: Any
+    desired: Any
+    status: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class BiosProfileDiffResult:
+    """Typed result from the bios-profile diff action."""
+
+    profile: Mapping[str, Any]
+    matches: bool
+    summary: Mapping[str, Any]
+    attributes: tuple[BiosProfileAttributeDiff, ...]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class BiosProfileApplyResult:
+    """Typed result from the guarded bios-profile apply action."""
+
+    profile: str | None
+    dry_run: bool
+    change: Mapping[str, Any]
+    rollback: Mapping[str, Any]
+    staged: Mapping[str, Any]
+    raw: Mapping[str, Any]
+
+
 def _invoke(
     manager: SyncInvoker,
     api_call: ApiRequestType,
@@ -410,5 +444,68 @@ def reboot(
         payload=payload,
         task_id=data.get("task_id"),
         task_state=data.get("task_state"),
+        raw=data,
+    )
+
+
+def bios_profile_diff(
+    manager: SyncInvoker,
+    profile_name: str,
+) -> BiosProfileDiffResult:
+    """Return a typed BIOS profile diff through bios-profile diff."""
+    data = _mapping(
+        _invoke(
+            manager,
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            action="diff",
+            profile_name=profile_name,
+        )
+    )
+    attributes = tuple(
+        BiosProfileAttributeDiff(
+            attribute=row.get("attribute"),
+            current=row.get("current"),
+            desired=row.get("desired"),
+            status=row.get("status"),
+            raw=row,
+        )
+        for row in _rows(data.get("attributes"))
+    )
+    return BiosProfileDiffResult(
+        profile=_mapping(data.get("profile")),
+        matches=bool(data.get("matches", False)),
+        summary=_mapping(data.get("summary")),
+        attributes=attributes,
+        raw=data,
+    )
+
+
+def bios_profile_apply(
+    manager: SyncInvoker,
+    profile_name: str,
+    *,
+    confirm: bool = False,
+    dry_run: bool = False,
+) -> BiosProfileApplyResult:
+    """Preview or stage a BIOS profile through guarded bios-profile apply."""
+    data = _mapping(
+        _invoke(
+            manager,
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            action="apply",
+            profile_name=profile_name,
+            confirm=confirm,
+            dry_run=dry_run,
+        )
+    )
+    profile = data.get("profile")
+    return BiosProfileApplyResult(
+        profile=profile if isinstance(profile, str) else None,
+        dry_run=bool(data.get("dry_run", not confirm)),
+        change=_mapping(data.get("change")),
+        rollback=_mapping(data.get("rollback")),
+        staged=_mapping(data.get("staged")),
         raw=data,
     )
