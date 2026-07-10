@@ -66,8 +66,19 @@ def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
     assert container["args"] == [
         "run",
         "--standalone",
+        # The watch stays scoped to the sandbox namespace so the namespaced
+        # Role is sufficient for the resource watch itself.
+        "--namespace=redfish-sandbox",
         "/app/k8s/controller/redfish_endpoint_controller.py",
     ]
+
+    cluster_role = next(doc for doc in docs if doc["kind"] == "ClusterRole")
+    cluster_verbs = set().union(
+        *(set(rule["verbs"]) for rule in cluster_role["rules"])
+    )
+    # kopf's startup observation is read-only; cluster-scope writes would be
+    # a regression.
+    assert cluster_verbs <= {"get", "list", "watch"}
 
     redfish_rules = [
         rule
