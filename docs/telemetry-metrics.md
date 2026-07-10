@@ -3,8 +3,8 @@
 Author: Mus <spyroot@gmail.com>
 
 This reference is generated from the Supermicro GB300 fixture files under
-`tests/supermicro_fixtures/`; those fixtures are captured Redfish JSON used by
-the offline tests, so this page does not require a live BMC or private endpoint.
+`tests/supermicro_gb300_corpus/`, the captured Redfish JSON corpus used by the
+offline tests, so this page does not require a live BMC or private endpoint.
 
 ## How To Read This
 
@@ -25,8 +25,9 @@ repeated source metric names without copying the full fixture path.
 
 `redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`, emits
 numeric `MetricValue` rows only. Known fabric counters use curated
-`hw.fabric.*` names; every other numeric row becomes a generated
-`hw.gb300.*` metric name derived from the source metric name.
+`hw.fabric.*` names. GPU temperature, processor, throttle, clock, and memory
+rows use curated `hw.gpu.*` names. Remaining numeric rows become generated
+`hw.gb300.*` metric names derived from the source metric name.
 
 ## Safe Consumption
 
@@ -67,10 +68,11 @@ redfish_ctl exporter --vendor supermicro --output signalfx --push-signalfx
 
 2. Find the data in Splunk Observability. Under **Metrics -> Metric Finder**, search the
    metric names this exporter emits: `hw.fabric.*` (NVLink/port link state, BER, RX/TX
-   throughput and errors), `hw.gb300.*` (GPU plus general chassis sensors), and
+   throughput and errors), `hw.gpu.*` (GPU temperature, processor, clock, throttle,
+   and memory gauges), `hw.gb300.*` (remaining GB300-specific numeric rows), and
    `hw.temperature`, `hw.energy_kwh`, `hw.component_integrity.enabled`. Every datapoint
-   carries these **dimensions** for filtering/grouping: `host`, `chassis`, `gpu`, `port`,
-   `sensor`, `vendor`, `report`.
+   carries these **dimensions** for filtering/grouping: `host.name`, `chassis`, `gpu`,
+   `port`, `sensor`, `vendor`, `report`.
 
 3. Confirm points are arriving with a chart or SignalFlow query, e.g. fabric receive rate
    per port on one host:

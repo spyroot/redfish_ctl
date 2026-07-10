@@ -53,6 +53,58 @@ FABRIC_PROPERTY_METRICS = {
     "VL15TXBytes": "hw.fabric.vl15_tx_bytes",
     "VL15TXPackets": "hw.fabric.vl15_tx_packets",
 }
+GPU_COMPUTE_PROPERTIES = {
+    "DMMAUtilizationPercent": "dmma",
+    "FP16ActivityPercent": "fp16_activity",
+    "FP32ActivityPercent": "fp32_activity",
+    "FP64ActivityPercent": "fp64_activity",
+    "GraphicsEngineActivityPercent": "graphics_engine_activity",
+    "HMMAUtilizationPercent": "hmma",
+    "IMMAUtilizationPercent": "imma",
+    "IntegerActivityUtilizationPercent": "integer_activity",
+    "NVDecInstanceUtilizationPercent": "nvdec_instance",
+    "NVDecUtilizationPercent": "nvdec",
+    "NVJpgInstanceUtilizationPercent": "nvjpg_instance",
+    "NVJpgUtilizationPercent": "nvjpg",
+    "NVOfaUtilizationPercent": "nvofa",
+    "SMActivityPercent": "sm_activity",
+    "SMOccupancyPercent": "sm_occupancy",
+    "SMUtilizationPercent": "sm",
+    "TensorCoreActivityPercent": "tensor_core_activity",
+}
+GPU_MEMORY_PROPERTIES = {
+    "BandwidthPercent": ("hw.gpu.memory.bandwidth_utilization", "bandwidth", "%"),
+    "CapacityUtilizationPercent": ("hw.gpu.memory.capacity_utilization", "capacity", "%"),
+    "OperatingSpeedMHz": ("hw.gpu.memory.clock_mhz", "operating_speed", "MHz"),
+}
+GPU_MEMORY_ECC_PROPERTIES = {
+    "CorrectableECCErrorCount": "correctable",
+    "UncorrectableECCErrorCount": "uncorrectable",
+}
+GPU_MEMORY_ROW_REMAP_PROPERTIES = {
+    "CorrectableRowRemappingCount": "correctable",
+    "HighAvailabilityBankCount": "high_availability",
+    "LowAvailabilityBankCount": "low_availability",
+    "MaxAvailabilityBankCount": "max_availability",
+    "NoAvailabilityBankCount": "no_availability",
+    "PartialAvailabilityBankCount": "partial_availability",
+    "UncorrectableRowRemappingCount": "uncorrectable",
+}
+GPU_THROTTLE_PROPERTIES = {
+    "GlobalSoftwareViolationThrottleDuration": "global_software_violation",
+    "HardwareViolationThrottleDuration": "hardware_violation",
+    "PowerLimitThrottleDuration": "power_limit",
+    "ThermalLimitThrottleDuration": "thermal_limit",
+}
+ISO_DURATION = re.compile(
+    r"^P"
+    r"(?:(?P<days>\d+(?:\.\d+)?)D)?"
+    r"(?:T"
+    r"(?:(?P<hours>\d+(?:\.\d+)?)H)?"
+    r"(?:(?P<minutes>\d+(?:\.\d+)?)M)?"
+    r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
+    r")?$"
+)
 SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
@@ -276,10 +328,15 @@ def samples_from_metric_report_rows(
         if not prop:
             continue
         prop_info = _parse_metric_property(str(prop))
+        prop_name = prop_info["property"]
+        gpu_sample = _gpu_metric_report_sample(prop_info, row, identity)
+        if gpu_sample is not None:
+            samples.append(gpu_sample)
+            continue
+
         value = _as_float(row.get("MetricValue"))
         if value is None:
             continue
-        prop_name = prop_info["property"]
         if prop_name in FABRIC_PROPERTY_METRICS:
             metric = FABRIC_PROPERTY_METRICS[prop_name]
             fabric = "ib" if prop_info.get("port", "").lower().startswith("ib") else "nvlink"
@@ -295,6 +352,116 @@ def samples_from_metric_report_rows(
         dims["report"] = str(row.get("Report") or "unknown")
         samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
     return samples
+
+
+def _gpu_metric_report_sample(
+        prop_info: Mapping[str, str],
+        row: Mapping,
+        identity: Mapping[str, str]) -> Optional[MetricSample]:
+    prop_name = str(prop_info.get("property") or "")
+    gpu = _gpu_from_metric_info(prop_info)
+    if not gpu:
+        return None
+
+    source = prop_info.get("metric_source")
+    value = _as_float(row.get("MetricValue"))
+    dims = _gpu_metric_dims(identity, prop_info, row, gpu)
+
+    if source == "sensor" and _is_gpu_temperature(prop_name):
+        if value is None:
+            return None
+        return _sample(
+            "hw.gpu.temperature",
+            value,
+            dims | {"property": "temperature", "sensor": _dim_value(prop_name)},
+            "Cel",
+            row.get("Timestamp"),
+        )
+
+    if source == "processor":
+        if prop_name == "OperatingSpeedMHz" and value is not None:
+            return _sample(
+                "hw.gpu.clock_mhz",
+                value,
+                dims | {"property": "operating_speed"},
+                "MHz",
+                row.get("Timestamp"),
+            )
+        if prop_name in GPU_COMPUTE_PROPERTIES and value is not None:
+            metric_dims = {
+                "property": GPU_COMPUTE_PROPERTIES[prop_name],
+            }
+            if prop_info.get("index"):
+                metric_dims["index"] = str(prop_info["index"])
+            return _sample(
+                "hw.gpu.compute.utilization",
+                value,
+                dims | metric_dims,
+                "%",
+                row.get("Timestamp"),
+            )
+        if prop_name in GPU_THROTTLE_PROPERTIES:
+            seconds = _duration_seconds(row.get("MetricValue"))
+            if seconds is None:
+                return None
+            return _sample(
+                "hw.gpu.throttle.duration_seconds",
+                seconds,
+                dims | {"property": GPU_THROTTLE_PROPERTIES[prop_name]},
+                "s",
+                row.get("Timestamp"),
+            )
+
+    if source == "memory":
+        if prop_name in GPU_MEMORY_PROPERTIES and value is not None:
+            metric, property_name, unit = GPU_MEMORY_PROPERTIES[prop_name]
+            return _sample(
+                metric,
+                value,
+                dims | {"property": property_name},
+                unit,
+                row.get("Timestamp"),
+            )
+        if prop_name in GPU_MEMORY_ECC_PROPERTIES and value is not None:
+            return _sample(
+                "hw.gpu.memory.ecc_errors",
+                value,
+                dims | {"property": GPU_MEMORY_ECC_PROPERTIES[prop_name]},
+                None,
+                row.get("Timestamp"),
+            )
+        if prop_name in GPU_MEMORY_ROW_REMAP_PROPERTIES and value is not None:
+            return _sample(
+                "hw.gpu.memory.row_remap_count",
+                value,
+                dims | {"property": GPU_MEMORY_ROW_REMAP_PROPERTIES[prop_name]},
+                None,
+                row.get("Timestamp"),
+            )
+        if prop_name == "RowRemappingFailed" and value is not None:
+            return _sample(
+                "hw.gpu.memory.row_remapping_failed",
+                value,
+                dims | {"property": "row_remapping_failed"},
+                None,
+                row.get("Timestamp"),
+            )
+
+    return None
+
+
+def _gpu_metric_dims(
+        identity: Mapping[str, str],
+        prop_info: Mapping[str, str],
+        row: Mapping,
+        gpu: str) -> dict[str, str]:
+    dims = _with_dims(identity, source="metric-report", gpu=gpu)
+    for key in ("system", "chassis", "memory"):
+        if prop_info.get(key):
+            dims[key] = str(prop_info[key])
+    if row.get("Report"):
+        dims["report"] = str(row["Report"])
+    return dims
 
 
 def samples_from_thermal_rows(
@@ -549,6 +716,28 @@ def _as_float(value) -> Optional[float]:
     return parsed if math.isfinite(parsed) else None
 
 
+def _duration_seconds(value) -> Optional[float]:
+    parsed = _as_float(value)
+    if parsed is not None:
+        return parsed
+    text = str(value or "").strip()
+    match = ISO_DURATION.match(text)
+    if not match:
+        return None
+    total = 0.0
+    multipliers = {
+        "days": 86400.0,
+        "hours": 3600.0,
+        "minutes": 60.0,
+        "seconds": 1.0,
+    }
+    for name, multiplier in multipliers.items():
+        amount = match.group(name)
+        if amount:
+            total += float(amount) * multiplier
+    return total if math.isfinite(total) else None
+
+
 def _leak_state_value(value) -> Optional[float]:
     if value in (None, ""):
         return None
@@ -640,6 +829,22 @@ def _gpu_from_chassis(chassis: str) -> Optional[str]:
     return chassis if chassis.startswith("GPU_") else None
 
 
+def _gpu_from_metric_info(info: Mapping[str, str]) -> Optional[str]:
+    gpu = str(info.get("gpu") or "")
+    if gpu.startswith("GPU_"):
+        return gpu
+    memory = str(info.get("memory") or "")
+    match = re.match(r"(GPU_\d+)", memory)
+    if match:
+        return match.group(1)
+    chassis_gpu = _gpu_from_chassis(str(info.get("chassis") or ""))
+    if chassis_gpu:
+        return chassis_gpu
+    sensor = str(info.get("sensor") or info.get("property") or "")
+    match = re.search(r"(?:^|_)(GPU_\d+)(?:_|$)", sensor)
+    return match.group(1) if match else None
+
+
 def _gpu_dim(chassis: str) -> dict[str, str]:
     gpu = _gpu_from_chassis(chassis)
     return {"gpu": gpu} if gpu else {}
@@ -662,8 +867,15 @@ def _parse_metric_property(prop: str) -> dict[str, str]:
     info = {"property": prop_name}
     if idx is not None:
         info["index"] = idx
+    if "Sensors" in parts:
+        info["metric_source"] = "sensor"
+    elif "MemoryMetrics" in parts or "Memory" in parts or "MemorySummary" in parts:
+        info["metric_source"] = "memory"
+    elif "ProcessorMetrics" in parts:
+        info["metric_source"] = "processor"
     for collection, key in (("Systems", "system"), ("Processors", "gpu"),
-                            ("Ports", "port"), ("Chassis", "chassis")):
+                            ("Memory", "memory"), ("Ports", "port"),
+                            ("Chassis", "chassis"), ("Sensors", "sensor")):
         if collection in parts:
             i = parts.index(collection) + 1
             if i < len(parts):
@@ -687,6 +899,11 @@ def _generic_metric_name(prop: str) -> str:
     snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", prop)
     snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
     return f"hw.gb300.{snake or 'metric'}"
+
+
+def _is_gpu_temperature(prop: str) -> bool:
+    lowered = prop.lower()
+    return "temp" in lowered or "temperature" in lowered
 
 
 def _dim_value(value) -> str:

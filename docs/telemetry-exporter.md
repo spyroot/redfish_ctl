@@ -4,7 +4,7 @@ Author: Mus <spyroot@gmail.com>
 
 `redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`, is the read-only path for
 turning BMC Redfish telemetry into metrics. I use it when the BMC can see hardware state that an
-in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink fabric counters.
+in-band host collector misses: chassis power, fans, voltages, GPU power, and NVLink fabric counters.
 
 ## What It Reads
 
@@ -18,11 +18,13 @@ in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink 
 - GPU `nvlink-ports`, `network-adapters`, and `component-integrity` command output.
 
 The exporter emits `hw.power`, `hw.temperature`, `hw.fan_speed`, `hw.voltage`, `hw.energy_kwh`,
-`hw.gpu.power`, `hw.leak.state`, and `hw.fabric.*`. EnvironmentMetrics rollups add `resource_type`
-and `resource` dimensions so chassis, processor, and memory power can be separated. `hw.leak.state`,
-derived from linked `LeakDetector` rows, is `0` for clear detector states and `1` for warning or
-critical states. Fabric metrics include link state, negotiated speed, RX/TX bytes, bandwidth,
-FEC/CRC-style counters when Redfish exposes them, and other NVLink error counters.
+`hw.gpu.power`, `hw.gpu.temperature`, `hw.gpu.clock_mhz`, `hw.gpu.compute.utilization`,
+`hw.gpu.throttle.duration_seconds`, `hw.gpu.memory.*`, `hw.leak.state`, and `hw.fabric.*`.
+EnvironmentMetrics rollups add `resource_type` and `resource` dimensions so chassis, processor, and
+memory power can be separated. `hw.leak.state`, derived from linked `LeakDetector` rows, is `0` for
+clear detector states and `1` for warning or critical states. Fabric metrics include link state,
+negotiated speed, RX/TX bytes, bandwidth, FEC/CRC-style counters when Redfish exposes them, and
+other NVLink error counters.
 
 ## Credentials
 
@@ -136,6 +138,10 @@ A Prometheus scrape should include at least one chassis power metric and, on GB3
 hw.power{...} 1349.263802
 hw.power{resource_type="Memory",resource="GPU_0_DRAM_0",...} 34.458
 hw.gpu.power{gpu="GPU_0",...} 231.958
+hw.gpu.temperature{gpu="GPU_0",sensor="HGX_GPU_0_TEMP_0",...} 32.9375
+hw.gpu.clock_mhz{gpu="GPU_0",property="operating_speed",...} 2070
+hw.gpu.memory.capacity_utilization{gpu="GPU_1",memory="GPU_1_DRAM_0",...} 91
+hw.gpu.throttle.duration_seconds{gpu="GPU_0",property="power_limit",...} 0
 hw.leak.state{detector="Chassis_0_LeakDetector_0_ColdPlate",...} 0
 hw.fabric.link_up{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 1
 hw.fabric.rx_bytes{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 9460179851686
