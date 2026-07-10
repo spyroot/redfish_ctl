@@ -9,6 +9,8 @@ in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink 
 ## What It Reads
 
 - Chassis `EnvironmentMetrics`, where many BMCs publish power and energy rollups.
+- Chassis `ThermalSubsystem`, linked from Chassis resources, with `ThermalMetrics`
+  temperature readings exposed as per-zone `hw.temperature` samples.
 - Chassis `Sensors`, followed through linked Sensor resources.
 - TelemetryService `MetricReports`, where GB300 exposes fabric and GPU metric properties.
 - GPU `nvlink-ports`, `network-adapters`, and `component-integrity` command output.
@@ -73,6 +75,10 @@ series as `host.name=gb300-poc1-slot9`, `node=slot9`, and `server.address=192.0.
 
 Use `--label-bmc-ip` only when the connection address is not the BMC address you want in the metric
 labels.
+
+ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
+and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
+falls back to the reported sensor name.
 
 ## SignalFx
 

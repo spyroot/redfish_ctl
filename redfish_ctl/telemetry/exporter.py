@@ -171,6 +171,7 @@ def build_metric_samples(
         sensor_rows: Iterable[Mapping],
         nvlink_rows: Iterable[Mapping],
         metric_report_rows: Iterable[Mapping],
+        thermal_rows: Iterable[Mapping] = (),
         network_rows: Iterable[Mapping] = (),
         component_integrity_rows: Iterable[Mapping] = ()) -> list[MetricSample]:
     """Build exporter samples from normalized Redfish command rows."""
@@ -178,6 +179,7 @@ def build_metric_samples(
     samples.extend(samples_from_environment_rows(environment_rows, identity))
     samples.extend(samples_from_sensor_rows(sensor_rows, identity))
     samples.extend(samples_from_nvlink_rows(nvlink_rows, identity))
+    samples.extend(samples_from_thermal_rows(thermal_rows, identity))
     samples.extend(samples_from_metric_report_rows(metric_report_rows, identity))
     samples.extend(samples_from_network_rows(network_rows, identity))
     samples.extend(samples_from_component_integrity_rows(component_integrity_rows, identity))
@@ -284,6 +286,29 @@ def samples_from_metric_report_rows(
                     dims[key] = str(prop_info[key])
         dims["report"] = str(row.get("Report") or "unknown")
         samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
+    return samples
+
+
+def samples_from_thermal_rows(
+        rows: Iterable[Mapping],
+        identity: Mapping[str, str]) -> list[MetricSample]:
+    """Map ThermalSubsystem temperature readings into per-zone metrics."""
+    samples = []
+    for row in rows:
+        reading = (row.get("ReadingCelsius")
+                   if row.get("ReadingCelsius") is not None
+                   else row.get("Reading"))
+        value = _as_float(reading)
+        if value is None:
+            continue
+        chassis = str(row.get("Chassis") or "unknown")
+        name = str(row.get("DeviceName") or row.get("Name")
+                   or row.get("DataSourceUri") or "temperature").rsplit("/", 1)[-1]
+        zone = row.get("PhysicalContext") or name
+        dims = _with_dims(identity, source="thermal-subsystem",
+                          chassis=chassis, sensor=_dim_value(name),
+                          zone=_dim_value(zone))
+        samples.append(_sample("hw.temperature", value, dims, "Cel"))
     return samples
 
 

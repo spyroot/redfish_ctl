@@ -129,6 +129,20 @@ class Exporter(IDracManager,
             rows.append(env_data)
         return rows
 
+    def _thermal_rows(self, do_async: bool = False, do_expanded: bool = False) -> list[dict]:
+        """Return temperature readings from the read-only thermal command."""
+        try:
+            result = self.sync_invoke(
+                ApiRequestType.Thermal, "thermal",
+                do_async=do_async, do_expanded=do_expanded)
+        except Exception:
+            return []
+        data = result.data if isinstance(result.data, dict) else {}
+        rows = data.get("temperature_readings")
+        if not isinstance(rows, list):
+            return []
+        return [row for row in rows if isinstance(row, dict)]
+
     def _vendor_label(self, vendor: Optional[str]) -> str:
         """Return a stable lower-case vendor label."""
         if vendor:
@@ -150,6 +164,7 @@ class Exporter(IDracManager,
             vendor=self._vendor_label(vendor),
         )
         environment_rows = self._environment_rows(do_async=do_async)
+        thermal_rows = self._thermal_rows(do_async=do_async, do_expanded=do_expanded)
         sensor_rows = self._invoke_rows(ApiRequestType.Sensors, "sensors",
                                         do_async=do_async, do_expanded=do_expanded)
         nvlink_rows = self._invoke_rows(ApiRequestType.NvLinkPorts, "nvlink-ports",
@@ -166,6 +181,7 @@ class Exporter(IDracManager,
             sensor_rows=sensor_rows,
             nvlink_rows=nvlink_rows,
             metric_report_rows=metric_rows,
+            thermal_rows=thermal_rows,
             network_rows=network_rows,
             component_integrity_rows=component_rows,
         )
