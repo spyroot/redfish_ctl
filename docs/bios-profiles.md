@@ -2,8 +2,10 @@
 
 Author: Mus <spyroot@gmail.com>
 
-BIOS profiles are how I make repeatable host tuning safe enough to review. The pattern is always:
-inspect the registry, preview the change, stage it, then verify after the reset.
+BIOS profiles make host tuning repeatable and reviewable: each profile is a named set of BIOS
+attributes that can be inspected, previewed, staged, and verified as one unit instead of as ad-hoc
+edits. The working pattern is always the same: inspect the registry, preview the change, stage it,
+then verify after the reset.
 
 The spec files used below are indexed with vendor and safety labels in [Specs](../specs/README.md).
 
@@ -123,6 +125,6 @@ redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
 
 ## Intel And AMD Notes
 
-The Intel and AMD scripts are intentionally registry-first. They show the class of knobs I care about
+The Intel and AMD scripts are intentionally registry-first. They show the class of knobs that matter
 for performance work, but the exact attribute names depend on platform generation and BIOS version.
 If `bios-registry --attr_name <name>` does not show the attribute, do not apply that line blindly.
