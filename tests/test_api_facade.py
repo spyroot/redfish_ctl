@@ -13,6 +13,7 @@ from redfish_ctl.api import (
     NtpSetResult,
     NtpSkipped,
     NtpTarget,
+    RebootResult,
     SensorReading,
     SystemStatus,
     TemperatureReading,
@@ -21,6 +22,7 @@ from redfish_ctl.api import (
     get_sensors,
     get_system,
     get_thermal,
+    reboot,
     set_ntp,
 )
 from redfish_ctl.idrac_manager import IDracManager
@@ -353,6 +355,48 @@ def test_set_ntp_returns_typed_dry_run_plan_by_default():
     ]
 
 
+def test_reboot_previews_host_reset_by_default():
+    """reboot delegates to the reset command without POSTing by default."""
+    preview = {
+        "dry_run": True,
+        "action": "#ComputerSystem.Reset",
+        "target": "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
+        "payload": {"ResetType": "GracefulRestart"},
+    }
+    manager = RecordingManager({
+        (ApiRequestType.ComputerSystemReset, "reboot"): CommandResult(
+            preview,
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = reboot(manager)
+
+    assert result == RebootResult(
+        reset_type="GracefulRestart",
+        dry_run=True,
+        target="/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
+        payload={"ResetType": "GracefulRestart"},
+        task_id=None,
+        task_state=None,
+        raw=preview,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.ComputerSystemReset,
+            "reboot",
+            {
+                "reset_type": "GracefulRestart",
+                "dry_run": True,
+                "do_wait": False,
+                "do_async": False,
+            },
+        )
+    ]
+
+
 def test_set_ntp_returns_typed_apply_result_when_confirmed():
     payload = {
         "servers": ["0.pool.ntp.org"],
@@ -408,6 +452,53 @@ def test_set_ntp_returns_typed_apply_result_when_confirmed():
     ]
 
 
+def test_reboot_confirm_invokes_host_reset_and_maps_task_result():
+    """reboot confirm exposes the reset task fields returned by the command."""
+    payload = {
+        "executed": True,
+        "task_id": "JID_1234",
+        "task_state": "Running",
+    }
+    manager = RecordingManager({
+        (ApiRequestType.ComputerSystemReset, "reboot"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = reboot(
+        manager,
+        reset_type="ForceRestart",
+        confirm=True,
+        wait=True,
+        async_call=True,
+    )
+
+    assert result == RebootResult(
+        reset_type="ForceRestart",
+        dry_run=False,
+        target=None,
+        payload={},
+        task_id="JID_1234",
+        task_state="Running",
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.ComputerSystemReset,
+            "reboot",
+            {
+                "reset_type": "ForceRestart",
+                "dry_run": False,
+                "do_wait": True,
+                "do_async": True,
+            },
+        )
+    ]
+
+
 def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     gb300_corpus_manager,
 ):
@@ -419,6 +510,7 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     thermal = get_thermal(manager)
     gpu_metrics = get_gpu_metrics(manager)
     ntp = set_ntp(manager, ["0.pool.ntp.org"])
+    reset_preview = reboot(manager)
 
     assert system.id == "System_0"
     assert system.name == "System_0"
@@ -459,6 +551,11 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
             raw=ntp.raw["plan"][0],
         ),
     )
+    assert reset_preview.dry_run is True
+    assert reset_preview.target == (
+        "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset"
+    )
+    assert reset_preview.payload == {"ResetType": "GracefulRestart"}
 
     paths = {request.path.lower() for request in requests}
     assert "/redfish/v1/systems/system_0" in paths
