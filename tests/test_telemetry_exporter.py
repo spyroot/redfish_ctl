@@ -161,6 +161,85 @@ def test_metric_report_mapper_emits_nvlink_bandwidth_and_error_counters():
     assert by_metric["hw.fabric.rx_gbps"].dimensions["port"] == "NVLink_0"
 
 
+def test_metric_report_mapper_emits_gpu_processor_memory_and_temperature_samples():
+    """GPU ProcessorMetrics, MemoryMetrics, and sensor rows get stable hw.gpu names."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[
+            {
+                "Report": "HGX_ProcessorMetrics_0",
+                "MetricProperty": (
+                    "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/"
+                    "ProcessorMetrics#/OperatingSpeedMHz"
+                ),
+                "MetricValue": "2070",
+                "Timestamp": "2026-06-29T08:05:19.536+00:00",
+            },
+            {
+                "Report": "HGX_ProcessorGPMMetrics_0",
+                "MetricProperty": (
+                    "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/"
+                    "ProcessorMetrics#/Oem/Nvidia/FP32ActivityPercent"
+                ),
+                "MetricValue": "12.5",
+                "Timestamp": "2026-06-29T08:05:19.536+00:00",
+            },
+            {
+                "Report": "HGX_ProcessorMetrics_0",
+                "MetricProperty": (
+                    "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/"
+                    "ProcessorMetrics#/PowerLimitThrottleDuration"
+                ),
+                "MetricValue": "PT1M2.5S",
+                "Timestamp": "2026-06-29T08:05:19.536+00:00",
+            },
+            {
+                "Report": "HGX_MemoryMetrics_0",
+                "MetricProperty": (
+                    "/redfish/v1/Systems/HGX_Baseboard_0/Memory/GPU_0_DRAM_0/"
+                    "MemoryMetrics#/CapacityUtilizationPercent"
+                ),
+                "MetricValue": "91",
+                "Timestamp": "2026-06-29T08:05:06.788+00:00",
+            },
+            {
+                "Report": "HGX_MemoryMetrics_0",
+                "MetricProperty": (
+                    "/redfish/v1/Systems/HGX_Baseboard_0/Memory/GPU_0_DRAM_0/"
+                    "MemoryMetrics#/LifeTime/CorrectableECCErrorCount"
+                ),
+                "MetricValue": "4",
+                "Timestamp": "2026-06-29T08:04:58.689+00:00",
+            },
+            {
+                "Report": "HGX_PlatformEnvironmentMetrics_0",
+                "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0/Sensors/HGX_GPU_0_TEMP_0",
+                "MetricValue": "32.937500",
+                "Timestamp": "2026-06-29T08:05:10.347+00:00",
+            },
+        ],
+    )
+
+    keyed = {
+        (sample.metric, sample.dimensions.get("gpu"), sample.dimensions.get("property")): sample
+        for sample in samples
+    }
+    assert keyed[("hw.gpu.clock_mhz", "GPU_0", "operating_speed")].value == 2070
+    assert keyed[("hw.gpu.compute.utilization", "GPU_0", "fp32_activity")].value == 12.5
+    assert keyed[("hw.gpu.throttle.duration_seconds", "GPU_0", "power_limit")].value == 62.5
+    assert keyed[("hw.gpu.memory.capacity_utilization", "GPU_0", "capacity")].value == 91
+    assert keyed[("hw.gpu.memory.ecc_errors", "GPU_0", "correctable")].value == 4
+    assert keyed[("hw.gpu.temperature", "GPU_0", "temperature")].value == 32.9375
+    assert keyed[
+        ("hw.gpu.memory.capacity_utilization", "GPU_0", "capacity")
+    ].dimensions["memory"] == "GPU_0_DRAM_0"
+    assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
+
+
 def test_prometheus_text_preserves_contract_names_and_dimensions():
     """Prometheus text output carries hw.* names and dotted OTel dimensions."""
     sample = MetricSample(
@@ -282,6 +361,13 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     gauges = result.data["gauge"]
     metrics = {point["metric"] for point in gauges}
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes"} <= metrics
+    assert {
+        "hw.gpu.clock_mhz",
+        "hw.gpu.compute.utilization",
+        "hw.gpu.memory.capacity_utilization",
+        "hw.gpu.throttle.duration_seconds",
+        "hw.gpu.temperature",
+    } <= metrics
     assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
     assert all(recorded.method != "POST" for recorded in service.requests)
 
