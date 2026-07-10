@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When I connect to a new BMC, I run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before I ask for deeper inventory or stage any change.
 
-The table below follows the 104 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the 105 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -93,6 +93,7 @@ Safety labels:
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
+| `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
 | `ethernet-interfaces` | Read host and manager EthernetInterfaces. | Read |
 | `event-submit-test` | Submit a Redfish test event; `--dry_run` previews the payload. | Write |
 | `exporter` | Expose BMC telemetry as Prometheus text or SignalFx datapoints. | Read |
@@ -169,6 +170,7 @@ redfish_ctl metric-reports
 redfish_ctl telemetry-triggers
 redfish_ctl thermal
 redfish_ctl power
+redfish_ctl environment-metrics
 redfish_ctl network-adapters
 redfish_ctl network-ports
 redfish_ctl ethernet-interfaces
