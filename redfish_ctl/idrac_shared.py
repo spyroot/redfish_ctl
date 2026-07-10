@@ -138,6 +138,7 @@ class ApiRequestType(Enum):
 
     # bios related
     BiosRegistry = auto()
+    BiosProfile = auto()
     BiosChangeSettings = auto()
     BiosResetDefault = auto()
     BiosClearPending = auto()
