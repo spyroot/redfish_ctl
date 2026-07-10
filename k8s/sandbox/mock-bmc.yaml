@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-bmc
+  labels:
+    app.kubernetes.io/name: mock-bmc
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-bmc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-bmc
+        app.kubernetes.io/component: redfish-sandbox
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: mock-bmc
+          image: redfish-ctl-mock-bmc:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: MOCK_BMC_CORPUS_DIR
+              value: /corpus/172.25.230.37
+          readinessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-bmc
+  labels:
+    app.kubernetes.io/name: mock-bmc
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mock-bmc
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
