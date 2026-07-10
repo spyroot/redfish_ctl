@@ -170,6 +170,7 @@ class ApiRequestType(Enum):
     JobDellServices = auto()
 
     Discovery = auto()
+    FleetInventory = auto()
 
 
 class ScheduleJobType(Enum):

@@ -117,6 +117,7 @@ Safety labels:
 | `firmware` | Read firmware view data. | Read |
 | `firmware-update` | Run UpdateService SimpleUpdate; `--dry_run` previews, `--confirm` writes. | Guarded |
 | `firmware_inventory` | Read firmware inventory. | Read |
+| `fleet` | Read a YAML fleet inventory and summarize per-node health, sensor count, and temperature max. | Read |
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
 | `insert_vm` | Insert virtual media from a URI. | Write |
