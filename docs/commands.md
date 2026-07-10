@@ -116,6 +116,7 @@ Safety labels:
 | `manager-network` | Read BMC ManagerNetworkProtocol service state, including HTTP/HTTPS/IPMI/SSH and NTP. | Read |
 | `manager-reboot` | Reboot the BMC manager. | Write |
 | `manager-time` | Read the BMC (Manager) clock; `--now`/`--set` write `DateTime` (read-only by default, no dry-run). | Write |
+| `memory-metrics` | Read MemoryMetrics resources linked from Memory modules and Processor MemorySummary. | Read |
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
@@ -132,6 +133,7 @@ Safety labels:
 | `oem-net-iso-task` | Read Dell OEM OS deployment task data. | Read |
 | `pci` | Read PCI device or function data. | Read |
 | `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
+| `processor-metrics` | Read ProcessorMetrics resources linked from ComputerSystem processor members. | Read |
 | `privilege-registry` | Read the privilege registry. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
@@ -172,6 +174,8 @@ redfish_ctl telemetry-triggers
 redfish_ctl thermal
 redfish_ctl power
 redfish_ctl environment-metrics
+redfish_ctl processor-metrics
+redfish_ctl memory-metrics
 redfish_ctl leak-detectors
 redfish_ctl network-adapters
 redfish_ctl network-ports
