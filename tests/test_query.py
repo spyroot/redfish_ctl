@@ -4,7 +4,25 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
+from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_main import (
+    _redfish_query_from_args,
+    _validate_redfish_query_for_vendor,
+)
 from redfish_ctl.redfish_query import RedfishQuery
+from redfish_ctl.vendors import get_vendor
+
+
+class QueryArgs:
+    """Small argparse-like object for global Redfish query flags."""
+
+    query_select = "Id,Name"
+    query_filter = "Id eq 'Manager'"
+    query_expand = "."
+    query_expand_levels = 2
+    query_top = 5
+    query_only = True
 
 
 def test_empty_query_is_blank():
@@ -12,6 +30,40 @@ def test_empty_query_is_blank():
     q = RedfishQuery()
     assert q.is_empty()
     assert q.to_query_string() == ""
+
+
+def test_global_cli_query_flags_build_redfish_query():
+    """Global CLI-style query args become one RedfishQuery object."""
+    query = _redfish_query_from_args(QueryArgs())
+
+    assert query.to_query_string() == (
+        "?$select=Id,Name&$filter=Id%20eq%20'Manager'"
+        "&$expand=.($levels=2)&$top=5&only"
+    )
+
+
+def test_vendor_gate_rejects_unsupported_query_flags():
+    """Vendor profiles block query parameters not declared for that target."""
+    query = RedfishQuery(select="Id")
+
+    with pytest.raises(InvalidArgument, match=r"\$select"):
+        _validate_redfish_query_for_vendor(query, get_vendor("supermicro"))
+
+
+def test_vendor_gate_treats_top_zero_as_active_query():
+    """$top=0 is valid Redfish syntax and still needs vendor support."""
+    query = RedfishQuery(top=0)
+
+    with pytest.raises(InvalidArgument, match=r"\$top"):
+        _validate_redfish_query_for_vendor(query, get_vendor("supermicro"))
+
+
+def test_dell_vendor_gate_rejects_combined_query_flags():
+    """Dell's one-query-parameter rule is enforced before any GET."""
+    query = RedfishQuery(select="Id", top=5)
+
+    with pytest.raises(InvalidArgument, match="only one query parameter"):
+        _validate_redfish_query_for_vendor(query, get_vendor("dell"))
 
 
 def test_select_list_and_string():
@@ -104,3 +156,17 @@ def test_get_with_query_enforces_one_param(redfish_mock):
         redfish_mock.get_with_query(
             "https://mock-idrac/redfish/v1/Managers", q, one_param_per_uri=True
         )
+
+
+def test_invoke_attaches_global_query_to_base_query(redfish_mock, redfish_service):
+    """Dispatch stores global query flags so base_query appends them to GETs."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.QueryIdrac,
+        "query_idrac",
+        resource="/redfish/v1/Managers",
+        redfish_query=RedfishQuery(top=1),
+        redfish_query_one_param_per_uri=False,
+    )
+
+    assert result.data["@odata.id"] == "/redfish/v1/Managers"
+    assert "top=1" in redfish_service.last_request.query

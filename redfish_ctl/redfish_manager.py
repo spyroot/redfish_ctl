@@ -10,7 +10,6 @@ import asyncio
 import collections
 import functools
 import logging
-import os
 import re
 from abc import abstractmethod
 from functools import cached_property
@@ -419,6 +418,20 @@ class RedfishManager:
         if len(select_target) > 0:
             r = f"{self._default_method}{self.redfish_ip}" \
                 f"{resource}{self.select(select_property=select_target)}"
+
+        request_query = kwargs.get("redfish_query", None)
+        if request_query is None:
+            request_query = getattr(self, "_redfish_query", None)
+        one_param_per_uri = kwargs.get(
+            "redfish_query_one_param_per_uri",
+            getattr(self, "_redfish_query_one_param_per_uri", False),
+        )
+        if (
+            request_query is not None
+            and not request_query.is_empty()
+            and "?" not in r
+        ):
+            r = request_query.apply(r, one_param_per_uri)
 
         logging.debug(f"Sending request to {r}")
 
