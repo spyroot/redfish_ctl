@@ -84,7 +84,7 @@ Safety labels:
 | `bios-change` | Stage BIOS attributes from a spec or attribute pair. | Write |
 | `bios-clear-pending` | Clear pending BIOS values. | Write |
 | `bios-pending` | Read pending BIOS values. | Read |
-| `bios-profile` | List committed BIOS tuning profiles, show one full profile, or diff a profile against current BIOS attributes. | Read |
+| `bios-profile` | List/show committed BIOS tuning profiles, diff against current BIOS attributes, or preview/apply a profile with `--confirm`. | Guarded |
 | `bios-registry` | Read BIOS registry metadata, choices, and writable attributes. | Read |
 | `bios-snapshot` | Capture a BIOS restore point for rollback-able changes. | Read |
 | `bmc-scan` | Scan a network segment for Redfish BMCs. | Read |
@@ -237,6 +237,20 @@ for the host reset:
 ```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
+
+Named profiles under `specs/profiles/` use the same staging path but add an automatic rollback
+snapshot before the profile is previewed or staged:
+
+```bash
+redfish_ctl bios-profile list
+redfish_ctl bios-profile show dell-cstates-off
+redfish_ctl bios-profile apply dell-cstates-off
+redfish_ctl bios-profile apply dell-cstates-off --confirm
+```
+
+`bios-profile apply` is a dry-run by default. It reads the current BIOS values for the named
+attributes, returns a rollback spec, and only stages the profile through `bios-change` when
+`--confirm` is present.
 
 ### Secure Boot
 
