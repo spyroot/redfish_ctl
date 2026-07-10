@@ -284,7 +284,10 @@ def is_network_scan(args) -> bool:
 
 def is_local_command(args) -> bool:
     """True when the command reads only local repository data."""
-    return getattr(args, "subcommand", None) in LOCAL_COMMANDS
+    subcommand = getattr(args, "subcommand", None)
+    if subcommand == "bios-profile":
+        return getattr(args, "action", "list") in {"list", "show"}
+    return subcommand in LOCAL_COMMANDS
 
 
 def _redfish_query_from_args(args: argparse.Namespace) -> RedfishQuery:
