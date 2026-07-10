@@ -10,12 +10,15 @@ in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink 
 
 - Chassis `EnvironmentMetrics`, where many BMCs publish power and energy rollups.
 - Chassis `Sensors`, followed through linked Sensor resources.
+- Chassis `LeakDetection` / `LeakDetectors`, followed from each chassis `ThermalSubsystem`.
 - TelemetryService `MetricReports`, where GB300 exposes fabric and GPU metric properties.
 - GPU `nvlink-ports`, `network-adapters`, and `component-integrity` command output.
 
 The exporter emits `hw.power`, `hw.temperature`, `hw.fan_speed`, `hw.voltage`, `hw.energy_kwh`,
-`hw.gpu.power`, and `hw.fabric.*`. Fabric metrics include link state, negotiated speed, RX/TX bytes,
-bandwidth, FEC/CRC-style counters when Redfish exposes them, and other NVLink error counters.
+`hw.gpu.power`, `hw.leak.state`, and `hw.fabric.*`. `hw.leak.state`, derived from linked
+`LeakDetector` rows, is `0` for clear detector states and `1` for warning or critical states.
+Fabric metrics include link state, negotiated speed, RX/TX bytes, bandwidth, FEC/CRC-style counters
+when Redfish exposes them, and other NVLink error counters.
 
 ## Credentials
 
@@ -123,6 +126,7 @@ A Prometheus scrape should include at least one chassis power metric and, on GB3
 ```text
 hw.power{...} 1349.263802
 hw.gpu.power{gpu="GPU_0",...} 231.958
+hw.leak.state{detector="Chassis_0_LeakDetector_0_ColdPlate",...} 0
 hw.fabric.link_up{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 1
 hw.fabric.rx_bytes{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 9460179851686
 ```

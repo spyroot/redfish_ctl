@@ -105,6 +105,24 @@ class Exporter(IDracManager,
             return []
         return result.data if isinstance(result.data, list) else []
 
+    def _invoke_dict(self, api_type: ApiRequestType, name: str, **kwargs) -> dict:
+        """Invoke another read-only command that returns an object payload."""
+        try:
+            result = self.sync_invoke(api_type, name, **kwargs)
+        except Exception:
+            return {}
+        return result.data if isinstance(result.data, dict) else {}
+
+    def _leak_detection_rows(self, do_async: bool = False) -> list[dict]:
+        """Return LeakDetector rows from the read-only leak-detectors command."""
+        data = self._invoke_dict(
+            ApiRequestType.LeakDetectors,
+            "leak-detectors",
+            do_async=do_async,
+        )
+        detectors = data.get("detectors") if isinstance(data, dict) else None
+        return detectors if isinstance(detectors, list) else []
+
     def _environment_rows(self, do_async: bool = False) -> list[dict]:
         """Walk Chassis EnvironmentMetrics links and return their payloads."""
         rows = []
@@ -156,6 +174,7 @@ class Exporter(IDracManager,
                                         do_async=do_async, do_expanded=do_expanded)
         metric_rows = self._invoke_rows(ApiRequestType.MetricReports, "metric-reports",
                                         do_async=do_async, do_expanded=do_expanded)
+        leak_rows = self._leak_detection_rows(do_async=do_async)
         network_rows = self._invoke_rows(ApiRequestType.NetworkAdapters, "network-adapters",
                                          do_async=do_async, do_expanded=do_expanded)
         component_rows = self._invoke_rows(ApiRequestType.ComponentIntegrity, "component-integrity",
@@ -166,6 +185,7 @@ class Exporter(IDracManager,
             sensor_rows=sensor_rows,
             nvlink_rows=nvlink_rows,
             metric_report_rows=metric_rows,
+            leak_detection_rows=leak_rows,
             network_rows=network_rows,
             component_integrity_rows=component_rows,
         )
