@@ -7,13 +7,21 @@ import pytest
 
 from redfish_ctl.api import (
     FanReading,
+    GpuMetricRow,
+    GpuMetricsStatus,
+    NtpApplied,
+    NtpSetResult,
+    NtpSkipped,
+    NtpTarget,
     SensorReading,
     SystemStatus,
     TemperatureReading,
     ThermalStatus,
+    get_gpu_metrics,
     get_sensors,
     get_system,
     get_thermal,
+    set_ntp,
 )
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
@@ -207,6 +215,199 @@ def test_get_thermal_returns_typed_summary_temperatures_and_fans():
     assert manager.calls == [(ApiRequestType.Thermal, "thermal", {})]
 
 
+def test_get_gpu_metrics_returns_typed_gpu_rows_from_command():
+    payload = {
+        "summary": {"systems": 1, "processors": 2, "gpus": 1},
+        "gpus": [
+            {
+                "SystemId": "HGX_Baseboard_0",
+                "GpuId": "GPU_0",
+                "ProcessorUri": "/redfish/v1/Systems/HGX/Processors/GPU_0",
+                "ProcessorMetricsUri": (
+                    "/redfish/v1/Systems/HGX/Processors/GPU_0/"
+                    "ProcessorMetrics"
+                ),
+                "Name": "GPU 0",
+                "Model": "NVIDIA GB300",
+                "Manufacturer": "NVIDIA",
+                "FirmwareVersion": "97.00.00",
+                "Status": {"Health": "OK", "State": "Enabled"},
+                "OperatingSpeedMHz": 2070,
+                "TemperaturesCelsius": {"GPU_0_TEMP": 32.9},
+                "ComputeUtilizationPercent": {"fp32_activity": 0.0},
+                "ThrottleDurationSeconds": {"thermal_limit": 0.0},
+                "ProcessorMetrics": {"OperatingSpeedMHz": 2070},
+                "Memory": [{"MemoryId": "GPU_0_DRAM_0"}],
+                "MemorySummaryMetrics": {"CapacityUtilizationPercent": 0},
+            }
+        ],
+    }
+    manager = RecordingManager({
+        (ApiRequestType.GpuMetrics, "gpu-metrics"): CommandResult(
+            payload, None, None, None)
+    })
+
+    metrics = get_gpu_metrics(manager)
+
+    assert metrics == GpuMetricsStatus(
+        summary=payload["summary"],
+        gpus=(
+            GpuMetricRow(
+                system_id="HGX_Baseboard_0",
+                gpu_id="GPU_0",
+                processor_uri="/redfish/v1/Systems/HGX/Processors/GPU_0",
+                processor_metrics_uri=(
+                    "/redfish/v1/Systems/HGX/Processors/GPU_0/"
+                    "ProcessorMetrics"
+                ),
+                name="GPU 0",
+                model="NVIDIA GB300",
+                manufacturer="NVIDIA",
+                firmware_version="97.00.00",
+                status={"Health": "OK", "State": "Enabled"},
+                operating_speed_mhz=2070,
+                temperatures_celsius={"GPU_0_TEMP": 32.9},
+                compute_utilization_percent={"fp32_activity": 0.0},
+                throttle_duration_seconds={"thermal_limit": 0.0},
+                processor_metrics={"OperatingSpeedMHz": 2070},
+                memory=({"MemoryId": "GPU_0_DRAM_0"},),
+                memory_summary_metrics={"CapacityUtilizationPercent": 0},
+                raw=payload["gpus"][0],
+            ),
+        ),
+        raw=payload,
+    )
+    assert manager.calls == [(ApiRequestType.GpuMetrics, "gpu-metrics", {})]
+
+
+def test_set_ntp_returns_typed_dry_run_plan_by_default():
+    payload = {
+        "dry_run": True,
+        "note": "preview only; re-run with --confirm to apply",
+        "servers": ["0.pool.ntp.org", "1.pool.ntp.org"],
+        "plan": [
+            {
+                "Manager": "BMC_0",
+                "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
+                "payload": {
+                    "NTP": {
+                        "NTPServers": ["0.pool.ntp.org", "1.pool.ntp.org"],
+                        "ProtocolEnabled": True,
+                    }
+                },
+            }
+        ],
+        "skipped": [
+            {
+                "Manager": "HGX_BMC_0",
+                "target": "/redfish/v1/Managers/HGX_BMC_0/NetworkProtocol",
+                "reason": "NTP block is not available",
+            }
+        ],
+    }
+    manager = RecordingManager({
+        (ApiRequestType.NtpSet, "ntp-set"): CommandResult(
+            payload, None, None, None)
+    })
+
+    result = set_ntp(manager, ["0.pool.ntp.org", "1.pool.ntp.org"])
+
+    assert result == NtpSetResult(
+        dry_run=True,
+        servers=("0.pool.ntp.org", "1.pool.ntp.org"),
+        plan=(
+            NtpTarget(
+                manager="BMC_0",
+                target="/redfish/v1/Managers/BMC_0/NetworkProtocol",
+                payload={
+                    "NTP": {
+                        "NTPServers": ["0.pool.ntp.org", "1.pool.ntp.org"],
+                        "ProtocolEnabled": True,
+                    }
+                },
+                raw=payload["plan"][0],
+            ),
+        ),
+        skipped=(
+            NtpSkipped(
+                manager="HGX_BMC_0",
+                target="/redfish/v1/Managers/HGX_BMC_0/NetworkProtocol",
+                reason="NTP block is not available",
+                raw=payload["skipped"][0],
+            ),
+        ),
+        applied=(),
+        note="preview only; re-run with --confirm to apply",
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.NtpSet,
+            "ntp-set",
+            {
+                "servers": ["0.pool.ntp.org", "1.pool.ntp.org"],
+                "manager_id": None,
+                "confirm": False,
+            },
+        )
+    ]
+
+
+def test_set_ntp_returns_typed_apply_result_when_confirmed():
+    payload = {
+        "servers": ["0.pool.ntp.org"],
+        "applied": [
+            {
+                "Manager": "BMC_0",
+                "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
+                "status": "IdracApiRespond.Ok",
+                "error": None,
+            }
+        ],
+        "skipped": [],
+    }
+    manager = RecordingManager({
+        (ApiRequestType.NtpSet, "ntp-set"): CommandResult(
+            payload, None, None, None)
+    })
+
+    result = set_ntp(
+        manager,
+        ("0.pool.ntp.org",),
+        manager_id="BMC_0",
+        confirm=True,
+    )
+
+    assert result == NtpSetResult(
+        dry_run=False,
+        servers=("0.pool.ntp.org",),
+        plan=(),
+        skipped=(),
+        applied=(
+            NtpApplied(
+                manager="BMC_0",
+                target="/redfish/v1/Managers/BMC_0/NetworkProtocol",
+                status="IdracApiRespond.Ok",
+                error=None,
+                raw=payload["applied"][0],
+            ),
+        ),
+        note=None,
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.NtpSet,
+            "ntp-set",
+            {
+                "servers": ["0.pool.ntp.org"],
+                "manager_id": "BMC_0",
+                "confirm": True,
+            },
+        )
+    ]
+
+
 def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     gb300_corpus_manager,
 ):
@@ -216,6 +417,8 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     system = get_system(manager)
     sensors = get_sensors(manager)
     thermal = get_thermal(manager)
+    gpu_metrics = get_gpu_metrics(manager)
+    ntp = set_ntp(manager, ["0.pool.ntp.org"])
 
     assert system.id == "System_0"
     assert system.name == "System_0"
@@ -234,8 +437,40 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
         and reading.reading_celsius == 24.437
         for reading in thermal.temperatures
     )
+    assert gpu_metrics.summary["gpus"] == 4
+    assert any(
+        row.gpu_id == "GPU_0"
+        and row.model == "NVIDIA GB300"
+        and row.temperatures_celsius["HGX_GPU_0_TEMP_0"] == 32.9375
+        for row in gpu_metrics.gpus
+    )
+    assert ntp.dry_run is True
+    assert ntp.servers == ("0.pool.ntp.org",)
+    assert ntp.plan == (
+        NtpTarget(
+            manager="BMC_0",
+            target="/redfish/v1/Managers/BMC_0/NetworkProtocol",
+            payload={
+                "NTP": {
+                    "NTPServers": ["0.pool.ntp.org"],
+                    "ProtocolEnabled": True,
+                }
+            },
+            raw=ntp.raw["plan"][0],
+        ),
+    )
 
     paths = {request.path.lower() for request in requests}
     assert "/redfish/v1/systems/system_0" in paths
     assert "/redfish/v1/chassis/chassis_0/sensors" in paths
     assert "/redfish/v1/chassis/chassis_0/thermalsubsystem" in paths
+    assert (
+        "/redfish/v1/systems/hgx_baseboard_0/processors/gpu_0/"
+        "processormetrics"
+    ) in paths
+    assert "/redfish/v1/managers/bmc_0/networkprotocol" in paths
+    assert {
+        request.method
+        for request in requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    } == set()
