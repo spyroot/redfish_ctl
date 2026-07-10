@@ -54,4 +54,8 @@ jobs:
           kubectl -n redfish-sandbox get all || true
           kubectl -n redfish-sandbox describe redfishendpoint gb300-mock || true
           kubectl -n redfish-sandbox logs deploy/redfish-endpoint-controller --tail=200 || true
+          # A crash-looping container's current log is often empty; the
+          # previous instance holds the actual traceback.
+          kubectl -n redfish-sandbox logs deploy/redfish-endpoint-controller --previous --tail=200 || true
+          kubectl -n redfish-sandbox logs deploy/mock-bmc --tail=50 || true
           kubectl -n redfish-sandbox get events --sort-by=.lastTimestamp | tail -40 || true

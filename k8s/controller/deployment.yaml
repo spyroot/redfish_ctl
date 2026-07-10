@@ -31,6 +31,9 @@ spec:
           args:
             - run
             - --standalone
+            # Watch only this namespace: the RBAC grant is a namespaced Role,
+            # so a cluster-wide watch would be rejected with 403s.
+            - --namespace=redfish-sandbox
             - /app/k8s/controller/redfish_endpoint_controller.py
           securityContext:
             allowPrivilegeEscalation: false
