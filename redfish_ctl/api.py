@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol
+from typing import Any, Iterable, Mapping, Protocol
 
 from .idrac_shared import ApiRequestType
 from .redfish_manager import CommandResult
@@ -82,6 +82,82 @@ class ThermalStatus:
     raw: Mapping[str, Any]
 
 
+@dataclass(frozen=True)
+class GpuMetricRow:
+    """Normalized GPU row from the gpu-metrics command."""
+
+    system_id: str | None
+    gpu_id: str | None
+    processor_uri: str | None
+    processor_metrics_uri: str | None
+    name: str | None
+    model: str | None
+    manufacturer: str | None
+    firmware_version: str | None
+    status: Mapping[str, Any]
+    operating_speed_mhz: int | float | str | None
+    temperatures_celsius: Mapping[str, Any]
+    compute_utilization_percent: Mapping[str, Any]
+    throttle_duration_seconds: Mapping[str, Any]
+    processor_metrics: Mapping[str, Any]
+    memory: tuple[Mapping[str, Any], ...]
+    memory_summary_metrics: Mapping[str, Any]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class GpuMetricsStatus:
+    """Typed summary of the gpu-metrics command payload."""
+
+    summary: Mapping[str, Any]
+    gpus: tuple[GpuMetricRow, ...]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NtpTarget:
+    """A ManagerNetworkProtocol resource that can receive an NTP PATCH."""
+
+    manager: str | None
+    target: str | None
+    payload: Mapping[str, Any]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NtpSkipped:
+    """A ManagerNetworkProtocol resource skipped by the ntp-set command."""
+
+    manager: str | None
+    target: str | None
+    reason: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NtpApplied:
+    """A ManagerNetworkProtocol PATCH result from the ntp-set command."""
+
+    manager: str | None
+    target: str | None
+    status: str | None
+    error: Any
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NtpSetResult:
+    """Typed result returned by the guarded ntp-set command."""
+
+    dry_run: bool
+    servers: tuple[str, ...]
+    plan: tuple[NtpTarget, ...]
+    skipped: tuple[NtpSkipped, ...]
+    applied: tuple[NtpApplied, ...]
+    note: str | None
+    raw: Mapping[str, Any]
+
+
 def _invoke(
     manager: SyncInvoker,
     api_call: ApiRequestType,
@@ -102,6 +178,17 @@ def _rows(data: Any) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(data, list):
         return ()
     return tuple(row for row in data if isinstance(row, Mapping))
+
+
+def _server_list(servers: str | Iterable[str]) -> list[str]:
+    if isinstance(servers, str):
+        return [servers]
+    return list(servers)
+
+
+def _server_tuple(data: Any, fallback: Iterable[str]) -> tuple[str, ...]:
+    values = data if isinstance(data, list) else list(fallback)
+    return tuple(str(value) for value in values)
 
 
 def get_system(manager: SyncInvoker, *, deep: bool = False) -> SystemStatus:
@@ -183,5 +270,100 @@ def get_thermal(manager: SyncInvoker) -> ThermalStatus:
         summary=_mapping(data.get("summary")),
         temperatures=temperatures,
         fans=fans,
+        raw=data,
+    )
+
+
+def get_gpu_metrics(manager: SyncInvoker) -> GpuMetricsStatus:
+    """Return typed GPU metric rows through the gpu-metrics command."""
+    data = _mapping(_invoke(manager, ApiRequestType.GpuMetrics, "gpu-metrics"))
+    gpu_rows = tuple(
+        GpuMetricRow(
+            system_id=row.get("SystemId"),
+            gpu_id=row.get("GpuId"),
+            processor_uri=row.get("ProcessorUri"),
+            processor_metrics_uri=row.get("ProcessorMetricsUri"),
+            name=row.get("Name"),
+            model=row.get("Model"),
+            manufacturer=row.get("Manufacturer"),
+            firmware_version=row.get("FirmwareVersion"),
+            status=_mapping(row.get("Status")),
+            operating_speed_mhz=row.get("OperatingSpeedMHz"),
+            temperatures_celsius=_mapping(row.get("TemperaturesCelsius")),
+            compute_utilization_percent=_mapping(
+                row.get("ComputeUtilizationPercent")
+            ),
+            throttle_duration_seconds=_mapping(
+                row.get("ThrottleDurationSeconds")
+            ),
+            processor_metrics=_mapping(row.get("ProcessorMetrics")),
+            memory=_rows(row.get("Memory")),
+            memory_summary_metrics=_mapping(row.get("MemorySummaryMetrics")),
+            raw=row,
+        )
+        for row in _rows(data.get("gpus"))
+    )
+    return GpuMetricsStatus(
+        summary=_mapping(data.get("summary")),
+        gpus=gpu_rows,
+        raw=data,
+    )
+
+
+def set_ntp(
+    manager: SyncInvoker,
+    servers: str | Iterable[str],
+    *,
+    manager_id: str | None = None,
+    confirm: bool = False,
+) -> NtpSetResult:
+    """Preview or apply NTP servers through the guarded ntp-set command."""
+    requested_servers = _server_list(servers)
+    data = _mapping(
+        _invoke(
+            manager,
+            ApiRequestType.NtpSet,
+            "ntp-set",
+            servers=requested_servers,
+            manager_id=manager_id,
+            confirm=confirm,
+        )
+    )
+    plan = tuple(
+        NtpTarget(
+            manager=row.get("Manager"),
+            target=row.get("target"),
+            payload=_mapping(row.get("payload")),
+            raw=row,
+        )
+        for row in _rows(data.get("plan"))
+    )
+    skipped = tuple(
+        NtpSkipped(
+            manager=row.get("Manager"),
+            target=row.get("target"),
+            reason=row.get("reason"),
+            raw=row,
+        )
+        for row in _rows(data.get("skipped"))
+    )
+    applied = tuple(
+        NtpApplied(
+            manager=row.get("Manager"),
+            target=row.get("target"),
+            status=row.get("status"),
+            error=row.get("error"),
+            raw=row,
+        )
+        for row in _rows(data.get("applied"))
+    )
+    note = data.get("note")
+    return NtpSetResult(
+        dry_run=bool(data.get("dry_run", False)),
+        servers=_server_tuple(data.get("servers"), requested_servers),
+        plan=plan,
+        skipped=skipped,
+        applied=applied,
+        note=note if isinstance(note, str) else None,
         raw=data,
     )
