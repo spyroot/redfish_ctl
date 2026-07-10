@@ -52,6 +52,7 @@ from .pci.cmd_pci import *
 
 # manager cmds
 from .manager.cmd_manager import *
+from .manager.cmd_manager_network import *
 from .manager.cmd_manager_reset import *
 
 
