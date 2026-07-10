@@ -1,0 +1,57 @@
+name: K8s E2E
+
+# End-to-end check of the Kubernetes read path in a throwaway kind cluster
+# (Kubernetes-in-Docker on the runner). It reuses the local sandbox entry
+# point (`make k8s-sandbox`, defined in the Makefile), which builds the
+# mock-BMC and controller images, loads them into kind, deploys the CRDs +
+# controller, and fails unless a RedfishEndpoint's .status.powerState gets
+# populated. Everything runs against the committed corpus served by the
+# mock BMC — no real BMC, no credentials, no secrets.
+
+on:
+  pull_request:
+    paths:
+      - "k8s/**"
+      - "docker/Dockerfile.controller"
+      - "docker/Dockerfile.mock-bmc"
+      - "redfish_ctl/api.py"
+      - "redfish_ctl/reconcile.py"
+      - "charts/**"
+      - ".github/workflows/k8s-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "k8s/**"
+      - "docker/Dockerfile.controller"
+      - "docker/Dockerfile.mock-bmc"
+      - "redfish_ctl/api.py"
+      - "redfish_ctl/reconcile.py"
+      - "charts/**"
+      - ".github/workflows/k8s-e2e.yml"
+  schedule:
+    # Nightly catch-all so regressions surface even when no filtered path
+    # changed (e.g. a dependency bump breaking the controller image build).
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  kind-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install kind and kubectl
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+      - name: Run the sandbox end-to-end
+        run: make k8s-sandbox
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n redfish-sandbox get all || true
+          kubectl -n redfish-sandbox describe redfishendpoint gb300-mock || true
+          kubectl -n redfish-sandbox logs deploy/redfish-endpoint-controller --tail=200 || true
+          kubectl -n redfish-sandbox get events --sort-by=.lastTimestamp | tail -40 || true
