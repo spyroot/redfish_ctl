@@ -86,6 +86,8 @@ class ApiRequestType(Enum):
     PowerSmoothing = auto()
     LeakDetectors = auto()
     EnvironmentMetrics = auto()
+    ProcessorMetrics = auto()
+    MemoryMetrics = auto()
     MetricReports = auto()
     MetricReportDefinitions = auto()
     ComponentIntegrity = auto()

@@ -84,6 +84,8 @@ from .power.cmd_power import *
 from .power.cmd_power_smoothing import *
 from .thermal.cmd_leak_detectors import *
 from .environment.cmd_environment_metrics import *
+from .metrics.cmd_processor_metrics import *
+from .metrics.cmd_memory_metrics import *
 from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_exporter import *
