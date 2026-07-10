@@ -14,6 +14,7 @@ from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.proxy import NodeConfig, NodeRegistry, ReadOnlyProxy, create_app
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.telemetry.exporter import MetricSample
 
 GB300_CORPUS = (
     Path(__file__).parent
@@ -219,6 +220,213 @@ def test_proxy_read_endpoints_delegate_to_existing_commands():
     ]
 
 
+def test_proxy_metric_samples_reuse_exporter_contract_per_node():
+    """Node telemetry samples reuse the exporter hw.* metric contract."""
+    manager = RecordingManager({
+        (ApiRequestType.EnvironmentMetrics, "environment-metrics"): CommandResult(
+            {
+                "metrics": [
+                    {
+                        "Chassis": "Chassis_0",
+                        "PowerWatts": {"Reading": 640.5},
+                        "EnergykWh": {"Reading": 2.25},
+                    }
+                ]
+            },
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.Thermal, "thermal"): CommandResult(
+            {
+                "temperature_readings": [
+                    {
+                        "Chassis": "Chassis_0",
+                        "DeviceName": "Front IO Temp",
+                        "PhysicalContext": "Intake",
+                        "ReadingCelsius": "24.5",
+                    }
+                ],
+                "fans": [],
+            },
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.Sensors, "sensors"): CommandResult(
+            [
+                {
+                    "Chassis": "Chassis_0",
+                    "Name": "Fan Bay 1",
+                    "Reading": 12000,
+                    "ReadingUnits": "RPM",
+                    "ReadingType": "Rotational",
+                    "Health": "OK",
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.NvLinkPorts, "nvlink-ports"): CommandResult(
+            [
+                {
+                    "System": "HGX_Baseboard_0",
+                    "GPU": "GPU_0",
+                    "Port": "NVLink_0",
+                    "LinkStatus": "LinkUp",
+                    "CurrentSpeedGbps": 400,
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.MetricReports, "metric-reports"): CommandResult(
+            [
+                {
+                    "Report": "HGX_ProcessorMetrics_0",
+                    "MetricProperty": (
+                        "/redfish/v1/Chassis/HGX_GPU_0/Sensors/"
+                        "GPU_0_Temp#/GPU_0_Temperature"
+                    ),
+                    "MetricValue": "34.5",
+                    "Timestamp": "2026-06-29T08:05:20.895+00:00",
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.LeakDetectors, "leak-detectors"): CommandResult(
+            {
+                "detectors": [
+                    {
+                        "Chassis": "Chassis_0",
+                        "Id": "LeakDetector0",
+                        "DetectorState": "Normal",
+                        "LeakDetectorType": "Moisture",
+                        "Health": "OK",
+                    }
+                ]
+            },
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.NetworkAdapters, "network-adapters"): CommandResult(
+            [{"Id": "NIC0", "DeviceClass": "NIC", "Model": "ConnectX"}],
+            None,
+            None,
+            None,
+        ),
+        (ApiRequestType.ComponentIntegrity, "component-integrity"): CommandResult(
+            [{"Id": "TPM-0", "Enabled": True, "Type": "TPM"}],
+            None,
+            None,
+            None,
+        ),
+    })
+    proxy = ReadOnlyProxy(
+        NodeRegistry([_node()]),
+        manager_factory=lambda node: manager,
+    )
+
+    samples = proxy.node_metric_samples(
+        "gb300-a",
+        label_bmc_ip="192.0.2.29",
+        vendor="supermicro",
+    )
+
+    assert samples
+    assert all(isinstance(sample, MetricSample) for sample in samples)
+    assert {
+        "hw.power",
+        "hw.energy_kwh",
+        "hw.temperature",
+        "hw.fan_speed",
+        "hw.fabric.link_up",
+        "hw.fabric.port_speed",
+        "hw.gpu.temperature",
+        "hw.leak.state",
+        "hw.fabric.adapter_present",
+        "hw.component_integrity.enabled",
+    } <= {sample.metric for sample in samples}
+    assert all(sample.dimensions["bmc.ip"] == "192.0.2.29" for sample in samples)
+    assert all(sample.dimensions["vendor"] == "supermicro" for sample in samples)
+    assert manager.calls == [
+        (ApiRequestType.EnvironmentMetrics, "environment-metrics", {}),
+        (ApiRequestType.Thermal, "thermal", {}),
+        (ApiRequestType.Sensors, "sensors", {"do_expanded": False}),
+        (ApiRequestType.NvLinkPorts, "nvlink-ports", {"do_expanded": False}),
+        (ApiRequestType.MetricReports, "metric-reports", {"do_expanded": False}),
+        (ApiRequestType.LeakDetectors, "leak-detectors", {}),
+        (ApiRequestType.NetworkAdapters, "network-adapters", {"do_expanded": False}),
+        (ApiRequestType.ComponentIntegrity, "component-integrity", {"do_expanded": False}),
+    ]
+
+
+def test_proxy_metrics_response_is_json_safe():
+    """Proxy metric responses serialize exporter samples without credentials."""
+    manager = RecordingManager({
+        (ApiRequestType.EnvironmentMetrics, "environment-metrics"): CommandResult(
+            {"metrics": []}, None, None, None
+        ),
+        (ApiRequestType.Thermal, "thermal"): CommandResult(
+            {"temperature_readings": [], "fans": []}, None, None, None
+        ),
+        (ApiRequestType.Sensors, "sensors"): CommandResult(
+            [
+                {
+                    "Chassis": "Chassis_0",
+                    "Name": "Inlet Temp",
+                    "Reading": 24.0,
+                    "ReadingUnits": "Cel",
+                    "ReadingType": "Temperature",
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+    })
+    proxy = ReadOnlyProxy(
+        NodeRegistry([_node()]),
+        manager_factory=lambda node: manager,
+    )
+
+    payload = proxy.node_metrics(
+        "gb300-a",
+        label_bmc_ip="192.0.2.29",
+        vendor="supermicro",
+    )
+
+    assert payload["id"] == "gb300-a"
+    assert payload["sampleCount"] == 1
+    assert payload["samples"] == [
+        {
+            "metric": "hw.temperature",
+            "value": 24.0,
+            "dimensions": {
+                "bmc.ip": "192.0.2.29",
+                "chassis": "Chassis_0",
+                "host.name": "gb300-poc1-slot9",
+                "node": "slot9",
+                "sensor": "Inlet_Temp",
+                "server.address": "192.0.2.49",
+                "source": "sensor",
+                "vendor": "supermicro",
+            },
+            "metricType": "gauge",
+            "unit": "Cel",
+            "timestamp": None,
+        }
+    ]
+    encoded = json.dumps(payload)
+    assert "operator" not in encoded
+    assert "do-not-expose" not in encoded
+
+
 def test_create_app_registers_read_only_routes(monkeypatch):
     """The optional FastAPI adapter exposes only GET routes."""
     routes = []
@@ -259,6 +467,7 @@ def test_create_app_registers_read_only_routes(monkeypatch):
         ("GET", "/nodes/{node_id}/sensors"),
         ("GET", "/nodes/{node_id}/gpu-metrics"),
         ("GET", "/nodes/{node_id}/bios"),
+        ("GET", "/nodes/{node_id}/metrics"),
     ]
 
 
@@ -293,4 +502,32 @@ def test_proxy_reads_gb300_corpus_through_registered_commands(
     assert "/redfish/v1/chassis/chassis_0/sensors" in paths
     assert "/redfish/v1/systems/hgx_baseboard_0/processors/gpu_0" in paths
     assert "/redfish/v1/systems/system_0/bios" in paths
+    assert {request.method for request in requests} == {"GET"}
+
+
+def test_proxy_builds_node_metric_samples_from_gb300_corpus(
+    gb300_corpus_manager,
+):
+    """The proxy telemetry pipeline reads the GB300 corpus without writes."""
+    manager, requests = gb300_corpus_manager
+    proxy = ReadOnlyProxy(
+        NodeRegistry([_node()]),
+        manager_factory=lambda node: manager,
+    )
+
+    samples = proxy.node_metric_samples(
+        "gb300-a",
+        label_bmc_ip="192.0.2.29",
+        vendor="supermicro",
+    )
+
+    by_metric = {sample.metric for sample in samples}
+    assert {
+        "hw.power",
+        "hw.temperature",
+        "hw.gpu.temperature",
+        "hw.leak.state",
+    } <= by_metric
+    assert all(sample.dimensions["bmc.ip"] == "192.0.2.29" for sample in samples)
+    assert all(sample.dimensions["vendor"] == "supermicro" for sample in samples)
     assert {request.method for request in requests} == {"GET"}

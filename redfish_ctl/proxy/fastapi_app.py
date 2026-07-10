@@ -49,4 +49,17 @@ def create_app(proxy: ReadOnlyProxy):
     def node_bios(node_id: str, attr_filter: str | None = None):
         return call(proxy.node_bios, node_id, attr_filter=attr_filter)
 
+    @app.get("/nodes/{node_id}/metrics")
+    def node_metrics(
+        node_id: str,
+        label_bmc_ip: str | None = None,
+        vendor: str | None = None,
+    ):
+        return call(
+            proxy.node_metrics,
+            node_id,
+            label_bmc_ip=label_bmc_ip,
+            vendor=vendor,
+        )
+
     return app
