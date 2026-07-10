@@ -50,7 +50,9 @@ from .cmd_utils import save_if_needed
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .idrac_manager import IDracManager
 from .idrac_shared import RedfishAction, RedfishActionEncoder
+from .redfish_query import RedfishQuery
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
+from .vendors import VendorCapabilities, get_vendor
 
 
 def _env(*names, default=""):
@@ -98,6 +100,13 @@ class TermColors:
 "note we do sub-string match"
 TermList = ["xterm", "linux", "ansi", "xterm-256color"]
 LOCAL_COMMANDS = {"bios-profile"}
+_QUERY_CAPABILITY_FLAGS = (
+    ("$select", "select", "query_select"),
+    ("$filter", "filter", "query_filter"),
+    ("$expand", "expand", "query_expand"),
+    ("$top", "top", "query_top"),
+    ("only", "only", "query_only"),
+)
 
 
 def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
@@ -278,6 +287,45 @@ def is_local_command(args) -> bool:
     return getattr(args, "subcommand", None) in LOCAL_COMMANDS
 
 
+def _redfish_query_from_args(args: argparse.Namespace) -> RedfishQuery:
+    """Build the global Redfish query object from top-level CLI flags."""
+    return RedfishQuery(
+        select=getattr(args, "query_select", None),
+        filter=getattr(args, "query_filter", None),
+        expand=getattr(args, "query_expand", None),
+        expand_levels=getattr(args, "query_expand_levels", 1),
+        top=getattr(args, "query_top", None),
+        only=getattr(args, "query_only", False),
+    )
+
+
+def _query_flag_is_active(query: RedfishQuery, attr: str) -> bool:
+    """Return whether a RedfishQuery field should be vendor-gated."""
+    value = getattr(query, attr)
+    if attr == "top":
+        return value is not None
+    return bool(value)
+
+
+def _validate_redfish_query_for_vendor(
+        query: RedfishQuery,
+        caps: VendorCapabilities) -> None:
+    """Raise when the target vendor profile does not support query flags."""
+    unsupported = [
+        name for name, attr, enabled_attr in _QUERY_CAPABILITY_FLAGS
+        if _query_flag_is_active(query, attr) and not getattr(caps, enabled_attr)
+    ]
+    if unsupported:
+        joined = ", ".join(unsupported)
+        raise InvalidArgument(
+            f"{caps.vendor} does not declare support for {joined}"
+        )
+    try:
+        query.to_query_string(caps.one_query_param_per_uri)
+    except ValueError as err:
+        raise InvalidArgument(str(err)) from err
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     """Main entry point
     """
@@ -317,6 +365,15 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         cmd = command_name_to_cmd[cmd_args.subcommand]
         arg_dict = dict((k, v) for k, v
                         in vars(cmd_args).items() if k != "message_type")
+
+        redfish_query = _redfish_query_from_args(cmd_args)
+        if not connectionless_mode and not redfish_query.is_empty():
+            query_caps = get_vendor(redfish_api.redfish_vendor)
+            _validate_redfish_query_for_vendor(redfish_query, query_caps)
+            arg_dict["redfish_query"] = redfish_query
+            arg_dict["redfish_query_one_param_per_uri"] = (
+                query_caps.one_query_param_per_uri
+            )
 
         if cmd_args.verbose:
             json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
@@ -477,6 +534,30 @@ def redfish_main_ctl():
     credentials.add_argument(
         '--use_http', action='store_true', required=False, default=False,
         help="use http instead https as transport.")
+
+    redfish_query = parser.add_argument_group(
+        'redfish query', '# server-side Redfish GET query options')
+    redfish_query.add_argument(
+        '--select', dest='query_select', required=False, default=None,
+        help="apply Redfish $select to GET commands, for example Id,Name.")
+    redfish_query.add_argument(
+        '--filter', dest='query_filter', required=False, default=None,
+        help="apply Redfish $filter to GET commands.")
+    redfish_query.add_argument(
+        '--expand', dest='query_expand', nargs='?', const='*',
+        choices=['*', '.', '~'], required=False, default=None,
+        help="apply Redfish $expand to GET commands; mode defaults to '*'.")
+    redfish_query.add_argument(
+        '--expand-levels', dest='query_expand_levels', required=False,
+        type=int, default=1,
+        help="Redfish $expand levels when --expand is used.")
+    redfish_query.add_argument(
+        '--top', dest='query_top', required=False, type=int, default=None,
+        help="apply Redfish $top to GET commands.")
+    redfish_query.add_argument(
+        '--only', dest='query_only', action='store_true',
+        required=False, default=False,
+        help="apply the Redfish only query parameter to GET commands.")
 
     verbose_group = parser.add_argument_group('verbose', '# verbose and debug options')
     verbose_group.add_argument(

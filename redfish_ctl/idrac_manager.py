@@ -26,7 +26,6 @@ import asyncio
 import functools
 import json
 import logging
-import os
 import time
 from abc import abstractmethod
 from datetime import datetime
@@ -275,6 +274,10 @@ class IDracManager(RedfishManager):
         _port = kwargs.pop("port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
+        _redfish_query = kwargs.pop("redfish_query", None)
+        _redfish_query_one_param_per_uri = kwargs.pop(
+            "redfish_query_one_param_per_uri", False
+        )
 
         inst = disp(
             idrac_ip=_idrac_ip,
@@ -284,6 +287,8 @@ class IDracManager(RedfishManager):
             insecure=_insecure,
             is_http=_is_http
         )
+        inst._redfish_query = _redfish_query
+        inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
 
         return inst.execute(**kwargs)
 
@@ -305,6 +310,10 @@ class IDracManager(RedfishManager):
         _port = kwargs.pop("port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
+        _redfish_query = kwargs.pop("redfish_query", None)
+        _redfish_query_one_param_per_uri = kwargs.pop(
+            "redfish_query_one_param_per_uri", False
+        )
         module_logger.debug(f"dispatching {name} to idrac port {_port}")
 
         inst = disp(
@@ -315,6 +324,8 @@ class IDracManager(RedfishManager):
             insecure=_insecure,
             is_http=_is_http
         )
+        inst._redfish_query = _redfish_query
+        inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
         return inst.execute(**kwargs)
 
     async def api_async_get_call(self, loop, req, hdr: Dict):

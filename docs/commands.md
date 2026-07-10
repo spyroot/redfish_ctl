@@ -24,6 +24,22 @@ TLS verification is off by default because lab BMCs commonly use self-signed cer
 `--verify-ssl`, defined by the root parser in `redfish_main.py`, opts into certificate verification
 when you have a trusted chain.
 
+## Server-Side Query Flags
+
+`redfish_main.py` defines top-level Redfish GET query flags that must appear before the subcommand:
+
+```bash
+redfish_ctl --select Id,Name query --resource /redfish/v1/Managers
+redfish_ctl --top 5 query --resource /redfish/v1/Managers
+redfish_ctl --expand --expand-levels 2 query --resource /redfish/v1/Systems
+```
+
+The supported flags are `--select`, `--filter`, `--expand`, `--expand-levels`, `--top`, and `--only`.
+They are validated against the target vendor capability profile before any command GET is issued.
+For example, Dell iDRAC profiles allow the standard Redfish query parameters but enforce iDRAC's
+one-query-parameter-per-URI rule, while profiles that do not declare support reject the flag early.
+These root flags are separate from command-specific filters such as `bios --filter`.
+
 ## First Reads
 
 ```bash
