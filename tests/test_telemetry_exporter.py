@@ -146,6 +146,38 @@ def test_mapper_emits_chassis_gpu_and_fabric_samples():
     assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
 
 
+def test_mapper_emits_thermal_subsystem_zone_temperatures():
+    """ThermalSubsystem rows become granular temperature samples."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[],
+        thermal_rows=[
+            {
+                "Chassis": "Chassis_0",
+                "DeviceName": "Front IO Temp",
+                "PhysicalContext": "Intake",
+                "ReadingCelsius": 24.437,
+                "DataSourceUri": (
+                    "/redfish/v1/Chassis/Chassis_0/Sensors/"
+                    "Chassis_0_Front_IO_Temp_0"
+                ),
+            }
+        ],
+    )
+
+    sample = next(sample for sample in samples if sample.metric == "hw.temperature")
+    assert sample.value == 24.437
+    assert sample.unit == "Cel"
+    assert sample.dimensions["source"] == "thermal-subsystem"
+    assert sample.dimensions["chassis"] == "Chassis_0"
+    assert sample.dimensions["sensor"] == "Front_IO_Temp"
+    assert sample.dimensions["zone"] == "Intake"
+
+
 def test_metric_report_mapper_emits_nvlink_bandwidth_and_error_counters():
     """TelemetryService MetricProperty paths add per-link NVLink counters."""
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
@@ -384,6 +416,13 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "Chassis_0_LeakDetector_1_Manifold",
     }
     assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
+    thermal_points = [
+        point for point in gauges
+        if point["metric"] == "hw.temperature"
+        and point["dimensions"].get("source") == "thermal-subsystem"
+    ]
+    assert thermal_points
+    assert {"chassis", "sensor", "zone"} <= set(thermal_points[0]["dimensions"])
     assert all(recorded.method != "POST" for recorded in service.requests)
 
 
