@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 from redfish_ctl.api import (
+    BiosProfileApplyResult,
+    BiosProfileAttributeDiff,
+    BiosProfileDiffResult,
     FanReading,
     GpuMetricRow,
     GpuMetricsStatus,
@@ -18,6 +21,8 @@ from redfish_ctl.api import (
     SystemStatus,
     TemperatureReading,
     ThermalStatus,
+    bios_profile_apply,
+    bios_profile_diff,
     get_gpu_metrics,
     get_sensors,
     get_system,
@@ -499,6 +504,122 @@ def test_reboot_confirm_invokes_host_reset_and_maps_task_result():
     ]
 
 
+def test_bios_profile_diff_returns_typed_attribute_rows():
+    """bios_profile_diff exposes the guarded diff command result."""
+    payload = {
+        "profile": {
+            "name": "gb300-power-capped",
+            "vendor": "supermicro",
+            "model": "gb300",
+            "risk": "medium",
+        },
+        "matches": False,
+        "summary": {"total": 2, "matching": 1, "different": 1, "missing": 0},
+        "attributes": [
+            {
+                "attribute": "ServerPowerControl",
+                "current": "Performance",
+                "desired": "Efficiency",
+                "status": "different",
+            },
+            {
+                "attribute": "ActiveCores",
+                "current": "All",
+                "desired": "All",
+                "status": "matching",
+            },
+        ],
+    }
+    manager = RecordingManager({
+        (ApiRequestType.BiosProfile, "bios-profile"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = bios_profile_diff(manager, "gb300-power-capped")
+
+    assert result == BiosProfileDiffResult(
+        profile=payload["profile"],
+        matches=False,
+        summary=payload["summary"],
+        attributes=(
+            BiosProfileAttributeDiff(
+                attribute="ServerPowerControl",
+                current="Performance",
+                desired="Efficiency",
+                status="different",
+                raw=payload["attributes"][0],
+            ),
+            BiosProfileAttributeDiff(
+                attribute="ActiveCores",
+                current="All",
+                desired="All",
+                status="matching",
+                raw=payload["attributes"][1],
+            ),
+        ),
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            {
+                "action": "diff",
+                "profile_name": "gb300-power-capped",
+            },
+        )
+    ]
+
+
+def test_bios_profile_apply_previews_by_default():
+    """bios_profile_apply delegates to apply without confirming by default."""
+    payload = {
+        "profile": "gb300-power-capped",
+        "dry_run": True,
+        "change": {"Attributes": {"ServerPowerControl": "Efficiency"}},
+        "rollback": {"Attributes": {"ServerPowerControl": "Performance"}},
+        "staged": {
+            "Attributes": {"ServerPowerControl": "Efficiency"},
+            "preview": True,
+        },
+    }
+    manager = RecordingManager({
+        (ApiRequestType.BiosProfile, "bios-profile"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = bios_profile_apply(manager, "gb300-power-capped")
+
+    assert result == BiosProfileApplyResult(
+        profile="gb300-power-capped",
+        dry_run=True,
+        change=payload["change"],
+        rollback=payload["rollback"],
+        staged=payload["staged"],
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            {
+                "action": "apply",
+                "profile_name": "gb300-power-capped",
+                "confirm": False,
+                "dry_run": False,
+            },
+        )
+    ]
+
+
 def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     gb300_corpus_manager,
 ):
@@ -511,6 +632,7 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     gpu_metrics = get_gpu_metrics(manager)
     ntp = set_ntp(manager, ["0.pool.ntp.org"])
     reset_preview = reboot(manager)
+    profile_diff = bios_profile_diff(manager, "gb300-power-capped")
 
     assert system.id == "System_0"
     assert system.name == "System_0"
@@ -556,6 +678,9 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
         "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset"
     )
     assert reset_preview.payload == {"ResetType": "GracefulRestart"}
+    assert profile_diff.profile["name"] == "gb300-power-capped"
+    assert profile_diff.summary["total"] == 1
+    assert profile_diff.attributes
 
     paths = {request.path.lower() for request in requests}
     assert "/redfish/v1/systems/system_0" in paths
