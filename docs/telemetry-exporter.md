@@ -8,14 +8,17 @@ in-band host agent misses: chassis power, fans, voltages, GPU power, and NVLink 
 
 ## What It Reads
 
-- Chassis `EnvironmentMetrics`, where many BMCs publish power and energy rollups.
+- Chassis, Processor, and Memory `EnvironmentMetrics` resources, discovered by the
+  `environment-metrics` command, where many BMCs publish power and energy rollups.
 - Chassis `Sensors`, followed through linked Sensor resources.
 - TelemetryService `MetricReports`, where GB300 exposes fabric and GPU metric properties.
 - GPU `nvlink-ports`, `network-adapters`, and `component-integrity` command output.
 
 The exporter emits `hw.power`, `hw.temperature`, `hw.fan_speed`, `hw.voltage`, `hw.energy_kwh`,
-`hw.gpu.power`, and `hw.fabric.*`. Fabric metrics include link state, negotiated speed, RX/TX bytes,
-bandwidth, FEC/CRC-style counters when Redfish exposes them, and other NVLink error counters.
+`hw.gpu.power`, and `hw.fabric.*`. EnvironmentMetrics rollups add `resource_type` and `resource`
+dimensions so chassis, processor, and memory power can be separated. Fabric metrics include link
+state, negotiated speed, RX/TX bytes, bandwidth, FEC/CRC-style counters when Redfish exposes them,
+and other NVLink error counters.
 
 ## Credentials
 
@@ -112,9 +115,10 @@ redfish_ctl exporter --vendor supermicro --output otlp --once             # push
 
 The contract is unchanged: metric names and dimension keys are identical to the Prometheus/SignalFx
 outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`) map to
-OTel **resource** attributes; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`)
-map to **datapoint** attributes. Monotonic cumulative counters (fabric byte/frame/error/packet/count
-totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything instantaneous stays a **Gauge**.
+OTel **resource** attributes; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`,
+`resource_type`, `resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
+byte/frame/error/packet/count totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything
+instantaneous stays a **Gauge**.
 
 ## What Good Looks Like
 
@@ -122,6 +126,7 @@ A Prometheus scrape should include at least one chassis power metric and, on GB3
 
 ```text
 hw.power{...} 1349.263802
+hw.power{resource_type="Memory",resource="GPU_0_DRAM_0",...} 34.458
 hw.gpu.power{gpu="GPU_0",...} 231.958
 hw.fabric.link_up{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 1
 hw.fabric.rx_bytes{fabric="nvlink",gpu="GPU_0",port="NVLink_0",...} 9460179851686
