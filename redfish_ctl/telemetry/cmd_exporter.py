@@ -105,6 +105,24 @@ class Exporter(IDracManager,
             return []
         return result.data if isinstance(result.data, list) else []
 
+    def _invoke_dict(self, api_type: ApiRequestType, name: str, **kwargs) -> dict:
+        """Invoke another read-only command that returns an object payload."""
+        try:
+            result = self.sync_invoke(api_type, name, **kwargs)
+        except Exception:
+            return {}
+        return result.data if isinstance(result.data, dict) else {}
+
+    def _leak_detection_rows(self, do_async: bool = False) -> list[dict]:
+        """Return LeakDetector rows from the read-only leak-detectors command."""
+        data = self._invoke_dict(
+            ApiRequestType.LeakDetectors,
+            "leak-detectors",
+            do_async=do_async,
+        )
+        detectors = data.get("detectors") if isinstance(data, dict) else None
+        return detectors if isinstance(detectors, list) else []
+
     def _environment_rows(self, do_async: bool = False) -> list[dict]:
         """Walk Chassis EnvironmentMetrics links and return their payloads."""
         rows = []
@@ -143,6 +161,23 @@ class Exporter(IDracManager,
             return []
         return [row for row in rows if isinstance(row, dict)]
 
+    def _environment_command_rows(self, do_async: bool = False) -> list[dict]:
+        """Return normalized rows from the environment-metrics command."""
+        try:
+            result = self.sync_invoke(
+                ApiRequestType.EnvironmentMetrics,
+                "environment-metrics",
+                do_async=do_async,
+            )
+        except Exception:
+            return self._environment_rows(do_async=do_async)
+        data = result.data
+        if isinstance(data, dict) and isinstance(data.get("metrics"), list):
+            return data["metrics"]
+        if isinstance(data, list):
+            return data
+        return self._environment_rows(do_async=do_async)
+
     def _vendor_label(self, vendor: Optional[str]) -> str:
         """Return a stable lower-case vendor label."""
         if vendor:
@@ -163,7 +198,7 @@ class Exporter(IDracManager,
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor),
         )
-        environment_rows = self._environment_rows(do_async=do_async)
+        environment_rows = self._environment_command_rows(do_async=do_async)
         thermal_rows = self._thermal_rows(do_async=do_async, do_expanded=do_expanded)
         sensor_rows = self._invoke_rows(ApiRequestType.Sensors, "sensors",
                                         do_async=do_async, do_expanded=do_expanded)
@@ -171,6 +206,7 @@ class Exporter(IDracManager,
                                         do_async=do_async, do_expanded=do_expanded)
         metric_rows = self._invoke_rows(ApiRequestType.MetricReports, "metric-reports",
                                         do_async=do_async, do_expanded=do_expanded)
+        leak_rows = self._leak_detection_rows(do_async=do_async)
         network_rows = self._invoke_rows(ApiRequestType.NetworkAdapters, "network-adapters",
                                          do_async=do_async, do_expanded=do_expanded)
         component_rows = self._invoke_rows(ApiRequestType.ComponentIntegrity, "component-integrity",
@@ -182,6 +218,7 @@ class Exporter(IDracManager,
             nvlink_rows=nvlink_rows,
             metric_report_rows=metric_rows,
             thermal_rows=thermal_rows,
+            leak_detection_rows=leak_rows,
             network_rows=network_rows,
             component_integrity_rows=component_rows,
         )
