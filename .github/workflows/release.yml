@@ -128,3 +128,35 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/redfish-ctl:latest
             ghcr.io/${{ github.repository_owner }}/redfish-ctl:${{ env.VERSION }}
             ghcr.io/${{ github.repository_owner }}/redfish-ctl:latest
+      - name: Build and push controller image (multi-arch)
+        # The Kubernetes controller image consumed by the Helm chart and the
+        # k8s/controller/ manifests. Gated the same way: skips until the
+        # Dockerfile exists so older tags cannot fail this job.
+        if: steps.gate.outputs.go == '1' && hashFiles('docker/Dockerfile.controller') != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.controller
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/redfish-ctl-controller:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/redfish-ctl-controller:latest
+            ghcr.io/${{ github.repository_owner }}/redfish-ctl-controller:${{ env.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/redfish-ctl-controller:latest
+      - name: Build and push mock-BMC image (multi-arch)
+        # The corpus-serving mock BMC used by the sandbox and the Helm chart's
+        # mockBmc.enabled toggle. Contains only the already-public committed
+        # test corpus; no credentials.
+        if: steps.gate.outputs.go == '1' && hashFiles('docker/Dockerfile.mock-bmc') != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.mock-bmc
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/redfish-ctl-mock-bmc:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/redfish-ctl-mock-bmc:latest
+            ghcr.io/${{ github.repository_owner }}/redfish-ctl-mock-bmc:${{ env.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/redfish-ctl-mock-bmc:latest
