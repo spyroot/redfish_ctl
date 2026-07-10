@@ -116,10 +116,12 @@ Safety labels:
 | `manager-network` | Read BMC ManagerNetworkProtocol service state, including HTTP/HTTPS/IPMI/SSH and NTP. | Read |
 | `manager-reboot` | Reboot the BMC manager. | Write |
 | `manager-time` | Read the BMC (Manager) clock; `--now`/`--set` write `DateTime` (read-only by default, no dry-run). | Write |
+| `memory-metrics` | Read MemoryMetrics resources linked from Memory modules and Processor MemorySummary. | Read |
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
+| `ntp-set` | Set ManagerNetworkProtocol NTP servers; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
 | `nvlink-ports` | Read GPU NVLink port resources where the BMC exposes them. | Read |
 | `oem-actions` | Read supported Dell OEM OS deployment actions. | Read |
 | `oem-attach` | Attach a network ISO through a Dell OEM action. | Write |
@@ -132,7 +134,9 @@ Safety labels:
 | `oem-net-iso-task` | Read Dell OEM OS deployment task data. | Read |
 | `pci` | Read PCI device or function data. | Read |
 | `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
+| `power-smoothing` | Read NVIDIA GPU PowerSmoothing current state, preset profiles, and admin override profile setpoints. | Read |
 | `privilege-registry` | Read the privilege registry. | Read |
+| `processor-metrics` | Read ProcessorMetrics resources linked from ComputerSystem processor members. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
 | `reboot` | Reset the host ComputerSystem; `--dry_run` previews, but the command writes by default. | Write |
@@ -172,6 +176,8 @@ redfish_ctl telemetry-triggers
 redfish_ctl thermal
 redfish_ctl power
 redfish_ctl environment-metrics
+redfish_ctl processor-metrics
+redfish_ctl memory-metrics
 redfish_ctl leak-detectors
 redfish_ctl network-adapters
 redfish_ctl network-ports

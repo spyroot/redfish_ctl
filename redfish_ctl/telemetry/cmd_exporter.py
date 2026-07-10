@@ -147,6 +147,23 @@ class Exporter(IDracManager,
             rows.append(env_data)
         return rows
 
+    def _environment_command_rows(self, do_async: bool = False) -> list[dict]:
+        """Return normalized rows from the environment-metrics command."""
+        try:
+            result = self.sync_invoke(
+                ApiRequestType.EnvironmentMetrics,
+                "environment-metrics",
+                do_async=do_async,
+            )
+        except Exception:
+            return self._environment_rows(do_async=do_async)
+        data = result.data
+        if isinstance(data, dict) and isinstance(data.get("metrics"), list):
+            return data["metrics"]
+        if isinstance(data, list):
+            return data
+        return self._environment_rows(do_async=do_async)
+
     def _vendor_label(self, vendor: Optional[str]) -> str:
         """Return a stable lower-case vendor label."""
         if vendor:
@@ -167,7 +184,7 @@ class Exporter(IDracManager,
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor),
         )
-        environment_rows = self._environment_rows(do_async=do_async)
+        environment_rows = self._environment_command_rows(do_async=do_async)
         sensor_rows = self._invoke_rows(ApiRequestType.Sensors, "sensors",
                                         do_async=do_async, do_expanded=do_expanded)
         nvlink_rows = self._invoke_rows(ApiRequestType.NvLinkPorts, "nvlink-ports",
