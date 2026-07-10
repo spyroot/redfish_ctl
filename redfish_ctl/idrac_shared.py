@@ -81,6 +81,7 @@ class ApiRequestType(Enum):
     BootSettingsQuery = auto()
     EnableBootOptions = auto()
     Sensors = auto()
+    Thermal = auto()
     MetricReports = auto()
     MetricReportDefinitions = auto()
     ComponentIntegrity = auto()

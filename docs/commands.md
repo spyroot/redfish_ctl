@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When I connect to a new BMC, I run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before I ask for deeper inventory or stage any change.
 
-The table below follows the 103 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the 104 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -152,6 +152,7 @@ Safety labels:
 | `task-watch` | Watch task progress. | Read |
 | `tasks` | Read the task collection. | Read |
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
+| `thermal` | Read Chassis `ThermalSubsystem` links, ThermalMetrics temperature readings, and fan collection counts from `redfish_ctl/thermal/cmd_thermal.py`. | Read |
 | `vm-mount` | Mount/unmount an ISO via Supermicro OEM virtual media (CfgCD). | Write |
 | `volume-get` | Read one volume from a storage device. | Read |
 | `volume-init` | Initialize a volume. | Write |
@@ -165,6 +166,7 @@ redfish_ctl sensors
 redfish_ctl metric-definitions
 redfish_ctl metric-reports
 redfish_ctl telemetry-triggers
+redfish_ctl thermal
 redfish_ctl network-adapters
 redfish_ctl network-ports
 redfish_ctl ethernet-interfaces
