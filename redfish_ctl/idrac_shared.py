@@ -130,6 +130,7 @@ class ApiRequestType(Enum):
     # idrac manager
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
+    NtpSet = auto()
     ManagerReset = auto()
 
     # bios related
