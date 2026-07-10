@@ -1,0 +1,89 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: redfishendpoints.redfish.ctl.dev
+spec:
+  group: redfish.ctl.dev
+  scope: Namespaced
+  names:
+    plural: redfishendpoints
+    singular: redfishendpoint
+    kind: RedfishEndpoint
+    shortNames:
+      - rfe
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - address
+              properties:
+                address:
+                  type: string
+                  minLength: 1
+                  description: BMC hostname, IP address, or URL for the Redfish ServiceRoot.
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                  default: 443
+                  description: TCP port for the Redfish endpoint.
+                insecure:
+                  type: boolean
+                  default: true
+                  description: Skip TLS certificate verification for self-signed BMC certificates.
+                pollInterval:
+                  type: string
+                  default: 30s
+                  pattern: ^[0-9]+(s|m|h)$
+                  description: Desired controller polling interval.
+                secretRef:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                      description: Secret in the same namespace containing BMC login data.
+                    usernameKey:
+                      type: string
+                      default: username
+                      description: Secret data key containing the BMC username.
+                    passwordKey:
+                      type: string
+                      default: password
+                      description: Secret data key containing the BMC password.
+                  additionalProperties: false
+              additionalProperties: false
+            status:
+              type: object
+              properties:
+                powerState:
+                  type: string
+                  nullable: true
+                health:
+                  type: string
+                  nullable: true
+                temperature:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                      minimum: 0
+                    maxCelsius:
+                      type: number
+                      nullable: true
+                  additionalProperties: false
+                lastPolled:
+                  type: string
+                  format: date-time
+              additionalProperties: false
