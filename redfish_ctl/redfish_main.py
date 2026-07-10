@@ -97,6 +97,7 @@ class TermColors:
 
 "note we do sub-string match"
 TermList = ["xterm", "linux", "ansi", "xterm-256color"]
+LOCAL_COMMANDS = {"bios-profile"}
 
 
 def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
@@ -272,6 +273,11 @@ def is_network_scan(args) -> bool:
     return False
 
 
+def is_local_command(args) -> bool:
+    """True when the command reads only local repository data."""
+    return getattr(args, "subcommand", None) in LOCAL_COMMANDS
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     """Main entry point
     """
@@ -295,7 +301,9 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # A network scan has no single target host, so skip the version handshake
     # (it would try to connect to a host we do not have).
     scan_mode = is_network_scan(cmd_args)
-    if not scan_mode:
+    local_mode = is_local_command(cmd_args)
+    connectionless_mode = scan_mode or local_mode
+    if not connectionless_mode:
         _ = redfish_api.check_api_version()
 
     if cmd_args.verbose:
@@ -314,12 +322,12 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
 
         # invoke cmd
-        if scan_mode:
-            # Credential-less dispatch: inject empty connection fields (invoke
-            # pops them) without the non-empty IDRAC_IP/credential check that
-            # sync_invoke enforces — a segment scan needs neither.
-            scan_kwargs = dict(arg_dict)
-            scan_kwargs.update({
+        if connectionless_mode:
+            # Connectionless dispatch: inject empty connection fields (invoke
+            # pops them) without the non-empty credential check that sync_invoke
+            # enforces. Segment scans and local catalog reads need no host.
+            invoke_kwargs = dict(arg_dict)
+            invoke_kwargs.update({
                 "idrac_ip": cmd_args.idrac_ip or "",
                 "username": cmd_args.idrac_username or "",
                 "password": cmd_args.idrac_password or "",
@@ -327,13 +335,13 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
                 "insecure": insecure,
                 "is_http": cmd_args.use_http,
             })
-            command_result = redfish_api.invoke(cmd.type, cmd.name, **scan_kwargs)
+            command_result = redfish_api.invoke(cmd.type, cmd.name, **invoke_kwargs)
         else:
             command_result = redfish_api.sync_invoke(
                 cmd.type, cmd.name, **arg_dict
             )
 
-        if not scan_mode and redfish_api.redfish_vendor == "Dell":
+        if not connectionless_mode and redfish_api.redfish_vendor == "Dell":
             if isinstance(command_result.data, dict):
                 command_result.data["idrac_version"] = redfish_api.idrac_manager_version
                 command_result.data["redfish_version"] = redfish_api.redfish_version
@@ -537,7 +545,7 @@ def redfish_main_ctl():
     # A network-segment scan (bmc-scan, or discovery --network) has no single
     # target host and uses no credentials, so it skips the IDRAC_IP/credential
     # gate that every host-targeted command requires.
-    if not is_network_scan(args):
+    if not is_network_scan(args) and not is_local_command(args):
         if args.idrac_ip is None or len(args.idrac_ip) == 0:
             print(
                 "Please indicate the idrac ip. "
