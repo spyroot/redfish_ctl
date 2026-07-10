@@ -92,6 +92,83 @@ conda env create -f environment.yml
 conda activate redfish_ctl
 ```
 
+## Run with Docker
+
+The production image is defined in [docker/Dockerfile](docker/Dockerfile). It installs
+`redfish_ctl[otlp]`, runs as a non-root user, and uses `redfish_ctl` as the entrypoint. Build it
+locally from the repository root:
+
+```bash
+make docker-image IMAGE=redfish-ctl:local
+```
+
+Put BMC connection settings in `.internal/redfish.env`, a gitignored runtime file you create before
+running the container:
+
+```bash
+mkdir -p .internal
+cat > .internal/redfish.env <<'EOF'
+REDFISH_IP=192.0.2.10
+REDFISH_USERNAME=root
+REDFISH_PASSWORD=replace-me
+REDFISH_PORT=443
+EOF
+```
+
+Run a safe one-shot read:
+
+```bash
+docker run --rm --env-file .internal/redfish.env redfish-ctl:local system
+```
+
+Run the exporter as an OTLP sidecar:
+
+```bash
+docker run --rm \
+  --env-file .internal/redfish.env \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 \
+  redfish-ctl:local exporter --output otlp --interval 30
+```
+
+With Docker Compose, keep credentials in `.internal/redfish.env` and pass only collector routing in
+the service definition:
+
+```yaml
+services:
+  redfish-exporter:
+    image: redfish-ctl:local
+    env_file:
+      - .internal/redfish.env
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    command: ["exporter", "--output", "otlp", "--interval", "30"]
+```
+
+In Kubernetes, store BMC credentials in a Secret that you create in the target namespace, then point
+the container at your collector:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redfish-exporter
+spec:
+  containers:
+    - name: exporter
+      image: redfish-ctl:local
+      imagePullPolicy: Never
+      args: ["exporter", "--output", "otlp", "--interval", "30"]
+      envFrom:
+        - secretRef:
+            name: redfish-bmc-credentials
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://otel-collector.monitoring.svc:4317
+```
+
+The Docker targets build and run locally only; they do not upload images or include credentials.
+See [Docker Images](docker/README.md) for the image contract and Linux test image.
+
 ## Connect
 
 The CLI reads these environment variables in `redfish_main.py`, so I set them once per shell:
