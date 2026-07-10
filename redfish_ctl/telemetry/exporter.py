@@ -223,6 +223,8 @@ def build_metric_samples(
         sensor_rows: Iterable[Mapping],
         nvlink_rows: Iterable[Mapping],
         metric_report_rows: Iterable[Mapping],
+        thermal_rows: Iterable[Mapping] = (),
+        leak_detection_rows: Iterable[Mapping] = (),
         network_rows: Iterable[Mapping] = (),
         component_integrity_rows: Iterable[Mapping] = ()) -> list[MetricSample]:
     """Build exporter samples from normalized Redfish command rows."""
@@ -230,7 +232,9 @@ def build_metric_samples(
     samples.extend(samples_from_environment_rows(environment_rows, identity))
     samples.extend(samples_from_sensor_rows(sensor_rows, identity))
     samples.extend(samples_from_nvlink_rows(nvlink_rows, identity))
+    samples.extend(samples_from_thermal_rows(thermal_rows, identity))
     samples.extend(samples_from_metric_report_rows(metric_report_rows, identity))
+    samples.extend(samples_from_leak_detection_rows(leak_detection_rows, identity))
     samples.extend(samples_from_network_rows(network_rows, identity))
     samples.extend(samples_from_component_integrity_rows(component_integrity_rows, identity))
     return samples
@@ -242,15 +246,21 @@ def samples_from_environment_rows(
     """Map Chassis EnvironmentMetrics rows into chassis/GPU power metrics."""
     samples = []
     for row in rows:
-        chassis = str(row.get("Chassis") or row.get("Id") or "unknown")
-        dims = _with_dims(identity, source="environment", chassis=chassis)
+        chassis = _environment_chassis(row)
+        dims = _environment_dims(identity, row, chassis)
+        gpu = _environment_gpu(row, chassis)
         power = _as_float(_reading(row.get("PowerWatts")))
         if power is not None:
-            metric = "hw.gpu.power" if _gpu_from_chassis(chassis) else "hw.power"
-            samples.append(_sample(metric, power, dims | _gpu_dim(chassis), unit="W"))
+            metric = "hw.gpu.power" if gpu and row.get("ParentType") != "Memory" else "hw.power"
+            samples.append(_sample(metric, power, dims | ({"gpu": gpu} if gpu else {}), unit="W"))
         energy = _as_float(_reading(row.get("EnergykWh") or row.get("EnergyKWh")))
         if energy is not None:
-            samples.append(_sample("hw.energy_kwh", energy, dims | _gpu_dim(chassis), unit="kWh"))
+            samples.append(_sample(
+                "hw.energy_kwh",
+                energy,
+                dims | ({"gpu": gpu} if gpu else {}),
+                unit="kWh",
+            ))
         for fan_name, rpm in _fan_readings(row):
             samples.append(_sample("hw.fan_speed", rpm, dims | {"fan": _dim_value(fan_name)}, "RPM"))
     return samples
@@ -452,6 +462,57 @@ def _gpu_metric_dims(
     if row.get("Report"):
         dims["report"] = str(row["Report"])
     return dims
+
+
+def samples_from_thermal_rows(
+        rows: Iterable[Mapping],
+        identity: Mapping[str, str]) -> list[MetricSample]:
+    """Map ThermalSubsystem temperature readings into per-zone metrics."""
+    samples = []
+    for row in rows:
+        reading = (row.get("ReadingCelsius")
+                   if row.get("ReadingCelsius") is not None
+                   else row.get("Reading"))
+        value = _as_float(reading)
+        if value is None:
+            continue
+        chassis = str(row.get("Chassis") or "unknown")
+        name = str(row.get("DeviceName") or row.get("Name")
+                   or row.get("DataSourceUri") or "temperature").rsplit("/", 1)[-1]
+        zone = row.get("PhysicalContext") or name
+        dims = _with_dims(identity, source="thermal-subsystem",
+                          chassis=chassis, sensor=_dim_value(name),
+                          zone=_dim_value(zone))
+        samples.append(_sample("hw.temperature", value, dims, "Cel"))
+    return samples
+
+
+def samples_from_leak_detection_rows(
+        rows: Iterable[Mapping],
+        identity: Mapping[str, str]) -> list[MetricSample]:
+    """Map LeakDetector rows into per-detector leak-state gauges."""
+    samples = []
+    for row in rows:
+        value = _leak_state_value(row.get("DetectorState"))
+        if value is None:
+            continue
+        chassis = str(row.get("Chassis") or "unknown")
+        detector = str(row.get("Id") or row.get("Name") or row.get("Uri") or "detector")
+        dims = _with_dims(
+            identity,
+            source="leak-detector",
+            chassis=chassis,
+            detector=_dim_value(detector),
+            detector_state=_dim_value(row.get("DetectorState")),
+        )
+        if row.get("LeakDetectorType"):
+            dims["detector_type"] = _dim_value(row["LeakDetectorType"])
+        if row.get("Health"):
+            dims["health"] = _dim_value(row["Health"])
+        if row.get("State"):
+            dims["state"] = _dim_value(row["State"])
+        samples.append(_sample("hw.leak.state", value, dims, None))
+    return samples
 
 
 def samples_from_network_rows(
@@ -677,6 +738,22 @@ def _duration_seconds(value) -> Optional[float]:
     return total if math.isfinite(total) else None
 
 
+def _leak_state_value(value) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    state = re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
+    clear_states = {
+        "ok",
+        "normal",
+        "none",
+        "absent",
+        "notdetected",
+        "noleak",
+        "noleakdetected",
+    }
+    return 0.0 if state in clear_states else 1.0
+
+
 def _sample(metric: str,
             value: float,
             dims: Mapping[str, str],
@@ -693,6 +770,44 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
         if value not in (None, ""):
             dims[key] = str(value)
     return dims
+
+
+def _environment_chassis(row: Mapping) -> str:
+    parent_type = row.get("ParentType")
+    parent_id = row.get("ParentId")
+    if parent_type == "Chassis" and parent_id:
+        return str(parent_id)
+    return str(row.get("Chassis") or row.get("Id") or "unknown")
+
+
+def _environment_dims(identity: Mapping[str, str],
+                      row: Mapping,
+                      chassis: str) -> dict[str, str]:
+    dims = _with_dims(identity, source="environment", chassis=chassis)
+    parent_type = row.get("ParentType")
+    parent_id = row.get("ParentId")
+    if parent_type:
+        dims["resource_type"] = str(parent_type)
+    if parent_id:
+        resource = _dim_value(parent_id)
+        dims["resource"] = resource
+        if parent_type == "Processor":
+            dims["processor"] = resource
+        elif parent_type == "Memory":
+            dims["memory"] = resource
+    return dims
+
+
+def _environment_gpu(row: Mapping, chassis: str) -> Optional[str]:
+    parent_type = row.get("ParentType")
+    parent_id = str(row.get("ParentId") or "")
+    if parent_type == "Processor" and parent_id.startswith("GPU_"):
+        return parent_id
+    if parent_type == "Memory":
+        match = re.match(r"(GPU_\d+)", parent_id)
+        if match:
+            return match.group(1)
+    return _gpu_from_chassis(chassis)
 
 
 def _fabric_dims(identity: Mapping[str, str],

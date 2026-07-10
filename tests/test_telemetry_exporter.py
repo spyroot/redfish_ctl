@@ -1,10 +1,13 @@
 """Offline tests for the Redfish telemetry exporter contract."""
 
 import argparse
+import json
+from pathlib import Path
 
 import pytest
 
 import redfish_ctl.telemetry.exporter as exporter_mod
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
@@ -19,6 +22,45 @@ from redfish_ctl.telemetry.exporter import (
 )
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
+GB300_CORPUS = (
+    Path(__file__).parent
+    / "supermicro_gb300_corpus"
+    / "json_responses"
+    / "172.25.230.37"
+)
+GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
+
+
+def _gb300_fixture_for_path(path):
+    name = "_" + path.strip("/").replace("/", "_") + ".json"
+    return GB300_INDEX.get(name.lower())
+
+
+@pytest.fixture
+def gb300_exporter_manager():
+    """Serve the committed GB300 crawl over requests-mock."""
+    requests_mock = pytest.importorskip("requests_mock")
+    requests = []
+
+    def get_cb(request, context):
+        requests.append(request)
+        fixture = _gb300_fixture_for_path(request.path)
+        if fixture is None:
+            context.status_code = 404
+            return json.dumps({"error": f"no fixture for {request.path}"})
+        context.status_code = 200
+        return fixture.read_text()
+
+    with requests_mock.Mocker() as mocker:
+        mocker.get(requests_mock.ANY, text=get_cb)
+        manager = IDracManager(
+            idrac_ip="mock-gb300",
+            idrac_username="root",
+            idrac_password="mock",
+            insecure=True,
+            is_debug=False,
+        )
+        yield manager, requests
 
 
 def test_identity_dimensions_follow_nv72_slot_contract():
@@ -102,6 +144,38 @@ def test_mapper_emits_chassis_gpu_and_fabric_samples():
         "hw.fabric.bit_error_rate",
     } <= by_name
     assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
+
+
+def test_mapper_emits_thermal_subsystem_zone_temperatures():
+    """ThermalSubsystem rows become granular temperature samples."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[],
+        thermal_rows=[
+            {
+                "Chassis": "Chassis_0",
+                "DeviceName": "Front IO Temp",
+                "PhysicalContext": "Intake",
+                "ReadingCelsius": 24.437,
+                "DataSourceUri": (
+                    "/redfish/v1/Chassis/Chassis_0/Sensors/"
+                    "Chassis_0_Front_IO_Temp_0"
+                ),
+            }
+        ],
+    )
+
+    sample = next(sample for sample in samples if sample.metric == "hw.temperature")
+    assert sample.value == 24.437
+    assert sample.unit == "Cel"
+    assert sample.dimensions["source"] == "thermal-subsystem"
+    assert sample.dimensions["chassis"] == "Chassis_0"
+    assert sample.dimensions["sensor"] == "Front_IO_Temp"
+    assert sample.dimensions["zone"] == "Intake"
 
 
 def test_metric_report_mapper_emits_nvlink_bandwidth_and_error_counters():
@@ -240,6 +314,52 @@ def test_metric_report_mapper_emits_gpu_processor_memory_and_temperature_samples
     assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
 
 
+def test_leak_detection_mapper_emits_state_gauges_with_detector_dimensions():
+    """LeakDetector rows become 0/1 hw.leak.state gauges per detector."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[],
+        leak_detection_rows=[
+            {
+                "Chassis": "Chassis_0",
+                "Id": "Chassis_0_LeakDetector_0_ColdPlate",
+                "Name": "Chassis 0 LeakDetector 0 ColdPlate",
+                "DetectorState": "OK",
+                "LeakDetectorType": "Moisture",
+                "State": "Enabled",
+                "Health": "OK",
+            },
+            {
+                "Chassis": "Chassis_0",
+                "Id": "Chassis_0_LeakDetector_1_ColdPlate",
+                "Name": "Chassis 0 LeakDetector 1 ColdPlate",
+                "DetectorState": "Critical",
+                "LeakDetectorType": "Moisture",
+                "State": "Enabled",
+                "Health": "Critical",
+            },
+        ],
+    )
+
+    leak_samples = {sample.dimensions["detector"]: sample for sample in samples}
+    ok_sample = leak_samples["Chassis_0_LeakDetector_0_ColdPlate"]
+    critical_sample = leak_samples["Chassis_0_LeakDetector_1_ColdPlate"]
+
+    assert ok_sample.metric == "hw.leak.state"
+    assert ok_sample.value == 0
+    assert critical_sample.value == 1
+    assert ok_sample.dimensions["source"] == "leak-detector"
+    assert ok_sample.dimensions["chassis"] == "Chassis_0"
+    assert ok_sample.dimensions["detector_type"] == "Moisture"
+    assert ok_sample.dimensions["detector_state"] == "OK"
+    assert ok_sample.dimensions["health"] == "OK"
+    assert REQUIRED_DIMS <= set(ok_sample.dimensions)
+
+
 def test_prometheus_text_preserves_contract_names_and_dimensions():
     """Prometheus text output carries hw.* names and dotted OTel dimensions."""
     sample = MetricSample(
@@ -360,7 +480,7 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
 
     gauges = result.data["gauge"]
     metrics = {point["metric"] for point in gauges}
-    assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes"} <= metrics
+    assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes", "hw.leak.state"} <= metrics
     assert {
         "hw.gpu.clock_mhz",
         "hw.gpu.compute.utilization",
@@ -368,8 +488,74 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "hw.gpu.throttle.duration_seconds",
         "hw.gpu.temperature",
     } <= metrics
+    leak_points = [point for point in gauges if point["metric"] == "hw.leak.state"]
+    assert len(leak_points) == 4
+    assert {point["value"] for point in leak_points} == {0.0}
+    assert {point["dimensions"]["source"] for point in leak_points} == {"leak-detector"}
+    assert {
+        point["dimensions"]["detector"]
+        for point in leak_points
+    } == {
+        "Chassis_0_LeakDetector_0_ColdPlate",
+        "Chassis_0_LeakDetector_0_Manifold",
+        "Chassis_0_LeakDetector_1_ColdPlate",
+        "Chassis_0_LeakDetector_1_Manifold",
+    }
     assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
+    thermal_points = [
+        point for point in gauges
+        if point["metric"] == "hw.temperature"
+        and point["dimensions"].get("source") == "thermal-subsystem"
+    ]
+    assert thermal_points
+    assert {"chassis", "sensor", "zone"} <= set(thermal_points[0]["dimensions"])
     assert all(recorded.method != "POST" for recorded in service.requests)
+
+
+def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manager):
+    """Exporter output includes EnvironmentMetrics rows for every GB300 resource."""
+    manager, requests = gb300_exporter_manager
+
+    result = manager.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        label_bmc_ip="172.25.230.37",
+        vendor="supermicro",
+    )
+
+    gauges = result.data["gauge"]
+    processor_power = [
+        point for point in gauges
+        if point["metric"] == "hw.gpu.power"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Processor"
+        and point["dimensions"].get("resource") == "GPU_0"
+    ]
+    memory_power = [
+        point for point in gauges
+        if point["metric"] == "hw.power"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Memory"
+        and point["dimensions"].get("resource") == "GPU_0_DRAM_0"
+    ]
+    processor_energy = [
+        point for point in gauges
+        if point["metric"] == "hw.energy_kwh"
+        and point["dimensions"].get("source") == "environment"
+        and point["dimensions"].get("resource_type") == "Processor"
+        and point["dimensions"].get("resource") == "GPU_0"
+    ]
+
+    assert processor_power[0]["value"] == pytest.approx(231.939)
+    assert memory_power[0]["value"] == pytest.approx(34.458)
+    assert processor_energy[0]["value"] == pytest.approx(63.95437164505238)
+    assert {
+        request.method
+        for request in requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    } == set()
 
 
 def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkeypatch):
