@@ -63,8 +63,6 @@ spec:
                           type: string
                           default: password
                           description: Secret data key containing the BMC password.
-                      additionalProperties: false
-                  additionalProperties: false
                 desiredState:
                   type: object
                   properties:
@@ -83,7 +81,6 @@ spec:
                         managerId:
                           type: string
                           nullable: true
-                      additionalProperties: false
                     boot:
                       type: object
                       properties:
@@ -96,15 +93,12 @@ spec:
                         uefiTarget:
                           type: string
                           nullable: true
-                      additionalProperties: false
                     reboot:
                       type: object
                       properties:
                         resetType:
                           type: string
                           nullable: true
-                      additionalProperties: false
-                  additionalProperties: false
                 approve:
                   type: boolean
                   default: false
@@ -113,7 +107,6 @@ spec:
                   type: boolean
                   default: false
                   description: Wait for the BMC to answer again after an approved reboot step.
-              additionalProperties: false
             status:
               type: object
               properties:
@@ -140,7 +133,6 @@ spec:
                       preview:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
-                    additionalProperties: false
                 appliedChanges:
                   type: array
                   items:
@@ -156,7 +148,6 @@ spec:
                       result:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
-                    additionalProperties: false
                 conditions:
                   type: array
                   items:
@@ -182,8 +173,6 @@ spec:
                       lastTransitionTime:
                         type: string
                         format: date-time
-                    additionalProperties: false
                 lastReconciled:
                   type: string
                   format: date-time
-              additionalProperties: false
