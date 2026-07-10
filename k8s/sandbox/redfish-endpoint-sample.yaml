@@ -1,0 +1,12 @@
+apiVersion: redfish.ctl.dev/v1alpha1
+kind: RedfishEndpoint
+metadata:
+  name: gb300-mock
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  address: http://mock-bmc.redfish-sandbox.svc.cluster.local
+  port: 80
+  insecure: true
+  pollInterval: 10s

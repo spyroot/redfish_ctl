@@ -44,12 +44,7 @@ docker-image: ## Build the production CLI image locally.
 	$(DOCKER) build -f docker/Dockerfile -t $(IMAGE) .
 
 k8s-sandbox: ## Run the local Kubernetes read-path sandbox when present.
-	@test -f k8s/sandbox/kind-config.yaml || { \
-		printf '%s\n' 'k8s/sandbox/kind-config.yaml is not present yet.'; \
-		printf '%s\n' 'Add the sandbox manifests and smoke script before using this target.'; \
-		exit 2; \
-	}
-	@printf '%s\n' 'Run the sandbox smoke harness from k8s/sandbox/.'
+	./k8s/sandbox/run-sandbox.sh
 
 clean: ## Remove local build, test, and type-check artifacts.
 	rm -rf build dist *.egg-info .coverage htmlcov .pytest_cache .ruff_cache .mypy_cache
