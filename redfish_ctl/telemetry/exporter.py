@@ -190,15 +190,21 @@ def samples_from_environment_rows(
     """Map Chassis EnvironmentMetrics rows into chassis/GPU power metrics."""
     samples = []
     for row in rows:
-        chassis = str(row.get("Chassis") or row.get("Id") or "unknown")
-        dims = _with_dims(identity, source="environment", chassis=chassis)
+        chassis = _environment_chassis(row)
+        dims = _environment_dims(identity, row, chassis)
+        gpu = _environment_gpu(row, chassis)
         power = _as_float(_reading(row.get("PowerWatts")))
         if power is not None:
-            metric = "hw.gpu.power" if _gpu_from_chassis(chassis) else "hw.power"
-            samples.append(_sample(metric, power, dims | _gpu_dim(chassis), unit="W"))
+            metric = "hw.gpu.power" if gpu and row.get("ParentType") != "Memory" else "hw.power"
+            samples.append(_sample(metric, power, dims | ({"gpu": gpu} if gpu else {}), unit="W"))
         energy = _as_float(_reading(row.get("EnergykWh") or row.get("EnergyKWh")))
         if energy is not None:
-            samples.append(_sample("hw.energy_kwh", energy, dims | _gpu_dim(chassis), unit="kWh"))
+            samples.append(_sample(
+                "hw.energy_kwh",
+                energy,
+                dims | ({"gpu": gpu} if gpu else {}),
+                unit="kWh",
+            ))
         for fan_name, rpm in _fan_readings(row):
             samples.append(_sample("hw.fan_speed", rpm, dims | {"fan": _dim_value(fan_name)}, "RPM"))
     return samples
@@ -504,6 +510,44 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
         if value not in (None, ""):
             dims[key] = str(value)
     return dims
+
+
+def _environment_chassis(row: Mapping) -> str:
+    parent_type = row.get("ParentType")
+    parent_id = row.get("ParentId")
+    if parent_type == "Chassis" and parent_id:
+        return str(parent_id)
+    return str(row.get("Chassis") or row.get("Id") or "unknown")
+
+
+def _environment_dims(identity: Mapping[str, str],
+                      row: Mapping,
+                      chassis: str) -> dict[str, str]:
+    dims = _with_dims(identity, source="environment", chassis=chassis)
+    parent_type = row.get("ParentType")
+    parent_id = row.get("ParentId")
+    if parent_type:
+        dims["resource_type"] = str(parent_type)
+    if parent_id:
+        resource = _dim_value(parent_id)
+        dims["resource"] = resource
+        if parent_type == "Processor":
+            dims["processor"] = resource
+        elif parent_type == "Memory":
+            dims["memory"] = resource
+    return dims
+
+
+def _environment_gpu(row: Mapping, chassis: str) -> Optional[str]:
+    parent_type = row.get("ParentType")
+    parent_id = str(row.get("ParentId") or "")
+    if parent_type == "Processor" and parent_id.startswith("GPU_"):
+        return parent_id
+    if parent_type == "Memory":
+        match = re.match(r"(GPU_\d+)", parent_id)
+        if match:
+            return match.group(1)
+    return _gpu_from_chassis(chassis)
 
 
 def _fabric_dims(identity: Mapping[str, str],

@@ -121,6 +121,7 @@ Safety labels:
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
+| `ntp-set` | Set ManagerNetworkProtocol NTP servers; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
 | `nvlink-ports` | Read GPU NVLink port resources where the BMC exposes them. | Read |
 | `oem-actions` | Read supported Dell OEM OS deployment actions. | Read |
 | `oem-attach` | Attach a network ISO through a Dell OEM action. | Write |
@@ -133,8 +134,9 @@ Safety labels:
 | `oem-net-iso-task` | Read Dell OEM OS deployment task data. | Read |
 | `pci` | Read PCI device or function data. | Read |
 | `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
-| `processor-metrics` | Read ProcessorMetrics resources linked from ComputerSystem processor members. | Read |
+| `power-smoothing` | Read NVIDIA GPU PowerSmoothing current state, preset profiles, and admin override profile setpoints. | Read |
 | `privilege-registry` | Read the privilege registry. | Read |
+| `processor-metrics` | Read ProcessorMetrics resources linked from ComputerSystem processor members. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |
 | `raid` | Read RAID service data. | Read |
 | `reboot` | Reset the host ComputerSystem; `--dry_run` previews, but the command writes by default. | Write |

@@ -83,6 +83,7 @@ class ApiRequestType(Enum):
     Sensors = auto()
     Thermal = auto()
     Power = auto()
+    PowerSmoothing = auto()
     LeakDetectors = auto()
     EnvironmentMetrics = auto()
     ProcessorMetrics = auto()
@@ -131,6 +132,7 @@ class ApiRequestType(Enum):
     # idrac manager
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
+    NtpSet = auto()
     ManagerReset = auto()
 
     # bios related

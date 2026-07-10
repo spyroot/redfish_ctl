@@ -53,6 +53,7 @@ from .pci.cmd_pci import *
 # manager cmds
 from .manager.cmd_manager import *
 from .manager.cmd_manager_network import *
+from .manager.cmd_ntp_set import *
 from .manager.cmd_manager_reset import *
 
 
@@ -80,6 +81,7 @@ from .chassis.cmd_chasis_reset import *
 from .sensors.cmd_sensors import *
 from .thermal.cmd_thermal import *
 from .power.cmd_power import *
+from .power.cmd_power_smoothing import *
 from .thermal.cmd_leak_detectors import *
 from .environment.cmd_environment_metrics import *
 from .metrics.cmd_processor_metrics import *
