@@ -58,10 +58,11 @@ redfish_ctl bios-profile apply gb300-power-capped --dry_run
 redfish_ctl bios-profile apply gb300-power-capped --confirm
 ```
 
-The current catalog command ships `list`, `show`, and guarded `apply`. Until `diff` is available in
-your installed version, use `bios-profile show <name>` plus a read-only `bios --filter ...` check to
-compare current values. Applying a profile stages BIOS settings and can require a host reset; only run
-the apply step during an approved maintenance window.
+The catalog command ships all four actions: `list` and `show` read only the local catalog, `diff`
+compares a profile against the current BIOS attributes over a read-only BMC query, and guarded
+`apply` previews by default and stages only with `--confirm`, capturing a rollback snapshot first.
+Applying a profile stages BIOS settings and can require a host reset; only run the apply step during
+an approved maintenance window.
 
 ## Included Examples
 
