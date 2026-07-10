@@ -110,6 +110,7 @@ Safety labels:
 | `jobs` | Read the job collection. | Read |
 | `jobs-dell-service` | Read Dell JobService. | Read |
 | `jobs-service` | Read standard Redfish JobService. | Read |
+| `leak-detectors` | Read chassis LeakDetection detector states and linked leak policy data. | Read |
 | `logs` | Read system and manager log entries. | Read |
 | `manager` | Read manager data. | Read |
 | `manager-network` | Read BMC ManagerNetworkProtocol service state, including HTTP/HTTPS/IPMI/SSH and NTP. | Read |
@@ -171,6 +172,7 @@ redfish_ctl telemetry-triggers
 redfish_ctl thermal
 redfish_ctl power
 redfish_ctl environment-metrics
+redfish_ctl leak-detectors
 redfish_ctl network-adapters
 redfish_ctl network-ports
 redfish_ctl ethernet-interfaces
