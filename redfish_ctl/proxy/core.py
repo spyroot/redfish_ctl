@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from redfish_ctl.api import (
     RedfishApiError,
@@ -16,6 +17,11 @@ from redfish_ctl.api import (
     get_thermal,
 )
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.telemetry.exporter import (
+    MetricSample,
+    build_identity_dimensions,
+    build_metric_samples,
+)
 
 
 @dataclass(frozen=True)
@@ -125,6 +131,68 @@ def _sensor_dicts(manager: SyncInvoker) -> list[dict[str, Any]]:
     ]
 
 
+def _address_host(address: str) -> str:
+    text = str(address or "").strip()
+    if "://" in text:
+        parsed = urlparse(text)
+        return parsed.hostname or text
+    hostport = text.split("/", 1)[0].rsplit("@", 1)[-1]
+    if hostport.startswith("[") and "]" in hostport:
+        return hostport.split("]", 1)[0].lstrip("[")
+    return hostport.split(":", 1)[0] or text
+
+
+def _vendor_label(manager: SyncInvoker, vendor: str | None) -> str:
+    if vendor:
+        return vendor
+    try:
+        detected = getattr(manager, "redfish_vendor")
+    except Exception:
+        detected = None
+    return str(detected or "unknown")
+
+
+def _optional_command(
+    manager: SyncInvoker,
+    api_call: ApiRequestType,
+    name: str,
+    **kwargs: Any,
+) -> Any:
+    try:
+        result = manager.sync_invoke(api_call, name, **kwargs)
+    except Exception:
+        return None
+    if result.error:
+        return None
+    return result.data
+
+
+def _list_payload(data: Any) -> list[dict[str, Any]]:
+    if not isinstance(data, list):
+        return []
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _dict_payload(data: Any) -> dict[str, Any]:
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def _dict_rows(data: Any, key: str) -> list[dict[str, Any]]:
+    rows = _dict_payload(data).get(key)
+    return _list_payload(rows)
+
+
+def _sample_dict(sample: MetricSample) -> dict[str, Any]:
+    return {
+        "metric": sample.metric,
+        "value": sample.value,
+        "dimensions": dict(sample.dimensions),
+        "metricType": sample.metric_type,
+        "unit": sample.unit,
+        "timestamp": sample.timestamp,
+    }
+
+
 class ReadOnlyProxy:
     """Read-only facade that shapes Redfish command results for service APIs."""
 
@@ -203,4 +271,111 @@ class ReadOnlyProxy:
                 attr_only=False,
                 do_deep=False,
             ),
+        }
+
+    def node_metric_samples(
+        self,
+        node_id: str,
+        *,
+        label_bmc_ip: str | None = None,
+        vendor: str | None = None,
+        do_expanded: bool = False,
+    ) -> tuple[MetricSample, ...]:
+        """Read one node and return exporter-compatible telemetry samples."""
+        node, manager = self._node_and_manager(node_id)
+        identity = build_identity_dimensions(
+            label_bmc_ip or _address_host(node.address),
+            vendor=_vendor_label(manager, vendor),
+        )
+        environment_rows = _dict_rows(
+            _optional_command(
+                manager,
+                ApiRequestType.EnvironmentMetrics,
+                "environment-metrics",
+            ),
+            "metrics",
+        )
+        thermal_rows = _dict_rows(
+            _optional_command(manager, ApiRequestType.Thermal, "thermal"),
+            "temperature_readings",
+        )
+        sensor_rows = _list_payload(
+            _optional_command(
+                manager,
+                ApiRequestType.Sensors,
+                "sensors",
+                do_expanded=do_expanded,
+            )
+        )
+        nvlink_rows = _list_payload(
+            _optional_command(
+                manager,
+                ApiRequestType.NvLinkPorts,
+                "nvlink-ports",
+                do_expanded=do_expanded,
+            )
+        )
+        metric_report_rows = _list_payload(
+            _optional_command(
+                manager,
+                ApiRequestType.MetricReports,
+                "metric-reports",
+                do_expanded=do_expanded,
+            )
+        )
+        leak_detection_rows = _dict_rows(
+            _optional_command(
+                manager,
+                ApiRequestType.LeakDetectors,
+                "leak-detectors",
+            ),
+            "detectors",
+        )
+        network_rows = _list_payload(
+            _optional_command(
+                manager,
+                ApiRequestType.NetworkAdapters,
+                "network-adapters",
+                do_expanded=do_expanded,
+            )
+        )
+        component_rows = _list_payload(
+            _optional_command(
+                manager,
+                ApiRequestType.ComponentIntegrity,
+                "component-integrity",
+                do_expanded=do_expanded,
+            )
+        )
+        return tuple(build_metric_samples(
+            identity=identity,
+            environment_rows=environment_rows,
+            sensor_rows=sensor_rows,
+            nvlink_rows=nvlink_rows,
+            metric_report_rows=metric_report_rows,
+            thermal_rows=thermal_rows,
+            leak_detection_rows=leak_detection_rows,
+            network_rows=network_rows,
+            component_integrity_rows=component_rows,
+        ))
+
+    def node_metrics(
+        self,
+        node_id: str,
+        *,
+        label_bmc_ip: str | None = None,
+        vendor: str | None = None,
+        do_expanded: bool = False,
+    ) -> dict[str, Any]:
+        """Return JSON-safe exporter samples for one node."""
+        samples = self.node_metric_samples(
+            node_id,
+            label_bmc_ip=label_bmc_ip,
+            vendor=vendor,
+            do_expanded=do_expanded,
+        )
+        return {
+            "id": node_id,
+            "sampleCount": len(samples),
+            "samples": [_sample_dict(sample) for sample in samples],
         }

@@ -52,6 +52,10 @@ The optional FastAPI adapter, defined in `redfish_ctl/proxy/fastapi_app.py`, imp
 `create_app()` is called. That keeps the CLI install dependency-light while still providing the route
 binding for deployments that install an ASGI runtime.
 
+The routes below are bound by `create_app()`, the adapter function in
+`redfish_ctl/proxy/fastapi_app.py`, and implemented by `ReadOnlyProxy`, the read facade in
+`redfish_ctl/proxy/core.py`.
+
 | Method | Path | Backing read |
 | --- | --- | --- |
 | `GET` | `/nodes` | Sanitized `NodeRegistry` inventory |
@@ -59,6 +63,7 @@ binding for deployments that install an ASGI runtime.
 | `GET` | `/nodes/{node_id}/sensors` | `sensors` command via `redfish_ctl.api.get_sensors()` |
 | `GET` | `/nodes/{node_id}/gpu-metrics` | `gpu-metrics` command |
 | `GET` | `/nodes/{node_id}/bios?attr_filter=...` | `bios` command |
+| `GET` | `/nodes/{node_id}/metrics` | Exporter `MetricSample` rows built from existing read commands |
 
 These routes are read-only. They do not create desired state, patch BMC resources, or run Redfish
 actions. The manager factory is intentionally supplied by the embedding service so credentials can
@@ -126,7 +131,7 @@ The read-only core now covers:
 - register a server,
 - read observed state,
 - list servers,
-- expose sensor, GPU metric, and BIOS reads through GET endpoints.
+- expose sensor, GPU metric, BIOS, and exporter-sample metric reads through GET endpoints.
 
 The next useful version should add persistent storage, desired power and boot override fields, and a
 reconcile loop that handles one server at a time with SQLite or Postgres.
