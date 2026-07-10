@@ -50,6 +50,7 @@ section "applying sandbox resources"
 kubectl apply -f k8s/sandbox/namespace.yaml
 kubectl apply -f k8s/controller/redfish-endpoint-crd.yaml
 kubectl apply -f k8s/sandbox/mock-bmc.yaml
+kubectl apply -f k8s/sandbox/mock-credentials.yaml
 kubectl apply -f k8s/controller/rbac.yaml
 kubectl apply -f k8s/controller/deployment.yaml
 kubectl apply -f k8s/sandbox/redfish-endpoint-sample.yaml

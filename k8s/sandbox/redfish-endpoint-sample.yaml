@@ -10,3 +10,7 @@ spec:
   port: 80
   insecure: true
   pollInterval: 10s
+  # The mock ignores authentication; the reference exists so the controller's
+  # secretRef -> Secret -> credentials path runs end-to-end in the sandbox.
+  secretRef:
+    name: mock-bmc-credentials

@@ -24,6 +24,10 @@ rules:
       - get
       - list
       - watch
+      # kopf persists its handler progress as annotations on the object
+      # itself, so the main resource needs patch/update as well as /status.
+      - patch
+      - update
   - apiGroups:
       - redfish.ctl.dev
     resources:

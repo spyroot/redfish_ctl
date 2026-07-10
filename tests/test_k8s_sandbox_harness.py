@@ -32,7 +32,12 @@ def test_kind_config_defines_a_local_redfish_sandbox_cluster() -> None:
 
 
 def test_sample_endpoint_points_at_mock_bmc_without_credentials() -> None:
-    """The sample CR reads the in-cluster mock BMC without embedding secrets."""
+    """The sample CR reads the mock BMC via a secretRef, never inline secrets.
+
+    The referenced Secret carries only the canonical public Redfish demo
+    credentials (the mock ignores authentication); the point is that the
+    controller's secretRef -> Secret -> credentials path runs end-to-end.
+    """
     endpoint = yaml.safe_load(SAMPLE_ENDPOINT.read_text(encoding="utf-8"))
 
     assert endpoint["apiVersion"] == "redfish.ctl.dev/v1alpha1"
@@ -44,9 +49,20 @@ def test_sample_endpoint_points_at_mock_bmc_without_credentials() -> None:
         "port": 80,
         "insecure": True,
         "pollInterval": "10s",
+        "secretRef": {"name": "mock-bmc-credentials"},
     }
-    assert "secretRef" not in endpoint["spec"]
-    assert "PASSWORD" not in SAMPLE_ENDPOINT.read_text(encoding="utf-8")
+    # Credentials live only in the Secret manifest, never inline in the CR.
+    sample_text = SAMPLE_ENDPOINT.read_text(encoding="utf-8")
+    assert "password" not in sample_text.lower().replace("secretref", "")
+
+    secret = yaml.safe_load(
+        (SAMPLE_ENDPOINT.parent / "mock-credentials.yaml").read_text(encoding="utf-8")
+    )
+    assert secret["kind"] == "Secret"
+    assert secret["metadata"]["name"] == "mock-bmc-credentials"
+    assert secret["metadata"]["namespace"] == "redfish-sandbox"
+    # Public demo credentials only — a real value here would be a leak.
+    assert secret["stringData"] == {"username": "root", "password": "calvin"}
 
 
 def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
@@ -131,6 +147,7 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert "kind load docker-image redfish-ctl-controller:local" in script
     assert "kubectl apply -f k8s/controller/redfish-endpoint-crd.yaml" in script
     assert "kubectl apply -f k8s/sandbox/mock-bmc.yaml" in script
+    assert "kubectl apply -f k8s/sandbox/mock-credentials.yaml" in script
     assert "kubectl apply -f k8s/controller/rbac.yaml" in script
     assert "kubectl apply -f k8s/controller/deployment.yaml" in script
     assert "kubectl apply -f k8s/sandbox/redfish-endpoint-sample.yaml" in script
