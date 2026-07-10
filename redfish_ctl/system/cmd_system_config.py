@@ -108,7 +108,7 @@ class ExportSystemConfig(IDracManager,
         if "Clone" in export_use or "Replace" in export_use:
             payload["ExportUse"] = export_use
 
-        r = f"https://{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ExportSystemConfiguration"
 
         # json_pd = json.dumps(payload)

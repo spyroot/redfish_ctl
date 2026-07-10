@@ -85,7 +85,7 @@ class BootSource(IDracManager,
 
         boot_data_sources = {}
         for full_dev_path in cmd_result.data:
-            r = f"https://{self.idrac_ip}{full_dev_path}?$expand=*($levels=1)"
+            r = f"{self._default_method}{self.idrac_ip}{full_dev_path}?$expand=*($levels=1)"
             if not do_async:
                 response = self.api_get_call(r, headers)
                 self.default_error_handler(response)

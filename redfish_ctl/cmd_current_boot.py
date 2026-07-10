@@ -74,7 +74,7 @@ class GetCurrentBoot(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r = f"https://{self.idrac_ip}{self.idrac_manage_servers}"
+        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}"
         response = self.api_get_call(r, headers)
         self.default_error_handler(response)
         data = response.json()

@@ -70,7 +70,7 @@ class BootSettings(IDracManager,
 
         # DellBootSources is a Dell OEM resource; degrade gracefully off Dell.
         target_api = f"{self.idrac_manage_servers}/Oem/Dell/DellBootSources/Settings"
-        r = f"https://{self.idrac_ip}{target_api}"
+        r = f"{self._default_method}{self.idrac_ip}{target_api}"
 
         try:
             if not do_async:
