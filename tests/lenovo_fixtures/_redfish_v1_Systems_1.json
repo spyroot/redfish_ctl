@@ -1,0 +1,67 @@
+{
+  "@odata.type": "#ComputerSystem.v1_9_0.ComputerSystem",
+  "@odata.id": "/redfish/v1/Systems/1",
+  "Id": "1",
+  "Name": "ComputerSystem",
+  "Description": "Lenovo XCC ComputerSystem fixture.",
+  "SystemType": "Physical",
+  "Manufacturer": "Lenovo",
+  "Model": "ThinkSystem",
+  "SerialNumber": "REDACTED",
+  "PowerState": "On",
+  "BiosVersion": "M5E101Q",
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK",
+    "HealthRollup": "OK"
+  },
+  "Bios": {
+    "@odata.id": "/redfish/v1/Systems/1/Bios"
+  },
+  "Boot": {
+    "BootSourceOverrideEnabled": "Disabled",
+    "BootSourceOverrideTarget": "None",
+    "BootSourceOverrideMode": "UEFI",
+    "BootSourceOverrideEnabled@Redfish.AllowableValues": [
+      "Once",
+      "Disabled"
+    ],
+    "BootSourceOverrideTarget@Redfish.AllowableValues": [
+      "None",
+      "Pxe",
+      "Cd",
+      "Usb",
+      "Hdd",
+      "BiosSetup",
+      "Diags",
+      "UefiTarget"
+    ]
+  },
+  "Links": {
+    "ManagedBy": [
+      {
+        "@odata.id": "/redfish/v1/Managers/1"
+      }
+    ],
+    "Chassis": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1"
+      }
+    ]
+  },
+  "Actions": {
+    "#ComputerSystem.Reset": {
+      "target": "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
+      "title": "Reset",
+      "ResetType@Redfish.AllowableValues": [
+        "On",
+        "Nmi",
+        "GracefulShutdown",
+        "GracefulRestart",
+        "ForceOn",
+        "ForceOff",
+        "ForceRestart"
+      ]
+    }
+  }
+}

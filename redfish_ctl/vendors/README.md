@@ -10,6 +10,7 @@ vendors/
   base.py            # VendorCapabilities model + registry
   dell/              # Dell iDRAC
   hpe/               # HPE iLO (placeholder)
+  lenovo/            # Lenovo XClarity Controller
   supermicro/        # Supermicro (placeholder)
 ```
 

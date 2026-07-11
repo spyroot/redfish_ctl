@@ -1,0 +1,24 @@
+{
+  "@odata.type": "#Manager.v1_10_0.Manager",
+  "@odata.id": "/redfish/v1/Managers/1",
+  "Id": "1",
+  "Name": "XClarity Controller",
+  "ManagerType": "BMC",
+  "FirmwareVersion": "1.00",
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  },
+  "Links": {
+    "ManagerForServers": [
+      {
+        "@odata.id": "/redfish/v1/Systems/1"
+      }
+    ],
+    "ManagerForChassis": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1"
+      }
+    ]
+  }
+}
