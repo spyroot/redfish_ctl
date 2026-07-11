@@ -6,7 +6,9 @@ Many classes mapped directly to JSON schem.
 Author Mus spyroot@gmail.com
 
 """
+import hashlib
 import json
+import threading
 from enum import Enum, auto
 from json import JSONEncoder
 from typing import Optional
@@ -242,6 +244,44 @@ class Singleton(type):
     """This redfish_ctl class for all action that singleton
     """
     _instances = {}
+    _lock = threading.RLock()
+
+    @staticmethod
+    def _arg_value(args, kwargs, index, names, default):
+        for name in names:
+            if name in kwargs:
+                return kwargs[name]
+        if len(args) > index:
+            return args[index]
+        return default
+
+    @classmethod
+    def _connection_key(cls, instance_cls, args, kwargs):
+        password = cls._arg_value(
+            args,
+            kwargs,
+            2,
+            ("idrac_password", "password", "redfish_password"),
+            "",
+        )
+        password_digest = hashlib.sha256(
+            str(password or "").encode("utf-8")
+        ).hexdigest()
+        return (
+            instance_cls,
+            cls._arg_value(args, kwargs, 0, ("idrac_ip", "redfish_ip"), ""),
+            cls._arg_value(
+                args,
+                kwargs,
+                1,
+                ("idrac_username", "username", "redfish_username"),
+                "root",
+            ),
+            password_digest,
+            cls._arg_value(args, kwargs, 3, ("idrac_port", "port", "redfish_port"), 443),
+            cls._arg_value(args, kwargs, 4, ("insecure",), True),
+            cls._arg_value(args, kwargs, 6, ("is_http",), False),
+        )
 
     def __call__(cls, *args, **kwargs):
         """
@@ -249,9 +289,11 @@ class Singleton(type):
         :param kwargs:
         :return:
         """
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+        key = Singleton._connection_key(cls, args, kwargs)
+        with Singleton._lock:
+            if key not in cls._instances:
+                cls._instances[key] = super(Singleton, cls).__call__(*args, **kwargs)
+            return cls._instances[key]
 
 
 class BootSource(Enum):
