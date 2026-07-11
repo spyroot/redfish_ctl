@@ -27,12 +27,27 @@ spec:
         - name: mock-bmc
           image: redfish-ctl-mock-bmc:local
           imagePullPolicy: IfNotPresent
+          # Serve the corpus AND accept order-independent writes so the
+          # node-profile controller's plan/approve/apply path has somewhere to
+          # write. Mutation-rules mode is transparent to reads (overlays are
+          # empty until a write), so the endpoint read path is unaffected.
+          args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --mutation-rules
+            - /rules/supermicro_gb300.yaml
           ports:
             - name: http
               containerPort: 8080
           env:
             - name: MOCK_BMC_CORPUS_DIR
               value: /corpus/172.25.230.37
+          volumeMounts:
+            - name: mutation-rules
+              mountPath: /rules
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /redfish/v1/
@@ -58,6 +73,11 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
+      volumes:
+        # Populated by run-sandbox.sh from tests/mutation_rules/supermicro_gb300.yaml
+        - name: mutation-rules
+          configMap:
+            name: mock-bmc-mutation-rules
 ---
 apiVersion: v1
 kind: Service

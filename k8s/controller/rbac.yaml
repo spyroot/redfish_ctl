@@ -36,6 +36,27 @@ rules:
       - get
       - patch
       - update
+  # The node-profile controller runs in the same process and watches
+  # RedfishNodeProfile objects, patching their /status subresource with the
+  # plan/approve/apply outcome. Same shape as the endpoint grant above.
+  - apiGroups:
+      - redfish.ctl.dev
+    resources:
+      - redfishnodeprofiles
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+  - apiGroups:
+      - redfish.ctl.dev
+    resources:
+      - redfishnodeprofiles/status
+    verbs:
+      - get
+      - patch
+      - update
   - apiGroups:
       - ""
     resources:
