@@ -280,7 +280,8 @@ def test_kopf_handler_reports_reconciler_load_errors_as_status(monkeypatch) -> N
 
     monkeypatch.setattr(module, "reconcile_profile", fake_reconcile_profile)
 
-    patch = module.reconcile_redfish_node_profile(
+    patch: dict = {}
+    result = module.reconcile_redfish_node_profile(
         spec={
             "endpoint": {"address": "mock-bmc"},
             "desiredState": {"biosProfile": "gb300-power-capped"},
@@ -289,8 +290,12 @@ def test_kopf_handler_reports_reconciler_load_errors_as_status(monkeypatch) -> N
         namespace="default",
         name="node-a",
         logger=None,
+        patch=patch,
     )
 
+    # Status is applied via the injected patch; the handler returns None so kopf
+    # does not persist a result under a status field the structural CRD rejects.
+    assert result is None
     assert patch["status"]["dryRun"] is True
     assert patch["status"]["drift"] is None
     conditions = {item["type"]: item for item in patch["status"]["conditions"]}

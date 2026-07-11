@@ -76,8 +76,20 @@ wait_for_endpoint() {
 				-o 'jsonpath={.status.powerState}' 2>/dev/null || true
 		)"
 		if [ -n "$power_state" ]; then
-			printf 'RedfishEndpoint %s powerState=%s\n' "$endpoint_name" "$power_state"
-			return 0
+			case "$power_state" in
+			On | Off | PoweringOn | PoweringOff | Paused)
+				printf 'RedfishEndpoint %s powerState=%s\n' \
+					"$endpoint_name" "$power_state"
+				return 0
+				;;
+			*)
+				# A populated but non-Redfish value means the controller
+				# wrote garbage; fail instead of passing on any non-empty string.
+				printf 'RedfishEndpoint %s reported invalid powerState=%s\n' \
+					"$endpoint_name" "$power_state" >&2
+				return 1
+				;;
+			esac
 		fi
 		sleep 5
 	done
@@ -87,6 +99,38 @@ wait_for_endpoint() {
 	kubectl_sandbox -n "${NAMESPACE}" get redfishendpoint "$endpoint_name" \
 		-o yaml || true
 	return 1
+}
+
+assert_corpus_status() {
+	# The corpus-mock backend is deterministic: the committed GB300 system_0
+	# reports health OK and a non-empty thermal set. Assert the controller
+	# surfaced those, not just that some status was written.
+	local endpoint_name="$1"
+	local health temp_count
+
+	health="$(
+		kubectl_sandbox -n "${NAMESPACE}" \
+			get redfishendpoint "$endpoint_name" \
+			-o 'jsonpath={.status.health}' 2>/dev/null || true
+	)"
+	temp_count="$(
+		kubectl_sandbox -n "${NAMESPACE}" \
+			get redfishendpoint "$endpoint_name" \
+			-o 'jsonpath={.status.temperature.count}' 2>/dev/null || true
+	)"
+
+	if [ "$health" != "OK" ]; then
+		printf 'RedfishEndpoint %s expected health=OK, got %s\n' \
+			"$endpoint_name" "$health" >&2
+		return 1
+	fi
+	if ! [ "$temp_count" -ge 1 ] 2>/dev/null; then
+		printf 'RedfishEndpoint %s expected temperature.count>=1, got %s\n' \
+			"$endpoint_name" "$temp_count" >&2
+		return 1
+	fi
+	printf 'RedfishEndpoint %s status verified: health=%s temperature.count=%s\n' \
+		"$endpoint_name" "$health" "$temp_count"
 }
 
 validate_backends
@@ -166,6 +210,7 @@ kubectl_sandbox -n "${NAMESPACE}" \
 section "waiting for RedfishEndpoint status"
 if has_backend "corpus-mock"; then
 	wait_for_endpoint gb300-mock
+	assert_corpus_status gb300-mock
 fi
 if has_backend "ilo-sim"; then
 	wait_for_endpoint ilo-sim

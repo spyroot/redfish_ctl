@@ -192,15 +192,21 @@ def poll_redfish_endpoint(
     logger: Any | None = None,
     patch: MutableMapping[str, Any] | None = None,
     **_: Any,
-) -> dict[str, Any]:
-    """Kopf callback that updates only the RedfishEndpoint status subresource."""
+) -> None:
+    """Kopf callback that updates only the RedfishEndpoint status subresource.
+
+    Status is written through the injected ``patch`` object; the handler
+    returns ``None`` on purpose. Returning a value makes kopf persist it under
+    ``status.poll_redfish_endpoint``, a field the structural CRD schema
+    rejects, which surfaces a "merge-patching finished with inconsistencies"
+    warning on every poll.
+    """
     credentials = load_secret_credentials(namespace, spec.get("secretRef"))
     status = poll_endpoint(spec, credentials=credentials)
     if patch is not None:
         patch.setdefault("status", {}).update(status)
     if logger is not None:
         logger.info("polled RedfishEndpoint %s/%s", namespace or "", name or "")
-    return {"status": status}
 
 
 if kopf is not None:  # pragma: no cover - decorator wiring is runtime-only.
