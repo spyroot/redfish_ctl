@@ -97,6 +97,7 @@ from .component_integrity.cmd_component_integrity import *
 from .network.cmd_network_adapters import *
 from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *
+from .events.cmd_event_service import *
 from .events.cmd_event_submit_test import *
 from .compute.cmd_system_reset import *
 from .logs.cmd_logs import *
