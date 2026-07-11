@@ -180,6 +180,8 @@ Safety labels:
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
 | `thermal` | Read Chassis `ThermalSubsystem` links, ThermalMetrics temperature readings, and fan collection counts from `redfish_ctl/thermal/cmd_thermal.py`. | Read |
 | `vm-mount` | Mount/unmount an ISO via Supermicro OEM virtual media (CfgCD). | Write |
+| `volume-create` | Create a Redfish volume; previews unless `--confirm` is given. | Guarded |
+| `volume-delete` | Delete a Redfish volume; requires `--confirm` and `--confirm_volume_id`. | Guarded |
 | `volume-get` | Read one volume from a storage device. | Read |
 | `volume-init` | Initialize a volume. | Write |
 | `volumes` | Read virtual disk data. | Read |

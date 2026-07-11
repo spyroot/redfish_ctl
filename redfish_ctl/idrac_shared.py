@@ -29,6 +29,8 @@ class ApiRequestType(Enum):
     Drives = auto()
     VolumeInit = auto()
     VolumeQuery = auto()
+    VolumeCreate = auto()
+    VolumeDelete = auto()
     ImportOneTimeBoot = auto()
 
     # dell oem
