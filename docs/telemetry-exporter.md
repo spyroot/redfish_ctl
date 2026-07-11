@@ -3,8 +3,72 @@
 Author: Mus <spyroot@gmail.com>
 
 `redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`, is the read-only path for
-turning BMC Redfish telemetry into metrics. I use it when the BMC can see hardware state that an
+turning BMC Redfish telemetry into metrics. Reach for it when the BMC can see hardware state that an
 in-band host collector misses: chassis power, fans, voltages, GPU power, and NVLink fabric counters.
+
+## Deployment Model: One Exporter Per BMC
+
+The exporter follows one rule: **one exporter, one BMC, one metric stream.** A running exporter
+polls a single BMC and publishes that BMC's metrics — nothing else. It never combines streams from
+several servers; merging, routing, and fleet-wide views are the job of the tools built for that (an
+OpenTelemetry Collector or Prometheus), which every telemetry pipeline already runs.
+
+This keeps the exporter small and predictable. A slow or dead BMC affects only its own stream, so
+one bad server never blocks the view of the rest. Monitoring more servers means starting more
+copies — the code never changes, only the count. And when one stream goes quiet, there is no
+ambiguity about which server it was.
+
+### On Kubernetes
+
+Two long-running pieces cooperate:
+
+- The **controller** (under `k8s/controller/`) watches `RedfishEndpoint` resources — one per BMC —
+  and keeps each resource's status (power state, health, temperature summary) up to date for
+  anything in the cluster that reads Kubernetes objects.
+- One **exporter pod per BMC** streams that BMC's metrics. Each pod either pushes OTLP to the
+  cluster's OpenTelemetry Collector (the standard agent/gateway most clusters already run — set
+  `OTEL_EXPORTER_OTLP_ENDPOINT` to its service address) or serves `/metrics` for Prometheus to
+  scrape per pod. Credentials come from a per-BMC Secret, never from the image.
+
+Adding server nineteen to the rack means adding one `RedfishEndpoint` and one exporter pod. The
+scheduler spreads the pods, the Collector merges the streams, and nothing existing is touched.
+
+### On Bare Metal
+
+No cluster is needed: each exporter is just a process. systemd runs one instance per BMC from a
+single template unit:
+
+```ini
+# /etc/systemd/system/redfish-exporter@.service
+[Unit]
+Description=Redfish telemetry exporter for BMC %i
+
+[Service]
+EnvironmentFile=/etc/redfish-exporter/%i.env
+ExecStart=/usr/local/bin/redfish_ctl exporter --output otlp
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Each instance reads its own environment file (`/etc/redfish-exporter/bmc-01.env` and so on) holding
+that BMC's `REDFISH_IP`, credentials, and the Collector endpoint. Eighteen BMCs are eighteen small
+files and one command:
+
+```bash
+systemctl enable --now redfish-exporter@bmc-{01..18}
+```
+
+Rotating a credential means updating that BMC's file and restarting that one unit. For a combined
+view, run an OpenTelemetry Collector (or Prometheus) on the same host or rack and point every
+instance at it — the aggregation stays in the aggregator.
+
+### Sizing
+
+This model is sized for tens up to a couple hundred BMCs per site. Far beyond that, shard the
+exporters across several hosts; do not look for a mode where one process owns the whole fleet —
+that mode deliberately does not exist.
 
 ## What It Reads
 
