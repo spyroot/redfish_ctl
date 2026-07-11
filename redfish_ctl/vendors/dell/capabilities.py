@@ -47,6 +47,26 @@ DELL_EVIDENCE = {
     "lifecycle_events_sse": DELL_EVENT_SERVICE_EVIDENCE,
 }
 
+DELL_SUPPORTED_RESOURCES = (
+    "/redfish/v1",
+    "/redfish/v1/Systems",
+    "/redfish/v1/Chassis",
+    "/redfish/v1/Managers",
+    "/redfish/v1/UpdateService",
+    "/redfish/v1/EventService",
+    "/redfish/v1/JobService",
+    "/redfish/v1/AccountService",
+)
+
+DELL_SUPPORTED_ACTIONS = (
+    "#ComputerSystem.Reset",
+    "#Chassis.Reset",
+    "#Manager.Reset",
+    "#UpdateService.SimpleUpdate",
+    "#DellJobService.CreateRebootJob",
+    "#EventService.SubmitTestEvent",
+)
+
 DELL = register(
     VendorCapabilities(
         vendor="dell",
@@ -64,5 +84,7 @@ DELL = register(
         schedulable_uris=DELL_SCHEDULABLE_URIS,
         lifecycle_events_sse=True,
         evidence=DELL_EVIDENCE,
+        supported_resources=DELL_SUPPORTED_RESOURCES,
+        supported_actions=DELL_SUPPORTED_ACTIONS,
     )
 )

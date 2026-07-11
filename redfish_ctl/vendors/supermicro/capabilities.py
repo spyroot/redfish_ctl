@@ -12,6 +12,26 @@ Author Mus spyroot@gmail.com
 """
 from ..base import VendorCapabilities, register
 
+SUPERMICRO_SUPPORTED_RESOURCES = (
+    "/redfish/v1",
+    "/redfish/v1/Systems",
+    "/redfish/v1/Chassis",
+    "/redfish/v1/Managers",
+    "/redfish/v1/UpdateService",
+    "/redfish/v1/EventService",
+    "/redfish/v1/TelemetryService",
+    "/redfish/v1/AccountService",
+)
+
+SUPERMICRO_SUPPORTED_ACTIONS = (
+    "#ComputerSystem.Reset",
+    "#Chassis.Reset",
+    "#Manager.Reset",
+    "#NetworkAdapter.Reset",
+    "#NvidiaWorkloadPower.EnableProfiles",
+    "#Control.ResetToDefaults",
+)
+
 SUPERMICRO = register(
     VendorCapabilities(
         vendor="supermicro",
@@ -26,5 +46,7 @@ SUPERMICRO = register(
         query_only=False,
         job_scheduling=False,
         one_recurring_job_per_type=False,
+        supported_resources=SUPERMICRO_SUPPORTED_RESOURCES,
+        supported_actions=SUPERMICRO_SUPPORTED_ACTIONS,
     )
 )
