@@ -1,0 +1,66 @@
+# HPE iLO Redfish emulator image for the Kubernetes sandbox.
+#
+# Build:
+#   docker build -f docker/Dockerfile.ilo-sim -t redfish-ctl-ilo-sim:local .
+FROM alpine:3.21 AS source
+
+ARG ILO_EMULATOR_REF=v1.1.0
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates git \
+    && git clone \
+    --depth 1 \
+    --branch "${ILO_EMULATOR_REF}" \
+    https://github.com/HewlettPackard/ilo-redfish-emulator.git \
+    /src
+
+FROM python:3.12-alpine
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:${PATH}" \
+    MOCKUP_FOLDER=DL380a \
+    ASYNC_SLEEP=0 \
+    PORT=8443
+
+RUN addgroup -S -g 10001 ilosim \
+    && adduser \
+        -S \
+        -D \
+        -u 10001 \
+        -G ilosim \
+        -h /home/ilosim \
+        ilosim
+
+WORKDIR /app
+
+COPY --from=source /src/src/requirements.txt /tmp/requirements.txt
+# hadolint ignore=DL3018
+RUN apk add --no-cache curl libffi openssl \
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        cargo \
+        gcc \
+        libffi-dev \
+        musl-dev \
+        openssl-dev \
+        python3-dev \
+    && python -m venv /opt/venv \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && pip check \
+    && apk del .build-deps \
+    && rm -rf /root/.cache/pip /tmp/requirements.txt
+
+COPY --from=source --chown=ilosim:ilosim /src/src /app
+COPY --from=source --chown=ilosim:ilosim \
+    /src/mockups \
+    /app/api_emulator/redfish/static
+
+USER ilosim
+
+EXPOSE 8443
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -fk https://127.0.0.1:8443/redfish/v1/ >/dev/null
+
+ENTRYPOINT ["python3", "emulator.py"]
