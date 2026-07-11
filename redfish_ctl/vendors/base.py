@@ -38,6 +38,11 @@ class VendorCapabilities:
     # Redfish Lifecycle Events over Server-Sent Events.
     lifecycle_events_sse: bool = False
 
+    # Fixture-backed conformance claims. Keep these empty until a committed
+    # vendor tree proves the resource root or action exists for that vendor.
+    supported_resources: Tuple[str, ...] = field(default_factory=tuple)
+    supported_actions: Tuple[str, ...] = field(default_factory=tuple)
+
     # Capability-field name -> short local fixture/source provenance note.
     evidence: Mapping[str, str] = field(default_factory=dict, compare=False, hash=False)
 
