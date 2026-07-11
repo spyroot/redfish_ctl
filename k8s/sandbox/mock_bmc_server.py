@@ -252,10 +252,17 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
             return
 
         replay = self._replay_state()
-        overlay = replay.overlay_for(self.path) if replay is not None else {}
-        if overlay:
+        replay_overlay = replay.overlay_for(self.path) if replay is not None else {}
+        identity = getattr(type(self), "identity_overlay", {})
+        identity_overlay = identity.get(
+            _normalize_request_path(self.path).lower(), {}
+        )
+        if replay_overlay or identity_overlay:
             payload = json.loads(fixture.read_text(encoding="utf-8"))
-            _deep_update(payload, overlay)
+            if identity_overlay:
+                _deep_update(payload, identity_overlay)
+            if replay_overlay:
+                _deep_update(payload, replay_overlay)
             content = json.dumps(payload, sort_keys=True).encode("utf-8")
         else:
             content = fixture.read_bytes()
@@ -374,6 +381,30 @@ def _deep_update(target: dict[str, Any], overlay: dict[str, Any]) -> None:
             target[key] = value
 
 
+def identity_overlay_from_env() -> dict[str, dict[str, Any]]:
+    """Per-pod identity overlay from ``MOCK_BMC_RACK`` / ``MOCK_BMC_SLOT``.
+
+    Lets one committed corpus image serve as many DISTINCT BMCs: each pod
+    overlays its own serial and name onto the System and Manager resources so
+    inventory reads report a unique node (``GB300-R<rack>-S<slot>``). Only
+    non-structural fields are overlaid — never ``Id`` or ``@odata.id``, which
+    the link-walk depends on. Returns an empty overlay when neither env var is
+    set, so a single-node sandbox is unchanged.
+    """
+    rack = os.environ.get("MOCK_BMC_RACK", "").strip()
+    slot = os.environ.get("MOCK_BMC_SLOT", "").strip()
+    if not rack and not slot:
+        return {}
+    node = f"GB300-R{rack or '0'}-S{(slot or '0').zfill(2)}"
+    return {
+        "/redfish/v1/systems/system_0": {"SerialNumber": node, "Name": node},
+        "/redfish/v1/managers/bmc_0": {
+            "SerialNumber": node,
+            "Name": f"{node}-BMC",
+        },
+    }
+
+
 def make_handler(
     corpus_dir: Path,
     replay_trace: Path | None = None,
@@ -393,6 +424,7 @@ def make_handler(
         if replay_trace is not None
         else None
     )
+    Handler.identity_overlay = identity_overlay_from_env()
     return Handler
 
 
