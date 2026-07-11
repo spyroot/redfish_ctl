@@ -194,6 +194,7 @@ class Exporter(IDracManager,
                         do_async: bool = False,
                         do_expanded: bool = False) -> list:
         """Scrape all supported read-only telemetry paths and build samples."""
+        started_at = exporter.time.monotonic()
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor),
@@ -211,7 +212,7 @@ class Exporter(IDracManager,
                                          do_async=do_async, do_expanded=do_expanded)
         component_rows = self._invoke_rows(ApiRequestType.ComponentIntegrity, "component-integrity",
                                            do_async=do_async, do_expanded=do_expanded)
-        return build_metric_samples(
+        samples = build_metric_samples(
             identity=identity,
             environment_rows=environment_rows,
             sensor_rows=sensor_rows,
@@ -222,6 +223,12 @@ class Exporter(IDracManager,
             network_rows=network_rows,
             component_integrity_rows=component_rows,
         )
+        samples.extend(exporter.scrape_health_samples(
+            identity,
+            ok=bool(samples),
+            duration_seconds=exporter.time.monotonic() - started_at,
+        ))
+        return samples
 
     def execute(self,
                 filename: Optional[str] = None,

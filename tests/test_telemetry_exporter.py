@@ -360,6 +360,24 @@ def test_leak_detection_mapper_emits_state_gauges_with_detector_dimensions():
     assert REQUIRED_DIMS <= set(ok_sample.dimensions)
 
 
+def test_scrape_health_samples_report_success_and_duration():
+    """Each exporter scrape reports a health gauge and duration sample."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    samples = exporter_mod.scrape_health_samples(
+        dims,
+        ok=True,
+        duration_seconds=1.25,
+    )
+
+    by_metric = {sample.metric: sample for sample in samples}
+    assert by_metric["hw.scrape.ok"].value == 1
+    assert by_metric["hw.scrape.ok"].dimensions["source"] == "exporter"
+    assert by_metric["hw.scrape.duration_seconds"].value == pytest.approx(1.25)
+    assert by_metric["hw.scrape.duration_seconds"].unit == "s"
+    assert REQUIRED_DIMS <= set(by_metric["hw.scrape.ok"].dimensions)
+
+
 def test_prometheus_text_preserves_contract_names_and_dimensions():
     """Prometheus text output carries hw.* names and dotted OTel dimensions."""
     sample = MetricSample(
@@ -481,6 +499,16 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     gauges = result.data["gauge"]
     metrics = {point["metric"] for point in gauges}
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes", "hw.leak.state"} <= metrics
+    assert {"hw.scrape.ok", "hw.scrape.duration_seconds"} <= metrics
+    scrape_ok = next(point for point in gauges if point["metric"] == "hw.scrape.ok")
+    scrape_duration = next(
+        point for point in gauges
+        if point["metric"] == "hw.scrape.duration_seconds"
+    )
+    assert scrape_ok["value"] == 1
+    assert scrape_ok["dimensions"]["source"] == "exporter"
+    assert scrape_duration["value"] >= 0
+    assert scrape_duration["dimensions"]["source"] == "exporter"
     assert {
         "hw.gpu.clock_mhz",
         "hw.gpu.compute.utilization",
@@ -510,6 +538,47 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     assert thermal_points
     assert {"chassis", "sensor", "zone"} <= set(thermal_points[0]["dimensions"])
     assert all(recorded.method != "POST" for recorded in service.requests)
+
+
+def test_signalfx_push_loop_jitters_sleep(monkeypatch):
+    """Long-running push mode offsets the poll interval to avoid scrape bursts."""
+    samples = [
+        MetricSample(
+            metric="hw.scrape.ok",
+            value=1,
+            dimensions=build_identity_dimensions("172.25.230.29", vendor="supermicro")
+            | {"source": "exporter"},
+        )
+    ]
+    pushes = []
+
+    def fake_push(body, token, ingest_url, timeout=20.0):
+        pushes.append((body, token, ingest_url, timeout))
+        return 200
+
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+        raise RuntimeError("stop loop")
+
+    monotonic_values = iter([100.0, 105.0])
+    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(exporter_mod.random, "random", lambda: 1.0)
+    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+
+    with pytest.raises(RuntimeError, match="stop loop"):
+        exporter_mod.run_signalfx_loop(
+            lambda: samples,
+            "token",
+            "https://ingest.us1.signalfx.com/v2/datapoint",
+            interval=30.0,
+            timeout=1.0,
+        )
+
+    assert len(pushes) == 1
+    assert sleep_calls == [pytest.approx(28.0)]
 
 
 def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manager):

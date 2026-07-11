@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 import re
 import time
 import urllib.request
@@ -110,6 +111,7 @@ DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
 # datapoint endpoint (…/v2/datapoint), never a bare host.
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
+POLL_JITTER_FRACTION = 0.10
 
 
 @dataclass(frozen=True)
@@ -238,6 +240,43 @@ def build_metric_samples(
     samples.extend(samples_from_network_rows(network_rows, identity))
     samples.extend(samples_from_component_integrity_rows(component_integrity_rows, identity))
     return samples
+
+
+def scrape_health_samples(
+        identity: Mapping[str, str],
+        ok: bool,
+        duration_seconds: float) -> list[MetricSample]:
+    """Return per-scrape liveness and duration samples."""
+    dims = _with_dims(identity, source="exporter")
+    duration = _as_float(duration_seconds)
+    return [
+        _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
+        _sample(
+            "hw.scrape.duration_seconds",
+            max(0.0, duration if duration is not None else 0.0),
+            dims,
+            "s",
+        ),
+    ]
+
+
+def jittered_interval(
+        interval: float,
+        jitter_fraction: float = POLL_JITTER_FRACTION,
+        random_value: Optional[float] = None) -> float:
+    """Return ``interval`` offset by a bounded symmetric jitter fraction."""
+    base = _as_float(interval)
+    if base is None or base <= 0:
+        base = 1.0
+    fraction = _as_float(jitter_fraction)
+    if fraction is None or fraction < 0:
+        fraction = 0.0
+    draw = random.random() if random_value is None else random_value
+    try:
+        bounded = min(1.0, max(0.0, float(draw)))
+    except (TypeError, ValueError):
+        bounded = 0.5
+    return base * (1.0 - fraction + (2.0 * fraction * bounded))
 
 
 def samples_from_environment_rows(
@@ -677,7 +716,7 @@ def run_signalfx_loop(
         start = time.monotonic()
         push_signalfx(to_signalfx_body(scrape_samples()), token, ingest_url, timeout=timeout)
         elapsed = time.monotonic() - start
-        time.sleep(max(1.0, interval - elapsed))
+        time.sleep(max(1.0, jittered_interval(interval) - elapsed))
 
 
 def _reading(field):

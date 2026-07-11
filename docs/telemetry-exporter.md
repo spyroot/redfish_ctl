@@ -70,6 +70,27 @@ This model is sized for tens up to a couple hundred BMCs per site. Far beyond th
 exporters across several hosts; do not look for a mode where one process owns the whole fleet —
 that mode deliberately does not exist.
 
+## Consumption Models
+
+Different consumers use the same Redfish read paths under different latency and liveness
+assumptions. Treat each mode separately when tuning or debugging.
+
+| Consumer | Where it runs | Latency envelope | Concurrency and caching | Optimize |
+|---|---|---|---|---|
+| Interactive CLI | Operator laptop or jump host | Often WAN/VPN, about 100-800 ms RTT | One BMC, one-shot command, per-connection caching and keep-alive | Clear errors, bounded request count, no hidden writes |
+| Exporter daemon | One process or pod per BMC | Usually in-rack or same-site | No cross-BMC fan-out; one stream per process, supervised by systemd or Kubernetes | Per-BMC scrape cost, health metrics, bounded sampler work |
+| Kubernetes controller/operator | In-cluster controller polling `RedfishEndpoint` resources | Cluster-to-BMC network path | One reconcile loop per endpoint; Kubernetes stores observed status | Status freshness, safe retry/backoff, no automatic mutation without approval |
+| Fleet CLI/proxy | Jump host or in-DC service | Mixed; usually closer to the BMC network than an operator laptop | Bounded read-only fan-out across BMCs; not a telemetry streamer | Per-node isolation, partial-failure reporting, request budgets |
+
+The exporter daemon deliberately keeps many shallow liveness domains: one child process or pod can
+fail, restart, or rotate credentials without disrupting the rest of the fleet. Aggregation belongs
+in the OpenTelemetry Collector or Prometheus, not inside `redfish_ctl`.
+
+Every completed scrape adds `hw.scrape.ok` and `hw.scrape.duration_seconds` so downstream alerts can
+distinguish an alive exporter with a bad scrape from a missing process or route. Long-running
+SignalFx push mode also offsets each sleep interval by plus or minus ten percent to avoid many BMCs
+being polled at the same instant.
+
 ## What It Reads
 
 - Chassis, Processor, and Memory `EnvironmentMetrics` resources, discovered by the

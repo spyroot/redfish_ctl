@@ -19,9 +19,11 @@ def test_exporter_once_returns_prometheus_metrics_from_mock_reads(
 
     assert isinstance(result, CommandResult)
     assert result.error is None
-    assert result.extra == {"sample_count": 3}
+    assert result.extra == {"sample_count": 5}
     assert isinstance(result.data, str)
     assert "hw.temperature" in result.data
+    assert "hw.scrape.ok" in result.data
+    assert "hw.scrape.duration_seconds" in result.data
     assert 'vendor="dell"' in result.data
     assert redfish_service.requests
     assert {request.method for request in redfish_service.requests} == {"GET"}
