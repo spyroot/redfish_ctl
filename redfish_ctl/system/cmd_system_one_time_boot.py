@@ -1,9 +1,11 @@
-"""iDRAC import system config from json file.
+"""iDRAC set a one-time boot device via a system-configuration import.
 
-Command provides the option to import configuration.
+Sends an ImportSystemConfiguration request whose buffer enables BootOnce and
+selects the first boot device, then optionally reboots. Distinct from the
+general ``system-import`` command, which imports the SCP file supplied by
+``--config`` verbatim.
 
-python redfish_ctl.py system-export --filename system.json
-python redfish_ctl.py system-import --config system.json
+python redfish_ctl.py system-onetime-boot --config system.json
 
 Author Mus spyroot@gmail.com
 """
@@ -12,10 +14,9 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_exceptions import PostRequestFailed
+from ..cmd_exceptions import InvalidArgument, PostRequestFailed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -57,8 +58,11 @@ class ImportOneTimeBoot(
                                   "Default and minimum value is 300 seconds. "
                                   "Maximum value is 3600 seconds..")
 
-        help_text = "command import system configuration"
-        return cmd_arg, "system-import", help_text
+        help_text = "command set a one-time boot device via system-config import"
+        # Distinct from ImportSystemConfig's "system-import": a shared subcommand
+        # name silently clobbers dispatch on Python 3.10 and raises
+        # argparse.ArgumentError when the parser is built on 3.11+.
+        return cmd_arg, "system-onetime-boot", help_text
 
     def execute(self,
                 config: str,
@@ -111,7 +115,7 @@ class ImportOneTimeBoot(
 
         path_config = Path(config).expanduser().resolve()
         if not path_config.is_file():
-            raise InvalidArgument(f"Invalid path to a config file.")
+            raise InvalidArgument("Invalid path to a config file.")
 
         buf = "<SystemConfiguration>""<Component FQDD=\"iDRAC.Embedded.1\">" \
               "<Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>" \
