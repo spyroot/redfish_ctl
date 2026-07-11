@@ -9,6 +9,8 @@ from redfish_ctl.api import (
     BiosProfileApplyResult,
     BiosProfileAttributeDiff,
     BiosProfileDiffResult,
+    BiosProfileSpec,
+    BiosProfileSummary,
     FanReading,
     GpuMetricRow,
     GpuMetricsStatus,
@@ -23,6 +25,8 @@ from redfish_ctl.api import (
     ThermalStatus,
     bios_profile_apply,
     bios_profile_diff,
+    bios_profile_list,
+    bios_profile_show,
     get_gpu_metrics,
     get_sensors,
     get_system,
@@ -575,6 +579,104 @@ def test_bios_profile_diff_returns_typed_attribute_rows():
     ]
 
 
+def test_bios_profile_list_returns_typed_summary_rows():
+    """bios_profile_list exposes committed catalog summaries for services."""
+    payload = [
+        {
+            "name": "gb300-power-capped",
+            "vendor": "supermicro",
+            "model": "GB300",
+            "description": "Smooth rack-level power draw.",
+            "risk": "medium",
+        },
+        {
+            "name": "dell-cstates-off",
+            "vendor": "dell",
+            "model": "PowerEdge",
+            "description": "Disable processor C-states.",
+            "risk": "low",
+        },
+    ]
+    manager = RecordingManager({
+        (ApiRequestType.BiosProfile, "bios-profile"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    summaries = bios_profile_list(manager)
+
+    assert summaries == (
+        BiosProfileSummary(
+            name="gb300-power-capped",
+            vendor="supermicro",
+            model="GB300",
+            description="Smooth rack-level power draw.",
+            risk="medium",
+            raw=payload[0],
+        ),
+        BiosProfileSummary(
+            name="dell-cstates-off",
+            vendor="dell",
+            model="PowerEdge",
+            description="Disable processor C-states.",
+            risk="low",
+            raw=payload[1],
+        ),
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            {"action": "list"},
+        )
+    ]
+
+
+def test_bios_profile_show_returns_typed_profile_spec():
+    """bios_profile_show exposes the selected profile attributes."""
+    payload = {
+        "name": "gb300-power-capped",
+        "vendor": "supermicro",
+        "model": "GB300",
+        "description": "Smooth rack-level power draw.",
+        "risk": "medium",
+        "attributes": {"ServerPowerControl": "Efficiency"},
+    }
+    manager = RecordingManager({
+        (ApiRequestType.BiosProfile, "bios-profile"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    profile = bios_profile_show(manager, "gb300-power-capped")
+
+    assert profile == BiosProfileSpec(
+        name="gb300-power-capped",
+        vendor="supermicro",
+        model="GB300",
+        description="Smooth rack-level power draw.",
+        risk="medium",
+        attributes={"ServerPowerControl": "Efficiency"},
+        raw=payload,
+    )
+    assert manager.calls == [
+        (
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            {
+                "action": "show",
+                "profile_name": "gb300-power-capped",
+            },
+        )
+    ]
+
+
 def test_bios_profile_apply_previews_by_default():
     """bios_profile_apply delegates to apply without confirming by default."""
     payload = {
@@ -614,6 +716,55 @@ def test_bios_profile_apply_previews_by_default():
                 "action": "apply",
                 "profile_name": "gb300-power-capped",
                 "confirm": False,
+                "dry_run": False,
+            },
+        )
+    ]
+
+
+def test_bios_profile_apply_confirms_when_requested():
+    """bios_profile_apply forwards explicit confirmation to the guarded command."""
+    payload = {
+        "profile": "dell-cstates-off",
+        "dry_run": False,
+        "change": {"Attributes": {"ProcCStates": "Disabled"}},
+        "rollback": {"Attributes": {"ProcCStates": "Enabled"}},
+        "staged": {
+            "Attributes": {"ProcCStates": "Disabled"},
+            "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
+        },
+    }
+    manager = RecordingManager({
+        (ApiRequestType.BiosProfile, "bios-profile"): CommandResult(
+            payload,
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = bios_profile_apply(manager, "dell-cstates-off", confirm=True)
+
+    assert result == BiosProfileApplyResult(
+        profile="dell-cstates-off",
+        dry_run=False,
+        change=payload["change"],
+        rollback=payload["rollback"],
+        staged=payload["staged"],
+        raw=payload,
+    )
+    assert result.staged == {
+        "Attributes": {"ProcCStates": "Disabled"},
+        "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
+    }
+    assert manager.calls == [
+        (
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            {
+                "action": "apply",
+                "profile_name": "dell-cstates-off",
+                "confirm": True,
                 "dry_run": False,
             },
         )
