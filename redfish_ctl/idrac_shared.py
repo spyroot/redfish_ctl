@@ -89,6 +89,7 @@ class ApiRequestType(Enum):
     Thermal = auto()
     Power = auto()
     PowerSmoothing = auto()
+    WorkloadPower = auto()
     LeakDetectors = auto()
     EnvironmentMetrics = auto()
     ProcessorMetrics = auto()

@@ -187,6 +187,7 @@ Safety labels:
 | `volume-init` | Initialize a volume. | Write |
 | `volumes` | Read virtual disk data. | Read |
 | `wait` | Wait for the BMC Redfish service to be reachable (e.g. after a reboot). | Read |
+| `workload-power` | Enable or disable an NVIDIA WorkloadPower profile mask; previews by default and `--confirm` posts the action. | Guarded |
 
 ## Vendor-Neutral Telemetry Reads
 

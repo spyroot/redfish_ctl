@@ -84,6 +84,7 @@ from .sensors.cmd_sensors import *
 from .thermal.cmd_thermal import *
 from .power.cmd_power import *
 from .power.cmd_power_smoothing import *
+from .power.cmd_workload_power import *
 from .thermal.cmd_leak_detectors import *
 from .environment.cmd_environment_metrics import *
 from .metrics.cmd_processor_metrics import *
