@@ -29,6 +29,7 @@ from .redfish_exceptions import (
 )
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
+from .telemetry import tracing
 from .redfish_respond_error import RedfishError
 from .redfish_shared import (
     RedfishApi,
@@ -254,20 +255,22 @@ class RedfishManager:
         # opening a fresh TLS connection per request wedges fragile BMCs.
         session = self._http_session()
 
+        get_kwargs = {"verify": self._is_verify_cert, "timeout": timeout}
         if self._x_auth is not None:
-            headers.update(
-                {
-                    'X-Auth-Token': self._x_auth
-                }
-            )
-            return session.get(
-                req, verify=self._is_verify_cert, headers=headers, timeout=timeout
-            )
+            headers.update({'X-Auth-Token': self._x_auth})
         else:
-            return session.get(
-                req, verify=self._is_verify_cert,
-                auth=(self._username, self._password), timeout=timeout
-            )
+            get_kwargs["auth"] = (self._username, self._password)
+
+        # CLIENT span for the BMC call (no-op unless tracing is enabled). The BMC
+        # renders as one inferred downstream service via peer.service in tracing.
+        with tracing.client_span(req, "GET") as span:
+            try:
+                response = session.get(req, headers=headers, **get_kwargs)
+            except Exception as exc:  # timeout / connection error → failed span
+                tracing.record_exception(span, exc)
+                raise
+            tracing.record_response(span, response.status_code)
+            return response
 
     def get_with_query(
             self, req: str,
