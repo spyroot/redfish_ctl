@@ -203,3 +203,4 @@ tests/popen_test.py
 
 # De-duplicated corpus: the redundant orig/ backup tree is never committed
 tests/supermicro_gb300_corpus/json_responses/orig/
+bios_firmware/
