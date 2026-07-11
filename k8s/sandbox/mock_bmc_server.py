@@ -8,6 +8,7 @@ import copy
 import fnmatch
 import json
 import os
+import random
 import sys
 import threading
 from contextlib import contextmanager
@@ -248,7 +249,7 @@ class MutationRules(_OverlayStore):
     boot.
     """
 
-    def __init__(self, spec: dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any], *, seed: int = 0) -> None:
         super().__init__()
         self.vendor = str(spec.get("vendor") or "generic")
         rules = spec.get("rules") or []
@@ -256,10 +257,16 @@ class MutationRules(_OverlayStore):
             raise ValueError("mutation rules must be a list")
         self.rules = rules
         self._applied: list[str] = []
+        self._failed: list[str] = []
+        # Seeded RNG so stochastic failure injection is reproducible: the same
+        # seed replays the same sequence of injected failures (an RL harness
+        # varies the seed per episode). reset() re-seeds to the same value.
+        self._seed = int(seed)
+        self._rng = random.Random(self._seed)
 
     @classmethod
-    def from_file(cls, path: Path) -> "MutationRules":
-        return cls(_load_trace(path))
+    def from_file(cls, path: Path, *, seed: int = 0) -> "MutationRules":
+        return cls(_load_trace(path), seed=seed)
 
     def status(self) -> dict[str, Any]:
         with self._lock:
@@ -268,6 +275,8 @@ class MutationRules(_OverlayStore):
                 "vendor": self.vendor,
                 "total_rules": len(self.rules),
                 "applied": list(self._applied),
+                "failed": list(self._failed),
+                "seed": self._seed,
             }
 
     def reset(self, scenario: str | None = None) -> bool:
@@ -276,6 +285,8 @@ class MutationRules(_OverlayStore):
         with self._lock:
             self._overlays.clear()
             self._applied.clear()
+            self._failed.clear()
+            self._rng = random.Random(self._seed)
         return True
 
     def match_write(
@@ -296,11 +307,35 @@ class MutationRules(_OverlayStore):
             ]
             if not matched:
                 return None
+            # Stochastic failure injection: if a matched rule rolls a failure the
+            # whole write fails and no transitions apply (models e.g. a flaky
+            # reboot). Rules with no failure block never touch the RNG, so purely
+            # deterministic rules stay deterministic regardless of seed.
+            failure_response = self._roll_failure(matched)
+            if failure_response is not None:
+                return failure_response
             for rule in matched:
                 self._apply_transitions(rule.get("state_transitions") or [])
                 self._applied.append(str(rule.get("name") or "unnamed"))
             response = matched[0].get("response") or {}
             return response if isinstance(response, dict) else {"status": 204}
+
+    def _roll_failure(self, matched: list[dict[str, Any]]) -> dict[str, Any] | None:
+        for rule in matched:
+            failure = rule.get("failure")
+            if not isinstance(failure, dict):
+                continue
+            try:
+                probability = float(failure.get("probability", 0) or 0)
+            except (TypeError, ValueError):
+                probability = 0.0
+            if probability <= 0:
+                continue
+            if self._rng.random() < probability:
+                self._failed.append(str(rule.get("name") or "unnamed"))
+                response = failure.get("response") or {"status": 500}
+                return response if isinstance(response, dict) else {"status": 500}
+        return None
 
     def _effective_state(self, resource_path: str, corpus_lookup: Any) -> dict[str, Any]:
         path = _normalize_request_path(resource_path)
@@ -586,6 +621,7 @@ def make_handler(
     corpus_dir: Path,
     replay_trace: Path | None = None,
     mutation_rules: Path | None = None,
+    seed: int = 0,
 ) -> type[CorpusRequestHandler]:
     root = Path(corpus_dir)
     if not root.is_dir():
@@ -605,7 +641,7 @@ def make_handler(
         else None
     )
     Handler.mutation_rules = (
-        MutationRules.from_file(mutation_rules)
+        MutationRules.from_file(mutation_rules, seed=seed)
         if mutation_rules is not None
         else None
     )
@@ -620,6 +656,7 @@ def run_server(
     corpus_dir: Path,
     replay_trace: Path | None = None,
     mutation_rules: Path | None = None,
+    seed: int = 0,
 ) -> Iterator[ThreadingHTTPServer]:
     server = ThreadingHTTPServer(
         (host, port),
@@ -627,6 +664,7 @@ def run_server(
             corpus_dir,
             replay_trace=replay_trace,
             mutation_rules=mutation_rules,
+            seed=seed,
         ),
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -664,6 +702,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Optional order-independent mutation-rules file "
         "(matches on method/path/precondition; applies writes in any order).",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=int(os.environ.get("MOCK_BMC_SEED", "0") or "0"),
+        help="Seed for mutation-rules failure injection (default 0, "
+        "overridable via MOCK_BMC_SEED). Same seed replays the same failures.",
+    )
     return parser.parse_args(argv)
 
 
@@ -677,6 +722,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.corpus_dir,
                 replay_trace=args.replay,
                 mutation_rules=args.mutation_rules,
+                seed=args.seed,
             ),
         )
         host, port = server.server_address

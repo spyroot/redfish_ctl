@@ -366,3 +366,100 @@ def test_make_handler_rejects_replay_and_mutation_rules_together() -> None:
             replay_trace=GRACEFUL_RESTART_TRACE,
             mutation_rules=SUPERMICRO_RULES,
         )
+
+
+# --- stochastic failure injection (RL) -----------------------------------------
+
+FLAKY_RULES = REPO_ROOT / "tests" / "mutation_rules" / "supermicro_gb300_flaky.yaml"
+
+
+def _prob_engine(module, seed: int, probability: float):
+    """A one-rule engine whose write always matches and fails with `probability`."""
+    return module.MutationRules(
+        {
+            "vendor": "t",
+            "rules": [
+                {
+                    "name": "flaky",
+                    "method": "POST",
+                    "path": "/x",
+                    "failure": {"probability": probability, "response": {"status": 503}},
+                    "state_transitions": [
+                        {"op": "set", "path": "/x", "field": "n", "value": 1}
+                    ],
+                    "response": {"status": 204},
+                }
+            ],
+        },
+        seed=seed,
+    )
+
+
+def _sequence(engine, n: int) -> list[int]:
+    return [engine.match_write("POST", "/x", {}, lambda _p: {})["status"] for _ in range(n)]
+
+
+def test_failure_injection_is_reproducible_and_seed_dependent() -> None:
+    """The same seed replays the same failure sequence; a different seed differs."""
+    module = _load_server_module()
+    assert _sequence(_prob_engine(module, 0, 0.5), 40) == _sequence(
+        _prob_engine(module, 0, 0.5), 40
+    )
+    assert _sequence(_prob_engine(module, 0, 0.5), 40) != _sequence(
+        _prob_engine(module, 1, 0.5), 40
+    )
+
+
+def test_probability_one_always_fails_and_never_mutates_state() -> None:
+    """A certain failure returns the error and applies no state transition."""
+    module = _load_server_module()
+    engine = _prob_engine(module, 0, 1.0)
+    assert _sequence(engine, 5) == [503, 503, 503, 503, 503]
+    assert engine.overlay_for("/x") == {}  # no transition ever applied
+    assert engine.status()["failed"] == ["flaky"] * 5
+
+
+def test_zero_probability_and_missing_failure_block_stay_deterministic() -> None:
+    """Rules without an active failure block never touch the RNG or fail."""
+    module = _load_server_module()
+    assert _sequence(_prob_engine(module, 7, 0.0), 5) == [204, 204, 204, 204, 204]
+    # The committed GB300 rules carry no failure block, so any seed is deterministic.
+    rules = module.MutationRules.from_file(SUPERMICRO_RULES, seed=99)
+    resp = rules.match_write(
+        "POST",
+        "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
+        {"ResetType": "ForceOff"},
+        lambda _p: {"PowerState": "On"},
+    )
+    assert resp == {"status": 204}
+    assert rules.status()["failed"] == []
+
+
+def test_reset_replays_the_same_failure_sequence() -> None:
+    """Scenario reset re-seeds the RNG so an episode replays identically."""
+    module = _load_server_module()
+    engine = _prob_engine(module, 3, 0.5)
+    first = _sequence(engine, 20)
+    engine.reset()
+    assert _sequence(engine, 20) == first
+
+
+def test_flaky_reboot_fails_over_http_without_changing_power_state() -> None:
+    """With a seed that fails the first roll, a reset is rejected and power holds."""
+    module = _load_server_module()
+    # random.Random(1).random() ~= 0.134 < 0.3, so the first ForceOff reset fails.
+    with module.run_server(
+        "127.0.0.1", 0, GB300_CORPUS, mutation_rules=FLAKY_RULES, seed=1
+    ) as srv:
+        base = "http://{}:{}".format(*srv.server_address)
+        assert _http(base, SYSTEM)[1]["PowerState"] == "On"
+
+        status, payload = _http(base, RESET, "POST", {"ResetType": "ForceOff"})
+        assert status == 503
+        assert payload["error"]["message"].startswith("Reset action failed")
+        # A failed reboot leaves the system exactly as it was.
+        assert _http(base, SYSTEM)[1]["PowerState"] == "On"
+
+        _, replay_status = _http(base, "/__replay_status")
+        assert replay_status["seed"] == 1
+        assert "power-off-on-forceoff" in replay_status["failed"]
