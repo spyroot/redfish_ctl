@@ -1,0 +1,8 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#JsonSchemaFileCollection.JsonSchemaFileCollection",
+    "@odata.type": "#JsonSchemaFileCollection.JsonSchemaFileCollection",
+    "@odata.id": "/redfish/v1/JsonSchemas",
+    "Name": "Schema Repository",
+    "Description": "Schema Repository",
+    "Members@odata.count": 0
+}
