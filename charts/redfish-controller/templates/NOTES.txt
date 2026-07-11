@@ -1,0 +1,16 @@
+The Redfish controllers have been installed in namespace {{ .Release.Namespace }}.
+
+For resources that need BMC credentials, create a Secret in the same namespace
+as the custom resource. The default Secret keys are username and password:
+
+  kubectl create secret generic redfish-bmc -n {{ .Release.Namespace }} \
+    --from-literal=username='<user>' \
+    --from-literal=password='<password>'
+
+Reference it from RedfishEndpoint.spec.secretRef or
+RedfishNodeProfile.spec.endpoint.secretRef:
+
+  secretRef:
+    name: redfish-bmc
+
+The chart does not create or store BMC credentials.

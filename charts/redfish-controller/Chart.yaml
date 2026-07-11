@@ -1,0 +1,14 @@
+apiVersion: v2
+name: redfish-controller
+description: Helm chart for the redfish_ctl Kubernetes controllers.
+type: application
+version: 0.1.0
+appVersion: v1.2.0
+home: https://github.com/spyroot/redfish_ctl
+sources:
+  - https://github.com/spyroot/redfish_ctl
+keywords:
+  - redfish
+  - bmc
+  - bare-metal
+  - kubernetes
