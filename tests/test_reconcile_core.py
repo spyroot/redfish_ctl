@@ -49,6 +49,87 @@ def _key(**kwargs):
     return RecordingManager._call_key(kwargs)
 
 
+def test_desired_state_rejects_boolean_reboot_shortcut():
+    """A reboot request must name the reset type instead of using truthy shorthand."""
+    with pytest.raises(ValueError, match="reboot.resetType"):
+        DesiredState.from_mapping({"reboot": True})
+
+
+def test_reconcile_skips_ntp_when_manager_already_matches():
+    """Converged ManagerNetworkProtocol NTP state must not issue an apply call."""
+    manager = RecordingManager({
+        (
+            ApiRequestType.ManagerNetworkProtocol,
+            "manager-network",
+            _key(),
+        ): CommandResult(
+            [
+                {
+                    "Manager": "BMC_0",
+                    "NTP": {
+                        "ProtocolEnabled": True,
+                        "NTPServers": ["0.pool.ntp.org"],
+                    },
+                }
+            ],
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = reconcile(
+        manager,
+        DesiredState(
+            ntp_servers=("0.pool.ntp.org",),
+            ntp_manager_id="BMC_0",
+        ),
+        confirm=True,
+    )
+
+    assert [(step.kind, step.required) for step in result.steps] == [
+        ("ntp", False),
+    ]
+    assert result.applied == ()
+    assert manager.calls == [
+        (ApiRequestType.ManagerNetworkProtocol, "manager-network", {}),
+    ]
+
+
+def test_reconcile_skips_boot_when_one_time_override_already_matches():
+    """Converged one-time boot state must not call the mutating boot command."""
+    manager = RecordingManager({
+        (
+            ApiRequestType.CurrentBoot,
+            "current_boot_query",
+            _key(),
+        ): CommandResult(
+            {
+                "BootSourceOverrideEnabled": "Once",
+                "BootSourceOverrideTarget": "Pxe",
+                "BootSourceOverrideMode": "UEFI",
+            },
+            None,
+            None,
+            None,
+        )
+    })
+
+    result = reconcile(
+        manager,
+        DesiredState(boot_device="Pxe", boot_mode="UEFI"),
+        confirm=True,
+    )
+
+    assert [(step.kind, step.required) for step in result.steps] == [
+        ("boot", False),
+    ]
+    assert result.applied == ()
+    assert manager.calls == [
+        (ApiRequestType.CurrentBoot, "current_boot_query", {}),
+    ]
+
+
 def _fixture_for_path(path: str) -> Path | None:
     name = "_" + path.strip("/").replace("/", "_") + ".json"
     return GB300_INDEX.get(name.lower())
@@ -91,17 +172,6 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
         "target": "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
         "payload": {"ResetType": "GracefulRestart"},
     }
-    boot_preview = {
-        "dry_run": True,
-        "target": "/redfish/v1/Systems/System_0",
-        "payload": {
-            "Boot": {
-                "BootSourceOverrideEnabled": "Once",
-                "BootSourceOverrideTarget": "Pxe",
-                "BootSourceOverrideMode": "UEFI",
-            }
-        },
-    }
     manager = RecordingManager({
         (
             ApiRequestType.BiosProfile,
@@ -118,17 +188,37 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
             ),
         ): CommandResult(ntp_preview, None, None, None),
         (
-            ApiRequestType.BootOneShot,
-            "boot_one_shot",
-            _key(
-                device="Pxe",
-                mode="UEFI",
-                uefi_target=None,
-                do_reboot=False,
-                dry_run=True,
-                confirm=False,
-            ),
-        ): CommandResult(boot_preview, None, None, None),
+            ApiRequestType.ManagerNetworkProtocol,
+            "manager-network",
+            _key(),
+        ): CommandResult(
+            [
+                {
+                    "Manager": "BMC_0",
+                    "NTP": {
+                        "ProtocolEnabled": True,
+                        "NTPServers": [],
+                    },
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+        (
+            ApiRequestType.CurrentBoot,
+            "current_boot_query",
+            _key(),
+        ): CommandResult(
+            {
+                "BootSourceOverrideEnabled": "Disabled",
+                "BootSourceOverrideTarget": "None",
+                "BootSourceOverrideMode": "UEFI",
+            },
+            None,
+            None,
+            None,
+        ),
         (
             ApiRequestType.ComputerSystemReset,
             "reboot",
@@ -164,6 +254,11 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
             {"action": "diff", "profile_name": "gb300-power-capped"},
         ),
         (
+            ApiRequestType.ManagerNetworkProtocol,
+            "manager-network",
+            {},
+        ),
+        (
             ApiRequestType.NtpSet,
             "ntp-set",
             {
@@ -173,16 +268,9 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
             },
         ),
         (
-            ApiRequestType.BootOneShot,
-            "boot_one_shot",
-            {
-                "device": "Pxe",
-                "mode": "UEFI",
-                "uefi_target": None,
-                "do_reboot": False,
-                "dry_run": True,
-                "confirm": False,
-            },
+            ApiRequestType.CurrentBoot,
+            "current_boot_query",
+            {},
         ),
         (
             ApiRequestType.ComputerSystemReset,
@@ -249,16 +337,40 @@ def test_reconcile_confirm_applies_only_required_changes():
             ),
         ): CommandResult(ntp_apply, None, None, None),
         (
+            ApiRequestType.ManagerNetworkProtocol,
+            "manager-network",
+            _key(),
+        ): CommandResult(
+            [
+                {
+                    "Manager": "BMC_0",
+                    "NTP": {
+                        "ProtocolEnabled": True,
+                        "NTPServers": [],
+                    },
+                }
+            ],
+            None,
+            None,
+            None,
+        ),
+        (
+            ApiRequestType.CurrentBoot,
+            "current_boot_query",
+            _key(),
+        ): CommandResult(
+            {
+                "BootSourceOverrideEnabled": "Disabled",
+                "BootSourceOverrideTarget": "None",
+            },
+            None,
+            None,
+            None,
+        ),
+        (
             ApiRequestType.BootOneShot,
             "boot_one_shot",
-            _key(
-                device="Pxe",
-                mode=None,
-                uefi_target=None,
-                do_reboot=False,
-                dry_run=False,
-                confirm=True,
-            ),
+            _key(device="Pxe", mode=None, uefi_target=None, do_reboot=False),
         ): CommandResult(boot_result, None, None, None),
         (
             ApiRequestType.ComputerSystemReset,
@@ -304,6 +416,11 @@ def test_reconcile_confirm_applies_only_required_changes():
             },
         ),
         (
+            ApiRequestType.ManagerNetworkProtocol,
+            "manager-network",
+            {},
+        ),
+        (
             ApiRequestType.NtpSet,
             "ntp-set",
             {
@@ -313,6 +430,11 @@ def test_reconcile_confirm_applies_only_required_changes():
             },
         ),
         (
+            ApiRequestType.CurrentBoot,
+            "current_boot_query",
+            {},
+        ),
+        (
             ApiRequestType.BootOneShot,
             "boot_one_shot",
             {
@@ -320,8 +442,6 @@ def test_reconcile_confirm_applies_only_required_changes():
                 "mode": None,
                 "uefi_target": None,
                 "do_reboot": False,
-                "dry_run": False,
-                "confirm": True,
             },
         ),
         (
