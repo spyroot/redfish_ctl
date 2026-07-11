@@ -172,6 +172,31 @@ class RebootResult:
 
 
 @dataclass(frozen=True)
+class BiosProfileSummary:
+    """Catalog row from bios-profile list."""
+
+    name: str | None
+    vendor: str | None
+    model: str | None
+    description: str | None
+    risk: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class BiosProfileSpec:
+    """Full BIOS profile specification from bios-profile show."""
+
+    name: str | None
+    vendor: str | None
+    model: str | None
+    description: str | None
+    risk: str | None
+    attributes: Mapping[str, Any]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
 class BiosProfileAttributeDiff:
     """One BIOS attribute comparison row from bios-profile diff."""
 
@@ -444,6 +469,54 @@ def reboot(
         payload=payload,
         task_id=data.get("task_id"),
         task_state=data.get("task_state"),
+        raw=data,
+    )
+
+
+def bios_profile_list(manager: SyncInvoker) -> tuple[BiosProfileSummary, ...]:
+    """Return typed BIOS profile summaries through bios-profile list."""
+    rows = _rows(
+        _invoke(
+            manager,
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            action="list",
+        )
+    )
+    return tuple(
+        BiosProfileSummary(
+            name=row.get("name"),
+            vendor=row.get("vendor"),
+            model=row.get("model"),
+            description=row.get("description"),
+            risk=row.get("risk"),
+            raw=row,
+        )
+        for row in rows
+    )
+
+
+def bios_profile_show(
+    manager: SyncInvoker,
+    profile_name: str,
+) -> BiosProfileSpec:
+    """Return a typed BIOS profile specification through bios-profile show."""
+    data = _mapping(
+        _invoke(
+            manager,
+            ApiRequestType.BiosProfile,
+            "bios-profile",
+            action="show",
+            profile_name=profile_name,
+        )
+    )
+    return BiosProfileSpec(
+        name=data.get("name"),
+        vendor=data.get("vendor"),
+        model=data.get("model"),
+        description=data.get("description"),
+        risk=data.get("risk"),
+        attributes=_mapping(data.get("attributes")),
         raw=data,
     )
 
