@@ -11,6 +11,7 @@ from requests.models import Response
 
 from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.redfish_respond import RedfishRespondMessage
+from redfish_ctl.redfish_respond_error import RedfishError
 from tests.test_utils import create_json_resp
 
 
@@ -62,3 +63,61 @@ def test_json_without_extended_info_is_empty():
     resp = create_json_resp({"SomeOtherKey": "value"})
     parsed = RedfishManager.parse_json_respond_msg(resp)
     assert parsed.message_extended == []
+
+
+def test_parse_error_without_error_envelope_returns_redfish_error():
+    """Non-standard JSON error payloads still honor the RedfishError contract."""
+    resp = create_json_resp({"message": "plain upstream failure"}, status_code=502)
+
+    parsed = RedfishManager.parse_error(resp)
+
+    assert isinstance(parsed, RedfishError)
+    assert parsed.status_code == 502
+    assert parsed.message == "plain upstream failure"
+
+
+def test_parse_error_scalar_json_returns_redfish_error():
+    """Scalar JSON bodies do not escape parse_error as TypeError."""
+    resp = _raw_response(b'"maintenance mode"', status_code=503)
+
+    parsed = RedfishManager.parse_error(resp)
+
+    assert isinstance(parsed, RedfishError)
+    assert parsed.status_code == 503
+    assert parsed.message == "maintenance mode"
+
+
+def test_parse_error_preserves_code_message_and_extended_info():
+    """A standard Redfish error envelope keeps code, message, and ExtendedInfo."""
+    resp = create_json_resp(
+        {
+            "error": {
+                "code": "Base.1.12.PropertyValueNotInList",
+                "message": "The requested value is not in the allowable list.",
+                "@Message.ExtendedInfo": [
+                    {
+                        "MessageId": "Base.1.12.PropertyValueNotInList",
+                        "MessageArgs": ["BootSourceOverrideTarget"],
+                        "Severity": "Warning",
+                        "Resolution": "Choose a value from AllowableValues.",
+                    }
+                ],
+            }
+        },
+        status_code=400,
+    )
+
+    parsed = RedfishManager.parse_error(resp)
+
+    assert isinstance(parsed, RedfishError)
+    assert parsed.status_code == 400
+    assert parsed.code == "Base.1.12.PropertyValueNotInList"
+    assert parsed.message == "The requested value is not in the allowable list."
+    assert parsed.message_extended == [
+        {
+            "MessageId": "Base.1.12.PropertyValueNotInList",
+            "MessageArgs": ["BootSourceOverrideTarget"],
+            "Severity": "Warning",
+            "Resolution": "Choose a value from AllowableValues.",
+        }
+    ]

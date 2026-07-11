@@ -468,6 +468,28 @@ class RedfishManager:
         return CommandResult(data, None, allow_header, None)
 
     @staticmethod
+    def _redfish_error_from_payload(status_code: int, payload) -> RedfishError:
+        if not isinstance(payload, dict):
+            message = "" if payload is None else str(payload)
+            return RedfishError(status_code, message=message)
+
+        code = payload.get("code", "")
+        message = payload.get("message", payload.get(RedfishJsonMessage.Message, ""))
+        redfish_error = RedfishError(
+            status_code,
+            code=str(code or ""),
+            message=str(message or ""),
+        )
+
+        message_extended = payload.get(RedfishJsonMessage.MessageExtendedInfo)
+        if isinstance(message_extended, list):
+            redfish_error.message_extended = [
+                m for m in message_extended if isinstance(m, dict)
+            ]
+
+        return redfish_error
+
+    @staticmethod
     def parse_error(error_response: requests.models.Response) -> RedfishError:
         """Default Parser for error msg from a JSON error.
         Note that respond can be same as success msg.
@@ -479,23 +501,24 @@ class RedfishManager:
 
         try:
             err_resp = error_response.json()
-            if 'error' not in err_resp:
-                return err_resp
+            if not isinstance(err_resp, dict):
+                return RedfishManager._redfish_error_from_payload(
+                    error_response.status_code, err_resp
+                )
 
-            err_data = err_resp['error']
-            # on top of redfish error we copy status code and header
-            # if we need analyze verbose error
-            redfish_error = RedfishError(error_response.status_code)
+            err_data = err_resp.get('error')
+            if not isinstance(err_data, dict):
+                if err_data is not None:
+                    return RedfishManager._redfish_error_from_payload(
+                        error_response.status_code, {"message": err_data}
+                    )
+                return RedfishManager._redfish_error_from_payload(
+                    error_response.status_code, err_resp
+                )
 
-            if 'message' in err_data:
-                redfish_error.message = err_data['message']
-
-            if RedfishJsonMessage.MessageExtendedInfo in err_data:
-                message_extended = err_data[RedfishJsonMessage.MessageExtendedInfo]
-                if isinstance(message_extended, list):
-                    redfish_error.message_extended = [
-                        m for m in message_extended if isinstance(m, dict)
-                    ]
+            redfish_error = RedfishManager._redfish_error_from_payload(
+                error_response.status_code, err_data
+            )
         except requests.exceptions.JSONDecodeError as json_err:
             redfish_error.exception_msg = str(json_err)
             return redfish_error
