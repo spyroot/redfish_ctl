@@ -20,6 +20,33 @@ DELL_SCHEDULABLE_URIS = (
     "/redfish/v1/Systems/System.Embedded.1/Bios/Actions/Oem/DellBios.RunBIOSLiveScanning",
 )
 
+DELL_SERVICE_ROOT_EVIDENCE = (
+    "tests/idrac_fixtures/_redfish_v1.json: "
+    "Dell ServiceRoot fixture for query-gated reads"
+)
+DELL_JOB_SERVICE_EVIDENCE = (
+    "tests/idrac_fixtures/_redfish_v1_Managers_iDRAC.Embedded.1_"
+    "Oem_Dell_DellJobService.json: Dell OEM job service fixture"
+)
+DELL_EVENT_SERVICE_EVIDENCE = (
+    "tests/idrac_fixtures/_redfish_v1_EventService.json: "
+    "Dell EventService fixture"
+)
+DELL_EVIDENCE = {
+    "query_select": DELL_SERVICE_ROOT_EVIDENCE,
+    "query_filter": DELL_SERVICE_ROOT_EVIDENCE,
+    "query_expand": DELL_SERVICE_ROOT_EVIDENCE,
+    "query_top": DELL_SERVICE_ROOT_EVIDENCE,
+    "query_only": DELL_SERVICE_ROOT_EVIDENCE,
+    "one_query_param_per_uri": (
+        "tests/test_query.py: Dell one-query-parameter gate coverage"
+    ),
+    "job_scheduling": DELL_JOB_SERVICE_EVIDENCE,
+    "one_recurring_job_per_type": DELL_JOB_SERVICE_EVIDENCE,
+    "schedulable_uris": DELL_JOB_SERVICE_EVIDENCE,
+    "lifecycle_events_sse": DELL_EVENT_SERVICE_EVIDENCE,
+}
+
 DELL = register(
     VendorCapabilities(
         vendor="dell",
@@ -36,5 +63,6 @@ DELL = register(
         one_recurring_job_per_type=True,
         schedulable_uris=DELL_SCHEDULABLE_URIS,
         lifecycle_events_sse=True,
+        evidence=DELL_EVIDENCE,
     )
 )
