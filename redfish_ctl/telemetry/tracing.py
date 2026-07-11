@@ -38,6 +38,46 @@ def enable_tracing(tracer: Any) -> None:
     _TRACER = tracer
 
 
+def setup_otlp(service_name: str = "redfish-ctl") -> None:
+    """Install an OTLP span pipeline and enable tracing.
+
+    Builds a ``TracerProvider`` + ``BatchSpanProcessor`` + ``OTLPSpanExporter``
+    and turns tracing on. The exporter resolves its endpoint from the standard
+    ``OTEL_EXPORTER_OTLP_*`` environment itself, so the ``/v1/traces`` path is
+    appended correctly for a generic endpoint (do not pre-pass one here).
+
+    Requires the OpenTelemetry SDK + OTLP exporter (the ``[otlp]`` extra);
+    raises a clear error otherwise. ``service.name`` becomes the APM service
+    map node.
+    """
+    try:
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    except ImportError as exc:  # pragma: no cover - exercised via the CLI path
+        raise RuntimeError(
+            "OTLP tracing needs the OpenTelemetry SDK. Install redfish_ctl[otlp]."
+        ) from exc
+    try:
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+            OTLPSpanExporter,
+        )
+    except ImportError:  # fall back to the HTTP exporter if grpc is absent
+        try:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+        except ImportError as exc:  # pragma: no cover - exercised via the CLI path
+            raise RuntimeError(
+                "OTLP tracing needs an OpenTelemetry OTLP exporter. "
+                "Install redfish_ctl[otlp]."
+            ) from exc
+
+    provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    enable_tracing(provider.get_tracer("redfish_ctl"))
+
+
 def disable_tracing() -> None:
     """Turn tracing off (used by tests to restore the default no-op state)."""
     global _TRACER
