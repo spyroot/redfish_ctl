@@ -1596,6 +1596,50 @@ class IDracManager(RedfishManager):
                 out[key] = val["target"]
         return out
 
+    @staticmethod
+    def _validate_action_payload(full_action_type: str,
+                                 action: Optional[RedfishAction],
+                                 payload: dict) -> list[dict]:
+        """Validate action payload keys/enum values when action metadata is available."""
+        inline_args = getattr(action, "args", None) or {}
+        if inline_args:
+            strict_names = False
+            parameters = {
+                name: {"allowed": tuple(values or ())}
+                for name, values in inline_args.items()
+            }
+        else:
+            from .redfish_csdl import action_parameters_for
+            strict_names = True
+            parameters = {
+                name: {"allowed": param.allowable_values}
+                for name, param in action_parameters_for(full_action_type).items()
+            }
+        if not parameters:
+            return []
+
+        errors = []
+        for name, value in payload.items():
+            if name not in parameters:
+                if strict_names:
+                    errors.append({
+                        "parameter": name,
+                        "value": value,
+                        "allowed": [],
+                    })
+                continue
+            allowed = tuple(parameters[name].get("allowed") or ())
+            if allowed:
+                values = value if isinstance(value, list) else [value]
+                invalid = [item for item in values if item not in allowed]
+                if invalid:
+                    errors.append({
+                        "parameter": name,
+                        "value": invalid[0] if len(invalid) == 1 else invalid,
+                        "allowed": sorted(allowed),
+                    })
+        return errors
+
     def invoke_action(self,
                       resource_uri: str,
                       action_name: str,
@@ -1675,6 +1719,25 @@ class IDracManager(RedfishManager):
 
         level = classify(full)
         body = payload or {}
+        action = actions.get(action_name)
+        validation_errors = self._validate_action_payload(full, action, body)
+        if validation_errors:
+            first = validation_errors[0]
+            action_label = full.lstrip("#")
+            if first["allowed"]:
+                error = (
+                    f"invalid value for {action_label} {first['parameter']}: "
+                    f"{first['value']}; allowed: {', '.join(first['allowed'])}"
+                )
+            else:
+                error = f"unknown parameter for {action_label}: {first['parameter']}"
+            return CommandResult({
+                "action": full,
+                "target": target,
+                "payload": body,
+                "level": level.value,
+                "validation_errors": validation_errors,
+            }, actions, None, error)
 
         # Fail-safe gate: decide whether this POST is actually allowed to fire.
         blocked_reason = None
