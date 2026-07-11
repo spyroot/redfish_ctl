@@ -1,0 +1,21 @@
+{
+  "scenario": "graceful_restart",
+  "description": "Host ComputerSystem.Reset with ResetType=GracefulRestart updates LastResetTime in the served system resource.",
+  "steps": [
+    {
+      "name": "host_graceful_restart",
+      "method": "POST",
+      "path": "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
+      "body": {"ResetType": "GracefulRestart"},
+      "response": {"status": 204},
+      "state_transitions": [
+        {
+          "op": "set",
+          "path": "/redfish/v1/Systems/System_0",
+          "field": "LastResetTime",
+          "value": "2026-04-14T23:35:33+00:00"
+        }
+      ]
+    }
+  ]
+}
