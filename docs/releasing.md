@@ -50,7 +50,7 @@ to publish the one-off `idrac_ctl` deprecation shim under `packaging/idrac_ctl_d
 
 ## Release Checklist
 
-I use this order so a broken package does not reach PyPI:
+Use this order so a broken package does not reach PyPI:
 
 1. Verify the tree.
 2. Build source and wheel distributions.
@@ -98,7 +98,7 @@ redfish_ctl --help
 ```
 
 The current `local_install.sh` helper creates a `test1` conda environment, builds `sdist` and wheel,
-then runs `python setup.py install`. It does not install the wheel with `pip`, so I treat it as a
+then runs `python setup.py install`. It does not install the wheel with `pip`, so treat it as a
 developer shortcut, not the full release gate above.
 
 ## Upload

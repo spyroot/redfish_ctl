@@ -2,8 +2,8 @@
 
 Author: Mus <spyroot@gmail.com>
 
-When I connect to a new BMC, I run `redfish_ctl system` first. It proves the endpoint, credentials, and
-basic Redfish path before I ask for deeper inventory or stage any change.
+When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
+basic Redfish path before deeper inventory or any staged change.
 
 The table below follows the 105 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
@@ -67,7 +67,7 @@ Safety labels:
 - **Guarded**: does not mutate by default; requires `--confirm` or an equivalent apply flag.
 - **Write**: may mutate when invoked, even if an optional preview flag exists.
 
-| Command | What I use it for | Safety |
+| Command | Purpose | Safety |
 |---|---|---|
 | `account` | Read one account resource. | Read |
 | `account-create` | Create a Redfish account (ManagerAccount); requires `--confirm` to write. | Guarded |
@@ -221,11 +221,11 @@ Commands labeled **Guarded** block or preview writes by default and require an e
 usually `--confirm`. Commands labeled **Write** can mutate as soon as they are invoked; some still
 offer `--show` or `--dry_run`, but those previews are optional.
 
-Before I run either kind of write, I use the same four phases:
+Before running either kind of write, use the same four phases:
 
 1. Read the current state.
 2. Preview the change when the command supports `--show` or `--dry_run`.
-3. Execute only on an approved target with the exact flags I intend to use.
+3. Execute only on an approved target with the exact intended flags.
 4. Verify with a read-only command or a job/task watch.
 
 ### BIOS Change From A Spec

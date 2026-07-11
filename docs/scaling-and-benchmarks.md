@@ -2,8 +2,8 @@
 
 Author: Mus <spyroot@gmail.com>
 
-I want `redfish_ctl` to grow past one server and drive roughly 1,000 BMCs to a desired state with
-numbers that show it is fast, correct, and stable. This page is the design target for that fleet
+The design target is for `redfish_ctl` to grow past one server and drive roughly 1,000 BMCs to a
+desired state with numbers that show it is fast, correct, and stable. This page defines the fleet
 engine, simulator, and benchmark gate. Those runnable artifacts are not in the repository yet.
 
 ## What Exists Today
@@ -21,7 +21,7 @@ seed material for a simulator because it exercises Redfish reads without live ha
 A future operation such as "apply profile `rt-low-latency` to these 1,000 servers" would run as
 bounded per-server pipelines:
 
-- async Redfish I/O through the existing `api_async_*` helpers,
+- async Redfish input/output through the existing `api_async_*` helpers,
 - a cap on simultaneous servers and in-flight requests,
 - ordered per-server steps for changes that create jobs or require reboot,
 - subnet-wide pacing plus capped transient-error backoff,

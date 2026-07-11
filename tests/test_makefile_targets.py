@@ -15,6 +15,7 @@ REQUIRED_TARGETS = {
     "build",
     "docker-test",
     "docker-image",
+    "docs-voice-check",
     "k8s-sandbox",
     "clean",
 }
@@ -39,7 +40,15 @@ def test_make_help_lists_required_developer_targets() -> None:
 def test_make_dry_run_uses_expected_safe_local_commands() -> None:
     """Dry-run recipes should route to local checks and never publish artifacts."""
     result = subprocess.run(
-        ["make", "-n", "build", "docker-test", "docker-image", "k8s-sandbox"],
+        [
+            "make",
+            "-n",
+            "build",
+            "docker-test",
+            "docker-image",
+            "docs-voice-check",
+            "k8s-sandbox",
+        ],
         cwd=REPO_ROOT,
         check=False,
         text=True,
@@ -52,6 +61,8 @@ def test_make_dry_run_uses_expected_safe_local_commands() -> None:
     assert "twine check" in result.stdout
     assert "docker/run-tests.sh" in result.stdout
     assert "docker build" in result.stdout
+    assert "\\b(I|me|my|mine|myself)\\b" in result.stdout
+    assert "README.md docs/" in result.stdout
     assert "k8s/sandbox" in result.stdout
 
     makefile_text = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")

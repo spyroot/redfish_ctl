@@ -4,13 +4,13 @@ Author: Mus <spyroot@gmail.com>
 
 > Status: read-only core exists. The CLI works without this service.
 
-For one server, I use `redfish_ctl` directly. For a fleet, I want one service that can reach the BMC
+For one server, run `redfish_ctl` directly. For a fleet, use one service that can reach the BMC
 network, keep desired state, read observed state, and reconcile the two. Clients should not all need
 direct routes to BMCs.
 
 ## What Exists
 
-The CLI already has the pieces I would reuse:
+The CLI already has the pieces a service would reuse:
 
 - `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, for product-neutral HTTP.
 - `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, for Dell/iDRAC behavior and host-system

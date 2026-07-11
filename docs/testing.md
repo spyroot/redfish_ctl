@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Before I trust a change, I clear any live iDRAC environment and run the offline suite:
+Before trusting a change, clear any live iDRAC environment and run the offline suite:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q

@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-I use `redfish_ctl system` as the first sanity check: it starts at the CLI, runs a self-registering
+Use `redfish_ctl system` as the first sanity check: it starts at the CLI, runs a self-registering
 command module, uses `IDracManager`, and ends in the generic Redfish HTTP client. The important rule
 is that Redfish stays product-neutral; Dell behavior sits above it.
 
