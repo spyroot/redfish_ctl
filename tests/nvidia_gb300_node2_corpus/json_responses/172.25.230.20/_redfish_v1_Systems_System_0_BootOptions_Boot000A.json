@@ -1,0 +1,11 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/BootOptions/Boot000A",
+    "@odata.type": "#BootOption.v1_0_4.BootOption",
+    "BootOptionEnabled": true,
+    "BootOptionReference": "Boot000A",
+    "Description": "UEFI PXEv4 (MAC:E09D73AD2E01)",
+    "DisplayName": "UEFI PXEv4 (MAC:E09D73AD2E01)",
+    "Id": "Boot000A",
+    "Name": "Boot000A",
+    "UefiDevicePath": "VenHw(1E5A432C-0466-4D31-B009-D4D9239271D3)/MemoryMapped(0xB,0x100014140000,0x100014141FFF)/PciRoot(0x16)/Pci(0x0,0x0)/Pci(0x0,0x1)/MAC(E09D73AD2E01,0x1)/IPv4(0.0.0.0)"
+}

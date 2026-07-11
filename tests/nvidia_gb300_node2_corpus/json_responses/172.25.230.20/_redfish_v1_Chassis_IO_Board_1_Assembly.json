@@ -1,0 +1,38 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/IO_Board_1/Assembly",
+    "@odata.type": "#Assembly.v1_3_0.Assembly",
+    "Assemblies": [
+        {
+            "@odata.id": "/redfish/v1/Chassis/IO_Board_1/Assembly#/Assemblies/0",
+            "Location": {
+                "PartLocation": {
+                    "LocationType": "Embedded"
+                }
+            },
+            "MemberId": "0",
+            "Model": "ConnectX-8 800GE 2P NIC",
+            "Name": "IO_Board_1 Board FRU Assembly0",
+            "PartNumber": "900-9X86E-00CX-ST0",
+            "ProductionDate": "2025-07-12T10:56:00Z",
+            "SerialNumber": "MT2528604DT9",
+            "Vendor": "Nvidia"
+        },
+        {
+            "@odata.id": "/redfish/v1/Chassis/IO_Board_1/Assembly#/Assemblies/1",
+            "Location": {
+                "PartLocation": {
+                    "LocationType": "Embedded"
+                }
+            },
+            "MemberId": "1",
+            "Model": "ConnectX-8 800GE 2P NIC",
+            "Name": "IO_Board_1 Product FRU Assembly1",
+            "PartNumber": "900-9X86E-00CX-ST0",
+            "SerialNumber": "MT2528604DT9",
+            "Vendor": "Nvidia",
+            "Version": "A2"
+        }
+    ],
+    "Id": "Assembly",
+    "Name": "Assembly data for IO_Board_1"
+}

@@ -1,0 +1,23 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers",
+    "@odata.type": "#StorageControllerCollection.StorageControllerCollection",
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_200"
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_202"
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_204"
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_206"
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_210"
+        }
+    ],
+    "Members@odata.count": 5,
+    "Name": "Storage Controller Collection"
+}

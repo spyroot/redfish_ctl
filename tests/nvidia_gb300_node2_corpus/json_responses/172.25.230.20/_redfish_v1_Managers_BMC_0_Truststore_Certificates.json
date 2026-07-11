@@ -1,0 +1,15 @@
+{
+    "@odata.id": "/redfish/v1/Managers/BMC_0/Truststore/Certificates/",
+    "@odata.type": "#CertificateCollection.CertificateCollection",
+    "Description": "A Collection of TrustStore certificate instances",
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/Managers/BMC_0/Truststore/Certificates/1"
+        },
+        {
+            "@odata.id": "/redfish/v1/Managers/BMC_0/Truststore/Certificates/2"
+        }
+    ],
+    "Members@odata.count": 2,
+    "Name": "TrustStore Certificates Collection"
+}

@@ -1,0 +1,87 @@
+{
+    "@odata.id": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics",
+    "@odata.type": "#ProcessorMetrics.v1_6_1.ProcessorMetrics",
+    "BandwidthPercent": 0.0,
+    "CacheMetricsTotal": {
+        "LifeTime": {
+            "CorrectableECCErrorCount": 0,
+            "UncorrectableECCErrorCount": 0
+        }
+    },
+    "CoreVoltage": {
+        "DataSourceUri": "/redfish/v1/Chassis/HGX_GPU_0/Sensors/HGX_GPU_0_Voltage_0",
+        "Reading": 0.7
+    },
+    "Id": "ProcessorMetrics",
+    "Name": "GPU_0 Processor Metrics",
+    "Oem": {
+        "Nvidia": {
+            "@odata.type": "#NvidiaProcessorMetrics.v1_4_0.NvidiaGPUProcessorMetrics",
+            "AccumulatedGPUContextUtilizationDuration": "PT5M24.397000000S",
+            "AccumulatedSMUtilizationDuration": "PT29.635000000S",
+            "DMMAUtilizationPercent": 0.0,
+            "FP16ActivityPercent": 0.0,
+            "FP32ActivityPercent": 0.0,
+            "FP64ActivityPercent": 0.0,
+            "GlobalSoftwareViolationThrottleDuration": "PT1H58M46.736986880S",
+            "GraphicsEngineActivityPercent": 0.0,
+            "HMMAUtilizationPercent": 0.0,
+            "HardwareViolationThrottleDuration": "PT0S",
+            "IMMAUtilizationPercent": 0.0,
+            "IntegerActivityUtilizationPercent": 0.0,
+            "NVDecInstanceUtilizationPercent": [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "NVDecUtilizationPercent": 0.0,
+            "NVJpgInstanceUtilizationPercent": [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "NVJpgUtilizationPercent": 0.0,
+            "NVLinkDataRxBandwidthGbps": 0.0,
+            "NVLinkDataTxBandwidthGbps": 0.0,
+            "NVLinkRawRxBandwidthGbps": 0.0,
+            "NVLinkRawTxBandwidthGbps": 0.0,
+            "NVOfaUtilizationPercent": 0.0,
+            "PCIeRXBytes": 0,
+            "PCIeRawRxBandwidthGbps": 3.814697265625e-06,
+            "PCIeRawTxBandwidthGbps": 0.0,
+            "PCIeTXBytes": 0,
+            "SMActivityPercent": 0.0,
+            "SMOccupancyPercent": 0.0,
+            "SMUtilizationPercent": 0.0,
+            "SRAMECCErrorThresholdExceeded": false,
+            "TensorCoreActivityPercent": 0.0,
+            "ThrottleReasons": [
+                "NA"
+            ]
+        }
+    },
+    "OperatingSpeedMHz": 120,
+    "PCIeErrors": {
+        "CorrectableErrorCount": 0,
+        "FatalErrorCount": 0,
+        "L0ToRecoveryCount": 4,
+        "NAKReceivedCount": 0,
+        "NAKSentCount": 0,
+        "NonFatalErrorCount": 0,
+        "ReplayCount": 0,
+        "ReplayRolloverCount": 0,
+        "UnsupportedRequestCount": 0
+    },
+    "PowerLimitThrottleDuration": "PT0S",
+    "ThermalLimitThrottleDuration": "PT0S"
+}

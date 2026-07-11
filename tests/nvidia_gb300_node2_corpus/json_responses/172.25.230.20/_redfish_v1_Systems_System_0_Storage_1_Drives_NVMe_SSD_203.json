@@ -1,0 +1,17 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Drives/NVMe_SSD_203",
+    "@odata.type": "#Drive.v1_18_0.Drive",
+    "DriveFormFactor": "EDSFF_1U_Short",
+    "Id": "NVMe_SSD_203",
+    "Name": "NVMe_SSD_203",
+    "PhysicalLocation": {
+        "PartLocation": {
+            "LocationType": "Slot",
+            "ServiceLabel": "NVMe E1.S Slot 3"
+        },
+        "PartLocationContext": "Chassis_0/StorageBackplane_0"
+    },
+    "Status": {
+        "State": "Absent"
+    }
+}

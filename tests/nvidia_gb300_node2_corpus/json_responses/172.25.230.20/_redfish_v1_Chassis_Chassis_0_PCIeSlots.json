@@ -1,0 +1,195 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/Chassis_0/PCIeSlots",
+    "@odata.type": "#PCIeSlots.v1_5_0.PCIeSlots",
+    "Id": "PCIeSlots",
+    "Name": "PCIeSlots for Chassis_0",
+    "Slots": [
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 1"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 2"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 5"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 6"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "M.2 NVMe Drive Slot 1"
+                }
+            },
+            "PCIeType": "Gen3",
+            "SlotType": "M2"
+        },
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 7"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 5"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 6"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 7"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 8"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 1,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "GPU 3"
+                }
+            },
+            "PCIeType": "Gen4"
+        },
+        {
+            "Lanes": 1,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "GPU 4"
+                }
+            },
+            "PCIeType": "Gen4"
+        },
+        {
+            "Lanes": 1,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 3"
+                }
+            },
+            "PCIeType": "Gen3"
+        },
+        {
+            "Lanes": 16,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "NIC Slot 4"
+                }
+            },
+            "PCIeType": "Gen5",
+            "SlotType": "FullLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 1"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 2"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 3"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 4,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "E1.S SSD Slot 4"
+                }
+            },
+            "SlotType": "HalfLength"
+        },
+        {
+            "Lanes": 1,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "GPU 1"
+                }
+            },
+            "PCIeType": "Gen4"
+        },
+        {
+            "Lanes": 1,
+            "Location": {
+                "PartLocation": {
+                    "ServiceLabel": "GPU 2"
+                }
+            },
+            "PCIeType": "Gen4"
+        }
+    ]
+}

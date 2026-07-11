@@ -1,0 +1,3531 @@
+{
+    "@odata.id": "/redfish/v1/TelemetryService/MetricReports/HGX_ProcessorMetrics_0",
+    "@odata.type": "#MetricReport.v1_4_2.MetricReport",
+    "Id": "HGX_ProcessorMetrics_0",
+    "MetricReportDefinition": {
+        "@odata.id": "/redfish/v1/TelemetryService/MetricReportDefinitions/HGX_ProcessorMetrics_0"
+    },
+    "MetricValues": [
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.777+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.777+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.783+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.783+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.783+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.488+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.488+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.488+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.779+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.779+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.779+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.769+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:48.492+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.780+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.784+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.778+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.777+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.777+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.777+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.785+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.781+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.782+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.782+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.783+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.487+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.487+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:48.487+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:48.490+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:48.491+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:48.489+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/RampDownHysteresisSeconds",
+            "MetricValue": "10.000000",
+            "Timestamp": "2026-07-08T22:19:47.740+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/RampDownWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:47.740+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/RampUpWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:47.740+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/TMPFloorPercent",
+            "MetricValue": "89.990234",
+            "Timestamp": "2026-07-08T22:19:47.740+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/ImmediateRampDown",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.738+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/RemainingLifetimeCircuitryPercent",
+            "MetricValue": "100.000000",
+            "Timestamp": "2026-07-08T22:19:47.739+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/PowerSmoothing#/Enabled",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.738+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/SMUtilizationPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:48.938+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/OperatingSpeedMHz",
+            "MetricValue": "120",
+            "Timestamp": "2026-07-08T22:19:44.578+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/BandwidthPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:48.937+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/CacheMetricsTotal/LifeTime/CorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:44.580+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/CacheMetricsTotal/LifeTime/UncorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:44.580+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/L0ToRecoveryCount",
+            "MetricValue": "4.000000",
+            "Timestamp": "2026-07-08T22:19:43.721+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0/PCIeDevices/GPU_0#/PCIeInterface/LanesInUse",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:43.719+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0/PCIeDevices/GPU_0#/PCIeInterface/MaxLanes",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:43.719+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/NAKReceivedCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.722+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/NAKSentCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.722+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0/PCIeDevices/GPU_0#/PCIeInterface/PCIeType",
+            "MetricValue": "Unknown",
+            "Timestamp": "2026-07-08T22:19:43.718+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/ReplayCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.722+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/ReplayRolloverCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.722+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/CorrectableErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.720+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/FatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.720+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PCIeErrors/NonFatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:43.720+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/AccumulatedGPUContextUtilizationDuration",
+            "MetricValue": "P5599DT6H13M20.000S",
+            "Timestamp": "2026-07-08T22:19:47.741+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/AccumulatedSMUtilizationDuration",
+            "MetricValue": "P840DT18H20M",
+            "Timestamp": "2026-07-08T22:19:47.741+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/GlobalSoftwareViolationThrottleDuration",
+            "MetricValue": "PT2H30M40.918910592S",
+            "Timestamp": "2026-07-08T22:19:49.032+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/HardwareViolationThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.032+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/PCIeRXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/PCIeTXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/PowerLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.031+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/ThermalLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.031+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/ProcessorMetrics#/Oem/Nvidia/ThrottleReasons/0",
+            "MetricValue": "NA",
+            "Timestamp": "2026-07-08T22:19:47.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.508+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.509+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.509+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.613+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.614+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.614+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.431+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.432+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.432+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.434+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.435+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.435+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.428+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.428+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.429+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.426+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.426+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.426+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.422+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.456+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.423+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.420+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.430+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.433+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.464+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.508+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.508+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.508+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.419+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.418+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.613+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.613+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:48.613+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.431+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.431+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.431+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.434+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.434+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.434+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.504+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.507+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.442+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.444+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.424+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.427+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.428+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.428+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.428+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.425+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:50.425+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:50.426+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/RampDownHysteresisSeconds",
+            "MetricValue": "10.000000",
+            "Timestamp": "2026-07-08T22:19:49.829+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/RampDownWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:49.829+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/RampUpWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:49.829+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/TMPFloorPercent",
+            "MetricValue": "89.990234",
+            "Timestamp": "2026-07-08T22:19:49.829+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/ImmediateRampDown",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:45.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/RemainingLifetimeCircuitryPercent",
+            "MetricValue": "100.000000",
+            "Timestamp": "2026-07-08T22:19:46.050+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/Oem/Nvidia/PowerSmoothing#/Enabled",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:45.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/SMUtilizationPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:38.976+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/OperatingSpeedMHz",
+            "MetricValue": "120",
+            "Timestamp": "2026-07-08T22:19:45.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/BandwidthPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:38.976+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/CacheMetricsTotal/LifeTime/CorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:45.756+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/CacheMetricsTotal/LifeTime/UncorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:45.756+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/L0ToRecoveryCount",
+            "MetricValue": "4.000000",
+            "Timestamp": "2026-07-08T22:19:45.746+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_1/PCIeDevices/GPU_1#/PCIeInterface/LanesInUse",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:45.744+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_1/PCIeDevices/GPU_1#/PCIeInterface/MaxLanes",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:45.744+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/NAKReceivedCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.747+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/NAKSentCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.747+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_1/PCIeDevices/GPU_1#/PCIeInterface/PCIeType",
+            "MetricValue": "Unknown",
+            "Timestamp": "2026-07-08T22:19:45.744+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/ReplayCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.747+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/ReplayRolloverCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.747+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/CorrectableErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.745+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/FatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.745+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PCIeErrors/NonFatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:45.745+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/AccumulatedGPUContextUtilizationDuration",
+            "MetricValue": "P5502DT20M",
+            "Timestamp": "2026-07-08T22:19:49.830+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/AccumulatedSMUtilizationDuration",
+            "MetricValue": "P822DT13H23M20.000S",
+            "Timestamp": "2026-07-08T22:19:49.829+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/GlobalSoftwareViolationThrottleDuration",
+            "MetricValue": "PT2H30M46.076939008S",
+            "Timestamp": "2026-07-08T22:19:48.986+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/HardwareViolationThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:48.986+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/PCIeRXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:49.833+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/PCIeTXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:49.833+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/PowerLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:48.985+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/ThermalLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:48.985+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_1/ProcessorMetrics#/Oem/Nvidia/ThrottleReasons/0",
+            "MetricValue": "NA",
+            "Timestamp": "2026-07-08T22:19:50.417+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.632+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.632+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.914+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.914+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.635+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.635+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.635+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.632+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.632+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.632+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.776+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.633+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.631+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.916+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.774+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.775+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.630+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.772+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.773+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.629+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.917+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.766+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.767+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.768+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.915+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.770+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.771+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.634+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.634+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.634+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:47.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/RampDownHysteresisSeconds",
+            "MetricValue": "10.000000",
+            "Timestamp": "2026-07-08T22:19:47.621+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/RampDownWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:47.621+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/RampUpWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:47.621+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/TMPFloorPercent",
+            "MetricValue": "89.990234",
+            "Timestamp": "2026-07-08T22:19:47.621+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/ImmediateRampDown",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.618+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/RemainingLifetimeCircuitryPercent",
+            "MetricValue": "100.000000",
+            "Timestamp": "2026-07-08T22:19:47.620+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Oem/Nvidia/PowerSmoothing#/Enabled",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:47.618+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/SMUtilizationPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:28.997+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/OperatingSpeedMHz",
+            "MetricValue": "120",
+            "Timestamp": "2026-07-08T22:19:45.660+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/BandwidthPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:28.997+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/CacheMetricsTotal/LifeTime/CorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:45.663+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/CacheMetricsTotal/LifeTime/UncorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:45.663+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/L0ToRecoveryCount",
+            "MetricValue": "4.000000",
+            "Timestamp": "2026-07-08T22:19:44.912+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_2/PCIeDevices/GPU_2#/PCIeInterface/LanesInUse",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:44.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_2/PCIeDevices/GPU_2#/PCIeInterface/MaxLanes",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:44.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/NAKReceivedCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/NAKSentCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_2/PCIeDevices/GPU_2#/PCIeInterface/PCIeType",
+            "MetricValue": "Unknown",
+            "Timestamp": "2026-07-08T22:19:44.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/ReplayCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/ReplayRolloverCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.913+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/CorrectableErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/FatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PCIeErrors/NonFatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:44.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/AccumulatedGPUContextUtilizationDuration",
+            "MetricValue": "P5742DT15H20M",
+            "Timestamp": "2026-07-08T22:19:47.623+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/AccumulatedSMUtilizationDuration",
+            "MetricValue": "P847DT15H53M20.000S",
+            "Timestamp": "2026-07-08T22:19:47.623+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/GlobalSoftwareViolationThrottleDuration",
+            "MetricValue": "PT2H30M10.305692288S",
+            "Timestamp": "2026-07-08T22:19:29.101+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/HardwareViolationThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:29.101+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/PCIeRXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.624+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/PCIeTXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.624+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/PowerLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:29.101+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/ThermalLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:29.101+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/ProcessorMetrics#/Oem/Nvidia/ThrottleReasons/0",
+            "MetricValue": "NA",
+            "Timestamp": "2026-07-08T22:19:47.626+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.316+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.316+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.317+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.318+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.318+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.318+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.315+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.315+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.803+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.803+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.803+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.753+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.753+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.753+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.751+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.751+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.751+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.904+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.904+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.904+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.805+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.805+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.805+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.901+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.901+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.453+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.453+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.453+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/DOEReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.316+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.316+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.316+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/BAR0TypeConfig/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.754+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.317+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.317+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCDevMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.318+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.315+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.315+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/CCMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.315+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ClockLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.455+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.802+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.803+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ECCEnable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.803+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EDPpScalingFactor/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.899+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/EGMMode/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.902+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.752+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.752+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/ForceTestCoupling/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.753+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/FusingMode/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.314+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HBMFrequencyChange/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.750+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.751+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/HULKLicenseUpdate/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.751+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InSystemTest/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.313+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.903+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.904+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/InfoROMFileSystemRecreate/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.904+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/NVLinkDisable/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.800+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.804+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.805+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PCIeVFConfiguration/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.805+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel1/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.900+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.901+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.901+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/PowerSmoothingPrivilegeLevel2/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.901+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingAllowed/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.748+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowOneShotConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/RowRemappingFeature/AllowPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.749+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPCurrentLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.450+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.452+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMaxLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.453+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPMinLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.454+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowFLRPersistentConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowOneShotConfig",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3#/Oem/Nvidia/InbandReconfigPermissions/TGPRatedLimit/AllowPersistentConfig",
+            "MetricValue": "true",
+            "Timestamp": "2026-07-08T22:19:46.451+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/RampDownHysteresisSeconds",
+            "MetricValue": "10.000000",
+            "Timestamp": "2026-07-08T22:19:46.309+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/RampDownWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:46.309+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/RampUpWattsPerSecond",
+            "MetricValue": "20.000000",
+            "Timestamp": "2026-07-08T22:19:46.309+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/TMPFloorPercent",
+            "MetricValue": "89.990234",
+            "Timestamp": "2026-07-08T22:19:46.309+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/ImmediateRampDown",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.307+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/RemainingLifetimeCircuitryPercent",
+            "MetricValue": "100.000000",
+            "Timestamp": "2026-07-08T22:19:46.308+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/Oem/Nvidia/PowerSmoothing#/Enabled",
+            "MetricValue": "false",
+            "Timestamp": "2026-07-08T22:19:46.307+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/SMUtilizationPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:48.967+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/OperatingSpeedMHz",
+            "MetricValue": "120",
+            "Timestamp": "2026-07-08T22:19:46.797+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/BandwidthPercent",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:48.967+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/CacheMetricsTotal/LifeTime/CorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.501+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/CacheMetricsTotal/LifeTime/UncorrectableECCErrorCount",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:47.501+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/L0ToRecoveryCount",
+            "MetricValue": "4.000000",
+            "Timestamp": "2026-07-08T22:19:46.763+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3#/PCIeInterface/LanesInUse",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:46.760+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3#/PCIeInterface/MaxLanes",
+            "MetricValue": "16",
+            "Timestamp": "2026-07-08T22:19:46.760+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/NAKReceivedCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.765+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/NAKSentCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3#/PCIeInterface/PCIeType",
+            "MetricValue": "Unknown",
+            "Timestamp": "2026-07-08T22:19:46.760+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/ReplayCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/ReplayRolloverCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.764+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/CorrectableErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.762+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/FatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PCIeErrors/NonFatalErrorCount",
+            "MetricValue": "0.000000",
+            "Timestamp": "2026-07-08T22:19:46.761+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/AccumulatedGPUContextUtilizationDuration",
+            "MetricValue": "P5462DT23H40M",
+            "Timestamp": "2026-07-08T22:19:46.310+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/AccumulatedSMUtilizationDuration",
+            "MetricValue": "P838DT17H26M40.000S",
+            "Timestamp": "2026-07-08T22:19:46.310+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/GlobalSoftwareViolationThrottleDuration",
+            "MetricValue": "PT2H30M51.385404096S",
+            "Timestamp": "2026-07-08T22:19:49.071+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/HardwareViolationThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.070+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/PCIeRXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:46.311+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/PCIeTXBytes",
+            "MetricValue": "0",
+            "Timestamp": "2026-07-08T22:19:46.311+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/PowerLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.071+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/ThermalLimitThrottleDuration",
+            "MetricValue": "PT0S",
+            "Timestamp": "2026-07-08T22:19:49.071+00:00"
+        },
+        {
+            "MetricProperty": "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_3/ProcessorMetrics#/Oem/Nvidia/ThrottleReasons/0",
+            "MetricValue": "NA",
+            "Timestamp": "2026-07-08T22:19:46.312+00:00"
+        }
+    ],
+    "Name": "HGX_ProcessorMetrics_0"
+}

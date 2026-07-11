@@ -1,0 +1,14 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/Storage/1/Controllers/NVMe_SSD_210",
+    "@odata.type": "#StorageController.v1_6_0.StorageController",
+    "FirmwareVersion": "GDC7502Q",
+    "Id": "NVMe_SSD_210",
+    "Manufacturer": "Samsung",
+    "Model": "SAMSUNG MZ1L21T9HCLS-00A07",
+    "Name": "NVMe_SSD_210",
+    "PartNumber": "",
+    "SerialNumber": "S666NS0Y300886",
+    "Status": {
+        "State": "Enabled"
+    }
+}
