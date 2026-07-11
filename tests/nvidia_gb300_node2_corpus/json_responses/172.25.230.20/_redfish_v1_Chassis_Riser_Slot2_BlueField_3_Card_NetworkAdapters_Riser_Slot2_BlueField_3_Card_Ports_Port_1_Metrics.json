@@ -1,0 +1,11 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/NetworkAdapters/Riser_Slot2_BlueField_3_Card/Ports/Port_1/Metrics",
+    "@odata.type": "#PortMetrics.v1_6_1.PortMetrics",
+    "Id": "Port_1",
+    "Name": "Port_1 Port Metrics",
+    "Oem": {
+        "Nvidia": {
+            "@odata.type": "#NvidiaPortMetrics.v1_6_0.NvidiaNVLinkPortMetrics"
+        }
+    }
+}

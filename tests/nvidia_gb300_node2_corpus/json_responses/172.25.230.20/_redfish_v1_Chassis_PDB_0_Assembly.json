@@ -1,0 +1,51 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/PDB_0/Assembly",
+    "@odata.type": "#Assembly.v1_3_0.Assembly",
+    "Assemblies": [
+        {
+            "@odata.id": "/redfish/v1/Chassis/PDB_0/Assembly#/Assemblies/0",
+            "Location": {
+                "PartLocation": {
+                    "LocationType": "Embedded"
+                }
+            },
+            "MemberId": "0",
+            "Name": "PDB_0 Chassis FRU Assembly0",
+            "PartNumber": "$CHASSIS_PART_NUMBER",
+            "SerialNumber": "$CHASSIS_SERIAL_NUMBER"
+        },
+        {
+            "@odata.id": "/redfish/v1/Chassis/PDB_0/Assembly#/Assemblies/1",
+            "Location": {
+                "PartLocation": {
+                    "LocationType": "Embedded"
+                }
+            },
+            "MemberId": "1",
+            "Model": "AOM-PDB-B3",
+            "Name": "PDB_0 Board FRU Assembly1",
+            "PartNumber": "AOM-PDB-B3",
+            "ProductionDate": "2025-09-07T07:38:00Z",
+            "SerialNumber": "HA258S046623",
+            "Vendor": "SUPERMICRO"
+        },
+        {
+            "@odata.id": "/redfish/v1/Chassis/PDB_0/Assembly#/Assemblies/2",
+            "Location": {
+                "PartLocation": {
+                    "LocationType": "Embedded"
+                }
+            },
+            "MemberId": "2",
+            "Model": "$PRODUCT_PRODUCT_NAME",
+            "Name": "PDB_0 Product FRU Assembly2",
+            "PartNumber": "$PRODUCT_PART_NUMBER",
+            "PhysicalContext": "Board",
+            "SerialNumber": "$PRODUCT_SERIAL_NUMBER",
+            "Vendor": "$PRODUCT_MANUFACTURER",
+            "Version": "$PRODUCT_VERSION"
+        }
+    ],
+    "Id": "Assembly",
+    "Name": "Assembly data for PDB_0"
+}

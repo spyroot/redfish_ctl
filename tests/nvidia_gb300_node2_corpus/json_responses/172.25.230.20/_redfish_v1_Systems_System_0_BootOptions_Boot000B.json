@@ -1,0 +1,11 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/BootOptions/Boot000B",
+    "@odata.type": "#BootOption.v1_0_4.BootOption",
+    "BootOptionEnabled": true,
+    "BootOptionReference": "Boot000B",
+    "Description": "UEFI Misc Device",
+    "DisplayName": "UEFI Misc Device",
+    "Id": "Boot000B",
+    "Name": "Boot000B",
+    "UefiDevicePath": "VenMedia(5023B95C-DB26-429B-A648-BD47664C8012)"
+}

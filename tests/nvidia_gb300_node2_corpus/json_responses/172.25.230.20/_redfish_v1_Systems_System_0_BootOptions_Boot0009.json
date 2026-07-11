@@ -1,0 +1,11 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System_0/BootOptions/Boot0009",
+    "@odata.type": "#BootOption.v1_0_4.BootOption",
+    "BootOptionEnabled": true,
+    "BootOptionReference": "Boot0009",
+    "Description": "UEFI SAMSUNG MZTL63T8HFLT-00AW7 S7UTNG0Y720212 1",
+    "DisplayName": "UEFI SAMSUNG MZTL63T8HFLT-00AW7 S7UTNG0Y720212 1",
+    "Id": "Boot0009",
+    "Name": "Boot0009",
+    "UefiDevicePath": "VenHw(1E5A432C-0466-4D31-B009-D4D9239271D3)/MemoryMapped(0xB,0x100014080000,0x100014081FFF)/PciRoot(0x10)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x3,0x0)/Pci(0x0,0x0)/Pci(0xC,0x0)/Pci(0x0,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)"
+}

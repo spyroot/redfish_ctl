@@ -1,0 +1,21 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/HGX_GPU_3/LogServices/XID",
+    "@odata.type": "#LogService.v1_1_0.LogService",
+    "DateTime": "2026-07-08T21:50:38+00:00",
+    "DateTimeLocalOffset": "+00:00",
+    "Description": "XID Log Service",
+    "Entries": {
+        "@odata.id": "/redfish/v1/Chassis/HGX_GPU_3/LogServices/XID/Entries"
+    },
+    "Id": "XID",
+    "Name": "XID Log Service",
+    "Oem": {
+        "Nvidia": {
+            "@odata.type": "#NvidiaLogService.v1_3_0.NvidiaLogService",
+            "BootEntryID": "3520",
+            "LatestEntryID": "3519",
+            "LatestEntryTimeStamp": "2026-07-08T18:32:27+00:00"
+        }
+    },
+    "OverWritePolicy": "WrapsWhenFull"
+}

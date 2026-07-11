@@ -1,0 +1,43 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3",
+    "@odata.type": "#PCIeDevice.v1_14_0.PCIeDevice",
+    "Actions": {
+        "Oem": {
+            "#NvidiaPCIeDevice.ClearAERErrorStatus": {
+                "target": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3/Actions/Oem/NvidiaPCIeDevice.ClearAERErrorStatus"
+            }
+        }
+    },
+    "DeviceType": "SingleFunction",
+    "Id": "GPU_3",
+    "Manufacturer": "NVIDIA",
+    "Model": "NVIDIA GB300",
+    "Name": "PCIe Device",
+    "Oem": {
+        "Nvidia": {
+            "@odata.type": "#NvidiaPCIeDevice.v1_2_0.NvidiaPCIeDevice",
+            "AERCorrectableErrorStatus": "0x00000000",
+            "AERUncorrectableErrorStatus": "0x00000000",
+            "NVLinkReferenceClockEnabled": false,
+            "PCIeReferenceClockEnabled": false
+        }
+    },
+    "PCIeFunctions": {
+        "@odata.id": "/redfish/v1/Chassis/HGX_GPU_3/PCIeDevices/GPU_3/PCIeFunctions"
+    },
+    "PCIeInterface": {
+        "LanesInUse": 16,
+        "MaxLanes": 16,
+        "MaxPCIeType": "Gen6",
+        "PCIeType": "Gen6"
+    },
+    "PartNumber": "31C2-893-A1",
+    "SerialNumber": "1653125034712",
+    "Status": {
+        "Conditions": [],
+        "Health": "OK",
+        "HealthRollup": "OK",
+        "State": "Enabled"
+    },
+    "UUID": "0b71cece-8ce0-f9c3-8027-420557e747a3"
+}

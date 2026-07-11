@@ -1,0 +1,27 @@
+{
+    "@odata.id": "/redfish/v1/Chassis/IO_Board_0/NetworkAdapters/IO_Board_0_CX8_0",
+    "@odata.type": "#NetworkAdapter.v1_9_0.NetworkAdapter",
+    "Actions": {
+        "#NetworkAdapter.Reset": {
+            "ResetType@Redfish.AllowableValues": [
+                "ForceRestart"
+            ],
+            "target": "/redfish/v1/Chassis/IO_Board_0/NetworkAdapters/IO_Board_0_CX8_0/Actions/NetworkAdapter.Reset"
+        }
+    },
+    "Controllers": [],
+    "Id": "IO_Board_0_CX8_0",
+    "Manufacturer": "Nvidia",
+    "Model": "ConnectX-8 800GE 2P NIC",
+    "Name": "IO_Board_0_CX8_0",
+    "PartNumber": "900-9X86E-00CX-ST0",
+    "Ports": {
+        "@odata.id": "/redfish/v1/Chassis/IO_Board_0/NetworkAdapters/IO_Board_0_CX8_0/Ports"
+    },
+    "SerialNumber": "MT2528604VMD",
+    "Status": {
+        "Conditions": [],
+        "HealthRollup": "OK",
+        "State": "Enabled"
+    }
+}
