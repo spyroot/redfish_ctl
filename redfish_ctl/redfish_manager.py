@@ -322,13 +322,24 @@ class RedfishManager:
         return await response
 
     @cached_property
+    def _service_root(self):
+        """The ``/redfish/v1/`` ServiceRoot document, fetched once per connection.
+
+        Version, vendor, and the Systems path all live in this one document;
+        a BMC round trip costs hundreds of milliseconds, so the identity
+        properties below share a single fetch instead of each paying their own.
+        """
+        api_resp = self.base_query("/redfish/v1/")
+        return api_resp.data if api_resp is not None else None
+
+    @cached_property
     def redfish_version(self) -> str:
         """Return version remote endpoint implemented
         :return:
         """
-        api_resp = self.base_query("/redfish/v1/")
-        if api_resp.data is not None and "RedfishVersion" in api_resp.data:
-            return api_resp.data["RedfishVersion"]
+        data = self._service_root
+        if data is not None and "RedfishVersion" in data:
+            return data["RedfishVersion"]
         return ""
 
     @cached_property
@@ -336,9 +347,9 @@ class RedfishManager:
         """Return remote vendor
         :return:
         """
-        api_resp = self.base_query("/redfish/v1/")
-        if api_resp.data is not None and "Vendor" in api_resp.data:
-            return api_resp.data["Vendor"]
+        data = self._service_root
+        if data is not None and "Vendor" in data:
+            return data["Vendor"]
         return ""
 
     @cached_property
@@ -346,9 +357,9 @@ class RedfishManager:
         """Return system path
         :return:
         """
-        api_resp = self.base_query("/redfish/v1/")
-        if api_resp.data is not None and "Systems" in api_resp.data:
-            return api_resp.data["Systems"]["@odata.id"]
+        data = self._service_root
+        if data is not None and "Systems" in data:
+            return data["Systems"]["@odata.id"]
         return ""
 
     @staticmethod
