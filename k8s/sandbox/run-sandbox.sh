@@ -133,6 +133,100 @@ assert_corpus_status() {
 		"$endpoint_name" "$health" "$temp_count"
 }
 
+node_profile_field() {
+	kubectl_sandbox -n "${NAMESPACE}" \
+		get redfishnodeprofile "$1" -o "jsonpath=$2" 2>/dev/null || true
+}
+
+wait_for_node_profile_plan() {
+	# Wait until the controller has produced a dry-run plan hash for the profile.
+	local name="$1"
+	local deadline
+	local plan_hash
+
+	deadline=$((SECONDS + STATUS_TIMEOUT_SECONDS))
+	while [ "$SECONDS" -lt "$deadline" ]; do
+		plan_hash="$(node_profile_field "$name" '{.status.planHash}')"
+		if [ -n "$plan_hash" ]; then
+			printf '%s\n' "$plan_hash"
+			return 0
+		fi
+		sleep 3
+	done
+
+	printf 'timed out waiting for RedfishNodeProfile %s plan\n' "$name" >&2
+	kubectl_sandbox -n "${NAMESPACE}" get redfishnodeprofile "$name" -o yaml >&2 || true
+	return 1
+}
+
+wait_for_node_profile_applied() {
+	# Wait until the approved plan is applied and consumed (one-shot approval).
+	local name="$1"
+	local plan_hash="$2"
+	local deadline
+	local applied
+	local consumed
+
+	deadline=$((SECONDS + STATUS_TIMEOUT_SECONDS))
+	while [ "$SECONDS" -lt "$deadline" ]; do
+		applied="$(node_profile_field "$name" \
+			'{.status.conditions[?(@.type=="Applied")].status}')"
+		consumed="$(node_profile_field "$name" '{.status.consumedPlanHash}')"
+		if [ "$applied" = "True" ] && [ "$consumed" = "$plan_hash" ]; then
+			printf 'RedfishNodeProfile %s applied (consumedPlanHash=%s)\n' \
+				"$name" "$consumed"
+			return 0
+		fi
+		sleep 3
+	done
+
+	printf 'timed out waiting for RedfishNodeProfile %s apply\n' "$name" >&2
+	kubectl_sandbox -n "${NAMESPACE}" get redfishnodeprofile "$name" -o yaml >&2 || true
+	return 1
+}
+
+wait_for_node_profile_converged() {
+	# After apply the mock reflects the change, so the next plan finds no drift.
+	local name="$1"
+	local deadline
+	local drift
+
+	deadline=$((SECONDS + STATUS_TIMEOUT_SECONDS))
+	while [ "$SECONDS" -lt "$deadline" ]; do
+		drift="$(node_profile_field "$name" \
+			'{.status.conditions[?(@.type=="DriftDetected")].status}')"
+		if [ "$drift" = "False" ]; then
+			printf 'RedfishNodeProfile %s converged (no drift after apply)\n' "$name"
+			return 0
+		fi
+		sleep 3
+	done
+
+	printf 'timed out waiting for RedfishNodeProfile %s to converge\n' "$name" >&2
+	kubectl_sandbox -n "${NAMESPACE}" get redfishnodeprofile "$name" -o yaml >&2 || true
+	return 1
+}
+
+drive_node_profile() {
+	# Exercise the gated write path end to end: plan -> approve -> apply -> converge.
+	local name="$1"
+	local plan_hash
+
+	section "waiting for RedfishNodeProfile ${name} plan"
+	plan_hash="$(wait_for_node_profile_plan "$name")"
+	printf 'RedfishNodeProfile %s planHash=%s (drift detected, approving)\n' \
+		"$name" "$plan_hash"
+
+	kubectl_sandbox -n "${NAMESPACE}" patch redfishnodeprofile "$name" \
+		--type=merge -p "{\"spec\":{\"approvedPlanHash\":\"${plan_hash}\"}}"
+
+	section "waiting for RedfishNodeProfile ${name} apply"
+	wait_for_node_profile_applied "$name" "$plan_hash"
+
+	section "waiting for RedfishNodeProfile ${name} convergence"
+	wait_for_node_profile_converged "$name"
+}
+
 validate_backends
 require_tool docker
 require_tool kind
@@ -156,8 +250,10 @@ docker build \
 	-t redfish-ctl-controller:local \
 	.
 
+cluster_reused=0
 if kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}"; then
 	section "using existing kind cluster ${KIND_CLUSTER_NAME}"
+	cluster_reused=1
 else
 	section "creating kind cluster ${KIND_CLUSTER_NAME}"
 	kind create cluster --name "${KIND_CLUSTER_NAME}" --config "${KIND_CONFIG}"
@@ -175,7 +271,13 @@ kind load docker-image redfish-ctl-controller:local --name "${KIND_CLUSTER_NAME}
 section "applying sandbox resources"
 kubectl_sandbox apply -f k8s/sandbox/namespace.yaml
 kubectl_sandbox apply -f k8s/controller/redfish-endpoint-crd.yaml
+kubectl_sandbox apply -f k8s/controller/redfish-node-profile-crd.yaml
 if has_backend "corpus-mock"; then
+	# Publish the mutation rules the mock Deployment mounts at /rules so the
+	# write path has somewhere to apply changes.
+	kubectl_sandbox -n "${NAMESPACE}" create configmap mock-bmc-mutation-rules \
+		--from-file=supermicro_gb300.yaml=tests/mutation_rules/supermicro_gb300.yaml \
+		--dry-run=client -o yaml | kubectl_sandbox apply -f -
 	kubectl_sandbox apply -f k8s/sandbox/mock-bmc.yaml
 	kubectl_sandbox apply -f k8s/sandbox/mock-credentials.yaml
 fi
@@ -187,9 +289,29 @@ kubectl_sandbox apply -f k8s/controller/rbac.yaml
 kubectl_sandbox apply -f k8s/controller/deployment.yaml
 if has_backend "corpus-mock"; then
 	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-sample.yaml
+	# Recreate the profile so each run starts from a clean approval state: a
+	# status.consumedPlanHash left by a prior run would block re-approval and
+	# the apply would never fire.
+	kubectl_sandbox -n "${NAMESPACE}" delete redfishnodeprofile gb300-mock \
+		--ignore-not-found
+	kubectl_sandbox apply -f k8s/sandbox/redfish-node-profile-sample.yaml
 fi
 if has_backend "ilo-sim"; then
 	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml
+fi
+
+if [ "$cluster_reused" = "1" ]; then
+	# On a reused cluster the :local image tag is unchanged, so `kubectl apply`
+	# alone will not recreate pods to pick up a freshly built image. Force a
+	# restart so a re-run always runs the newly loaded images.
+	section "restarting workloads to pick up rebuilt images"
+	if has_backend "corpus-mock"; then
+		kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/mock-bmc
+	fi
+	if has_backend "ilo-sim"; then
+		kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/ilo-sim
+	fi
+	kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/redfish-endpoint-controller
 fi
 
 section "waiting for deployments"
@@ -214,4 +336,9 @@ if has_backend "corpus-mock"; then
 fi
 if has_backend "ilo-sim"; then
 	wait_for_endpoint ilo-sim
+fi
+
+# Write/CONVERGE leg: drive the RedfishNodeProfile plan -> approve -> apply path.
+if has_backend "corpus-mock"; then
+	drive_node_profile gb300-mock
 fi

@@ -21,6 +21,8 @@ ILO_SIM_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.ilo-sim"
 MAKEFILE = REPO_ROOT / "Makefile"
 SANDBOX_README = REPO_ROOT / "k8s" / "sandbox" / "README.md"
 K8S_README = REPO_ROOT / "k8s" / "README.md"
+NODE_PROFILE_SAMPLE = REPO_ROOT / "k8s" / "sandbox" / "redfish-node-profile-sample.yaml"
+MOCK_BMC_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "mock-bmc.yaml"
 
 
 def _yaml_documents(path: Path) -> list[dict]:
@@ -128,7 +130,7 @@ def test_ilo_sim_manifest_deploys_hpe_emulator_service() -> None:
 
 
 def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
-    """The sandbox controller can patch status but has no BMC write path."""
+    """Both controllers run in one pod with minimal, namespaced Kubernetes RBAC."""
     docs = _yaml_documents(CONTROLLER_RBAC)
     deployment = yaml.safe_load(CONTROLLER_DEPLOYMENT.read_text(encoding="utf-8"))
     role = next(doc for doc in docs if doc["kind"] == "Role")
@@ -147,7 +149,10 @@ def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
         # The watch stays scoped to the sandbox namespace so the namespaced
         # Role is sufficient for the resource watch itself.
         "--namespace=redfish-sandbox",
+        # Both controllers run in one kopf process: the endpoint controller
+        # polls read status, the node-profile controller drives gated writes.
         "/app/k8s/controller/redfish_endpoint_controller.py",
+        "/app/k8s/controller/redfish_node_profile_controller.py",
     ]
 
     cluster_role = next(doc for doc in docs if doc["kind"] == "ClusterRole")
@@ -274,3 +279,85 @@ def test_make_k8s_sandbox_invokes_smoke_harness() -> None:
 
     assert "k8s/sandbox/run-sandbox.sh" in makefile
     assert "kind-config.yaml is not present yet" not in makefile
+
+
+# --- write/CONVERGE leg (RedfishNodeProfile) -----------------------------------
+
+
+def test_node_profile_sample_arms_pxe_boot_via_secret_ref() -> None:
+    """The sample profile drives a gated one-time PXE boot with no inline secrets."""
+    profile = yaml.safe_load(NODE_PROFILE_SAMPLE.read_text(encoding="utf-8"))
+
+    assert profile["kind"] == "RedfishNodeProfile"
+    assert profile["metadata"]["namespace"] == "redfish-sandbox"
+    spec = profile["spec"]
+    assert spec["endpoint"]["address"].startswith("http://mock-bmc.redfish-sandbox")
+    assert spec["endpoint"]["secretRef"]["name"] == "mock-bmc-credentials"
+    assert spec["desiredState"]["boot"]["device"] == "Pxe"
+    # Credentials come only through the Secret reference (a key name, never a
+    # value); no approval is baked in — an operator sets approvedPlanHash after
+    # seeing the plan.
+    assert "approvedPlanHash" not in spec
+    assert set(spec["endpoint"]["secretRef"]) >= {"name", "usernameKey", "passwordKey"}
+    assert "password" not in {k.lower() for k in spec["endpoint"].keys()}
+
+
+def test_controller_rbac_grants_node_profile_status_but_not_delete() -> None:
+    """The controller can watch/patch RedfishNodeProfiles and their status only."""
+    role = next(
+        doc for doc in _yaml_documents(CONTROLLER_RBAC) if doc["kind"] == "Role"
+    )
+    resources = {
+        resource
+        for rule in role["rules"]
+        for resource in rule.get("resources", [])
+    }
+    assert "redfishnodeprofiles" in resources
+    assert "redfishnodeprofiles/status" in resources
+
+    profile_verbs = set().union(
+        *(
+            set(rule["verbs"])
+            for rule in role["rules"]
+            if "redfishnodeprofiles" in rule.get("resources", [])
+        )
+    )
+    assert {"get", "list", "watch", "patch", "update"} <= profile_verbs
+    assert "delete" not in profile_verbs
+    assert "create" not in profile_verbs
+
+
+def test_mock_bmc_runs_with_mounted_mutation_rules() -> None:
+    """The mock accepts writes via a ConfigMap-mounted mutation-rules file."""
+    deployment = next(
+        doc
+        for doc in _yaml_documents(MOCK_BMC_MANIFEST)
+        if doc["kind"] == "Deployment"
+    )
+    pod = deployment["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+
+    assert "--mutation-rules" in container["args"]
+    rules_path = container["args"][container["args"].index("--mutation-rules") + 1]
+    mount = next(m for m in container["volumeMounts"] if m["mountPath"] == "/rules")
+    assert rules_path.startswith("/rules/")
+    assert mount["readOnly"] is True
+    volume = next(v for v in pod["volumes"] if v["name"] == mount["name"])
+    assert volume["configMap"]["name"] == "mock-bmc-mutation-rules"
+
+
+def test_run_sandbox_drives_the_node_profile_write_leg() -> None:
+    """The harness applies the profile CRD/CR and runs the plan->approve->apply flow."""
+    script = SMOKE_SCRIPT.read_text(encoding="utf-8")
+
+    assert "redfish-node-profile-crd.yaml" in script
+    assert "redfish-node-profile-sample.yaml" in script
+    assert "configmap mock-bmc-mutation-rules" in script
+    assert "supermicro_gb300.yaml=tests/mutation_rules/supermicro_gb300.yaml" in script
+    # The approval flow: read the plan hash, patch approvedPlanHash, wait applied.
+    assert "wait_for_node_profile_plan" in script
+    assert "approvedPlanHash" in script
+    assert "wait_for_node_profile_applied" in script
+    # Convergence: after apply the mock reflects the change, so drift clears.
+    assert "wait_for_node_profile_converged" in script
+    assert "drive_node_profile gb300-mock" in script

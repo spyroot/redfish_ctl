@@ -1,0 +1,28 @@
+# A RedfishNodeProfile that drives the write/CONVERGE path against the mock BMC.
+#
+# desiredState arms a one-time PXE boot. The node-profile controller
+# (k8s/controller/redfish_node_profile_controller.py) plans it as a dry run,
+# reports a plan hash in .status, and applies nothing until an operator copies
+# that hash into spec.approvedPlanHash. On approval it issues one BootOneShot
+# PATCH to the mock (matched by the boot-override-pxe-once mutation rule), then
+# converges: the mock now reports the override, so the next plan shows no drift.
+#
+# endpoint/secretRef point at the same in-cluster mock and Secret the
+# RedfishEndpoint read path uses (mock-bmc Service, mock-bmc-credentials Secret).
+apiVersion: redfish.ctl.dev/v1alpha1
+kind: RedfishNodeProfile
+metadata:
+  name: gb300-mock
+  namespace: redfish-sandbox
+spec:
+  endpoint:
+    address: http://mock-bmc.redfish-sandbox.svc.cluster.local
+    port: 80
+    insecure: true
+    secretRef:
+      name: mock-bmc-credentials
+      usernameKey: username
+      passwordKey: password
+  desiredState:
+    boot:
+      device: Pxe

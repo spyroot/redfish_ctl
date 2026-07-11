@@ -34,7 +34,11 @@ spec:
             # Watch only this namespace: the RBAC grant is a namespaced Role,
             # so a cluster-wide watch would be rejected with 403s.
             - --namespace=redfish-sandbox
+            # Both controllers run in one kopf process: the endpoint controller
+            # polls read status, the node-profile controller drives the gated
+            # plan/approve/apply write path.
             - /app/k8s/controller/redfish_endpoint_controller.py
+            - /app/k8s/controller/redfish_node_profile_controller.py
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
