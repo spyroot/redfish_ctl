@@ -10,7 +10,8 @@ packages register a profile here.
 Author Mus spyroot@gmail.com
 """
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from types import MappingProxyType
+from typing import Dict, Mapping, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,12 @@ class VendorCapabilities:
 
     # Redfish Lifecycle Events over Server-Sent Events.
     lifecycle_events_sse: bool = False
+
+    # Capability-field name -> short local fixture/source provenance note.
+    evidence: Mapping[str, str] = field(default_factory=dict, compare=False, hash=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "evidence", MappingProxyType(dict(self.evidence)))
 
 
 _REGISTRY: Dict[str, VendorCapabilities] = {}
