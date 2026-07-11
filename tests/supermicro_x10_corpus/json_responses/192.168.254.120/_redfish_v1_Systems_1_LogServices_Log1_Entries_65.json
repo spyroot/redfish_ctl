@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.type": "#LogEntry.v1_3_0.LogEntry",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/Log1/Entries/65",
+    "Id": "65",
+    "Name": "Log Entry 65",
+    "EntryType": "Event",
+    "Created": "2020-02-25T17:13:16+00:00",
+    "EntryCode": "Assert",
+    "OemSensorType": "OOB",
+    "SensorNumber": 255,
+    "Message": "[ OEM ] Activate Node Product Key",
+    "MessageArgs": [
+        "ArrayOfMessageArgs"
+    ],
+    "Links": {
+        "Oem": {}
+    },
+    "Oem": {
+        "Supermicro": {
+            "@odata.type": "#SmcLogEntryExtensions.v1_0_0.LogEntry",
+            "RawEventData": {
+                "EventDirAndType": "0x6F",
+                "SensorType": "0xCA",
+                "SensorName": "OEM",
+                "EventData1": "0x18",
+                "EventData2": "0x00",
+                "EventData3": "0xFF"
+            }
+        }
+    }
+}

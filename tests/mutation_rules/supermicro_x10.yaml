@@ -1,0 +1,65 @@
+# Order-independent mutation rules for a Supermicro X10 (ASPEED BMC) board.
+#
+# Consumed by the mock BMC server against tests/supermicro_x10_corpus. This is
+# the home-lab X10 hardware, captured from a real board. It uses the numeric
+# Redfish scheme (Systems/1, Managers/1) and an ASPEED BMC. The ComputerSystem
+# exposes no Bios resource and only a Supermicro-proprietary VirtualMedia
+# (VM1/CfgCD) with no standard slots, so those classes are absent here.
+#
+# Coverage: power reset, boot-source override, one-time-boot revert, log clear.
+vendor: supermicro-x10
+rules:
+  - name: power-off-on-forceoff
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: ForceOff}
+    when:
+      - {path: /redfish/v1/Systems/1, field: PowerState, equals: "On"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, field: PowerState, value: "Off"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Status, State], value: "Disabled"}
+    response: {status: 204}
+
+  - name: power-on
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: "On"}
+    when:
+      - {path: /redfish/v1/Systems/1, field: PowerState, equals: "Off"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, field: PowerState, value: "On"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Status, State], value: "Enabled"}
+    response: {status: 204}
+
+  - name: boot-override-pxe-once
+    method: PATCH
+    path: /redfish/v1/Systems/1
+    body_contains: {Boot: {BootSourceOverrideTarget: Pxe, BootSourceOverrideEnabled: Once}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "Pxe"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Once"}
+    response: {status: 200}
+
+  - name: boot-override-disable
+    method: PATCH
+    path: /redfish/v1/Systems/1
+    body_contains: {Boot: {BootSourceOverrideEnabled: Disabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 200}
+
+  - name: boot-once-revert-on-reset
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], equals: "Once"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 204}
+
+  - name: system-log-clear
+    method: POST
+    path: /redfish/v1/Systems/1/LogServices/Log1/Actions/LogService.ClearLog
+    response: {status: 204}
