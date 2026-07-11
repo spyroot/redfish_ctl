@@ -8,7 +8,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    MOCK_BMC_CORPUS_DIR=/corpus/172.25.230.37
+    MOCK_BMC_CORPUS_DIR=/corpus/gb300
 
 # PyYAML lets the mock load YAML replay traces and mutation-rules files; the
 # server itself is otherwise stdlib-only. Without it the mock can only read
@@ -32,7 +32,7 @@ COPY --chown=mockbmc:mockbmc k8s/sandbox/mock_bmc_server.py \
     /app/mock_bmc_server.py
 COPY --chown=mockbmc:mockbmc \
     tests/supermicro_gb300_corpus/json_responses/172.25.230.37 \
-    /corpus/172.25.230.37
+    /corpus/gb300
 
 USER mockbmc
 

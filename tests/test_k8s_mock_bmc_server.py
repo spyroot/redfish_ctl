@@ -15,6 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
 DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.mock-bmc"
 MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "mock-bmc.yaml"
+FLEET_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "gb300-fleet.yaml"
+HELM_VALUES = REPO_ROOT / "charts" / "redfish-controller" / "values.yaml"
+SIMULATION_DOC = REPO_ROOT / "docs" / "simulation-and-replay.md"
 GRACEFUL_RESTART_TRACE = REPO_ROOT / "tests" / "write_traces" / "graceful_restart.yaml"
 SUPERMICRO_RULES = REPO_ROOT / "tests" / "mutation_rules" / "supermicro_gb300.yaml"
 GB300_CORPUS = (
@@ -145,6 +148,9 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     assert "--chown=mockbmc:mockbmc" in dockerfile
     assert "k8s/sandbox/mock_bmc_server.py" in dockerfile
     assert "tests/supermicro_gb300_corpus/json_responses/172.25.230.37" in dockerfile
+    assert "MOCK_BMC_CORPUS_DIR=/corpus/gb300" in dockerfile
+    assert "/corpus/gb300" in dockerfile
+    assert "/corpus/172.25.230.37" not in dockerfile
     assert "USER mockbmc" in dockerfile
     assert "EXPOSE 8080" in dockerfile
     assert "ENTRYPOINT" in dockerfile
@@ -170,9 +176,32 @@ def test_mock_bmc_manifest_exposes_read_only_service_without_secrets() -> None:
     assert service["metadata"]["name"] == "mock-bmc"
     assert container["image"] == "redfish-ctl-mock-bmc:local"
     assert container["ports"][0]["containerPort"] == 8080
+    assert container["env"] == [
+        {
+            "name": "MOCK_BMC_CORPUS_DIR",
+            "value": "/corpus/gb300",
+        }
+    ]
     assert container["readinessProbe"]["httpGet"]["path"] == "/redfish/v1/"
     assert service["spec"]["ports"][0]["targetPort"] == "http"
     assert not {name for name in env_names if "PASSWORD" in name or "SECRET" in name}
+
+
+def test_public_runtime_paths_do_not_embed_lab_addresses() -> None:
+    """Public image, manifest, chart, and doc paths use a neutral corpus mount."""
+    public_files = [
+        DOCKERFILE,
+        SERVER_MODULE,
+        MANIFEST,
+        FLEET_MANIFEST,
+        HELM_VALUES,
+        SIMULATION_DOC,
+    ]
+
+    for path in public_files:
+        text = path.read_text(encoding="utf-8")
+        assert "/corpus/172.25.230.37" not in text, path
+        assert "/corpus/gb300" in text, path
 
 
 # --- order-independent mutation-rules mode -------------------------------------
