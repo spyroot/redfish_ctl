@@ -91,6 +91,17 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
         "target": "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
         "payload": {"ResetType": "GracefulRestart"},
     }
+    boot_preview = {
+        "dry_run": True,
+        "target": "/redfish/v1/Systems/System_0",
+        "payload": {
+            "Boot": {
+                "BootSourceOverrideEnabled": "Once",
+                "BootSourceOverrideTarget": "Pxe",
+                "BootSourceOverrideMode": "UEFI",
+            }
+        },
+    }
     manager = RecordingManager({
         (
             ApiRequestType.BiosProfile,
@@ -106,6 +117,18 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
                 confirm=False,
             ),
         ): CommandResult(ntp_preview, None, None, None),
+        (
+            ApiRequestType.BootOneShot,
+            "boot_one_shot",
+            _key(
+                device="Pxe",
+                mode="UEFI",
+                uefi_target=None,
+                do_reboot=False,
+                dry_run=True,
+                confirm=False,
+            ),
+        ): CommandResult(boot_preview, None, None, None),
         (
             ApiRequestType.ComputerSystemReset,
             "reboot",
@@ -146,6 +169,18 @@ def test_reconcile_dry_run_plans_without_mutating_commands():
             {
                 "servers": ("0.pool.ntp.org",),
                 "manager_id": "BMC_0",
+                "confirm": False,
+            },
+        ),
+        (
+            ApiRequestType.BootOneShot,
+            "boot_one_shot",
+            {
+                "device": "Pxe",
+                "mode": "UEFI",
+                "uefi_target": None,
+                "do_reboot": False,
+                "dry_run": True,
                 "confirm": False,
             },
         ),
@@ -216,7 +251,14 @@ def test_reconcile_confirm_applies_only_required_changes():
         (
             ApiRequestType.BootOneShot,
             "boot_one_shot",
-            _key(device="Pxe", mode=None, uefi_target=None, do_reboot=False),
+            _key(
+                device="Pxe",
+                mode=None,
+                uefi_target=None,
+                do_reboot=False,
+                dry_run=False,
+                confirm=True,
+            ),
         ): CommandResult(boot_result, None, None, None),
         (
             ApiRequestType.ComputerSystemReset,
@@ -278,6 +320,8 @@ def test_reconcile_confirm_applies_only_required_changes():
                 "mode": None,
                 "uefi_target": None,
                 "do_reboot": False,
+                "dry_run": False,
+                "confirm": True,
             },
         ),
         (

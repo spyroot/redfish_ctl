@@ -201,29 +201,26 @@ def _reconcile_boot(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
-    preview = {
-        "device": state.boot_device,
-        "mode": state.boot_mode,
-        "uefiTarget": state.uefi_target,
-    }
+    result = _invoke_mapping(
+        manager,
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device=state.boot_device,
+        mode=state.boot_mode,
+        uefi_target=state.uefi_target,
+        do_reboot=False,
+        dry_run=not confirm,
+        confirm=confirm,
+    )
     steps.append(
         ReconcileStep(
             kind="boot",
             required=True,
             description="One-time boot override",
-            preview=preview,
+            preview=result,
         )
     )
     if confirm:
-        result = _invoke_mapping(
-            manager,
-            ApiRequestType.BootOneShot,
-            "boot_one_shot",
-            device=state.boot_device,
-            mode=state.boot_mode,
-            uefi_target=state.uefi_target,
-            do_reboot=False,
-        )
         applied.append(
             AppliedChange(kind="boot", changed=True, result=result)
         )

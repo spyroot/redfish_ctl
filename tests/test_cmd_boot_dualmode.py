@@ -187,6 +187,72 @@ def test_boot_one_shot_patches_requested_target_in_mock_mode(
     assert current.data["BootSourceOverrideTarget"] == "Pxe"
 
 
+def test_boot_one_shot_dry_run_previews_payload_without_patch(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot dry_run reports the Boot payload without mutating settings."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Pxe",
+        mode="UEFI",
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data == {
+        "dry_run": True,
+        "target": "/redfish/v1/Systems/System.Embedded.1",
+        "payload": {
+            "Boot": {
+                "BootSourceOverrideEnabled": "Once",
+                "BootSourceOverrideTarget": "Pxe",
+                "BootSourceOverrideMode": "UEFI",
+            }
+        },
+        "blocked": None,
+    }
+    assert redfish_service.requests
+    assert all(request.method != "PATCH" for request in redfish_service.requests)
+
+
+def test_boot_one_shot_dry_run_suppresses_power_on_and_reboot(
+    redfish_mock, redfish_service
+):
+    """boot_one_shot dry_run does not fire nested power-on or reboot requests."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Pxe",
+        dry_run=True,
+        do_power_on=True,
+        do_reboot=True,
+    )
+
+    assert result.data["dry_run"] is True
+    assert all(
+        request.method not in {"PATCH", "POST"}
+        for request in redfish_service.requests
+    )
+
+
+def test_boot_one_shot_confirm_false_previews_without_patch(
+    redfish_mock, redfish_service
+):
+    """Internal callers can require explicit confirm before boot-one-shot writes."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Pxe",
+        confirm=False,
+    )
+
+    assert result.data["dry_run"] is True
+    assert result.data["blocked"] == "one-time boot requires confirm"
+    assert all(request.method != "PATCH" for request in redfish_service.requests)
+
+
 def test_boot_one_shot_rejects_invalid_target_before_patch_in_mock_mode(
     redfish_mock, redfish_service
 ):
