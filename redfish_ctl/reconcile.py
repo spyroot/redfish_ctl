@@ -167,6 +167,26 @@ def _reconcile_ntp(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
+    current = _invoke_rows(
+        manager,
+        ApiRequestType.ManagerNetworkProtocol,
+        "manager-network",
+    )
+    if _ntp_already_matches(current, state):
+        steps.append(
+            ReconcileStep(
+                kind="ntp",
+                required=False,
+                description="Manager NTP servers",
+                preview={
+                    "servers": list(state.ntp_servers),
+                    "manager": state.ntp_manager_id,
+                    "current": list(current),
+                },
+            )
+        )
+        return
+
     result = _invoke_mapping(
         manager,
         ApiRequestType.NtpSet,
@@ -175,7 +195,7 @@ def _reconcile_ntp(
         manager_id=state.ntp_manager_id,
         confirm=confirm,
     )
-    required = confirm or bool(result.get("plan") or result.get("applied"))
+    required = bool(result.get("plan") or result.get("applied"))
     steps.append(
         ReconcileStep(
             kind="ntp",
@@ -201,26 +221,36 @@ def _reconcile_boot(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
-    result = _invoke_mapping(
+    current = _invoke_mapping(
         manager,
-        ApiRequestType.BootOneShot,
-        "boot_one_shot",
-        device=state.boot_device,
-        mode=state.boot_mode,
-        uefi_target=state.uefi_target,
-        do_reboot=False,
-        dry_run=not confirm,
-        confirm=confirm,
+        ApiRequestType.CurrentBoot,
+        "current_boot_query",
     )
+    preview = {
+        "device": state.boot_device,
+        "mode": state.boot_mode,
+        "uefiTarget": state.uefi_target,
+        "current": current,
+    }
+    required = not _boot_already_matches(current, state)
     steps.append(
         ReconcileStep(
             kind="boot",
-            required=True,
+            required=required,
             description="One-time boot override",
-            preview=result,
+            preview=preview,
         )
     )
-    if confirm:
+    if confirm and required:
+        result = _invoke_mapping(
+            manager,
+            ApiRequestType.BootOneShot,
+            "boot_one_shot",
+            device=state.boot_device,
+            mode=state.boot_mode,
+            uefi_target=state.uefi_target,
+            do_reboot=False,
+        )
         applied.append(
             AppliedChange(kind="boot", changed=True, result=result)
         )
@@ -264,14 +294,38 @@ def _invoke_mapping(
     name: str,
     **kwargs: Any,
 ) -> Mapping[str, Any]:
+    return _mapping(_invoke_data(manager, api_call, name, **kwargs))
+
+
+def _invoke_rows(
+    manager: SyncInvoker,
+    api_call: ApiRequestType,
+    name: str,
+    **kwargs: Any,
+) -> tuple[Mapping[str, Any], ...]:
+    return _mapping_rows(_invoke_data(manager, api_call, name, **kwargs))
+
+
+def _invoke_data(
+    manager: SyncInvoker,
+    api_call: ApiRequestType,
+    name: str,
+    **kwargs: Any,
+) -> Any:
     result = manager.sync_invoke(api_call, name, **kwargs)
     if result.error:
         raise RedfishApiError(str(result.error))
-    return _mapping(result.data)
+    return result.data
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _mapping_rows(value: Any) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(row for row in value if isinstance(row, Mapping))
 
 
 def _first(mapping: Mapping[str, Any], *keys: str) -> Any:
@@ -302,9 +356,66 @@ def _str_tuple(value: Any) -> tuple[str, ...]:
     )
 
 
+def _ntp_already_matches(
+    rows: tuple[Mapping[str, Any], ...],
+    state: DesiredState,
+) -> bool:
+    desired_servers = tuple(state.ntp_servers)
+    comparable_rows = []
+    for row in rows:
+        manager_id = _optional_str(row.get("Manager"))
+        if state.ntp_manager_id and manager_id != state.ntp_manager_id:
+            continue
+        ntp = _mapping(row.get("NTP"))
+        if not _ntp_row_is_capable(ntp):
+            if state.ntp_manager_id:
+                return False
+            continue
+        comparable_rows.append(row)
+        if ntp.get("ProtocolEnabled") is not True:
+            return False
+        if _str_tuple(ntp.get("NTPServers")) != desired_servers:
+            return False
+    return bool(comparable_rows)
+
+
+def _ntp_row_is_capable(ntp: Mapping[str, Any]) -> bool:
+    return ntp.get("ProtocolEnabled") is not None or bool(ntp.get("NTPServers"))
+
+
+def _boot_already_matches(
+    current: Mapping[str, Any],
+    state: DesiredState,
+) -> bool:
+    desired_device = state.boot_device
+    desired_enabled = "Disabled" if desired_device == "None" else "Once"
+    if current.get("BootSourceOverrideEnabled") != desired_enabled:
+        return False
+    if current.get("BootSourceOverrideTarget") != desired_device:
+        return False
+    if (
+        state.boot_mode is not None
+        and current.get("BootSourceOverrideMode") != state.boot_mode
+    ):
+        return False
+    if (
+        state.uefi_target is not None
+        and current.get("UefiTargetBootSourceOverride") != state.uefi_target
+    ):
+        return False
+    return True
+
+
 def _reset_type(reboot_spec: Any, reboot: Mapping[str, Any]) -> str | None:
     if isinstance(reboot_spec, str):
         return _optional_str(reboot_spec)
-    if reboot_spec is True:
-        return "GracefulRestart"
-    return _optional_str(_first(reboot, "resetType", "reset_type"))
+    if isinstance(reboot_spec, bool):
+        if reboot_spec:
+            raise ValueError("reboot.resetType must be an explicit string")
+        return None
+    reset_type = _first(reboot, "resetType", "reset_type")
+    if reset_type is None:
+        return None
+    if not isinstance(reset_type, str):
+        raise ValueError("reboot.resetType must be an explicit string")
+    return _optional_str(reset_type)
