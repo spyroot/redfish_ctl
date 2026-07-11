@@ -6,7 +6,9 @@ Many classes mapped directly to JSON schem.
 Author Mus spyroot@gmail.com
 
 """
+import hashlib
 import json
+import threading
 from enum import Enum, auto
 from json import JSONEncoder
 from typing import Optional
@@ -239,19 +241,48 @@ class RedfishAction:
 
 
 class Singleton(type):
-    """This redfish_ctl class for all action that singleton
+    """One command instance per (class, BMC connection).
+
+    Commands cache expensive per-BMC discovery (vendor, Redfish version,
+    resource paths) on themselves, and a BMC round-trip can cost hundreds of
+    milliseconds — so repeated invocations against the SAME BMC must reuse
+    one instance. Keying by class alone made every later construction return
+    the first BMC's instance with its credentials, transport, and cached
+    state, so any multi-BMC path (fleet fan-out, proxy, a controller with
+    several endpoints) silently read the first node. The key therefore
+    fingerprints the connection; the password contributes only as a digest,
+    never held as a plain dict key.
     """
     _instances = {}
+    _lock = threading.Lock()
+
+    @staticmethod
+    def _connection_key(cls, args, kwargs):
+        password = str(kwargs.get("idrac_password", "") or "")
+        return (
+            cls,
+            args,
+            kwargs.get("idrac_ip", ""),
+            kwargs.get("idrac_username", ""),
+            hashlib.sha256(password.encode()).hexdigest(),
+            kwargs.get("idrac_port", 443),
+            bool(kwargs.get("is_http", False)),
+            bool(kwargs.get("insecure", True)),
+            str(kwargs.get("x_auth", "") or ""),
+        )
 
     def __call__(cls, *args, **kwargs):
-        """
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+        key = Singleton._connection_key(cls, args, kwargs)
+        inst = cls._instances.get(key)
+        if inst is None:
+            # Concurrent first-builds (fleet thread pool) must converge on
+            # one instance.
+            with Singleton._lock:
+                inst = cls._instances.get(key)
+                if inst is None:
+                    inst = super(Singleton, cls).__call__(*args, **kwargs)
+                    cls._instances[key] = inst
+        return inst
 
 
 class BootSource(Enum):
