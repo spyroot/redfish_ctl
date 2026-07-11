@@ -194,31 +194,15 @@ Then validate standard Redfish resources with `tools/redfish_validate.py`.
 network fetches and requires schemas already cached under `tools/redfish-schemas/`.
 
 ```bash
-REDFISH_SCHEMA_OFFLINE=1 python - <<'PY'
-import json
-from pathlib import Path
-
-from tools.redfish_validate import SchemaUnavailable, validate_payload
-
-for path in sorted(Path("tests/idrac_fixtures").glob("*.json")):
-    payload = json.loads(path.read_text())
-    try:
-        errors = validate_payload(payload)
-    except (SchemaUnavailable, ValueError) as err:
-        print(f"SKIP {path}: {err}")
-        continue
-    if errors:
-        print(f"FAIL {path}")
-        for err in errors:
-            print(f"  {'/'.join(map(str, err.absolute_path))}: {err.message}")
-        raise SystemExit(1)
-    print(f"OK {path}")
-PY
+REDFISH_SCHEMA_OFFLINE=1 \
+  python tools/redfish_validate.py tests/idrac_fixtures
 ```
 
-OEM resources often skip validation because no standard DMTF schema exists for
-their private type. That is acceptable when the test asserts the exact command
-behavior that depends on the OEM fields.
+The validator classifies each JSON file as valid, error, or skipped. Use
+`--json` when a script needs the same result as machine-readable output. OEM
+resources often skip validation because no standard DMTF schema exists for their
+private type. That is acceptable when the test asserts the exact command behavior
+that depends on the OEM fields.
 
 ### Import
 
