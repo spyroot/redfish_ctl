@@ -5,7 +5,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/redfish-ctl.svg)](https://pypi.org/project/redfish-ctl/)
 [![License: MIT](https://img.shields.io/pypi/l/redfish-ctl.svg)](https://github.com/spyroot/redfish_ctl/blob/main/LICENSE)
 
-`redfish_ctl` is a standalone command-line tool I built to drive server BMCs entirely through the
+`redfish_ctl` is a standalone command-line tool for driving server BMCs entirely through the
 Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
 with JSON or YAML output (`--yaml`, and save-to-file), both synchronous and asynchronous calls,
 optional server-side `$expand` on large collection reads, and a read-first, guarded-write model
@@ -31,7 +31,9 @@ What it does across the whole server lifecycle:
   Serial-over-LAN service, in one step, vendor-neutrally.
 - **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
   an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
-  — to Prometheus, SignalFx, and Splunk Observability.
+  — to Prometheus, SignalFx, and Splunk Observability. The
+  [telemetry exporter guide](docs/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
+  model and the supported consumer modes.
 - **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
 - **Accounts & security** — create/update/delete accounts, SSH-key import, the account and privilege
   services, Secure Boot, and SPDM component-integrity attestation.
