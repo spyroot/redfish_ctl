@@ -11,8 +11,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -185,9 +184,9 @@ class ChangeBootOrder(
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
-        elif api_resp.Success or api_resp.Ok:
+        elif api_resp in (IdracApiRespond.Success, IdracApiRespond.Ok):
             if do_commit:
-                self.logger.info(f"Commit changes and rebooting.")
+                self.logger.info("Commit changes and rebooting.")
                 # we commit with a reboot
                 cmd_apply = self.sync_invoke(
                     ApiRequestType.JobApply,

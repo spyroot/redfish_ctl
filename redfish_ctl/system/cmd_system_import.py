@@ -7,21 +7,14 @@ python redfish_ctl.py system-import --config system.json
 
 Author Mus spyroot@gmail.com
 """
-import json
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import PostRequestFailed, IDracManager
-from ..redfish_manager import CommandResult
-from ..cmd_exceptions import FailedDiscoverAction
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_exceptions import UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
-from ..idrac_shared import IDRAC_JSON
+from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager import CommandResult
 
 
 class ImportSystemConfig(IDracManager,
@@ -137,7 +130,7 @@ class ImportSystemConfig(IDracManager,
 
         path_config = Path(config).expanduser().resolve()
         if not path_config.is_file():
-            raise InvalidArgument(f"Invalid path to a config file.")
+            raise InvalidArgument("Invalid path to a config file.")
 
         with open(str(path_config), "r") as f:
             buf = f.read()
@@ -156,11 +149,11 @@ class ImportSystemConfig(IDracManager,
         data = {}
 
         cmd_result, api_resp = self.base_post(r, payload)
-        if api_resp.AcceptedTaskGenerated:
-            job_id = cmd_result.data['job_id']
-            task_state = self.fetch_task(cmd_result.data['job_id'])
+        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+            task_id = cmd_result.data['task_id']
+            task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
-            cmd_result.data['task_id'] = job_id
+            cmd_result.data['task_id'] = task_id
 
         if do_reboot:
             reboot_result = self.reboot()
