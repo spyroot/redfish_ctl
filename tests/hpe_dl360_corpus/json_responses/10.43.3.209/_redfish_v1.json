@@ -1,0 +1,23 @@
+{
+  "@odata.id": "/redfish/v1",
+  "@odata.type": "#ServiceRoot.v1_5_0.ServiceRoot",
+  "Id": "RootService",
+  "Name": "Root Service",
+  "RedfishVersion": "1.6.0",
+  "Vendor": "HPE",
+  "Systems": {
+    "@odata.id": "/redfish/v1/Systems"
+  },
+  "Managers": {
+    "@odata.id": "/redfish/v1/Managers"
+  },
+  "Chassis": {
+    "@odata.id": "/redfish/v1/Chassis"
+  },
+  "Oem": {
+    "redfish_ctl": {
+      "Synthesized": true,
+      "Reason": "partial crawl missing this index"
+    }
+  }
+}
