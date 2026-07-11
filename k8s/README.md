@@ -41,8 +41,7 @@ spec:
 ```
 
 ```console
-$ kubectl get redfishendpoints -o custom-columns=\
-NAME:.metadata.name,POWER:.status.powerState,HEALTH:.status.health,POLLED:.status.lastPolled
+$ kubectl get redfishendpoints
 NAME          POWER   HEALTH   POLLED
 rack7-node3   On      OK       2026-07-11T02:10:41Z
 ```

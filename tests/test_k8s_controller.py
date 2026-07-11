@@ -51,7 +51,8 @@ def _fixture_for_path(path: str) -> Path | None:
 def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
     """The CRD exposes only connection fields and read-only status."""
     crd = yaml.safe_load(CRD_MANIFEST.read_text(encoding="utf-8"))
-    schema = crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+    version = crd["spec"]["versions"][0]
+    schema = version["schema"]["openAPIV3Schema"]
     spec_props = schema["properties"]["spec"]["properties"]
     status_props = schema["properties"]["status"]["properties"]
 
@@ -77,6 +78,23 @@ def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
     }
     assert status_props["temperature"]["properties"]["maxCelsius"]["type"] == "number"
     assert "valueFrom" not in json.dumps(crd)
+    assert version["additionalPrinterColumns"] == [
+        {
+            "name": "POWER",
+            "type": "string",
+            "jsonPath": ".status.powerState",
+        },
+        {
+            "name": "HEALTH",
+            "type": "string",
+            "jsonPath": ".status.health",
+        },
+        {
+            "name": "POLLED",
+            "type": "date",
+            "jsonPath": ".status.lastPolled",
+        },
+    ]
 
 
 def test_build_status_tolerates_missing_values_and_summarizes_temperatures() -> None:

@@ -31,3 +31,9 @@ The smoke check waits until `.status.powerState` is populated on the sample
 resources. The corpus mock BMC serves only the committed GB300 corpus and
 rejects mutating HTTP verbs; the iLO backend is an emulator service, not a live
 BMC.
+
+Remove the default sandbox cluster when finished:
+
+```bash
+kind delete cluster --name redfish-sandbox
+```

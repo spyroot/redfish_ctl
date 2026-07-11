@@ -7,6 +7,7 @@ KIND_CONFIG="${KIND_CONFIG:-k8s/sandbox/kind-config.yaml}"
 NAMESPACE="${NAMESPACE:-redfish-sandbox}"
 SANDBOX_BACKENDS="${SANDBOX_BACKENDS:-corpus-mock}"
 STATUS_TIMEOUT_SECONDS="${STATUS_TIMEOUT_SECONDS:-180}"
+KUBECTL_CONTEXT="kind-${KIND_CLUSTER_NAME}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 cd "$REPO_ROOT"
@@ -57,6 +58,10 @@ section() {
 	printf '\n>> %s\n' "$1"
 }
 
+kubectl_sandbox() {
+	kubectl --context "${KUBECTL_CONTEXT}" "$@"
+}
+
 wait_for_endpoint() {
 	local endpoint_name="$1"
 	local deadline
@@ -66,7 +71,7 @@ wait_for_endpoint() {
 	power_state=""
 	while [ "$SECONDS" -lt "$deadline" ]; do
 		power_state="$(
-			kubectl -n "${NAMESPACE}" \
+			kubectl_sandbox -n "${NAMESPACE}" \
 				get redfishendpoint "$endpoint_name" \
 				-o 'jsonpath={.status.powerState}' 2>/dev/null || true
 		)"
@@ -79,7 +84,8 @@ wait_for_endpoint() {
 
 	printf 'timed out waiting for RedfishEndpoint %s status.powerState\n' \
 		"$endpoint_name" >&2
-	kubectl -n "${NAMESPACE}" get redfishendpoint "$endpoint_name" -o yaml || true
+	kubectl_sandbox -n "${NAMESPACE}" get redfishendpoint "$endpoint_name" \
+		-o yaml || true
 	return 1
 }
 
@@ -123,33 +129,37 @@ fi
 kind load docker-image redfish-ctl-controller:local --name "${KIND_CLUSTER_NAME}"
 
 section "applying sandbox resources"
-kubectl apply -f k8s/sandbox/namespace.yaml
-kubectl apply -f k8s/controller/redfish-endpoint-crd.yaml
+kubectl_sandbox apply -f k8s/sandbox/namespace.yaml
+kubectl_sandbox apply -f k8s/controller/redfish-endpoint-crd.yaml
 if has_backend "corpus-mock"; then
-	kubectl apply -f k8s/sandbox/mock-bmc.yaml
-	kubectl apply -f k8s/sandbox/mock-credentials.yaml
+	kubectl_sandbox apply -f k8s/sandbox/mock-bmc.yaml
+	kubectl_sandbox apply -f k8s/sandbox/mock-credentials.yaml
 fi
 if has_backend "ilo-sim"; then
-	kubectl apply -f k8s/sandbox/ilo-sim.yaml
-	kubectl apply -f k8s/sandbox/ilo-credentials.yaml
+	kubectl_sandbox apply -f k8s/sandbox/ilo-sim.yaml
+	kubectl_sandbox apply -f k8s/sandbox/ilo-credentials.yaml
 fi
-kubectl apply -f k8s/controller/rbac.yaml
-kubectl apply -f k8s/controller/deployment.yaml
+kubectl_sandbox apply -f k8s/controller/rbac.yaml
+kubectl_sandbox apply -f k8s/controller/deployment.yaml
 if has_backend "corpus-mock"; then
-	kubectl apply -f k8s/sandbox/redfish-endpoint-sample.yaml
+	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-sample.yaml
 fi
 if has_backend "ilo-sim"; then
-	kubectl apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml
+	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml
 fi
 
 section "waiting for deployments"
 if has_backend "corpus-mock"; then
-	kubectl -n "${NAMESPACE}" rollout status deploy/mock-bmc --timeout=120s
+	kubectl_sandbox -n "${NAMESPACE}" \
+		rollout status deploy/mock-bmc \
+		--timeout=120s
 fi
 if has_backend "ilo-sim"; then
-	kubectl -n "${NAMESPACE}" rollout status deploy/ilo-sim --timeout=120s
+	kubectl_sandbox -n "${NAMESPACE}" \
+		rollout status deploy/ilo-sim \
+		--timeout=120s
 fi
-kubectl -n "${NAMESPACE}" \
+kubectl_sandbox -n "${NAMESPACE}" \
 	rollout status deploy/redfish-endpoint-controller \
 	--timeout=120s
 
