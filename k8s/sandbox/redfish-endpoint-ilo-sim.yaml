@@ -1,0 +1,15 @@
+---
+apiVersion: redfish.ctl.dev/v1alpha1
+kind: RedfishEndpoint
+metadata:
+  name: ilo-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  address: https://ilo-sim.redfish-sandbox.svc.cluster.local
+  port: 443
+  insecure: true
+  pollInterval: 10s
+  secretRef:
+    name: ilo-sim-credentials

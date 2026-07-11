@@ -1,0 +1,83 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ilo-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: ilo-sim
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ilo-sim
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ilo-sim
+        app.kubernetes.io/component: redfish-sandbox
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: ilo-sim
+          image: redfish-ctl-ilo-sim:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: https
+              containerPort: 8443
+          env:
+            - name: MOCKUP_FOLDER
+              value: DL380a
+            - name: ASYNC_SLEEP
+              value: "0"
+            - name: PORT
+              value: "8443"
+          readinessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ilo-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: ilo-sim
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ilo-sim
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
