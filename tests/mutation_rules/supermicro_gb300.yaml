@@ -1,0 +1,117 @@
+# Order-independent mutation rules for the Supermicro GB300 (NVIDIA HGX) BMC.
+#
+# Consumed by the mock BMC server's MutationRules engine
+# (k8s/sandbox/mock_bmc_server.py, --mutation-rules). Unlike an ordered replay
+# trace, each rule is matched against every write on its own terms:
+#
+#   method         HTTP verb (POST/PATCH/PUT/DELETE)
+#   path           normalized Redfish path; may be an fnmatch glob (*, ?, [])
+#   body_contains  optional subset the request body must contain
+#   when           optional preconditions over the CURRENT effective state
+#                  (corpus fixture + overlays already applied); each is
+#                  {path, field|json_path, equals|not_equals|exists|absent}
+#   state_transitions  overlays applied on match, reusing the replay vocabulary
+#                      ({op: set|delete, path, field|json_path, value})
+#   response       {status, body?} returned to the caller (default 204)
+#
+# All matching rules apply, so conditional side effects compose: a reset both
+# powers the system down and, only when a one-time boot is armed, reverts it.
+# Every path/field below exists in tests/supermicro_gb300_corpus.
+#
+# The GB300 is a GPU compute node; its corpus has no Volumes collection or
+# clearable LogService, so storage-volume and log-clear classes are covered by
+# a vendor whose corpus has those resources (see the HPE rules).
+vendor: supermicro-gb300
+rules:
+  # --- power reset ---------------------------------------------------------
+  - name: power-off-on-forceoff
+    method: POST
+    path: /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: ForceOff}
+    when:
+      - {path: /redfish/v1/Systems/System_0, field: PowerState, equals: "On"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, field: PowerState, value: "Off"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Status, State], value: "Disabled"}
+    response: {status: 204}
+
+  - name: power-on
+    method: POST
+    path: /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: "On"}
+    when:
+      - {path: /redfish/v1/Systems/System_0, field: PowerState, equals: "Off"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, field: PowerState, value: "On"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Status, State], value: "Enabled"}
+    response: {status: 204}
+
+  # --- boot source override ------------------------------------------------
+  - name: boot-override-pxe-once
+    method: PATCH
+    path: /redfish/v1/Systems/System_0
+    body_contains: {Boot: {BootSourceOverrideTarget: Pxe, BootSourceOverrideEnabled: Once}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideTarget], value: "Pxe"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideEnabled], value: "Once"}
+    response: {status: 200}
+
+  - name: boot-override-disable
+    method: PATCH
+    path: /redfish/v1/Systems/System_0
+    body_contains: {Boot: {BootSourceOverrideEnabled: Disabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 200}
+
+  # --- one-time (boot-once) revert: a reset consumes an armed Once override --
+  - name: boot-once-revert-on-reset
+    method: POST
+    path: /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideEnabled], equals: "Once"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 204}
+
+  # --- BIOS pending + apply-on-reset ---------------------------------------
+  - name: bios-stage-above4g-disabled
+    method: PATCH
+    path: /redfish/v1/Systems/System_0/Bios/Settings
+    body_contains: {Attributes: {Above4GDecoding: Disabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0/Bios/Settings, json_path: [Attributes, Above4GDecoding], value: "Disabled"}
+    response: {status: 200}
+
+  - name: bios-apply-pending-on-reset
+    method: POST
+    path: /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/System_0/Bios/Settings, json_path: [Attributes, Above4GDecoding], equals: "Disabled"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0/Bios, json_path: [Attributes, Above4GDecoding], value: "Disabled"}
+      - {op: delete, path: /redfish/v1/Systems/System_0/Bios/Settings, json_path: [Attributes, Above4GDecoding]}
+    response: {status: 204}
+
+  # --- virtual media insert / eject ----------------------------------------
+  - name: vmedia-insert-usb1
+    method: POST
+    path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1/Actions/VirtualMedia.InsertMedia
+    when:
+      - {path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, equals: false}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, value: true}
+      - {op: set, path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: ConnectedVia, value: "URI"}
+    response: {status: 204}
+
+  - name: vmedia-eject-usb1
+    method: POST
+    path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1/Actions/VirtualMedia.EjectMedia
+    when:
+      - {path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, equals: true}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, value: false}
+      - {op: delete, path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Image}
+    response: {status: 204}

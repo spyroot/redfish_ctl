@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fnmatch
 import json
 import os
 import sys
@@ -77,97 +78,27 @@ def _body_contains(actual: Any, expected: Any) -> bool:
     return actual == expected
 
 
-class ReplayState:
-    """Ordered write replay with in-memory state overlays for corpus reads."""
+class _OverlayStore:
+    """Shared corpus-overlay + state-transition machinery for write engines.
 
-    def __init__(self, trace: dict[str, Any]) -> None:
-        self.scenario = str(trace.get("scenario") or "default")
-        steps = trace.get("steps") or []
-        if not isinstance(steps, list):
-            raise ValueError("replay trace steps must be a list")
-        self.steps = steps
-        self._matched: set[int] = set()
+    Both the ordered ``ReplayState`` and the order-independent ``MutationRules``
+    build the same kind of in-memory overlay: a per-resource dict that is
+    deep-merged onto the corpus fixture at read time and mutated by
+    ``state_transitions`` (``op`` = set/delete, ``path`` = resource,
+    ``field``/``json_path`` = key, ``value``).
+    """
+
+    def __init__(self) -> None:
         self._overlays: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-
-    @classmethod
-    def from_file(cls, trace_path: Path) -> "ReplayState":
-        return cls(_load_trace(trace_path))
-
-    def status(self) -> dict[str, Any]:
-        with self._lock:
-            pending = [
-                str(step.get("name") or f"step-{index}")
-                for index, step in enumerate(self.steps)
-                if index not in self._matched
-            ]
-            matched_steps = len(self._matched)
-        return {
-            "scenario": self.scenario,
-            "matched_steps": matched_steps,
-            "pending_steps": pending,
-            "total_steps": len(self.steps),
-            "complete": not pending,
-        }
-
-    def reset(self, scenario: str | None = None) -> bool:
-        if scenario is not None and scenario != self.scenario:
-            return False
-        with self._lock:
-            self._matched.clear()
-            self._overlays.clear()
-        return True
 
     def overlay_for(self, request_path: str) -> dict[str, Any]:
         path = _normalize_request_path(request_path)
         with self._lock:
             return copy.deepcopy(self._overlays.get(path, {}))
 
-    def match_write(
-        self,
-        method: str,
-        request_path: str,
-        body: Any,
-    ) -> dict[str, Any] | None:
-        path = _normalize_request_path(request_path)
-        with self._lock:
-            next_index = self._next_pending_index()
-            if next_index is None:
-                return None
-            step = self.steps[next_index]
-            if not self._matches(step, method, path, body):
-                return None
-            self._matched.add(next_index)
-            self._apply_transitions(step.get("state_transitions") or [])
-            response = step.get("response") or {}
-            return response if isinstance(response, dict) else {"status": 204}
-
-    def _next_pending_index(self) -> int | None:
-        for index in range(len(self.steps)):
-            if index not in self._matched:
-                return index
-        return None
-
-    @staticmethod
-    def _matches(
-        step: dict[str, Any],
-        method: str,
-        path: str,
-        body: Any,
-    ) -> bool:
-        if str(step.get("method", "")).upper() != method.upper():
-            return False
-        if _normalize_request_path(str(step.get("path", ""))) != path:
-            return False
-        if "body" in step and body != step["body"]:
-            return False
-        if "body_contains" in step and not _body_contains(
-            body, step["body_contains"]
-        ):
-            return False
-        return True
-
     def _apply_transitions(self, transitions: list[Any]) -> None:
+        # Callers hold ``self._lock``; this only mutates ``self._overlays``.
         for transition in transitions:
             if not isinstance(transition, dict):
                 continue
@@ -216,6 +147,225 @@ class ReplayState:
         cursor.pop(parts[-1], None)
 
 
+class ReplayState(_OverlayStore):
+    """Ordered write replay with in-memory state overlays for corpus reads."""
+
+    def __init__(self, trace: dict[str, Any]) -> None:
+        super().__init__()
+        self.scenario = str(trace.get("scenario") or "default")
+        steps = trace.get("steps") or []
+        if not isinstance(steps, list):
+            raise ValueError("replay trace steps must be a list")
+        self.steps = steps
+        self._matched: set[int] = set()
+
+    @classmethod
+    def from_file(cls, trace_path: Path) -> "ReplayState":
+        return cls(_load_trace(trace_path))
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            pending = [
+                str(step.get("name") or f"step-{index}")
+                for index, step in enumerate(self.steps)
+                if index not in self._matched
+            ]
+            matched_steps = len(self._matched)
+        return {
+            "scenario": self.scenario,
+            "matched_steps": matched_steps,
+            "pending_steps": pending,
+            "total_steps": len(self.steps),
+            "complete": not pending,
+        }
+
+    def reset(self, scenario: str | None = None) -> bool:
+        if scenario is not None and scenario != self.scenario:
+            return False
+        with self._lock:
+            self._matched.clear()
+            self._overlays.clear()
+        return True
+
+    def match_write(
+        self,
+        method: str,
+        request_path: str,
+        body: Any,
+        corpus_state: Any = None,
+    ) -> dict[str, Any] | None:
+        path = _normalize_request_path(request_path)
+        with self._lock:
+            next_index = self._next_pending_index()
+            if next_index is None:
+                return None
+            step = self.steps[next_index]
+            if not self._matches(step, method, path, body):
+                return None
+            self._matched.add(next_index)
+            self._apply_transitions(step.get("state_transitions") or [])
+            response = step.get("response") or {}
+            return response if isinstance(response, dict) else {"status": 204}
+
+    def _next_pending_index(self) -> int | None:
+        for index in range(len(self.steps)):
+            if index not in self._matched:
+                return index
+        return None
+
+    @staticmethod
+    def _matches(
+        step: dict[str, Any],
+        method: str,
+        path: str,
+        body: Any,
+    ) -> bool:
+        if str(step.get("method", "")).upper() != method.upper():
+            return False
+        if _normalize_request_path(str(step.get("path", ""))) != path:
+            return False
+        if "body" in step and body != step["body"]:
+            return False
+        if "body_contains" in step and not _body_contains(
+            body, step["body_contains"]
+        ):
+            return False
+        return True
+
+
+class MutationRules(_OverlayStore):
+    """Order-independent write rules keyed on (method, path, precondition).
+
+    Where ``ReplayState`` accepts only the next step of a fixed trace, every
+    rule here is evaluated against each write, so a controller may drive the
+    same mutations in any order (and repeatedly). A rule fires when the method
+    and normalized path match, its optional ``body_contains`` subset matches,
+    and every ``when`` precondition holds against the CURRENT effective state
+    (corpus fixture + overlays already applied). All matching rules apply their
+    ``state_transitions``; the first match's ``response`` is returned. This lets
+    conditional side effects compose — e.g. a reset both powers the system off
+    and, only when ``BootSourceOverrideEnabled == Once``, reverts the one-shot
+    boot.
+    """
+
+    def __init__(self, spec: dict[str, Any]) -> None:
+        super().__init__()
+        self.vendor = str(spec.get("vendor") or "generic")
+        rules = spec.get("rules") or []
+        if not isinstance(rules, list):
+            raise ValueError("mutation rules must be a list")
+        self.rules = rules
+        self._applied: list[str] = []
+
+    @classmethod
+    def from_file(cls, path: Path) -> "MutationRules":
+        return cls(_load_trace(path))
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "mode": "mutation-rules",
+                "vendor": self.vendor,
+                "total_rules": len(self.rules),
+                "applied": list(self._applied),
+            }
+
+    def reset(self, scenario: str | None = None) -> bool:
+        if scenario is not None and scenario != self.vendor:
+            return False
+        with self._lock:
+            self._overlays.clear()
+            self._applied.clear()
+        return True
+
+    def match_write(
+        self,
+        method: str,
+        request_path: str,
+        body: Any,
+        corpus_state: Any = None,
+    ) -> dict[str, Any] | None:
+        path = _normalize_request_path(request_path)
+        corpus_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
+        with self._lock:
+            matched = [
+                rule
+                for rule in self.rules
+                if isinstance(rule, dict)
+                and self._rule_matches(rule, method, path, body, corpus_lookup)
+            ]
+            if not matched:
+                return None
+            for rule in matched:
+                self._apply_transitions(rule.get("state_transitions") or [])
+                self._applied.append(str(rule.get("name") or "unnamed"))
+            response = matched[0].get("response") or {}
+            return response if isinstance(response, dict) else {"status": 204}
+
+    def _effective_state(self, resource_path: str, corpus_lookup: Any) -> dict[str, Any]:
+        path = _normalize_request_path(resource_path)
+        base = copy.deepcopy(corpus_lookup(path) or {})
+        overlay = self._overlays.get(path)
+        if overlay:
+            _deep_update(base, overlay)
+        return base
+
+    def _rule_matches(
+        self,
+        rule: dict[str, Any],
+        method: str,
+        path: str,
+        body: Any,
+        corpus_lookup: Any,
+    ) -> bool:
+        if str(rule.get("method", "")).upper() != method.upper():
+            return False
+        rule_path = _normalize_request_path(str(rule.get("path", "")))
+        if any(ch in rule_path for ch in "*?["):
+            # A glob path-pattern matches a family of resources (e.g. every
+            # VirtualMedia slot) in one rule.
+            if not fnmatch.fnmatchcase(path, rule_path):
+                return False
+        elif rule_path != path:
+            return False
+        if "body" in rule and body != rule["body"]:
+            return False
+        if "body_contains" in rule and not _body_contains(body, rule["body_contains"]):
+            return False
+        for condition in rule.get("when") or []:
+            if not isinstance(condition, dict):
+                return False
+            if not self._precondition_holds(condition, corpus_lookup):
+                return False
+        return True
+
+    def _precondition_holds(self, condition: dict[str, Any], corpus_lookup: Any) -> bool:
+        resource_path = condition.get("path")
+        if not isinstance(resource_path, str):
+            return False
+        state = self._effective_state(resource_path, corpus_lookup)
+        keys = self._path_parts(condition.get("json_path", condition.get("field")))
+        cursor: Any = state
+        present = True
+        for key in keys:
+            if isinstance(cursor, dict) and key in cursor:
+                cursor = cursor[key]
+            else:
+                present = False
+                break
+        if "exists" in condition:
+            return present == bool(condition["exists"])
+        if "absent" in condition:
+            return present == (not bool(condition["absent"]))
+        if not present:
+            return False
+        if "equals" in condition:
+            return cursor == condition["equals"]
+        if "not_equals" in condition:
+            return cursor != condition["not_equals"]
+        return present
+
+
 class CorpusRequestHandler(BaseHTTPRequestHandler):
     """HTTP handler that serves a flattened Redfish corpus."""
 
@@ -229,8 +379,35 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         key = "_" + path.strip("/").replace("/", "_") + ".json"
         return fixture_index.get(key.lower())
 
-    def _replay_state(self) -> ReplayState | None:
-        return getattr(type(self), "replay_state", None)
+    def _active_writer(self) -> "ReplayState | MutationRules | None":
+        """The write engine in effect (mutation-rules takes precedence)."""
+        return getattr(type(self), "mutation_rules", None) or getattr(
+            type(self), "replay_state", None
+        )
+
+    def _corpus_state(self, request_path: str) -> dict[str, Any]:
+        """Corpus fixture (+identity overlay) for a resource, for preconditions.
+
+        Deliberately excludes the write engine's own overlay: the engine holds
+        its lock and merges that overlay itself, so returning it here would
+        double-apply it (and risk re-entrancy on the engine lock).
+        """
+        fixture_index = getattr(type(self), "fixture_index")
+        path = _normalize_request_path(request_path)
+        if not path.startswith("/redfish/v1"):
+            return {}
+        key = "_" + path.strip("/").replace("/", "_") + ".json"
+        fixture = fixture_index.get(key.lower())
+        if fixture is None:
+            return {}
+        payload = json.loads(fixture.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return {}
+        identity = getattr(type(self), "identity_overlay", {})
+        identity_overlay = identity.get(path.lower(), {})
+        if identity_overlay:
+            _deep_update(payload, identity_overlay)
+        return payload
 
     def _send_json(self, status: int, payload: dict[str, object]) -> None:
         content = json.dumps(payload, sort_keys=True).encode("utf-8")
@@ -251,8 +428,8 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": f"no fixture for {self.path}"})
             return
 
-        replay = self._replay_state()
-        replay_overlay = replay.overlay_for(self.path) if replay is not None else {}
+        writer = self._active_writer()
+        replay_overlay = writer.overlay_for(self.path) if writer is not None else {}
         identity = getattr(type(self), "identity_overlay", {})
         identity_overlay = identity.get(
             _normalize_request_path(self.path).lower(), {}
@@ -275,11 +452,11 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if _normalize_request_path(self.path) == "/__replay_status":
-            replay = self._replay_state()
-            if replay is None:
+            writer = self._active_writer()
+            if writer is None:
                 self._send_json(404, {"error": "replay is not enabled"})
                 return
-            self._send_json(200, replay.status())
+            self._send_json(200, writer.status())
             return
         self._serve_fixture(send_body=True)
 
@@ -289,7 +466,7 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         allow = "GET, HEAD, OPTIONS"
-        if self._replay_state() is not None:
+        if self._active_writer() is not None:
             allow = f"{allow}, POST, PATCH, PUT, DELETE"
         self.send_header("Allow", allow)
         self.send_header("Content-Length", "0")
@@ -318,8 +495,8 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         return json.loads(content) if content else {}
 
     def _handle_set_scenario(self) -> None:
-        replay = self._replay_state()
-        if replay is None:
+        writer = self._active_writer()
+        if writer is None:
             self._send_json(404, {"error": "replay is not enabled"})
             return
         body = self._read_json_body()
@@ -327,26 +504,26 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         if scenario is not None and not isinstance(scenario, str):
             self._send_json(400, {"error": "scenario must be a string"})
             return
-        if not replay.reset(scenario):
+        if not writer.reset(scenario):
             self._send_json(404, {"error": f"unknown scenario {scenario}"})
             return
-        self._send_json(200, replay.status())
+        self._send_json(200, writer.status())
 
     def _handle_replay_write(self, method: str) -> None:
-        replay = self._replay_state()
-        if replay is None:
+        writer = self._active_writer()
+        if writer is None:
             self._send_method_not_allowed()
             return
         body = self._read_json_body()
-        response = replay.match_write(method, self.path, body)
+        response = writer.match_write(method, self.path, body, self._corpus_state)
         if response is None:
             self._send_json(
                 409,
                 {
-                    "error": "request did not match the next replay step",
+                    "error": "no write rule matched the request",
                     "method": method,
                     "path": _normalize_request_path(self.path),
-                    "status": replay.status(),
+                    "status": writer.status(),
                 },
             )
             return
@@ -408,10 +585,13 @@ def identity_overlay_from_env() -> dict[str, dict[str, Any]]:
 def make_handler(
     corpus_dir: Path,
     replay_trace: Path | None = None,
+    mutation_rules: Path | None = None,
 ) -> type[CorpusRequestHandler]:
     root = Path(corpus_dir)
     if not root.is_dir():
         raise FileNotFoundError(f"corpus directory not found: {root}")
+    if replay_trace is not None and mutation_rules is not None:
+        raise ValueError("choose either --replay or --mutation-rules, not both")
 
     class Handler(CorpusRequestHandler):
         pass
@@ -424,6 +604,11 @@ def make_handler(
         if replay_trace is not None
         else None
     )
+    Handler.mutation_rules = (
+        MutationRules.from_file(mutation_rules)
+        if mutation_rules is not None
+        else None
+    )
     Handler.identity_overlay = identity_overlay_from_env()
     return Handler
 
@@ -434,10 +619,15 @@ def run_server(
     port: int,
     corpus_dir: Path,
     replay_trace: Path | None = None,
+    mutation_rules: Path | None = None,
 ) -> Iterator[ThreadingHTTPServer]:
     server = ThreadingHTTPServer(
         (host, port),
-        make_handler(corpus_dir, replay_trace=replay_trace),
+        make_handler(
+            corpus_dir,
+            replay_trace=replay_trace,
+            mutation_rules=mutation_rules,
+        ),
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -465,7 +655,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--replay",
         type=Path,
         default=None,
-        help="Optional write replay trace file.",
+        help="Optional ordered write-replay trace file (fixed step sequence).",
+    )
+    parser.add_argument(
+        "--mutation-rules",
+        type=Path,
+        default=None,
+        help="Optional order-independent mutation-rules file "
+        "(matches on method/path/precondition; applies writes in any order).",
     )
     return parser.parse_args(argv)
 
@@ -476,7 +673,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         server = ThreadingHTTPServer(
             (args.host, args.port),
-            make_handler(args.corpus_dir, replay_trace=args.replay),
+            make_handler(
+                args.corpus_dir,
+                replay_trace=args.replay,
+                mutation_rules=args.mutation_rules,
+            ),
         )
         host, port = server.server_address
         print(f"Serving Redfish corpus from {args.corpus_dir} on {host}:{port}")
