@@ -1,0 +1,37 @@
+{
+  "@odata.type": "#Bios.v1_0_6.Bios",
+  "@odata.id": "/redfish/v1/Systems/1/Bios",
+  "Id": "Bios",
+  "Name": "Bios",
+  "Description": "System Bios",
+  "AttributeRegistry": "BiosAttributeRegistry.1.0.0",
+  "Attributes": {
+    "Memory_MemorySpeed": "MaxPerformance",
+    "Processors_CStates": "Disable",
+    "Processors_CPUPstateControl": "Autonomous"
+  },
+  "@Redfish.Settings": {
+    "@odata.type": "#Settings.v1_2_1.Settings",
+    "SettingsObject": {
+      "@odata.id": "/redfish/v1/Systems/1/Bios/Pending"
+    },
+    "Messages": [],
+    "SupportedApplyTimes": [
+      "OnReset"
+    ]
+  },
+  "Actions": {
+    "#Bios.ResetBios": {
+      "target": "/redfish/v1/Systems/1/Bios/Actions/Bios.ResetBios",
+      "title": "ResetBios"
+    },
+    "#Bios.ChangePassword": {
+      "target": "/redfish/v1/Systems/1/Bios/Actions/Bios.ChangePassword",
+      "title": "ChangePassword",
+      "PasswordName@Redfish.AllowableValues": [
+        "UefiAdminPassword",
+        "UefiPowerOnPassword"
+      ]
+    }
+  }
+}

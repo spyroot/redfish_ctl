@@ -16,6 +16,7 @@ from .base import VendorCapabilities, all_vendors
 from .base import get as get_vendor
 from .dell import capabilities as _dell  # noqa: F401
 from .hpe import capabilities as _hpe  # noqa: F401
+from .lenovo import capabilities as _lenovo  # noqa: F401
 from .supermicro import capabilities as _supermicro  # noqa: F401
 
 __all__ = ["VendorCapabilities", "get_vendor", "all_vendors"]

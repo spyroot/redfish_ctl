@@ -1,0 +1,14 @@
+{
+  "@odata.type": "#Bios.v1_0_6.Bios",
+  "@odata.id": "/redfish/v1/Systems/1/Bios/Pending",
+  "Id": "Pending",
+  "Name": "Pending",
+  "Description": "Bios Pending Setting",
+  "AttributeRegistry": "BiosAttributeRegistry.1.0.0",
+  "Attributes": {
+    "DevicesandIOPorts_Device_Slot6": "Enable",
+    "Memory_MemorySpeed": "MaxPerformance",
+    "Processors_CPUPstateControl": "Autonomous",
+    "Processors_CStates": "Disable"
+  }
+}

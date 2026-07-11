@@ -1,0 +1,48 @@
+{
+  "@odata.type": "#UpdateService.v1_6_0.UpdateService",
+  "@odata.id": "/redfish/v1/UpdateService",
+  "Id": "UpdateService",
+  "Name": "Update Service",
+  "Description": "Lenovo firmware update service.",
+  "ServiceEnabled": true,
+  "Status": {
+    "HealthRollup": "OK",
+    "Health": "OK",
+    "State": "Enabled"
+  },
+  "FirmwareInventory": {
+    "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory"
+  },
+  "HttpPushUri": "/fwupdate",
+  "HttpPushUriTargets": [],
+  "HttpPushUriTargetsBusy": false,
+  "HttpPushUriOptions": {
+    "HttpPushUriApplyTime": {
+      "ApplyTime": "Immediate"
+    }
+  },
+  "MultipartHttpPushUri": "/mfwupdate",
+  "MaxImageSizeBytes": 250000000,
+  "Actions": {
+    "#UpdateService.SimpleUpdate": {
+      "target": "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate",
+      "title": "SimpleUpdate",
+      "TransferProtocol@Redfish.AllowableValues": [
+        "TFTP",
+        "SFTP"
+      ],
+      "Targets@Redfish.AllowableValues": [
+        "/redfish/v1/UpdateService/FirmwareInventory/BMC-Backup"
+      ],
+      "@Redfish.ActionInfo": "/redfish/v1/UpdateService/SimpleUpdateActionInfo"
+    }
+  },
+  "Oem": {
+    "Lenovo": {
+      "@odata.type": "#LenovoUpdateService.v1_0_0.LenovoUpdateService",
+      "FirmwareServices": {
+        "@odata.id": "/redfish/v1/UpdateService/Oem/Lenovo/FirmwareServices"
+      }
+    }
+  }
+}

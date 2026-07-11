@@ -1,0 +1,43 @@
+{
+  "@odata.type": "#ServiceRoot.v1_7_0.ServiceRoot",
+  "@odata.id": "/redfish/v1/",
+  "Id": "RootService",
+  "Name": "Root Service",
+  "Description": "Lenovo XCC Redfish service root fixture.",
+  "Vendor": "Lenovo",
+  "RedfishVersion": "1.10.0",
+  "UUID": "00000000-0000-0000-0000-000000000001",
+  "ProtocolFeaturesSupported": {
+    "ExpandQuery": {
+      "ExpandAll": true,
+      "Levels": true,
+      "Links": true,
+      "NoLinks": true,
+      "MaxLevels": 2
+    },
+    "OnlyMemberQuery": true,
+    "FilterQuery": true,
+    "ExcerptQuery": true,
+    "SelectQuery": true,
+    "DeepOperations": {
+      "DeepPOST": false,
+      "DeepPATCH": false,
+      "MaxLevels": 2
+    }
+  },
+  "Systems": {
+    "@odata.id": "/redfish/v1/Systems"
+  },
+  "Managers": {
+    "@odata.id": "/redfish/v1/Managers"
+  },
+  "Chassis": {
+    "@odata.id": "/redfish/v1/Chassis"
+  },
+  "UpdateService": {
+    "@odata.id": "/redfish/v1/UpdateService"
+  },
+  "Tasks": {
+    "@odata.id": "/redfish/v1/TaskService"
+  }
+}
