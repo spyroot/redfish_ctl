@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.etag": "W/\"355B7E52\"",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/IML/Entries/36",
+    "@odata.type": "#LogEntry.v1_11_0.LogEntry",
+    "Id": "36",
+    "Created": "2020-04-11T19:08:01Z",
+    "EntryType": "Oem",
+    "Message": "Server Critical Fault (Service Information: Input Power Loss, Power Supply,  Power Supply 1 (03h))  ",
+    "Name": "Integrated Management Log",
+    "Oem": {
+        "Hpe": {
+            "@odata.context": "/redfish/v1/$metadata#HpeLogEntry.HpeLogEntry",
+            "@odata.type": "#HpeLogEntry.v2_4_0.HpeLogEntry",
+            "Categories": [
+                "Other"
+            ],
+            "Class": 20,
+            "ClassDescription": "System Error",
+            "Code": 7,
+            "Count": 1,
+            "EventNumber": 145,
+            "LearnMoreLink": "http://www.hpe.com/support/class0x0014code0x0007-gen10",
+            "RecommendedAction": "Gather Active Health System logs and create a support case.",
+            "Repaired": false,
+            "Severity": "Critical",
+            "Updated": "2020-04-11T19:08:01Z"
+        }
+    },
+    "OemRecordFormat": "Hpe-IML",
+    "Severity": "Critical"
+}

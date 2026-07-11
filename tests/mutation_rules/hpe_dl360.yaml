@@ -1,0 +1,88 @@
+# Order-independent mutation rules for an HPE iLO 5 (ProLiant DL360 Gen10).
+#
+# Consumed by the mock BMC server against tests/hpe_dl360_corpus. HPE uses the
+# numeric scheme (Systems/1, Managers/1) but its own resource @odata.ids mix
+# case: the ComputerSystem is /redfish/v1/Systems/1 while its Bios link is the
+# lowercase /redfish/v1/systems/1/bios. Paths below match the real @odata.ids;
+# the mock resolves fixtures case-insensitively but keys overlays by exact path,
+# so reads and rules use the same case per resource.
+#
+# Coverage: power reset, boot-source override, one-time-boot revert, BIOS
+# pending + apply-on-reset (BootMode), and IML log clear. No VirtualMedia or
+# Storage Volumes collection was captured, so those classes are absent.
+vendor: hpe-dl360
+rules:
+  - name: power-off-on-forceoff
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: ForceOff}
+    when:
+      - {path: /redfish/v1/Systems/1, field: PowerState, equals: "On"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, field: PowerState, value: "Off"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Status, State], value: "Disabled"}
+    response: {status: 204}
+
+  - name: power-on
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: "On"}
+    when:
+      - {path: /redfish/v1/Systems/1, field: PowerState, equals: "Off"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, field: PowerState, value: "On"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Status, State], value: "Enabled"}
+    response: {status: 204}
+
+  - name: boot-override-pxe-once
+    method: PATCH
+    path: /redfish/v1/Systems/1
+    body_contains: {Boot: {BootSourceOverrideTarget: Pxe, BootSourceOverrideEnabled: Once}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "Pxe"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Once"}
+    response: {status: 200}
+
+  - name: boot-override-disable
+    method: PATCH
+    path: /redfish/v1/Systems/1
+    body_contains: {Boot: {BootSourceOverrideEnabled: Disabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 200}
+
+  - name: boot-once-revert-on-reset
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], equals: "Once"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 204}
+
+  # BIOS pending + apply-on-reset. iLO stages attributes at the lowercase
+  # bios/settings resource and applies them on the next reset.
+  - name: bios-stage-boot-mode-legacy
+    method: PATCH
+    path: /redfish/v1/systems/1/bios/settings
+    body_contains: {Attributes: {BootMode: LegacyBios}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/systems/1/bios/settings, json_path: [Attributes, BootMode], value: "LegacyBios"}
+    response: {status: 200}
+
+  - name: bios-apply-pending-on-reset
+    method: POST
+    path: /redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/systems/1/bios/settings, json_path: [Attributes, BootMode], equals: "LegacyBios"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/systems/1/bios, json_path: [Attributes, BootMode], value: "LegacyBios"}
+      - {op: delete, path: /redfish/v1/systems/1/bios/settings, json_path: [Attributes, BootMode]}
+    response: {status: 204}
+
+  - name: iml-log-clear
+    method: POST
+    path: /redfish/v1/Systems/1/LogServices/IML/Actions/LogService.ClearLog
+    response: {status: 204}

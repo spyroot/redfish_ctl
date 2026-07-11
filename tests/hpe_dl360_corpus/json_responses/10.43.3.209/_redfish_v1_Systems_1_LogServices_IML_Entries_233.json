@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.etag": "W/\"0EB6685B\"",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/IML/Entries/233",
+    "@odata.type": "#LogEntry.v1_11_0.LogEntry",
+    "Id": "233",
+    "Created": "2025-07-16T22:57:17Z",
+    "EntryType": "Oem",
+    "Message": "HPE Eth 10/25Gb 2p 640FLR-SFP28 Adptr - NIC Connectivity status changed to Link Failure for adapter in slot 0, port 2",
+    "Name": "Integrated Management Log",
+    "Oem": {
+        "Hpe": {
+            "@odata.context": "/redfish/v1/$metadata#HpeLogEntry.HpeLogEntry",
+            "@odata.type": "#HpeLogEntry.v2_4_0.HpeLogEntry",
+            "Categories": [
+                "Hardware"
+            ],
+            "Class": 17,
+            "ClassDescription": "Network",
+            "Code": 10,
+            "Count": 1,
+            "EventNumber": 342,
+            "LearnMoreLink": "http://www.hpe.com/support/class0x0011code0x000a-gen10",
+            "RecommendedAction": "If the connection is lost, then check the physical connection from the server to its destination device such as interconnect ,blade, switch etc, including any cables. Refer to the NIC issues flowchart in the Troubleshooting Guide for more information.",
+            "Repaired": false,
+            "Severity": "Critical",
+            "Updated": "2025-07-16T22:57:17Z"
+        }
+    },
+    "OemRecordFormat": "Hpe-IML",
+    "Severity": "Critical"
+}

@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.etag": "W/\"6F59E18A\"",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/IML/Entries/180",
+    "@odata.type": "#LogEntry.v1_11_0.LogEntry",
+    "Id": "180",
+    "Created": "2024-09-29T19:24:24Z",
+    "EntryType": "Oem",
+    "Message": "System Overheating (Temperature Sensor 1, Location Ambient, Temperature 43)",
+    "Name": "Integrated Management Log",
+    "Oem": {
+        "Hpe": {
+            "@odata.context": "/redfish/v1/$metadata#HpeLogEntry.HpeLogEntry",
+            "@odata.type": "#HpeLogEntry.v2_4_0.HpeLogEntry",
+            "Categories": [
+                "Cooling"
+            ],
+            "Class": 2,
+            "ClassDescription": "Environment",
+            "Code": 19,
+            "Count": 1,
+            "EventNumber": 289,
+            "LearnMoreLink": "http://www.hpe.com/support/class0x0002code0x0013-gen10",
+            "RecommendedAction": "Check fans, processor heat sink and air baffles installation.",
+            "Repaired": true,
+            "Severity": "Repaired",
+            "Updated": "2024-09-29T19:24:27Z"
+        }
+    },
+    "OemRecordFormat": "Hpe-IML",
+    "Severity": "OK"
+}

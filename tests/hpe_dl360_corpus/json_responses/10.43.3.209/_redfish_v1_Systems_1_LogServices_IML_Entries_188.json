@@ -1,0 +1,32 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.etag": "W/\"4D37D2B1\"",
+    "@odata.id": "/redfish/v1/Systems/1/LogServices/IML/Entries/188",
+    "@odata.type": "#LogEntry.v1_11_0.LogEntry",
+    "Id": "188",
+    "Created": "2024-09-29T19:29:34Z",
+    "EntryType": "Oem",
+    "Message": "Automatic Operating System Shutdown Initiated Due to Overheat Condition",
+    "Name": "Integrated Management Log",
+    "Oem": {
+        "Hpe": {
+            "@odata.context": "/redfish/v1/$metadata#HpeLogEntry.HpeLogEntry",
+            "@odata.type": "#HpeLogEntry.v2_4_0.HpeLogEntry",
+            "Categories": [
+                "Other"
+            ],
+            "Class": 14,
+            "ClassDescription": "OS",
+            "Code": 2,
+            "Count": 1,
+            "EventNumber": 297,
+            "LearnMoreLink": "http://www.hpe.com/support/class0x000ecode0x0002-gen10",
+            "RecommendedAction": "Check simultaneously logged messages for cause of shutdown and address those issues accordingly.",
+            "Repaired": true,
+            "Severity": "Repaired",
+            "Updated": "2024-09-29T19:29:39Z"
+        }
+    },
+    "OemRecordFormat": "Hpe-IML",
+    "Severity": "OK"
+}
