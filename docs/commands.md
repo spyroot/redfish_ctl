@@ -115,7 +115,7 @@ Safety labels:
 | `event-submit-test` | Submit a Redfish test event; `--dry_run` previews the payload. | Write |
 | `exporter` | Expose BMC telemetry as Prometheus text or SignalFx datapoints. | Read |
 | `firmware` | Read firmware view data. | Read |
-| `firmware-update` | Run UpdateService SimpleUpdate; `--dry_run` previews, `--confirm` writes. | Guarded |
+| `firmware-update` | Run UpdateService SimpleUpdate or a discovered push upload URI; `--dry_run` previews, `--confirm` writes. | Guarded |
 | `firmware_inventory` | Read firmware inventory. | Read |
 | `fleet` | Read a YAML fleet inventory and summarize per-node health, sensor count, and temperature max. | Read |
 | `get_vm` | Read virtual media. | Read |
@@ -293,12 +293,15 @@ unless `--dry_run` is supplied; `--wait` only waits after a real reset.
 redfish_ctl firmware_inventory
 redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
 redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
+redfish_ctl firmware-update --image_file ./firmware.bin --dry_run
+redfish_ctl firmware-update --image_file ./firmware.bin --confirm
 redfish_ctl tasks
 ```
 
 `firmware-update`, defined in `redfish_ctl/firmware/cmd_firmware_update.py`, is destructive when
-confirmed. Use only approved images and approved non-production targets until you have your own
-firmware rollout process.
+confirmed. It prefers the standard `SimpleUpdate` action when the BMC advertises it; otherwise it
+uses `MultipartHttpPushUri`, then `HttpPushUri`, for local image uploads. Use only approved images
+and approved non-production targets until you have your own firmware rollout process.
 
 ### HPE iLO Canary
 
