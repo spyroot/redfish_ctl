@@ -1,0 +1,62 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#PowerSupply.PowerSupply",
+    "@odata.type": "#PowerSupply.v1_4_0.PowerSupply",
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.1-1-1",
+    "Assembly": {
+        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.1-1-1/Assembly"
+    },
+    "Description": "An instance of PowerSupply",
+    "FirmwareVersion": "00.18.31",
+    "HotPluggable": false,
+    "Id": "PSU.ChassisSlot.1-1-1",
+    "InputNominalVoltageType": null,
+    "InputRanges": [
+        {
+            "CapacityWatts": 0.0,
+            "NominalVoltageType": null
+        }
+    ],
+    "LineInputStatus": "OutOfRange",
+    "Manufacturer": "",
+    "Metrics": {
+        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.1-1-1/Metrics"
+    },
+    "Model": "",
+    "Name": "PS1 Status",
+    "Oem": {
+        "Dell": {
+            "@odata.type": "#DellOemPower.v1_0_0.DellOemPower",
+            "DellPowerSupply": {
+                "ActiveInputVoltage": "Unknown",
+                "ActiveInputVoltage@Redfish.Deprecated": "Please migrate to use InputNominalVoltageType under DMTF PowerSupply",
+                "IsSwitchingSupply": true,
+                "OperationalStatus": [
+                    "OK"
+                ],
+                "OperationalStatus@odata.count": 1,
+                "RequestedState": "NotApplicable"
+            },
+            "DellPowerSupplyView": {
+                "DetailedState": "Presence Detected",
+                "DeviceDescription": "PSU.ChassisSlot.1-1-1",
+                "LastSystemInventoryTime": "2023-02-22T18:56:05+00:00",
+                "LastUpdateTime": "2023-06-02T16:09:25+00:00",
+                "PMBusMonitoring": null,
+                "Range1MaxInputPowerWatts": 1566,
+                "RedMinNumberNeeded": null,
+                "RedTypeOfSet": null,
+                "RedTypeOfSet@odata.count": null,
+                "RedundancyStatus": null
+            }
+        }
+    },
+    "PartNumber": "0C6T8MA00",
+    "PowerCapacityWatts": 1400.0,
+    "PowerSupplyType": "DC",
+    "SerialNumber": "",
+    "SparePartNumber": "0C6T8MA00",
+    "Status": {
+        "Health": "OK",
+        "State": "Enabled"
+    }
+}

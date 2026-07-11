@@ -1,0 +1,105 @@
+# Order-independent mutation rules for a Dell iDRAC (PowerEdge XR8620t).
+#
+# Consumed by the mock BMC server's MutationRules engine
+# (k8s/sandbox/mock_bmc_server.py, --mutation-rules) against the committed
+# tests/dell_xr8620t_corpus. Same rule grammar as supermicro_gb300.yaml; every
+# path/field/value below was read from that corpus. Dell uses the iDRAC path
+# scheme (System.Embedded.1 / iDRAC.Embedded.1), not the GB300 System_0 / BMC_0.
+#
+# Coverage: power reset, boot-source override, one-time-boot revert, BIOS
+# pending + apply-on-reset, iDRAC SEL log clear, and storage volume
+# create/delete (this corpus has a real PCIeSSD Volumes collection, which the
+# GB300 GPU node lacks). No standard VirtualMedia slots were captured, so that
+# class is absent for this corpus.
+vendor: dell-xr8620t
+rules:
+  # --- power reset ---------------------------------------------------------
+  - name: power-off-on-forceoff
+    method: POST
+    path: /redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: ForceOff}
+    when:
+      - {path: /redfish/v1/Systems/System.Embedded.1, field: PowerState, equals: "On"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, field: PowerState, value: "Off"}
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Status, State], value: "Disabled"}
+    response: {status: 204}
+
+  - name: power-on
+    method: POST
+    path: /redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: "On"}
+    when:
+      - {path: /redfish/v1/Systems/System.Embedded.1, field: PowerState, equals: "Off"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, field: PowerState, value: "On"}
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Status, State], value: "Enabled"}
+    response: {status: 204}
+
+  # --- boot source override ------------------------------------------------
+  - name: boot-override-pxe-once
+    method: PATCH
+    path: /redfish/v1/Systems/System.Embedded.1
+    body_contains: {Boot: {BootSourceOverrideTarget: Pxe, BootSourceOverrideEnabled: Once}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideTarget], value: "Pxe"}
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideEnabled], value: "Once"}
+    response: {status: 200}
+
+  - name: boot-override-disable
+    method: PATCH
+    path: /redfish/v1/Systems/System.Embedded.1
+    body_contains: {Boot: {BootSourceOverrideEnabled: Disabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 200}
+
+  # --- one-time (boot-once) revert -----------------------------------------
+  - name: boot-once-revert-on-reset
+    method: POST
+    path: /redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideEnabled], equals: "Once"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideEnabled], value: "Disabled"}
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1, json_path: [Boot, BootSourceOverrideTarget], value: "None"}
+    response: {status: 204}
+
+  # --- BIOS pending + apply-on-reset (Dell applies staged Settings at reset) -
+  - name: bios-stage-aep-error-inj-enabled
+    method: PATCH
+    path: /redfish/v1/Systems/System.Embedded.1/Bios/Settings
+    body_contains: {Attributes: {AEPErrorInjEn: Enabled}}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1/Bios/Settings, json_path: [Attributes, AEPErrorInjEn], value: "Enabled"}
+    response: {status: 202}
+
+  - name: bios-apply-pending-on-reset
+    method: POST
+    path: /redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset
+    when:
+      - {path: /redfish/v1/Systems/System.Embedded.1/Bios/Settings, json_path: [Attributes, AEPErrorInjEn], equals: "Enabled"}
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System.Embedded.1/Bios, json_path: [Attributes, AEPErrorInjEn], value: "Enabled"}
+      - {op: delete, path: /redfish/v1/Systems/System.Embedded.1/Bios/Settings, json_path: [Attributes, AEPErrorInjEn]}
+    response: {status: 204}
+
+  # --- iDRAC SEL log clear (response-level; the SEL entries are a sub-collection)
+  - name: sel-log-clear
+    method: POST
+    path: /redfish/v1/Managers/iDRAC.Embedded.1/LogServices/Sel/Actions/LogService.ClearLog
+    response: {status: 204}
+
+  # --- storage volume create / delete (real PCIeSSD Volumes collection) -----
+  - name: volume-create
+    method: POST
+    path: /redfish/v1/Systems/System.Embedded.1/Storage/PCIeSSD.Integrated.1-C/Volumes
+    response:
+      status: 202
+      body: {"@Message.ExtendedInfo": [{MessageId: "Base.1.0.Created", Message: "Volume creation accepted; a job was created."}]}
+
+  - name: volume-delete
+    method: DELETE
+    path: /redfish/v1/Systems/System.Embedded.1/Storage/PCIeSSD.Integrated.1-C/Volumes/*
+    response: {status: 202}

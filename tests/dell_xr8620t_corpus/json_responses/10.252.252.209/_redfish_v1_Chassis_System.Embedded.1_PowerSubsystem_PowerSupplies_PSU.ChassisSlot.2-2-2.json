@@ -1,0 +1,59 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#PowerSupply.PowerSupply",
+    "@odata.type": "#PowerSupply.v1_4_0.PowerSupply",
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.2-2-2",
+    "FirmwareVersion": null,
+    "Description": "An instance of PowerSupply",
+    "HotPluggable": false,
+    "Id": "PSU.ChassisSlot.2-2-2",
+    "InputNominalVoltageType": null,
+    "InputRanges": [
+        {
+            "CapacityWatts": 0.0,
+            "NominalVoltageType": null
+        }
+    ],
+    "LineInputStatus": "OutOfRange",
+    "Manufacturer": "",
+    "Metrics": {
+        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.2-2-2/Metrics"
+    },
+    "Model": "",
+    "Name": "PS2 Status",
+    "Oem": {
+        "Dell": {
+            "@odata.type": "#DellOemPower.v1_0_0.DellOemPower",
+            "DellPowerSupply": {
+                "ActiveInputVoltage": "Unknown",
+                "ActiveInputVoltage@Redfish.Deprecated": "Please migrate to use InputNominalVoltageType under DMTF PowerSupply",
+                "IsSwitchingSupply": true,
+                "OperationalStatus": [
+                    "Error"
+                ],
+                "OperationalStatus@odata.count": 1,
+                "RequestedState": "NotApplicable"
+            },
+            "DellPowerSupplyView": {
+                "DetailedState": "Absent",
+                "DeviceDescription": "PSU.ChassisSlot.2-2-2",
+                "LastSystemInventoryTime": "2023-02-22T18:56:05+00:00",
+                "LastUpdateTime": "2023-06-02T16:09:25+00:00",
+                "PMBusMonitoring": null,
+                "Range1MaxInputPowerWatts": 0,
+                "RedMinNumberNeeded": null,
+                "RedTypeOfSet": null,
+                "RedTypeOfSet@odata.count": null,
+                "RedundancyStatus": null
+            }
+        }
+    },
+    "PartNumber": "",
+    "PowerCapacityWatts": 0.0,
+    "PowerSupplyType": "AC",
+    "SerialNumber": "",
+    "SparePartNumber": "",
+    "Status": {
+        "Health": "Critical",
+        "State": "Absent"
+    }
+}

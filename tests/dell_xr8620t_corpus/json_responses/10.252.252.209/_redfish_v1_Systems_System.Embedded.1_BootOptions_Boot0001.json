@@ -1,0 +1,17 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#BootOption.BootOption",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/BootOptions/Boot0001",
+    "@odata.type": "#BootOption.v1_0_4.BootOption",
+    "BootOptionEnabled": true,
+    "BootOptionReference": "Boot0001",
+    "Description": "Current settings of the UEFI Boot option",
+    "DisplayName": "Virtual Optical Drive",
+    "Id": "Boot0001",
+    "Name": "Uefi Boot Option",
+    "UefiDevicePath": "PciRoot(0x0)/Pci(0x14,0x0)/USB(0x9,0x0)/USB(0x3,0x0)/USB(0x1,0x0)",
+    "RelatedItem": [
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/VirtualMedia"
+        }
+    ]
+}

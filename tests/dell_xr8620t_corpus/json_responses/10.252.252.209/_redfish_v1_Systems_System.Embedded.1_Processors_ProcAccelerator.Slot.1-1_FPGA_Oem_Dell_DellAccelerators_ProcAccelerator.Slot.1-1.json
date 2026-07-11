@@ -1,0 +1,11 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#DellAccelerator.DellAccelerator",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/DellAccelerators/ProcAccelerator.Slot.1-1",
+    "@odata.type": "#DellAccelerator.v1_0_0.DellAccelerator",
+    "BoardPartNumber": "0KH30NA01",
+    "Description": "DellAccelerator is a representation of the FPGA Accelerator devices in the managed system.",
+    "DeviceDescription": "Proc Accelerator Controller in Slot 1 of Instance 1",
+    "FQDD": "ProcAccelerator.Slot.1-1",
+    "Id": "ProcAccelerator.Slot.1-1",
+    "Name": "DellAccelerator"
+}

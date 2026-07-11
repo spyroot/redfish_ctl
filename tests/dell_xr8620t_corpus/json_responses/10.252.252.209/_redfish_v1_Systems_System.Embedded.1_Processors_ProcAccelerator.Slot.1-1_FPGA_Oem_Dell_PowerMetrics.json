@@ -1,0 +1,10 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/PowerMetrics",
+    "@odata.type": "#Power.v1_7_1.Power",
+    "@odata.context": "/redfish/v1/$metadata#Power.Power",
+    "Description": "FPGA PowerMetrics",
+    "Name": "FPGA PowerMetrics",
+    "Id": "ProcAccelerator.Slot.1-1",
+    "PowerControl": [],
+    "PowerControl@odata.count": 0
+}

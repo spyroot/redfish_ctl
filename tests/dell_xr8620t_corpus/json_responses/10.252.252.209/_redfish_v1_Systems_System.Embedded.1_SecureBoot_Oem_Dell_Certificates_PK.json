@@ -1,0 +1,61 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#DellCertificateCollection.DellCertificateCollection",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/SecureBoot/Oem/Dell/Certificates/PK",
+    "@odata.type": "#DellCertificateCollection.DellCertificateCollection",
+    "Description": "DellCertificateCollection",
+    "Name": "DellCertificateCollection",
+    "Certificates": [
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/SecureBoot/Oem/Dell/Certificates/PK/StdSecbootpolicy.1",
+            "CertificateSubtype": "Certificate",
+            "CertificateType": "PK",
+            "Description": "SecureBoot Certificate",
+            "Id": "StdSecbootpolicy.1",
+            "Name": "SecureBoot Certificate",
+            "SecureBootPolicy": "Standard",
+            "IssuerCommonName_CN": "Dell Technologies Inc. Platform Key Gen16 3K",
+            "IssuerCountryCode_CC": "US",
+            "IssuerLocality_L": "Round Rock",
+            "IssuerOrganization_O": "Dell Technologies Inc.",
+            "IssuerState_S": "Texas",
+            "SerialNumber": "31771969E09798AD4888B6416C50F2E0",
+            "SubjectCommonName_CN": "Dell Technologies Inc. Platform Key Gen16 3K",
+            "SubjectCountryCode_CC": "US",
+            "SubjectLocality_L": "Round Rock",
+            "SubjectOrganization_O": "Dell Technologies Inc.",
+            "SubjectState_S": "Texas",
+            "Thumbprint": "FF:71:16:CA:01:EA:31:96:71:8A:9E:78:51:79:A0:E5:53:AC:E1:EE",
+            "ValidFrom": "Feb 15 16:02:18 2022 GMT",
+            "ValidTo": "Feb 15 16:12:18 2052 GMT"
+        }
+    ],
+    "Certificates@odata.count": 1,
+    "Hash": [],
+    "Hash@odata.count": 0,
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/SecureBoot/Oem/Dell/Certificates/PK/StdSecbootpolicy.1",
+            "CertificateSubtype": "Certificate",
+            "CertificateType": "PK",
+            "Description": "SecureBoot Certificate",
+            "Id": "StdSecbootpolicy.1",
+            "Name": "SecureBoot Certificate",
+            "SecureBootPolicy": "Standard",
+            "IssuerCommonName_CN": "Dell Technologies Inc. Platform Key Gen16 3K",
+            "IssuerCountryCode_CC": "US",
+            "IssuerLocality_L": "Round Rock",
+            "IssuerOrganization_O": "Dell Technologies Inc.",
+            "IssuerState_S": "Texas",
+            "SerialNumber": "31771969E09798AD4888B6416C50F2E0",
+            "SubjectCommonName_CN": "Dell Technologies Inc. Platform Key Gen16 3K",
+            "SubjectCountryCode_CC": "US",
+            "SubjectLocality_L": "Round Rock",
+            "SubjectOrganization_O": "Dell Technologies Inc.",
+            "SubjectState_S": "Texas",
+            "Thumbprint": "FF:71:16:CA:01:EA:31:96:71:8A:9E:78:51:79:A0:E5:53:AC:E1:EE",
+            "ValidFrom": "Feb 15 16:02:18 2022 GMT",
+            "ValidTo": "Feb 15 16:12:18 2052 GMT"
+        }
+    ],
+    "Members@odata.count": 1
+}

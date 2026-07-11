@@ -1,0 +1,238 @@
+{
+    "@Redfish.Settings": {
+        "@odata.context": "/redfish/v1/$metadata#Settings.Settings",
+        "@odata.type": "#Settings.v1_3_4.Settings",
+        "SettingsObject": {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Settings"
+        },
+        "SupportedApplyTimes": [
+            "OnReset",
+            "AtMaintenanceWindowStart",
+            "InMaintenanceWindowOnReset"
+        ]
+    },
+    "@odata.context": "/redfish/v1/$metadata#NetworkDeviceFunction.NetworkDeviceFunction",
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1",
+    "@odata.type": "#NetworkDeviceFunction.v1_8_0.NetworkDeviceFunction",
+    "AssignablePhysicalPorts": [
+        {
+            "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+        }
+    ],
+    "AssignablePhysicalPorts@odata.count": 1,
+    "Description": "NetworkDeviceFunction",
+    "Ethernet": {
+        "MACAddress": "50:7C:6F:24:3B:C0",
+        "MTUSize": null,
+        "PermanentMACAddress": "50:7C:6F:24:3B:C0",
+        "VLAN": {}
+    },
+    "FibreChannel": {
+        "BootTargets": [
+            {
+                "LUNID": null,
+                "WWPN": null
+            }
+        ],
+        "BootTargets@odata.count": 1,
+        "FCoEActiveVLANId": null,
+        "FCoELocalVLANId": null,
+        "PermanentWWNN": null,
+        "PermanentWWPN": null,
+        "WWNN": null,
+        "WWNSource": null,
+        "WWPN": null
+    },
+    "Id": "NIC.Slot.3-1-1",
+    "Links": {
+        "PhysicalPortAssignment": {
+            "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+        },
+        "Oem": {
+            "Dell": {
+                "@odata.type": "#DellOem.v1_3_0.DellOemLinks",
+                "DellNetworkAttributes": {
+                    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Oem/Dell/DellNetworkAttributes/NIC.Slot.3-1-1"
+                },
+                "CPUAffinity": [
+                    {
+                        "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/CPU.Socket.1"
+                    }
+                ],
+                "CPUAffinity@odata.count": 1
+            }
+        }
+    },
+    "MaxVirtualFunctions": 256,
+    "Name": "NetworkDeviceFunction",
+    "NetDevFuncCapabilities": [
+        "Disabled",
+        "Ethernet"
+    ],
+    "NetDevFuncCapabilities@odata.count": 2,
+    "NetDevFuncType": "Ethernet",
+    "Oem": {
+        "Dell": {
+            "@odata.type": "#DellOem.v1_3_0.DellOemResources",
+            "DellNIC": {
+                "BusNumber": 111,
+                "CableLengthMetres": null,
+                "ControllerBIOSVersion": null,
+                "DataBusWidth": "16XOrX16",
+                "DeviceDescription": "NIC in Slot 3 Port 1 Partition 1",
+                "EFIVersion": "4.0.24",
+                "FCOSDriverVersion": null,
+                "FCoEOSDriverVersion": null,
+                "FCoEOffloadMode": "Unknown",
+                "FQDD": "NIC.Slot.3-1-1",
+                "FamilyVersion": "21.5.9",
+                "Id": "NIC.Slot.3-1-1",
+                "ISCSIOSDriverVersion": null,
+                "IdentifierType": null,
+                "InstanceID": "NIC.Slot.3-1-1",
+                "LANDriverVersion": "1.9.11",
+                "LastSystemInventoryTime": "2023-02-16T16:50:57+00:00",
+                "LastUpdateTime": "2023-02-16T16:51:54+00:00",
+                "LinkDuplex": "FullDuplex",
+                "MaxBandwidthPercent": 0,
+                "MediaType": "SFF_CAGE",
+                "MinBandwidthPercent": 0,
+                "Name": "DellNIC",
+                "NicMode": "Unknown",
+                "PCIDeviceID": "1593",
+                "PCISubDeviceID": "000f",
+                "PCISubVendorID": "8086",
+                "PCIVendorID": "8086",
+                "PartNumber": "0WK9RR",
+                "PermanentFCOEMACAddress": null,
+                "PermanentFIPAddress": null,
+                "PermanentiSCSIMACAddress": null,
+                "ProductName": "Intel(R) Ethernet 25G 4P E810-XXV-stg Adapter - 50:7C:6F:24:3B:C0",
+                "Protocol": "NIC,RDMA",
+                "RDMAOSDriverVersion": null,
+                "Revision": null,
+                "SNAPIState": "Disabled",
+                "SNAPISupport": "NotAvailable",
+                "SerialNumber": "MYFLMIT26K00WY",
+                "SlotLength": "LongLength",
+                "SlotType": "PCIExpressGen5",
+                "TransceiverPartNumber": null,
+                "TransceiverSerialNumber": null,
+                "TransceiverVendorName": null,
+                "VPISupport": "NotAvailable",
+                "VendorName": "Intel Corp",
+                "VirtualFIPAddress": null,
+                "VirtualISCSIAddress": null,
+                "iScsiOffloadMode": "Unknown",
+                "@odata.context": "/redfish/v1/$metadata#DellNIC.DellNIC",
+                "@odata.type": "#DellNIC.v1_6_0.DellNIC",
+                "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Oem/Dell/DellNIC/NIC.Slot.3-1-1"
+            },
+            "DellNICPortMetrics": {
+                "DiscardedPkts": 0,
+                "FCCRCErrorCount": null,
+                "FCOELinkFailures": null,
+                "FCOEPktRxCount": null,
+                "FCOEPktTxCount": null,
+                "FCOERxPktDroppedCount": null,
+                "FQDD": "NIC.Slot.3-1-1",
+                "Id": "NIC.Slot.3-1-1",
+                "LanFCSRxErrors": null,
+                "LanUnicastPktRXCount": null,
+                "LanUnicastPktTXCount": null,
+                "Name": "DellNICPortMetrics",
+                "OSDriverState": "Operational",
+                "PartitionLinkStatus": null,
+                "PartitionOSDriverState": null,
+                "RDMARxTotalBytes": 0,
+                "RDMARxTotalPackets": 0,
+                "RDMATotalProtectionErrors": null,
+                "RDMATotalProtocolErrors": null,
+                "RDMATxTotalBytes": 0,
+                "RDMATxTotalPackets": 0,
+                "RDMATxTotalReadReqPkts": 0,
+                "RDMATxTotalSendPkts": 0,
+                "RDMATxTotalWritePkts": 0,
+                "RxBroadcast": 491551540,
+                "RxBytes": 710717326552,
+                "RxErrorPktAlignmentErrors": null,
+                "RxErrorPktFCSErrors": 87,
+                "RxFalseCarrierDetection": null,
+                "RxJabberPkt": 0,
+                "RxMutlicastPackets": 1323458608,
+                "RxPauseXOFFFrames": 0,
+                "RxPauseXONFrames": 0,
+                "RxRuntPkt": 0,
+                "RxUnicastPackets": 807656728463,
+                "StartStatisticTime": "2023-02-22T12:56:43-05:00",
+                "StatisticTime": "2023-06-02T11:06:32-05:00",
+                "TxBroadcast": 38,
+                "TxBytes": 3218493,
+                "TxErrorPktExcessiveCollision": null,
+                "TxErrorPktLateCollision": null,
+                "TxErrorPktMultipleCollision": null,
+                "TxErrorPktSingleCollision": null,
+                "TxMutlicastPackets": 17,
+                "TxPauseXOFFFrames": 0,
+                "TxPauseXONFrames": 0,
+                "TxUnicastPackets": 32602,
+                "@odata.context": "/redfish/v1/$metadata#DellNICPortMetrics.DellNICPortMetrics",
+                "@odata.type": "#DellNICPortMetrics.v1_1_1.DellNICPortMetrics",
+                "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Oem/Dell/DellNICPortMetrics/NIC.Slot.3-1-1"
+            },
+            "DellNICCapabilities": {
+                "BPESupport": "Supported",
+                "CongestionNotification": "Supported",
+                "DCBExchangeProtocol": "Supported",
+                "ETS": "Supported",
+                "EVBModesSupport": "NotSupported",
+                "FCoEBootSupport": "NotSupported",
+                "FCoEMaxIOsPerSession": 0,
+                "FCoEMaxNPIVPerPort": 0,
+                "FCoEMaxNumberExchanges": 0,
+                "FCoEMaxNumberLogins": 0,
+                "FCoEMaxNumberOfFCTargets": 0,
+                "FCoEMaxNumberOutStandingCommands": 0,
+                "FCoEOffloadSupport": "NotSupported",
+                "FeatureLicensingSupport": "NotSupported",
+                "FlexAddressingSupport": "Supported",
+                "Id": "NIC.Slot.3-1-1",
+                "IPSecOffloadSupport": "NotSupported",
+                "MACSecSupport": "NotSupported",
+                "Name": "DellNICCapabilities",
+                "NicPartitioningSupport": "NotSupported",
+                "NWManagementPassThrough": "NotSupported",
+                "OSBMCManagementPassThrough": "NotSupported",
+                "OnChipThermalSensor": "Supported",
+                "OpenFlowSupport": "NotSupported",
+                "PXEBootSupport": "Supported",
+                "PartitionWOLSupport": "NotSupported",
+                "PersistencePolicySupport": "Supported",
+                "PriorityFlowControl": "Supported",
+                "RDMASupport": "Supported",
+                "RemotePHY": "NotSupported",
+                "TCPChimneySupport": "NotSupported",
+                "TCPOffloadEngineSupport": "NotSupported",
+                "VEB": "Supported",
+                "VEBVEPAMultiChannel": "NotSupported",
+                "VEBVEPASingleChannel": "Supported",
+                "VirtualLinkControl": "NotSupported",
+                "iSCSIBootSupport": "NotSupported",
+                "iSCSIOffloadSupport": "NotSupported",
+                "uEFISupport": "Supported",
+                "@odata.context": "/redfish/v1/$metadata#DellNICCapabilities.DellNICCapabilities",
+                "@odata.type": "#DellNICCapabilities.v1_2_0.DellNICCapabilities",
+                "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Oem/Dell/DellNICCapabilities/NIC.Slot.3-1-1"
+            }
+        }
+    },
+    "PhysicalPortAssignment": {
+        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+    },
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK",
+        "HealthRollup": "OK"
+    },
+    "iSCSIBoot": {}
+}

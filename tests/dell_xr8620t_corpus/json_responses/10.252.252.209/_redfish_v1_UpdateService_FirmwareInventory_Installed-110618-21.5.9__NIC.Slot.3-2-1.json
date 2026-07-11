@@ -1,0 +1,61 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory",
+    "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory/Installed-110618-21.5.9__NIC.Slot.3-2-1",
+    "@odata.type": "#SoftwareInventory.v1_7_0.SoftwareInventory",
+    "Description": "Represents Firmware Inventory",
+    "Id": "Installed-110618-21.5.9__NIC.Slot.3-2-1",
+    "Name": "Intel(R) Ethernet 25G 4P E810-XXV-stg Adapter - 50:7C:6F:24:3B:C1",
+    "Oem": {
+        "Dell": {
+            "@odata.type": "#DellOem.v1_3_0.DellOemResources",
+            "DellSoftwareInventory": {
+                "@odata.context": "/redfish/v1/$metadata#DellSoftwareInventory.DellSoftwareInventory",
+                "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory/Installed-110618-21.5.9__NIC.Slot.3-2-1/Oem/Dell/DellSoftwareInventory/DCIM:INSTALLED_0x23_701__NIC.Slot.3-2-1",
+                "@odata.type": "#DellSoftwareInventory.v1_2_0.DellSoftwareInventory",
+                "BuildNumber": 0,
+                "Classifications": [
+                    "Firmware"
+                ],
+                "Classifications@odata.count": 1,
+                "ComponentID": "110618",
+                "ComponentType": "FRMW",
+                "Description": "The DellSoftwareInventory resource is a representation of an available device firmware in the managed system.",
+                "DeviceID": "1593",
+                "ElementName": "Intel(R) Ethernet 25G 4P E810-XXV-stg Adapter - 50:7C:6F:24:3B:C1",
+                "HashValue": "08f01a09c799cc79754225e7ce58f38ad8ae5dc8f8e419e68640f85355e8fe51",
+                "Id": "DCIM:INSTALLED_0x23_701__NIC.Slot.3-2-1",
+                "IdentityInfoType": [
+                    "OrgID:ComponentType:VendorID:DeviceID:SubVendorID:SubDeviceID"
+                ],
+                "IdentityInfoType@odata.count": 1,
+                "IdentityInfoValue": [
+                    "DCIM:firmware:8086:1593:8086:000F"
+                ],
+                "IdentityInfoValue@odata.count": 1,
+                "InstallationDate": "2023-01-13T18:55:37Z",
+                "IsEntity": true,
+                "MajorVersion": 21,
+                "MinorVersion": 5,
+                "Name": "DellSoftwareInventory",
+                "PLDMCapabilitiesDuringUpdate": "0x0000000c",
+                "PLDMFDPCapabilitiesDuringUpdate": "0x00000000",
+                "RevisionNumber": 9,
+                "RevisionString": null,
+                "SidebandUpdateCapable": true,
+                "Status": "Installed",
+                "SubDeviceID": "000F",
+                "SubVendorID": "8086",
+                "VendorID": "8086",
+                "impactsTPMmeasurements": true
+            }
+        }
+    },
+    "ReleaseDate": "2022-09-13T00:00:00Z",
+    "SoftwareId": "110618",
+    "Status": {
+        "Health": "OK",
+        "State": "Enabled"
+    },
+    "Updateable": true,
+    "Version": "21.5.9"
+}
