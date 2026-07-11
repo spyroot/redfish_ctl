@@ -65,6 +65,7 @@ from .idrac_shared import (
 from .idrac_shared import ResetType as ResetType
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import CommandResult, RedfishManager
+from .telemetry import tracing
 from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .redfish_task_state import TaskState, TaskStatus
 
@@ -393,16 +394,22 @@ class IDracManager(RedfishManager):
         # opening a fresh TLS connection per request wedges fragile BMCs.
         session = self._http_session()
 
+        get_kwargs = {"verify": self._is_verify_cert, "timeout": timeout}
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
-            return session.get(
-                req, verify=self._is_verify_cert, headers=headers, timeout=timeout
-            )
         else:
-            return session.get(
-                req, verify=self._is_verify_cert,
-                auth=(self._username, self._password), timeout=timeout
-            )
+            get_kwargs["auth"] = (self._username, self._password)
+
+        # CLIENT span for the BMC call (no-op unless tracing is enabled); the BMC
+        # renders as one inferred downstream service via peer.service.
+        with tracing.client_span(req, "GET") as span:
+            try:
+                response = session.get(req, headers=headers, **get_kwargs)
+            except Exception as exc:  # timeout / connection error → failed span
+                tracing.record_exception(span, exc)
+                raise
+            tracing.record_response(span, response.status_code)
+            return response
 
     def sync_invoke(self, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
         """Synchronous invocation of target command
@@ -431,7 +438,12 @@ class IDracManager(RedfishManager):
                 "is_http": self._is_http,
             }
         )
-        return self.invoke(api_call, name, **kwargs)
+        # Operation root span named by the command (no-op unless tracing is on);
+        # nested sync_invoke calls nest under it to form the trace waterfall.
+        with tracing.operation_span(name) as span:
+            result = self.invoke(api_call, name, **kwargs)
+            tracing.record_result(span, result)
+            return result
 
     def get_job(self,
                 job_id: str,
