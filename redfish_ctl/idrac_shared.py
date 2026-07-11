@@ -177,6 +177,7 @@ class ApiRequestType(Enum):
 
     Discovery = auto()
     FleetInventory = auto()
+    CapabilityReport = auto()
 
 
 class ScheduleJobType(Enum):

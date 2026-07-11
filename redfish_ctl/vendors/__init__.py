@@ -21,6 +21,7 @@ from .base import get as get_vendor
 from .dell import capabilities as _dell  # noqa: F401
 from .hpe import capabilities as _hpe  # noqa: F401
 from .lenovo import capabilities as _lenovo  # noqa: F401
+from .report import capability_report
 from .supermicro import capabilities as _supermicro  # noqa: F401
 
 
@@ -35,4 +36,5 @@ __all__ = [
     "get_vendor",
     "all_vendors",
     "capabilities_for_service_root",
+    "capability_report",
 ]

@@ -44,6 +44,24 @@ class VendorCapabilities:
     def __post_init__(self):
         object.__setattr__(self, "evidence", MappingProxyType(dict(self.evidence)))
 
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-ready representation of the capability profile."""
+        return {
+            "vendor": self.vendor,
+            "oem_prefix": self.oem_prefix,
+            "query_select": self.query_select,
+            "query_filter": self.query_filter,
+            "query_expand": self.query_expand,
+            "query_top": self.query_top,
+            "query_only": self.query_only,
+            "one_query_param_per_uri": self.one_query_param_per_uri,
+            "job_scheduling": self.job_scheduling,
+            "one_recurring_job_per_type": self.one_recurring_job_per_type,
+            "schedulable_uris": list(self.schedulable_uris),
+            "lifecycle_events_sse": self.lifecycle_events_sse,
+            "evidence": dict(self.evidence),
+        }
+
 
 _REGISTRY: Dict[str, VendorCapabilities] = {}
 
