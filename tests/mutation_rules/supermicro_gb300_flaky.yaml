@@ -1,0 +1,50 @@
+# Stochastic variant of the GB300 mutation rules for RL training.
+#
+# Same mutations as supermicro_gb300.yaml, but the reset and virtual-media
+# insert carry a `failure` block: with the given probability the mock rejects
+# the write and applies NO state change, modelling a flaky BMC (e.g. a reset
+# that does not take, or a media insert that fails). Failures are reproducible
+# for a given --seed (MOCK_BMC_SEED); the mock re-seeds on scenario reset, so an
+# RL episode replays the same failure sequence and can vary it per episode by
+# choosing a different seed.
+#
+#   failure:
+#     probability: 0.0..1.0   # chance this write fails instead of applying
+#     response: {status, body?}  # returned on a failed roll
+vendor: supermicro-gb300-flaky
+rules:
+  - name: power-off-on-forceoff
+    method: POST
+    path: /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset
+    body_contains: {ResetType: ForceOff}
+    when:
+      - {path: /redfish/v1/Systems/System_0, field: PowerState, equals: "On"}
+    failure:
+      probability: 0.3
+      response:
+        status: 503
+        body:
+          error:
+            code: "Base.1.0.GeneralError"
+            message: "Reset action failed; the system did not transition."
+    state_transitions:
+      - {op: set, path: /redfish/v1/Systems/System_0, field: PowerState, value: "Off"}
+      - {op: set, path: /redfish/v1/Systems/System_0, json_path: [Status, State], value: "Disabled"}
+    response: {status: 204}
+
+  - name: vmedia-insert-usb1
+    method: POST
+    path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1/Actions/VirtualMedia.InsertMedia
+    when:
+      - {path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, equals: false}
+    failure:
+      probability: 0.2
+      response:
+        status: 500
+        body:
+          error:
+            code: "Base.1.0.InternalError"
+            message: "Virtual media insert failed."
+    state_transitions:
+      - {op: set, path: /redfish/v1/Managers/BMC_0/VirtualMedia/USB1, field: Inserted, value: true}
+    response: {status: 204}
