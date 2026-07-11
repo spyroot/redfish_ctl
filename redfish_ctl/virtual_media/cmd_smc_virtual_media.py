@@ -72,7 +72,7 @@ class SmcVirtualMediaMount(IDracManager,
     def _get(self, path: str) -> Optional[dict]:
         """Best-effort GET (path -> full URL) returning JSON or None (never raises)."""
         try:
-            resp = self.api_get_call(f"https://{self.idrac_ip}{path}", {})
+            resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}{path}", {})
             if resp is not None and resp.status_code == 200:
                 return resp.json()
         except Exception:

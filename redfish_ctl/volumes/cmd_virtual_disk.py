@@ -91,7 +91,7 @@ class VirtualDiskQuery(
             raise InvalidArgument(f"Storage device_id {device_id} "
                                   f"not found, available {storage_ids}")
 
-        r = f"https://{self.idrac_ip}{self.idrac_manage_servers}" \
+        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
             f"/Storage/{device_id}/Volumes"
         #
         response = self.api_get_call(r, headers)
@@ -104,7 +104,7 @@ class VirtualDiskQuery(
 
         results = []
         for vol_id in vd_list:
-            r = f"https://{self.idrac_ip}{self.idrac_manage_servers}" \
+            r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
                 f"/Storage/Volumes/{vol_id}"
             try:
                 response = self.api_get_call(r, headers)

@@ -8,9 +8,13 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN groupadd --system redfish \
+# uid/gid are pinned to 10001 to match the deployment's runAsUser/runAsGroup:
+# kopf resolves its identity via getpwuid(), so the runtime uid must exist in
+# /etc/passwd or the operator crashes at startup.
+RUN groupadd --system --gid 10001 redfish \
     && useradd \
         --system \
+        --uid 10001 \
         --gid redfish \
         --home-dir /home/redfish \
         --create-home \

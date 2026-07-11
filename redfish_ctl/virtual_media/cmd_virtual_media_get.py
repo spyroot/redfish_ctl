@@ -102,7 +102,7 @@ class VirtualMediaGet(IDracManager,
         # Resolve the VirtualMedia collection from whichever resource exposes it
         # (a Manager on iLO/Supermicro, the ComputerSystem on Dell) — no hardcoded id.
         vm_uri = self.discover_virtual_media_uri()
-        r = f"https://{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
+        r = f"{self._default_method}{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)
         self.default_error_handler(response)

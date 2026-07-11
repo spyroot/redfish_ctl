@@ -150,7 +150,7 @@ class ImportSystemConfig(IDracManager,
                    "ShareParameters": {"Target": "ALL"}
                    }
 
-        r = f"https://{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ImportSystemConfiguration"
 
         data = {}

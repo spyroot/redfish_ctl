@@ -72,7 +72,7 @@ class RaidServiceQuery(IDracManager,
         # (not a hardcoded System.Embedded.1) and degrade gracefully off Dell,
         # where standard RAID is driven via the Storage/Volumes commands instead.
         system_id = self.idrac_manage_servers.rsplit("/", 1)[-1]
-        r = f"https://{self.idrac_ip}/redfish/v1/Dell/Systems/" \
+        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Dell/Systems/" \
             f"{system_id}/DellRaidService"
 
         try:

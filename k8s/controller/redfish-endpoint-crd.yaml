@@ -62,8 +62,6 @@ spec:
                       type: string
                       default: password
                       description: Secret data key containing the BMC password.
-                  additionalProperties: false
-              additionalProperties: false
             status:
               type: object
               properties:
@@ -82,8 +80,6 @@ spec:
                     maxCelsius:
                       type: number
                       nullable: true
-                  additionalProperties: false
                 lastPolled:
                   type: string
                   format: date-time
-              additionalProperties: false
