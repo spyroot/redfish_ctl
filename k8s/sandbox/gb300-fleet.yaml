@@ -1,0 +1,92 @@
+# Simulated NV72 GB300 fleet: 36 mock BMCs (18 servers x 2 racks) from ONE corpus image.
+#
+# Each pod serves the committed GB300 Redfish corpus (baked into the image layer,
+# no per-pod copy) and overlays a distinct identity derived from its StatefulSet
+# ordinal, so inventory reads report a unique node (GB300-R<rack>-S<slot>) and an
+# APM backend sees 36 distinct servers behind the one inferred "bmc" service.
+#
+# Reads only in this manifest; the mutation path (write replay) is added with the
+# fleet's replay-trace ConfigMap in a follow-up. Deploy into the sandbox namespace.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gb300-bmc
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: gb300-bmc
+    app.kubernetes.io/component: fleet-sim
+spec:
+  clusterIP: None            # headless: each pod gets a stable DNS name
+  selector:
+    app.kubernetes.io/name: gb300-bmc
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gb300-bmc
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: gb300-bmc
+    app.kubernetes.io/component: fleet-sim
+spec:
+  serviceName: gb300-bmc
+  replicas: 36              # 18 slots x 2 racks; scale this to simulate a larger fleet
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gb300-bmc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gb300-bmc
+        app.kubernetes.io/component: fleet-sim
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001        # matches the image's pinned mockbmc uid
+        runAsGroup: 10001
+      containers:
+        - name: mock-bmc
+          image: redfish-ctl-mock-bmc:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          # Derive rack/slot from the StatefulSet ordinal (pod name ends -<ordinal>)
+          # and inject them so the mock overlays a distinct identity per pod.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ORD="${HOSTNAME##*-}"
+              export MOCK_BMC_RACK=$(( ORD / 18 + 1 ))
+              export MOCK_BMC_SLOT=$(( ORD % 18 + 1 ))
+              exec python /app/mock_bmc_server.py --corpus-dir "$MOCK_BMC_CORPUS_DIR"
+          env:
+            - name: MOCK_BMC_CORPUS_DIR
+              value: /corpus/172.25.230.37
+          readinessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # A static-JSON http.server is tiny; keep requests low so 36 pods fit
+          # on one kind node (36 x 16Mi = ~576Mi total requested).
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
