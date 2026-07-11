@@ -128,6 +128,7 @@ from .tasks.cmd_task_watch import *
 from .volumes.cmd_initilize import *
 from .volumes.cmd_volumes import *
 from .volumes.cmd_virtual_disk import *
+from .volumes.cmd_volume_manage import *
 
 # boot options
 from .boot_options.cmd_boot_option_list import *
