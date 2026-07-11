@@ -12,17 +12,13 @@ accessible to software that runs on the system.
 
 Author Mus spyroot@gmail.com
 """
-import json
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_exceptions import InvalidArgumentFormat
-from ..cmd_exceptions import InvalidJsonSpec
+from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -101,16 +97,12 @@ class ChassisUpdate(IDracManager,
 
         if chassis_id is None or len(chassis_id) == 0:
             raise InvalidArgumentFormat(
-                f"chassis_id is empty string"
+                "chassis_id is empty string"
             )
 
-        try:
-            if from_spec is None or len(from_spec) > 0:
-                raise InvalidArgument("Invalid from_spec")
-        except json.decoder.JSONDecodeError as jde:
-            raise InvalidJsonSpec(
-                "It looks like your JSON spec is invalid. "
-                "JSONlint the file and check..".format(str(jde)))
+        # A missing spec is the invalid case; a provided path is parsed below.
+        if from_spec is None or len(from_spec) == 0:
+            raise InvalidArgument("Invalid from_spec")
 
         payload = from_json_spec(from_spec)
         if len(payload) == 0:
@@ -125,7 +117,7 @@ class ChassisUpdate(IDracManager,
             data_type=data_type
         )
 
-        if api_resp.AcceptedTaskGenerated:
+        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(cmd_result.data['task_id'])
             cmd_result.data['task_state'] = task_state

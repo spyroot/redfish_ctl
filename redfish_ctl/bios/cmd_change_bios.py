@@ -363,7 +363,7 @@ class BiosChangeSettings(IDracManager,
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
-        elif api_resp.Success or api_resp.Ok:
+        elif api_resp in (IdracApiRespond.Success, IdracApiRespond.Ok):
             if do_commit:
                 self.logger.info("Commit changes and rebooting.")
                 # we commit with a reboot
