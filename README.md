@@ -173,7 +173,7 @@ See [Docker Images](docker/README.md) for the image contract and Linux test imag
 
 ## Connect
 
-The CLI reads these environment variables in `redfish_main.py`, so I set them once per shell:
+The CLI reads these environment variables in `redfish_main.py`; set them once per shell:
 
 ```bash
 export REDFISH_IP=10.0.0.42
@@ -230,7 +230,7 @@ covered by offline fixture corpora, with HPE also covered by the opt-in emulator
 ## Mutating Commands
 
 Some commands change real hardware: power, BIOS, boot order, storage conversion, virtual media,
-firmware update, and manager reset. I always read current state first, preview when the command has
+firmware update, and manager reset. Read current state first, preview when the command has
 `--show` or `--dry_run`, then verify after the job or task completes.
 
 ```bash
@@ -241,6 +241,42 @@ redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --d
 
 Use `--confirm` only when you mean to perform a guarded action such as `system-reset` or
 `firmware-update`.
+
+## Observability with Splunk
+
+`redfish_ctl` streams what it does to Splunk Observability APM (or any OTLP backend) so a fleet of
+BMCs — and the operations run against them — are visible with no agent on the host and no code in the
+firmware. Full guide: [Observability](docs/observability.md).
+
+### Telemetry (metrics)
+
+The exporter turns out-of-band hardware state (power, thermal, fans, GPU, leak detection, fabric)
+into the stable `hw.*` metric family and pushes it over native OTLP. One exporter streams one BMC;
+scale by running more. See [Telemetry Exporter](docs/telemetry-exporter.md).
+
+```bash
+redfish_ctl exporter --output otlp --once
+```
+
+### Traces and spans
+
+Every command opens an operation span (`bios-change`, `firmware-update`, `reboot`), and every BMC
+call becomes a `CLIENT` span tagged `peer.service=bmc` — so the fleet renders in APM as a
+`redfish-ctl → bmc` service map with a trace waterfall, and per-operation error rate and latency in
+Tag Spotlight (sliceable by vendor, action, and profile). Failed writes show up red, so a failed BIOS
+apply or a slow firmware flash is one glance away.
+
+### Quick start — up and streaming in three commands
+
+```bash
+pip install "redfish-ctl[otlp]"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://<collector-or-ingest>:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="X-SF-Token=<splunk-access-token>"   # token via env, never argv
+redfish_ctl --otlp-traces system      # appears in APM as redfish-ctl → bmc
+```
+
+For Kubernetes (one exporter pod per BMC, the operator reconciling profiles, all streaming to an
+in-cluster Collector) see the [Kubernetes guide](k8s/README.md) and the Helm chart under `charts/`.
 
 ## Troubleshooting
 
@@ -266,6 +302,9 @@ First-run problems are almost always the connection, not the command:
 - [BIOS profiles](docs/bios-profiles.md) - low-latency, Dell System Profile, custom, Intel, and AMD
   profile examples.
 - [Vendors](docs/vendors.md) - Dell, Supermicro, HPE, and generic Redfish support.
+- [Observability](docs/observability.md) - stream BMC operations to Splunk APM as traces and metrics.
+- [Telemetry Exporter](docs/telemetry-exporter.md) - the `hw.*` metric exporter and deployment model.
+- [Simulation and replay](docs/simulation-and-replay.md) - the hardware-free mock and mutation replay.
 - [Testing](docs/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
 - [Docker](docker/README.md) - production image and Linux offline-test image usage.
 - [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.

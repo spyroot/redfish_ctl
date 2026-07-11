@@ -346,6 +346,11 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     if insecure:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+    # Optional OTLP span pipeline for this run; no-op unless --otlp-traces is set.
+    if getattr(cmd_args, "otlp_traces", False):
+        from .telemetry import tracing
+        tracing.setup_otlp("redfish-ctl")
+
     # idrac manager main interface main uses to interact with IDRAC.
     redfish_api = IDracManager(idrac_ip=cmd_args.idrac_ip,
                                idrac_username=cmd_args.idrac_username,
@@ -579,6 +584,11 @@ def redfish_main_ctl():
     verbose_group.add_argument(
         '--log', required=False, default=logging.NOTSET,
         help="log level.")
+    verbose_group.add_argument(
+        '--otlp-traces', action='store_true', required=False, default=False,
+        dest="otlp_traces",
+        help="emit OpenTelemetry spans for this run over OTLP "
+             "(honours OTEL_EXPORTER_OTLP_*; needs the [otlp] extra).")
 
     # controls for output
     output_controllers = parser.add_argument_group('output', '# output controller options')
