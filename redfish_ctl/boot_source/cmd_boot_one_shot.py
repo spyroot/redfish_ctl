@@ -64,6 +64,12 @@ class BootOneShot(IDracManager,
                  "entry, e.g. a UEFI virtual CD/DVD on boards where the Legacy "
                  "path is unusable.")
 
+        cmd_parser.add_argument(
+            '--dry_run', action='store_true',
+            required=False, dest="dry_run",
+            default=False,
+            help="preview the one-time boot PATCH payload; write nothing.")
+
         help_text = "command change one shoot boot"
         return cmd_parser, "boot-one-shot", help_text
 
@@ -78,6 +84,8 @@ class BootOneShot(IDracManager,
                 do_async: Optional[bool] = False,
                 do_reboot: Optional[bool] = False,
                 do_power_on: Optional[bool] = False,
+                dry_run: Optional[bool] = False,
+                confirm: Optional[bool] = True,
                 **kwargs) -> CommandResult:
         """Query information for particular boot source device from idrac.
         Example python redfish_ctl.py get_boot_source --dev "HardDisk.List.1-1"
@@ -86,6 +94,9 @@ class BootOneShot(IDracManager,
 
         :param do_reboot:  will reboot host
         :param do_power_on: will power on server if server in power down state.
+        :param dry_run: preview the PATCH payload without mutating Boot settings.
+        :param confirm: allow the PATCH to fire. Defaults True for backward
+                        compatibility; internal dry-run callers pass False.
         :param mode: boot source override mode, "UEFI" or "Legacy"
                      (Redfish BootSourceOverrideMode). None leaves it unchanged.
         :param uefi_target:
@@ -106,13 +117,6 @@ class BootOneShot(IDracManager,
         headers = {}
         if data_type == "json":
             headers.update(self.json_content_type)
-
-        # power on first if a client requested.
-        if do_power_on:
-            current_boot = self.sync_invoke(
-                ApiRequestType.ChassisReset, "reboot",
-                reset_type="On"
-            )
 
         # query for a power state
         current_boot = self.sync_invoke(
@@ -173,6 +177,26 @@ class BootOneShot(IDracManager,
         for key, value in dict(payload['Boot']).items():
             if value is None:
                 del payload['Boot'][key]
+
+        if dry_run or not confirm:
+            return CommandResult(
+                {
+                    "dry_run": True,
+                    "target": self.idrac_manage_servers,
+                    "payload": payload,
+                    "blocked": None if dry_run else "one-time boot requires confirm",
+                },
+                None,
+                None,
+                None,
+            )
+
+        # power on first if a client requested and this is a confirmed write.
+        if do_power_on:
+            self.sync_invoke(
+                ApiRequestType.ChassisReset, "reboot",
+                reset_type="On"
+            )
 
         cmd_result, api_resp = self.base_patch(
             self.idrac_manage_servers, payload=payload,

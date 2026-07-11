@@ -89,7 +89,7 @@ Safety labels:
 | `bios-snapshot` | Capture a BIOS restore point for rollback-able changes. | Read |
 | `bmc-scan` | Scan a network segment for Redfish BMCs. | Read |
 | `boot` | Read boot source data (vendor-neutral: falls back to the ComputerSystem `Boot` object). | Read |
-| `boot-one-shot` | Set a one-time boot target and optionally reboot or power on. | Write |
+| `boot-one-shot` | Set a one-time boot target; `--dry_run` previews the Boot PATCH payload. | Write |
 | `boot-options` | Read boot option members. | Read |
 | `boot-options-clear` | Clear pending boot option values. | Write |
 | `boot-pending` | Read pending boot source values. | Read |
@@ -272,6 +272,7 @@ redfish_ctl get_vm
 redfish_ctl eject_vm --device_id 1
 redfish_ctl insert_vm --uri_path http://10.0.0.10/ubuntu.iso --device_id 1
 redfish_ctl get_vm
+redfish_ctl boot-one-shot --device Cd --dry_run
 redfish_ctl boot-one-shot --device Cd -r
 redfish_ctl current_boot
 ```

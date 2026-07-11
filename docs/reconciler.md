@@ -23,9 +23,10 @@ commands:
 - `bios-profile diff`, from `redfish_ctl/bios/cmd_bios_profile.py`, reads current BIOS attributes.
 - `ntp-set` without `confirm`, from `redfish_ctl/manager/cmd_ntp_set.py`, builds a PATCH plan but does
   not write it.
+- `boot-one-shot` with `dry_run=True`, from `redfish_ctl/boot_source/cmd_boot_one_shot.py`, builds
+  the Boot PATCH payload without PATCHing the ComputerSystem.
 - `reboot` with `dry_run=True`, from `redfish_ctl/compute/cmd_power_state.py`, discovers the reset
   target and payload without POSTing.
-- `boot-one-shot` is not invoked during dry-run because it has no preview-only command path.
 
 `reconcile(manager, desired, confirm=True)` applies only the required planned changes:
 
