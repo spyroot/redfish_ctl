@@ -1,9 +1,0 @@
-{
-    "@odata.id": "/redfish/v1/LicenseService",
-    "@odata.type": "#LicenseService.v1_1_2.LicenseService",
-    "Id": "LicenseService",
-    "Licenses": {
-        "@odata.id": "/redfish/v1/LicenseService/Licenses"
-    },
-    "Name": "License Service"
-}

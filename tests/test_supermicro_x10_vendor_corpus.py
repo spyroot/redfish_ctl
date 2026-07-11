@@ -17,10 +17,11 @@ import urllib.request
 from pathlib import Path
 
 import yaml
+from vendor_corpus import corpus_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
-X10_CORPUS = REPO_ROOT / "tests" / "supermicro_x10_corpus" / "json_responses" / "192.168.254.120"
+X10_CORPUS = corpus_dir(REPO_ROOT / "tests" / "supermicro_x10_corpus.tar.gz", "192.168.254.120")
 X10_RULES = REPO_ROOT / "tests" / "mutation_rules" / "supermicro_x10.yaml"
 
 SYSTEM = "/redfish/v1/Systems/1"

@@ -1,7 +1,0 @@
-{
-    "@odata.id": "/redfish/v1/TaskService/Tasks",
-    "@odata.type": "#TaskCollection.TaskCollection",
-    "Members": [],
-    "Members@odata.count": 0,
-    "Name": "Task Collection"
-}

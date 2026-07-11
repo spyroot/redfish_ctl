@@ -16,10 +16,11 @@ import urllib.request
 from pathlib import Path
 
 import yaml
+from vendor_corpus import corpus_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
-DELL_CORPUS = REPO_ROOT / "tests" / "dell_xr8620t_corpus" / "json_responses" / "10.252.252.209"
+DELL_CORPUS = corpus_dir(REPO_ROOT / "tests" / "dell_xr8620t_corpus.tar.gz", "10.252.252.209")
 DELL_RULES = REPO_ROOT / "tests" / "mutation_rules" / "dell_xr8620t.yaml"
 
 SYSTEM = "/redfish/v1/Systems/System.Embedded.1"

@@ -17,10 +17,11 @@ import urllib.request
 from pathlib import Path
 
 import yaml
+from vendor_corpus import corpus_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
-HPE_CORPUS = REPO_ROOT / "tests" / "hpe_dl360_corpus" / "json_responses" / "10.43.3.209"
+HPE_CORPUS = corpus_dir(REPO_ROOT / "tests" / "hpe_dl360_corpus.tar.gz", "10.43.3.209")
 HPE_RULES = REPO_ROOT / "tests" / "mutation_rules" / "hpe_dl360.yaml"
 
 SYSTEM = "/redfish/v1/Systems/1"
