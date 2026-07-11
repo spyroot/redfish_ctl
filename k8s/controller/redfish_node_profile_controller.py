@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import json
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, MutableMapping
 from urllib.parse import urlsplit
@@ -88,10 +90,41 @@ def _applied_change(change: Any) -> dict[str, Any]:
     }
 
 
+def plan_hash(planned_steps: list[dict[str, Any]]) -> str | None:
+    required_steps = [step for step in planned_steps if step.get("required")]
+    if not required_steps:
+        return None
+    encoded = json.dumps(
+        required_steps,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _approval_reason(
+    *,
+    approved: bool,
+    current_plan_hash: str | None,
+    approved_plan_hash: str | None,
+    consumed_plan_hash: str | None,
+) -> str:
+    if approved:
+        return "Approved"
+    if current_plan_hash and consumed_plan_hash == current_plan_hash:
+        return "ApprovalConsumed"
+    if approved_plan_hash and approved_plan_hash != current_plan_hash:
+        return "ApprovalHashMismatch"
+    return "ApprovalRequired"
+
+
 def build_status(
     result: Any,
     *,
     approved: bool,
+    approved_plan_hash: str | None = None,
+    plan_hash_value: str | None = None,
+    consumed_plan_hash: str | None = None,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Return the RedfishNodeProfile status object from a reconcile result."""
@@ -100,6 +133,10 @@ def build_status(
     applied = tuple(getattr(result, "applied", ()))
     planned_steps = [_planned_step(step) for step in steps]
     applied_changes = [_applied_change(change) for change in applied]
+    current_plan_hash = plan_hash_value or plan_hash(planned_steps)
+    current_consumed_hash = consumed_plan_hash
+    if approved and current_plan_hash:
+        current_consumed_hash = current_plan_hash
     drift = any(step["required"] for step in planned_steps)
     changed = any(change["changed"] for change in applied_changes)
     if changed:
@@ -108,7 +145,7 @@ def build_status(
         applied_reason = "NoChanges"
     else:
         applied_reason = "DryRun"
-    return {
+    status = {
         "dryRun": bool(getattr(result, "dry_run", not approved)),
         "drift": drift,
         "plannedSteps": planned_steps,
@@ -117,7 +154,12 @@ def build_status(
             _condition(
                 "Approved",
                 approved,
-                "Approved" if approved else "ApprovalRequired",
+                _approval_reason(
+                    approved=approved,
+                    current_plan_hash=current_plan_hash,
+                    approved_plan_hash=approved_plan_hash,
+                    consumed_plan_hash=consumed_plan_hash,
+                ),
                 changed_at=observed_at,
             ),
             _condition(
@@ -135,6 +177,11 @@ def build_status(
         ],
         "lastReconciled": _rfc3339(observed_at),
     }
+    if current_plan_hash:
+        status["planHash"] = current_plan_hash
+    if current_consumed_hash:
+        status["consumedPlanHash"] = current_consumed_hash
+    return status
 
 
 def build_error_status(
@@ -214,6 +261,7 @@ def reconcile_profile(
     spec: Mapping[str, Any],
     *,
     credentials: Mapping[str, str] | None = None,
+    current_status: Mapping[str, Any] | None = None,
     manager_factory: ManagerFactory = IDracManager,
     reconcile_func: ReconcileFunc | None = None,
     reconciled_at: datetime | None = None,
@@ -222,15 +270,49 @@ def reconcile_profile(
     endpoint = _endpoint_spec(spec)
     desired_state = _mapping(spec.get("desiredState"))
     manager = _make_manager(endpoint, credentials or {}, manager_factory)
-    approved = bool(spec.get("approve", False))
-    result = (reconcile_func or _load_reconcile_func())(
+    reconcile_action = reconcile_func or _load_reconcile_func()
+    dry_run_result = reconcile_action(
         manager,
         desired_state,
-        confirm=approved,
+        confirm=False,
+        wait_for_reboot=False,
+        async_call=False,
+    )
+    dry_status = build_status(
+        dry_run_result,
+        approved=False,
+        approved_plan_hash=str(spec.get("approvedPlanHash") or "") or None,
+        consumed_plan_hash=str(_mapping(current_status).get("consumedPlanHash") or "") or None,
+        reconciled_at=reconciled_at,
+    )
+    current_plan_hash = dry_status.get("planHash")
+    approved_plan_hash = str(spec.get("approvedPlanHash") or "") or None
+    consumed_plan_hash = str(
+        _mapping(current_status).get("consumedPlanHash") or ""
+    ) or None
+    approved = bool(
+        current_plan_hash
+        and approved_plan_hash == current_plan_hash
+        and consumed_plan_hash != current_plan_hash
+    )
+    if not approved:
+        return dry_status
+
+    result = reconcile_action(
+        manager,
+        desired_state,
+        confirm=True,
         wait_for_reboot=bool(spec.get("waitForReboot", False)),
         async_call=False,
     )
-    return build_status(result, approved=approved, reconciled_at=reconciled_at)
+    return build_status(
+        result,
+        approved=approved,
+        approved_plan_hash=approved_plan_hash,
+        plan_hash_value=current_plan_hash,
+        consumed_plan_hash=current_plan_hash,
+        reconciled_at=reconciled_at,
+    )
 
 
 def _decode_secret_value(data: Mapping[str, str], key: str) -> str | None:
@@ -288,7 +370,11 @@ def reconcile_redfish_node_profile(
     endpoint = _mapping(spec.get("endpoint"))
     credentials = load_secret_credentials(namespace, endpoint.get("secretRef"))
     try:
-        status = reconcile_profile(spec, credentials=credentials)
+        status = reconcile_profile(
+            spec,
+            credentials=credentials,
+            current_status=_mapping(_mapping(body).get("status")),
+        )
     except Exception as exc:
         status = build_error_status(str(exc))
     if patch is not None:

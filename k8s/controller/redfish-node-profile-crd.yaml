@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -35,7 +36,9 @@ spec:
                     address:
                       type: string
                       minLength: 1
-                      description: BMC hostname, IP address, or URL for the Redfish ServiceRoot.
+                      description: >-
+                        BMC hostname, IP address, or URL for the Redfish
+                        ServiceRoot.
                     port:
                       type: integer
                       minimum: 1
@@ -45,7 +48,9 @@ spec:
                     insecure:
                       type: boolean
                       default: true
-                      description: Skip TLS certificate verification for self-signed BMC certificates.
+                      description: >-
+                        Skip TLS certificate verification for self-signed BMC
+                        certificates.
                     secretRef:
                       type: object
                       required:
@@ -54,22 +59,28 @@ spec:
                         name:
                           type: string
                           minLength: 1
-                          description: Secret in the same namespace containing BMC login data.
+                          description: >-
+                            Secret in the same namespace containing BMC login
+                            data.
                         usernameKey:
                           type: string
                           default: username
-                          description: Secret data key containing the BMC username.
+                          description: >-
+                            Secret data key containing the BMC username.
                         passwordKey:
                           type: string
                           default: password
-                          description: Secret data key containing the BMC password.
+                          description: >-
+                            Secret data key containing the BMC password.
                 desiredState:
                   type: object
                   properties:
                     biosProfile:
                       type: string
                       nullable: true
-                      description: Named BIOS profile to diff or stage through the reconciler.
+                      description: >-
+                        Named BIOS profile to diff or stage through the
+                        reconciler.
                     ntp:
                       type: object
                       properties:
@@ -102,11 +113,21 @@ spec:
                 approve:
                   type: boolean
                   default: false
-                  description: Required approval gate before any desired-state changes are applied.
+                  description: >-
+                    Deprecated standing approval flag; use approvedPlanHash
+                    for one-shot applies.
+                approvedPlanHash:
+                  type: string
+                  nullable: true
+                  description: >-
+                    Current status.planHash value approved for exactly one
+                    apply attempt.
                 waitForReboot:
                   type: boolean
                   default: false
-                  description: Wait for the BMC to answer again after an approved reboot step.
+                  description: >-
+                    Wait for the BMC to answer again after an approved reboot
+                    step.
             status:
               type: object
               properties:
@@ -114,6 +135,12 @@ spec:
                   type: boolean
                 drift:
                   type: boolean
+                  nullable: true
+                planHash:
+                  type: string
+                  nullable: true
+                consumedPlanHash:
+                  type: string
                   nullable: true
                 plannedSteps:
                   type: array

@@ -69,9 +69,11 @@ def test_crd_schema_pins_profile_spec_and_status_shape() -> None:
         "endpoint",
         "desiredState",
         "approve",
+        "approvedPlanHash",
         "waitForReboot",
     }
     assert spec_props["approve"]["default"] is False
+    assert spec_props["approvedPlanHash"]["type"] == "string"
     endpoint_props = spec_props["endpoint"]["properties"]
     assert set(endpoint_props) == {
         "address",
@@ -89,6 +91,8 @@ def test_crd_schema_pins_profile_spec_and_status_shape() -> None:
     assert set(status_props) == {
         "dryRun",
         "drift",
+        "planHash",
+        "consumedPlanHash",
         "plannedSteps",
         "appliedChanges",
         "conditions",
@@ -107,6 +111,8 @@ def test_build_status_reports_drift_without_apply_when_unapproved() -> None:
 
     assert status["dryRun"] is True
     assert status["drift"] is True
+    assert status["planHash"] == module.plan_hash(status["plannedSteps"])
+    assert "consumedPlanHash" not in status
     assert status["plannedSteps"][0] == {
         "kind": "bios-profile",
         "required": True,
@@ -164,23 +170,30 @@ def test_reconcile_profile_requires_approval_before_confirming() -> None:
     assert {item["type"]: item["status"] for item in status["conditions"]}["Approved"] == "False"
 
 
-def test_reconcile_profile_confirms_only_when_approved() -> None:
-    """An approved profile may call the reconciler with confirm enabled."""
+def test_reconcile_profile_confirms_only_for_matching_plan_hash() -> None:
+    """A matching approvedPlanHash applies the current drift plan once."""
     module = _load_controller_module()
     calls: list[dict] = []
 
     def fake_reconcile(manager, desired, **kwargs):
         calls.append(kwargs)
-        return FakeResult(
-            dry_run=False,
-            applied=(FakeAppliedChange("bios-profile", True),),
-        )
+        if kwargs["confirm"]:
+            return FakeResult(
+                dry_run=False,
+                applied=(FakeAppliedChange("bios-profile", True),),
+            )
+        return FakeResult(dry_run=True)
+
+    dry_run = FakeResult(dry_run=True)
+    approved_hash = module.plan_hash([
+        module._planned_step(step) for step in dry_run.steps
+    ])
 
     status = module.reconcile_profile(
         {
             "endpoint": {"address": "https://mock-bmc:8443", "secretRef": {"name": "bmc-login"}},
             "desiredState": {"biosProfile": "gb300-power-capped"},
-            "approve": True,
+            "approvedPlanHash": approved_hash,
             "waitForReboot": True,
         },
         credentials={"username": "root", "password": "mock"},
@@ -191,12 +204,19 @@ def test_reconcile_profile_confirms_only_when_approved() -> None:
 
     assert calls == [
         {
+            "confirm": False,
+            "wait_for_reboot": False,
+            "async_call": False,
+        },
+        {
             "confirm": True,
             "wait_for_reboot": True,
             "async_call": False,
         }
     ]
     assert status["dryRun"] is False
+    assert status["planHash"] == approved_hash
+    assert status["consumedPlanHash"] == approved_hash
     assert status["appliedChanges"] == [
         {
             "kind": "bios-profile",
@@ -207,6 +227,48 @@ def test_reconcile_profile_confirms_only_when_approved() -> None:
     conditions = {item["type"]: item for item in status["conditions"]}
     assert conditions["Approved"]["status"] == "True"
     assert conditions["Applied"]["status"] == "True"
+
+
+def test_reconcile_profile_does_not_reapply_consumed_plan_hash() -> None:
+    """A consumed approvedPlanHash cannot reapply on the next timer tick."""
+    module = _load_controller_module()
+    calls: list[dict] = []
+
+    def fake_reconcile(manager, desired, **kwargs):
+        calls.append(kwargs)
+        return FakeResult(dry_run=not kwargs["confirm"])
+
+    dry_run = FakeResult(dry_run=True)
+    consumed_hash = module.plan_hash([
+        module._planned_step(step) for step in dry_run.steps
+    ])
+
+    status = module.reconcile_profile(
+        {
+            "endpoint": {"address": "mock-bmc"},
+            "desiredState": {"biosProfile": "gb300-power-capped"},
+            "approvedPlanHash": consumed_hash,
+        },
+        current_status={"consumedPlanHash": consumed_hash},
+        manager_factory=lambda **kwargs: kwargs,
+        reconcile_func=fake_reconcile,
+        reconciled_at=datetime(2026, 7, 10, 22, 55, tzinfo=timezone.utc),
+    )
+
+    assert calls == [
+        {
+            "confirm": False,
+            "wait_for_reboot": False,
+            "async_call": False,
+        }
+    ]
+    assert status["dryRun"] is True
+    assert status["planHash"] == consumed_hash
+    assert status["consumedPlanHash"] == consumed_hash
+    assert status["appliedChanges"] == []
+    conditions = {item["type"]: item for item in status["conditions"]}
+    assert conditions["Approved"]["status"] == "False"
+    assert conditions["Approved"]["reason"] == "ApprovalConsumed"
 
 
 def test_kopf_handler_reports_reconciler_load_errors_as_status(monkeypatch) -> None:
