@@ -312,6 +312,7 @@ First-run problems are almost always the connection, not the command:
 - [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
 - [Telemetry exporter](docs/telemetry-exporter.md) - BMC metrics for Prometheus and SignalFx.
 - [Telemetry metrics](docs/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
+- [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
 - [Releasing](docs/releasing.md) - local verification, package build, PyPI upload, and tagging.
 - [Fleet proxy design](docs/redfish-proxy.md) - planned service/controller shape for fleet management.
 - [Scaling and benchmarks](docs/scaling-and-benchmarks.md) - planned concurrency engine and benchmark goals.
