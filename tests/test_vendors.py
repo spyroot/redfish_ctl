@@ -2,7 +2,7 @@
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.vendors import all_vendors, get_vendor
+from redfish_ctl.vendors import all_vendors, capabilities_for_service_root, get_vendor
 from redfish_ctl.vendors.base import VendorCapabilities
 
 
@@ -40,6 +40,34 @@ def test_registry_contains_scaffolded_vendors():
     """Dell, HPE, Supermicro and generic are all registered."""
     names = set(all_vendors())
     assert {"dell", "hpe", "supermicro", "generic"} <= names
+
+
+def test_service_root_resolves_registered_vendor_profile():
+    """A ServiceRoot vendor signal resolves to the matching capability profile."""
+    caps = capabilities_for_service_root({"Oem": {"Dell": {}}})
+
+    assert caps is get_vendor("dell")
+    assert caps.job_scheduling is True
+
+
+def test_service_root_resolution_uses_classifier_ranking():
+    """The registry bridge keeps the classifier's OEM-over-text precedence."""
+    caps = capabilities_for_service_root(
+        {
+            "@odata.type": "#ServiceRoot.v1_5_0.ServiceRoot",
+            "Oem": {"Hpe": {}},
+            "Vendor": "Dell",
+        }
+    )
+
+    assert caps is get_vendor("hpe")
+    assert caps.oem_prefix == "Hpe"
+
+
+def test_service_root_resolution_unknown_is_generic():
+    """Unidentifiable ServiceRoot input returns the conservative generic profile."""
+    assert capabilities_for_service_root(None) is get_vendor("generic")
+    assert capabilities_for_service_root({"Vendor": "Acme"}) is get_vendor("generic")
 
 
 def test_capabilities_are_immutable():
