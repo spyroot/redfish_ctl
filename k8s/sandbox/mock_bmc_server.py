@@ -20,7 +20,7 @@ from urllib.parse import unquote, urlsplit
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8080
 DEFAULT_CORPUS_DIR = Path(
-    os.environ.get("MOCK_BMC_CORPUS_DIR", "/corpus/172.25.230.37")
+    os.environ.get("MOCK_BMC_CORPUS_DIR", "/corpus/gb300")
 )
 
 

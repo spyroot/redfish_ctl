@@ -150,7 +150,7 @@ def test_mock_bmc_can_be_enabled() -> None:
     assert container["env"] == [
         {
             "name": "MOCK_BMC_CORPUS_DIR",
-            "value": "/corpus/172.25.230.37",
+            "value": "/corpus/gb300",
         }
     ]
     assert mock_service["spec"]["ports"] == [{"name": "http", "port": 80, "targetPort": "http"}]

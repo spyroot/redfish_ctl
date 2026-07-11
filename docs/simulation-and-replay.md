@@ -38,10 +38,11 @@ Reads alone cannot exercise a mutation. Layer 3 teaches the mock BMC to accept w
 served state exactly as observed on real hardware, driven by a **trace** captured from a mutation
 that was already verified live. This turns a static corpus into a *mutate-able* environment.
 
-The mock BMC enters replay mode when started with a trace file:
+The mock BMC enters replay mode when started with a trace file. In the container image, the
+committed GB300 corpus is mounted at `/corpus/gb300`:
 
 ```bash
-python k8s/sandbox/mock_bmc_server.py --corpus-dir tests/supermicro_gb300_corpus/json_responses/172.25.230.37 \
+python /app/mock_bmc_server.py --corpus-dir /corpus/gb300 \
   --replay tests/write_traces/graceful_restart.yaml
 ```
 

@@ -43,7 +43,7 @@ spec:
               containerPort: 8080
           env:
             - name: MOCK_BMC_CORPUS_DIR
-              value: /corpus/172.25.230.37
+              value: /corpus/gb300
           volumeMounts:
             - name: mutation-rules
               mountPath: /rules

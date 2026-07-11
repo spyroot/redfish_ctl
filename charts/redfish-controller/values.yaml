@@ -26,7 +26,7 @@ mockBmc:
     repository: spyroot/redfish-ctl-mock-bmc
     tag: v1.2.0
     pullPolicy: IfNotPresent
-  corpusDir: /corpus/172.25.230.37
+  corpusDir: /corpus/gb300
   resources:
     requests:
       cpu: 25m

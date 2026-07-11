@@ -68,7 +68,7 @@ spec:
               exec python /app/mock_bmc_server.py --corpus-dir "$MOCK_BMC_CORPUS_DIR"
           env:
             - name: MOCK_BMC_CORPUS_DIR
-              value: /corpus/172.25.230.37
+              value: /corpus/gb300
           readinessProbe:
             httpGet:
               path: /redfish/v1/
