@@ -184,7 +184,7 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
 
 
 def test_kopf_handler_patches_status_only(monkeypatch) -> None:
-    """The resource handler returns a status patch and never mutates the BMC."""
+    """The handler writes status through the kopf patch, returns None, never mutates."""
     module = _load_controller_module()
     calls: list[tuple[dict, dict]] = []
 
@@ -199,14 +199,20 @@ def test_kopf_handler_patches_status_only(monkeypatch) -> None:
 
     monkeypatch.setattr(module, "poll_endpoint", fake_poll_endpoint)
 
-    patch = module.poll_redfish_endpoint(
+    patch: dict = {}
+    result = module.poll_redfish_endpoint(
         spec={"address": "mock-bmc", "secretRef": {"name": "bmc-login"}},
         body={},
         namespace="default",
         name="node-a",
         logger=None,
+        patch=patch,
     )
 
+    # Status is applied via the injected patch; the handler returns None so kopf
+    # does not persist a result under a status field the structural CRD rejects
+    # (the source of the "merge-patching inconsistencies" warning every poll).
+    assert result is None
     assert patch == {
         "status": {
             "powerState": "On",
