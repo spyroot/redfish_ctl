@@ -15,9 +15,16 @@ Targets the next minor release (1.3.0). Everything below is already on `main`.
 
 #### Simulation and reinforcement-learning environment
 - **Corpus-backed mock BMC.** `k8s/sandbox/mock_bmc_server.py` serves a Redfish
-  tree captured from real hardware (the committed Supermicro GB300 / NVIDIA HGX
-  corpus) over HTTP with a per-pod identity overlay, so one image can stand in
-  for many distinct BMCs.
+  tree captured from real hardware over HTTP with a per-pod identity overlay, so
+  one image can stand in for many distinct BMCs.
+- **Multi-vendor corpora.** Real captures committed under `tests/*_corpus` for
+  four vendors — Dell iDRAC (PowerEdge XR8620t), HPE iLO 5 (ProLiant DL360
+  Gen10), Supermicro X10, and NVIDIA GB300 — each with a per-vendor
+  mutation-rules file grounded in its own path scheme (Dell `System.Embedded.1`,
+  HPE `Systems/1`, GB300 `System_0`). Point `--corpus-dir` at any of them to
+  mock that vendor; between them they cover reset, boot override, one-time-boot,
+  BIOS pending/apply, virtual media, storage volume create/delete, and log
+  clear.
 - **Ordered write replay.** `--replay <trace>` accepts a fixed sequence of
   writes and overlays the resulting state onto later reads.
 - **Order-independent mutation rules.** `--mutation-rules <vendor>.yaml` matches
