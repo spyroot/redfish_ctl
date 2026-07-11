@@ -18,10 +18,11 @@ import urllib.request
 from pathlib import Path
 
 import yaml
+from vendor_corpus import corpus_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
-CORPUS = REPO_ROOT / "tests" / "nvidia_gb300_node2_corpus" / "json_responses" / "172.25.230.20"
+CORPUS = corpus_dir(REPO_ROOT / "tests" / "nvidia_gb300_node2_corpus.tar.gz", "172.25.230.20")
 RULES = REPO_ROOT / "tests" / "mutation_rules" / "nvidia_gb300_node2.yaml"
 
 SYSTEM = "/redfish/v1/Systems/System_0"

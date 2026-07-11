@@ -21,8 +21,11 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v5
-        # No LFS: the offline suite reads JSON fixtures only, never the
-        # LFS-tracked firmware binaries, so we skip the heavy LFS pull.
+        with:
+          # The offline suite extracts the LFS-tracked vendor corpus tarballs
+          # (tests/*_corpus.tar.gz), so their objects must be fetched. The
+          # tarballs are small (a few hundred KB each).
+          lfs: true
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
