@@ -20,6 +20,7 @@ CONTROLLER_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.controller"
 ILO_SIM_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.ilo-sim"
 MAKEFILE = REPO_ROOT / "Makefile"
 SANDBOX_README = REPO_ROOT / "k8s" / "sandbox" / "README.md"
+K8S_README = REPO_ROOT / "k8s" / "README.md"
 
 
 def _yaml_documents(path: Path) -> list[dict]:
@@ -216,24 +217,31 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     """The opt-in smoke harness proves the CR status is populated."""
     script = SMOKE_SCRIPT.read_text(encoding="utf-8")
     mode = os.stat(SMOKE_SCRIPT).st_mode
+    kubectl_lines = [
+        line.strip()
+        for line in script.splitlines()
+        if line.strip().startswith("kubectl ")
+    ]
 
     assert mode & stat.S_IXUSR
     assert "SANDBOX_BACKENDS=\"${SANDBOX_BACKENDS:-corpus-mock}\"" in script
+    assert "KUBECTL_CONTEXT=\"kind-${KIND_CLUSTER_NAME}\"" in script
+    assert kubectl_lines == ['kubectl --context "${KUBECTL_CONTEXT}" "$@"']
     assert "has_backend \"corpus-mock\"" in script
     assert "has_backend \"ilo-sim\"" in script
     assert "kind create cluster --name \"${KIND_CLUSTER_NAME}\"" in script
     assert "kind load docker-image redfish-ctl-mock-bmc:local" in script
     assert "kind load docker-image redfish-ctl-ilo-sim:local" in script
     assert "kind load docker-image redfish-ctl-controller:local" in script
-    assert "kubectl apply -f k8s/controller/redfish-endpoint-crd.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/mock-bmc.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/mock-credentials.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/ilo-sim.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/ilo-credentials.yaml" in script
-    assert "kubectl apply -f k8s/controller/rbac.yaml" in script
-    assert "kubectl apply -f k8s/controller/deployment.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/redfish-endpoint-sample.yaml" in script
-    assert "kubectl apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/controller/redfish-endpoint-crd.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/mock-bmc.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/mock-credentials.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/ilo-sim.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/ilo-credentials.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/controller/rbac.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/controller/deployment.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-sample.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml" in script
     assert "jsonpath={.status.powerState}" in script
     assert "wait_for_endpoint gb300-mock" in script
     assert "wait_for_endpoint ilo-sim" in script
@@ -248,6 +256,16 @@ def test_sandbox_readme_documents_ilo_backend_selection() -> None:
     assert "SANDBOX_BACKENDS=corpus-mock,ilo-sim make k8s-sandbox" in readme
     assert "HPE iLO Redfish emulator" in readme
     assert "https://github.com/HewlettPackard/ilo-redfish-emulator" in readme
+
+
+def test_sandbox_docs_show_teardown_and_plain_endpoint_listing() -> None:
+    """Sandbox docs include cleanup and rely on CRD default columns."""
+    sandbox_readme = SANDBOX_README.read_text(encoding="utf-8")
+    k8s_readme = K8S_README.read_text(encoding="utf-8")
+
+    assert "kind delete cluster --name redfish-sandbox" in sandbox_readme
+    assert "$ kubectl get redfishendpoints\n" in k8s_readme
+    assert "custom-columns" not in k8s_readme
 
 
 def test_make_k8s_sandbox_invokes_smoke_harness() -> None:
