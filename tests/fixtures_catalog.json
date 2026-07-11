@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "sets": [
+    {
+      "key": "dell-idrac-overlay",
+      "vendor": "dell",
+      "generation": "idrac",
+      "path": "tests/idrac_fixtures",
+      "status": "active",
+      "redfish_version": "1.15.0",
+      "oem_types": ["Dell"],
+      "source": "Hand-authored Dell iDRAC-shaped overlay used by dual-mode command tests."
+    },
+    {
+      "key": "generic-dmtf-base",
+      "vendor": "generic",
+      "generation": "base-mockup",
+      "path": "redfish_ctl/json_responses",
+      "status": "active",
+      "oem_types": [],
+      "source": "Packaged Redfish mockup base served by the default requests-mock fixture."
+    },
+    {
+      "key": "generic-dmtf-public-rackmount1",
+      "vendor": "generic",
+      "generation": "public-rackmount1",
+      "path": "tests/generic_fixtures",
+      "status": "active",
+      "redfish_version": "1.15.0",
+      "oem_types": [],
+      "source": "DMTF public-rackmount1 fixture tree imported for product-neutral tests."
+    },
+    {
+      "key": "hpe-ilo-reference",
+      "vendor": "hpe",
+      "generation": "ilo",
+      "path": "tests/hpe_fixtures",
+      "status": "active",
+      "redfish_version": "1.20.0",
+      "oem_types": ["Hpe"],
+      "source": "Imported HPE iLO Redfish fixture tree with local license notes."
+    },
+    {
+      "key": "supermicro-gb300-overlay",
+      "vendor": "supermicro",
+      "generation": "gb300",
+      "path": "tests/supermicro_fixtures",
+      "status": "active",
+      "redfish_version": "1.17.0",
+      "oem_types": ["Supermicro", "Nvidia"],
+      "source": "Flattened Supermicro GB300 fixture overlay used by vendor-aware tests."
+    },
+    {
+      "key": "supermicro-gb300-corpus",
+      "vendor": "supermicro",
+      "generation": "gb300",
+      "path": "tests/supermicro_gb300_corpus/json_responses",
+      "status": "active",
+      "redfish_version": "1.17.0",
+      "oem_types": ["Supermicro", "Nvidia"],
+      "source": "Full committed GB300 crawl used by corpus-backed telemetry and controller tests."
+    },
+    {
+      "key": "supermicro-x10",
+      "vendor": "supermicro",
+      "generation": "x10",
+      "path": "tests/supermicro_x10_fixtures",
+      "status": "active",
+      "oem_types": ["Supermicro"],
+      "source": "Flattened Supermicro X10 fixture overlay."
+    },
+    {
+      "key": "supermicro-x10-119",
+      "vendor": "supermicro",
+      "generation": "x10",
+      "path": "tests/supermicro_x10_119_fixtures",
+      "status": "active",
+      "oem_types": ["Supermicro"],
+      "source": "Second Supermicro X10 fixture overlay for portability checks."
+    },
+    {
+      "key": "cisco-cimc-corpus",
+      "vendor": "cisco",
+      "generation": "ucs-c-series",
+      "path": "tests/cisco_fixtures",
+      "status": "pending",
+      "oem_types": ["Cisco"],
+      "reason": "Waiting for a sanitized Cisco CIMC Redfish crawl."
+    },
+    {
+      "key": "lenovo-xcc-doc-seeded",
+      "vendor": "lenovo",
+      "generation": "xcc",
+      "path": "tests/lenovo_fixtures",
+      "status": "pending",
+      "oem_types": ["Lenovo"],
+      "reason": "Waiting for the Lenovo XCC fixture/profile package to land."
+    }
+  ]
+}
