@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
 DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.mock-bmc"
 MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "mock-bmc.yaml"
+GRACEFUL_RESTART_TRACE = REPO_ROOT / "tests" / "write_traces" / "graceful_restart.yaml"
 GB300_CORPUS = (
     REPO_ROOT
     / "tests"
@@ -69,6 +70,49 @@ def test_mock_bmc_serves_json_read_only_over_http() -> None:
             assert exc.code == 405
         else:  # pragma: no cover - the assertion above is the expected path.
             raise AssertionError("POST unexpectedly succeeded")
+
+
+def test_mock_bmc_replay_graceful_restart_updates_system_state() -> None:
+    """Replay mode accepts the reset trace and mutates served system state."""
+    module = _load_server_module()
+    system_url = "/redfish/v1/Systems/System_0"
+    reset_url = f"{system_url}/Actions/ComputerSystem.Reset"
+
+    with module.run_server(
+        "127.0.0.1",
+        0,
+        GB300_CORPUS,
+        replay_trace=GRACEFUL_RESTART_TRACE,
+    ) as server:
+        host, port = server.server_address
+        base_url = f"http://{host}:{port}"
+
+        with urllib.request.urlopen(base_url + system_url, timeout=5) as response:
+            before = json.loads(response.read().decode("utf-8"))
+        assert before["LastResetTime"] == "2026-04-14T23:34:33+00:00"
+
+        request = urllib.request.Request(
+            base_url + reset_url,
+            data=json.dumps({"ResetType": "GracefulRestart"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            assert response.status == 204
+
+        with urllib.request.urlopen(base_url + system_url, timeout=5) as response:
+            after = json.loads(response.read().decode("utf-8"))
+        assert after["LastResetTime"] == "2026-04-14T23:35:33+00:00"
+
+        with urllib.request.urlopen(base_url + "/__replay_status", timeout=5) as response:
+            status = json.loads(response.read().decode("utf-8"))
+        assert status == {
+            "scenario": "graceful_restart",
+            "matched_steps": 1,
+            "pending_steps": [],
+            "total_steps": 1,
+            "complete": True,
+        }
 
 
 def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
