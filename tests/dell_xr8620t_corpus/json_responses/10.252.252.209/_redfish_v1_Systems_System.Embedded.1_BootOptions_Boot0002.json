@@ -1,0 +1,12 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#BootOption.BootOption",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/BootOptions/Boot0002",
+    "@odata.type": "#BootOption.v1_0_4.BootOption",
+    "BootOptionEnabled": true,
+    "BootOptionReference": "Boot0002",
+    "Description": "Current settings of the UEFI Boot option",
+    "DisplayName": "Unavailable: Photon",
+    "Id": "Boot0002",
+    "Name": "Uefi Boot Option",
+    "UefiDevicePath": "HD(2,GPT,4EC85064-6751-9256-BBC9-13D8E6628D18,0x2800,0x5000)/\\EFI\\BOOT\\bootx64.efi"
+}

@@ -1,0 +1,179 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#DellBootSourcesRegistry.DellBootSourcesRegistry",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/BootSources/BootSourcesRegistry",
+    "@odata.type": "#DellBootSourcesRegistry.v1_1_0.DellBootSourcesRegistry",
+    "Description": "This registry defines a representation of Boot Sources instances",
+    "Id": "DellBootSourcesRegistry.v1_1_0",
+    "Language": "en",
+    "Name": "Dell Boot Sources Registry",
+    "OwningEntity": "Dell",
+    "RegistryEntries": {
+        "Attributes": [
+            {
+                "AttributeName": "UefiBootSeq",
+                "DisplayName": "UEFI Boot Sequence",
+                "DisplayOrder": 0,
+                "Entry": [
+                    {
+                        "DisplayName": "Integrated PCIe SSD 1 Disk 0: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#PCIeSSD.Integrated.1-0#b7598f68461df7be829545518c494799",
+                        "Index": null,
+                        "Name": "PCIeSSD.Integrated.1-0"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.2-1#7f728bf966b1194e11605bf01e13f96c",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.2-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.3-1#4fe5f5547b4d5ebaa18838b1a6f26e46",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.3-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.4-1#e8f4af9b6af97256a3d5f5f58e81ef16",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.4-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.5-1#b448c85178e27e55f9447e3449d76c4f",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.5-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.6-1#229f573b0fe3c4a4c94949df28e3a182",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.6-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.7-1#e986ac25f19e3b40df7486afb0c25509",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.7-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.8-1#13c4a1f918a078f1097facdc2a1de432",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.8-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.9-1#7f67070517b67005b74ad5f4fdb4571d",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.9-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.10-1#0ec90fa46322db8bd51e439ef5f4af4f",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.10-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.11-1#0d1ab99f365a574d99b780256adb9c32",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.11-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.12-1#39bdce730c82a9fb2ba36bba3314e7a5",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.12-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.13-1#470a9c87a013e7633514ca2dee805acc",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.13-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.14-1#2d913ae57c1d6d4a61048e5b0a8b316c",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.14-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.15-1#98a51155e0f45f4924986483865be763",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.15-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.16-1#681178bb86565f48cc9fcbbe07e87cdc",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.16-1"
+                    },
+                    {
+                        "DisplayName": "Unavailable: Photon",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Unknown.Unknown.17-1#d10c78eda84cdec5f3f1fa8af1f19fc3",
+                        "Index": null,
+                        "Name": "Unknown.Unknown.17-1"
+                    },
+                    {
+                        "DisplayName": "PXE Device 1: NIC in Slot 2 Port 1 Partition 1",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#NIC.PxeDevice.1-1#cf7f54fb19147f7b9bf9f8429eb36af6",
+                        "Index": null,
+                        "Name": "NIC.PxeDevice.1-1"
+                    },
+                    {
+                        "DisplayName": "Virtual Optical Drive",
+                        "Enabled": null,
+                        "Id": "BIOS.Setup.1-1#UefiBootSeq#Optical.iDRACVirtual.1-1#c9c18e0059cec50694ecbc954b937404",
+                        "Index": null,
+                        "Name": "Optical.iDRACVirtual.1-1"
+                    }
+                ],
+                "HelpText": "This field controls the UEFI boot order. The first option in the list will be attempted first, and if unsuccessful, the second option will be attempted and so on. This field applies only when Boot Mode is 'UEFI'; it has no effect when Boot Mode is 'BIOS'.",
+                "Hidden": false,
+                "MenuPath": "./BootSettingsRef/UefiBootSettingsRef",
+                "ReadOnly": false,
+                "Type": "OrderedList"
+            }
+        ],
+        "Dependencies": [
+            {
+                "Dependency": {
+                    "MapFrom": [
+                        {
+                            "MapFromAttribute": "BootMode",
+                            "MapFromCondition": "EQU",
+                            "MapFromProperty": "CurrentValue",
+                            "MapFromValue": "Bios"
+                        }
+                    ],
+                    "MapToAttribute": "UefiBootSeq",
+                    "MapToProperty": "ReadOnly",
+                    "MapToValue": true
+                },
+                "DependencyFor": "UefiBootSeq",
+                "Type": "Map"
+            }
+        ]
+    },
+    "RegistryVersion": "v1_1_0"
+}

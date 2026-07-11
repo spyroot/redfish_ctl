@@ -1,0 +1,106 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntryCollection.LogEntryCollection",
+    "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/LogServices/FaultList/Entries",
+    "@odata.type": "#LogEntryCollection.LogEntryCollection",
+    "Description": "Providing additional health information for the devices which support rolled up health data",
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/LogServices/FaultList/Entries/Fault_03200002_1",
+            "@odata.type": "#LogEntry.v1_12_0.LogEntry",
+            "Created": "2023-02-15T17:22:25-06:00",
+            "Description": "PSU.Slot.2",
+            "EntryType": "SEL",
+            "Id": "Fault_03200002_1",
+            "Links": {
+                "OriginOfCondition": {
+                    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/Power#/PowerSupplies/1"
+                }
+            },
+            "Message": "Power supply 2 is absent.",
+            "MessageArgs": [
+                "2"
+            ],
+            "MessageArgs@odata.count": 1,
+            "MessageId": "IDRAC.2.8.PSUA0016",
+            "Name": "PSU.Slot.2",
+            "Oem": {
+                "Dell": {
+                    "@odata.type": "#DellLogEntry.v1_0_1.DellLogEntry",
+                    "FQDD": "PSU.Slot.2",
+                    "Id": "Fault_03200002_1",
+                    "Name": "PSU.Slot.2",
+                    "SubSystem": "PowerSupply"
+                }
+            },
+            "SensorNumber": 0,
+            "SensorType": "Power Supply / Converter",
+            "Severity": "Critical"
+        },
+        {
+            "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/LogServices/FaultList/Entries/Fault_03200003_1",
+            "@odata.type": "#LogEntry.v1_12_0.LogEntry",
+            "Created": "2023-02-16T10:49:14-06:00",
+            "Description": "System.Embedded.1",
+            "EntryType": "SEL",
+            "Id": "Fault_03200003_1",
+            "Links": {
+                "OriginOfCondition": {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1"
+                }
+            },
+            "Message": "The System Configuration Check operation resulted in the following issue: Config Error:  Riser  3.",
+            "MessageArgs": [
+                "Config Error:  Riser  3"
+            ],
+            "MessageArgs@odata.count": 1,
+            "MessageId": "IDRAC.2.8.HWC8010",
+            "Name": "System.Embedded.1",
+            "Oem": {
+                "Dell": {
+                    "@odata.type": "#DellLogEntry.v1_0_1.DellLogEntry",
+                    "FQDD": "System.Embedded.1",
+                    "Id": "Fault_03200003_1",
+                    "Name": "System.Embedded.1",
+                    "SubSystem": "Miscellaneous"
+                }
+            },
+            "SensorNumber": 0,
+            "SensorType": null,
+            "Severity": "Critical"
+        },
+        {
+            "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/LogServices/FaultList/Entries/Fault_03200004_1",
+            "@odata.type": "#LogEntry.v1_12_0.LogEntry",
+            "Created": "2023-02-16T10:49:53-06:00",
+            "Description": "System.Embedded.1",
+            "EntryType": "SEL",
+            "Id": "Fault_03200004_1",
+            "Links": {
+                "OriginOfCondition": {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1"
+                }
+            },
+            "Message": "Fan 1A configuration mismatch.",
+            "MessageArgs": [
+                "1A"
+            ],
+            "MessageArgs@odata.count": 1,
+            "MessageId": "IDRAC.2.8.FAN0030",
+            "Name": "System.Embedded.1",
+            "Oem": {
+                "Dell": {
+                    "@odata.type": "#DellLogEntry.v1_0_1.DellLogEntry",
+                    "FQDD": "System.Embedded.1",
+                    "Id": "Fault_03200004_1",
+                    "Name": "System.Embedded.1",
+                    "SubSystem": "Miscellaneous"
+                }
+            },
+            "SensorNumber": 0,
+            "SensorType": null,
+            "Severity": "Critical"
+        }
+    ],
+    "Members@odata.count": 3,
+    "Name": "FaultList Entries Collection"
+}

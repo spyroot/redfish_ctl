@@ -1,0 +1,26 @@
+{
+    "@odata.type": "#PowerSupplyMetrics.v1_0_1.PowerSupplyMetrics",
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PowerSubsystem/PowerSupplies/PSU.ChassisSlot.2-2-2/Metrics",
+    "@odata.context": "/redfish/v1/$metadata#PowerSupplyMetrics.PowerSupplyMetrics",
+    "Description": "Represents the properties of Power supply Metrics",
+    "Id": "Metrics",
+    "InputVoltage": null,
+    "InputCurrentAmps": null,
+    "InputPowerWatts": {
+        "DataSourceUri": "/redfish/v1/Chassis/System.Embedded.1/Sensors/PSU.ChassisSlot.2-2-2_InputPower",
+        "Reading": 0.0
+    },
+    "OutputPowerWatts": {
+        "DataSourceUri": "/redfish/v1/Chassis/System.Embedded.1/Sensors/PSU.ChassisSlot.2-2-2_OutputPower",
+        "Reading": 0.0
+    },
+    "FrequencyHz": {
+        "DataSourceUri": "/redfish/v1/Chassis/System.Embedded.1/Sensors/PSU.ChassisSlot.2-2-2_MaximumFrequency",
+        "Reading": 0
+    },
+    "Name": "Metrics for Power Supply 2",
+    "Status": {
+        "Health": "Critical",
+        "State": null
+    }
+}

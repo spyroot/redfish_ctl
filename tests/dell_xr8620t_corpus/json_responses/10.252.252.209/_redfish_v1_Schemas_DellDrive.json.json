@@ -1,0 +1,70 @@
+{
+    "$id": "/redfish/v1/Schemas/DellDrive.json",
+    "$schema": "/redfish/v1/Schemas/redfish-schema-v1.json",
+    "copyright": "Copyright 2014-2022 Dell, Inc. or its subsidiaries. All Rights Reserved.",
+    "definitions": {
+        "IgnoreCertificateWarning": {
+            "enum": [
+                "Enable",
+                "Disable"
+            ],
+            "enumDescriptions": {
+                "Disable": "Ignoring of certificate warning is Disable.",
+                "Enable": "Ignoring of certificate warning is Enable."
+            },
+            "type": "string"
+        },
+        "LogTypes": {
+            "enum": [
+                "PEL"
+            ],
+            "enumDescriptions": {
+                "PEL": "PEL"
+            },
+            "type": "string"
+        },
+        "ProxySupport": {
+            "enum": [
+                "Disabled",
+                "EnabledProxyDefault",
+                "Enabled"
+            ],
+            "enumDescriptions": {
+                "Disabled": "Proxy Support is Disabled.",
+                "Enabled": "Proxy Support is Enabled.",
+                "EnabledProxyDefault": "Proxy Support to be Enabled and set to default."
+            },
+            "type": "string"
+        },
+        "ProxyType": {
+            "enum": [
+                "HTTP",
+                "SOCKS4"
+            ],
+            "enumDescriptions": {
+                "HTTP": "Proxy type is of HTTP type.",
+                "SOCKS4": "Proxy type is of SOCKS4 type."
+            },
+            "type": "string"
+        },
+        "ShareType": {
+            "enum": [
+                "CIFS",
+                "HTTP",
+                "HTTPS",
+                "Local",
+                "NFS"
+            ],
+            "enumDescriptions": {
+                "CIFS": "Share type is CIFS.",
+                "HTTP": "Share type is HTTP.",
+                "HTTPS": "Share type is HTTPS.",
+                "Local": "Share type is Local.",
+                "NFS": "Share type is NFS."
+            },
+            "type": "string"
+        }
+    },
+    "owningEntity": "Dell",
+    "title": "#DellDrive"
+}

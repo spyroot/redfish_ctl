@@ -1,0 +1,23 @@
+{
+    "@odata.type": "#ThermalMetrics.v1_0_1.ThermalMetrics",
+    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/ThermalSubsystem/ThermalMetrics",
+    "@odata.context": "/redfish/v1/$metadata#ThermalMetrics.ThermalMetrics",
+    "Id": "ThermalMetrics",
+    "Name": "Chassis Thermal Metrics",
+    "Description": "Represents the properties of Thermal Metrics of the chassis",
+    "TemperatureSummaryCelsius": {
+        "Internal": {
+            "DataSourceUri": "/redfish/v1/Chassis/System.Embedded.1/Sensors/CPU1Temp",
+            "Reading": 45.0
+        },
+        "Intake": null
+    },
+    "TemperatureReadingsCelsius": [
+        {
+            "Reading": 45.0,
+            "DeviceName": "Internal",
+            "DataSourceUri": "/redfish/v1/Chassis/System.Embedded.1/Sensors/CPU1Temp"
+        }
+    ],
+    "TemperatureReadingsCelsius@odata.count": 1
+}

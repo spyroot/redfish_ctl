@@ -1,0 +1,55 @@
+{
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/ThermalMetrics",
+    "@odata.type": "#Thermal.v1_7_1.Thermal",
+    "@odata.context": "/redfish/v1/$metadata#Thermal.Thermal",
+    "Description": "FPGA ThermalMetrics",
+    "Name": "FPGA ThermalMetrics",
+    "Id": "ProcAccelerator.Slot.1-1",
+    "Temperatures": [
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/ThermalMetrics#/Temperatures/0",
+            "Name": "Board Temp",
+            "MemberId": "0",
+            "ReadingCelsius": 42.5,
+            "RelatedItem": [
+                {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1"
+                }
+            ]
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/ThermalMetrics#/Temperatures/1",
+            "Name": "DDR SA Temp",
+            "MemberId": "1",
+            "ReadingCelsius": 49.0,
+            "RelatedItem": [
+                {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1"
+                }
+            ]
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/ThermalMetrics#/Temperatures/2",
+            "Name": "MTB  Serdes Temp",
+            "MemberId": "2",
+            "ReadingCelsius": 59.0,
+            "RelatedItem": [
+                {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1"
+                }
+            ]
+        },
+        {
+            "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1/FPGA/Oem/Dell/ThermalMetrics#/Temperatures/3",
+            "Name": "MTB Core Temp",
+            "MemberId": "3",
+            "ReadingCelsius": 59.0,
+            "RelatedItem": [
+                {
+                    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/Processors/ProcAccelerator.Slot.1-1"
+                }
+            ]
+        }
+    ],
+    "Temperatures@odata.count": 4
+}

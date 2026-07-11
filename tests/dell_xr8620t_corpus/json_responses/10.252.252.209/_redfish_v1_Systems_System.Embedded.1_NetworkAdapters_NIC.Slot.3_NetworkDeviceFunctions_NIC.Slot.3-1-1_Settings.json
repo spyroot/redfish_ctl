@@ -1,0 +1,60 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#NetworkDeviceFunction.NetworkDeviceFunction",
+    "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkDeviceFunctions/NIC.Slot.3-1-1/Settings",
+    "@odata.type": "#NetworkDeviceFunction.v1_8_0.NetworkDeviceFunction",
+    "AssignablePhysicalPorts": [
+        {
+            "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+        }
+    ],
+    "AssignablePhysicalPorts@odata.count": 1,
+    "Description": "NetworkDeviceFunction",
+    "Ethernet": {
+        "MACAddress": "50:7C:6F:24:3B:C0",
+        "MTUSize": null,
+        "PermanentMACAddress": "50:7C:6F:24:3B:C0",
+        "VLAN": {
+            "VLANEnable": null,
+            "VLANId": 0
+        }
+    },
+    "FibreChannel": {
+        "BootTargets": [
+            {
+                "LUNID": null,
+                "WWPN": null
+            }
+        ],
+        "BootTargets@odata.count": 1,
+        "FCoEActiveVLANId": null,
+        "FCoELocalVLANId": null,
+        "PermanentWWNN": null,
+        "PermanentWWPN": null,
+        "WWNN": null,
+        "WWNSource": null,
+        "WWPN": null
+    },
+    "Id": "NIC.Slot.3-1-1",
+    "Links": {
+        "PhysicalPortAssignment": {
+            "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+        }
+    },
+    "MaxVirtualFunctions": 256,
+    "Name": "NetworkDeviceFunction",
+    "NetDevFuncCapabilities": [
+        "Disabled",
+        "Ethernet"
+    ],
+    "NetDevFuncCapabilities@odata.count": 2,
+    "NetDevFuncType": "Ethernet",
+    "PhysicalPortAssignment": {
+        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/NetworkAdapters/NIC.Slot.3/NetworkPorts/NIC.Slot.3-1"
+    },
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK",
+        "HealthRollup": "OK"
+    },
+    "iSCSIBoot": {}
+}
