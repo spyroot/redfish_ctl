@@ -99,7 +99,7 @@ class TermColors:
 
 "note we do sub-string match"
 TermList = ["xterm", "linux", "ansi", "xterm-256color"]
-LOCAL_COMMANDS = {"bios-profile"}
+LOCAL_COMMANDS = {"bios-profile", "capability-report"}
 _QUERY_CAPABILITY_FLAGS = (
     ("$select", "select", "query_select"),
     ("$filter", "filter", "query_filter"),

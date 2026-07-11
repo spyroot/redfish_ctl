@@ -159,3 +159,4 @@ from .accounts.cmd_privilage_registry import *
 from .discovery.cmd_discovery import *
 from .discovery.cmd_bmc_scan import *
 from .fleet.cmd_fleet import *
+from .vendors.cmd_capability_report import *

@@ -100,6 +100,7 @@ Safety labels:
 | `boot-source-update` | Stage boot source settings. | Write |
 | `boot-sources` | List boot source members. | Read |
 | `boot-state` | Infer what the host will boot (target/order/media). | Read |
+| `capability-report` | Export registered vendor capability profiles for IaC and inventory tooling. | Read |
 | `change-boot-order` | Change boot order and boot options. | Write |
 | `chassis` | Read chassis services. | Read |
 | `chassis-reset` | Change chassis power state. | Write |
