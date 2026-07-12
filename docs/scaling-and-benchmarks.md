@@ -4,7 +4,7 @@ Author: Mus <spyroot@gmail.com>
 
 The design target is for `redfish_ctl` to grow past one server and drive roughly 1,000 BMCs to a
 desired state with numbers that show it is fast, correct, and stable. This page defines the fleet
-engine, simulator, and benchmark gate. Those runnable artifacts are not in the repository yet.
+engine, simulator, and benchmark gate.
 
 ## What Exists Today
 
@@ -15,6 +15,21 @@ themselves.
 
 The discover package has a small fake-async harness in tests around scanner behavior. It is useful
 seed material for a simulator because it exercises Redfish reads without live hardware.
+
+`tests/request_benchmark.py`, the local benchmark helper used by request-count tests, also includes
+an opt-in mock-BMC concurrency benchmark. It serves the committed GB300 corpus through
+`k8s/sandbox/mock_bmc_server.py`, ramps clients at `1, 8, 32, 128`, and records request throughput plus
+p50/p95/p99 latency for a read-only Redfish path.
+
+Run it locally from the repository root:
+
+```bash
+make bench-concurrency
+```
+
+The target writes `reports/concurrency-benchmark.json` for machine comparison and
+`reports/concurrency-benchmark.md` for review. It does not contact live BMCs, publish artifacts, or
+upload images.
 
 ## Planned Concurrency Engine
 
@@ -42,7 +57,7 @@ one generic server. It is not wired as a fleet benchmark gate.
 
 ## Metrics And Targets
 
-Each benchmark would write a result under `reports/`, such as `reports/bench-fleet-1000.json`, so
+Each benchmark writes a result under `reports/`, such as `reports/concurrency-benchmark.json`, so
 regressions are visible.
 
 | Metric | Target |
