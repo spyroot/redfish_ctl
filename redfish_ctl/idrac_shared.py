@@ -103,6 +103,7 @@ class ApiRequestType(Enum):
     Exporter = auto()
     ActionList = auto()
     EventSubmitTest = auto()
+    EventServiceQuery = auto()
     SystemReset = auto()
     Logs = auto()
     EthernetInterfaces = auto()
