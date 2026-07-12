@@ -9,7 +9,7 @@ TWINE ?= twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build docker-test docker-image docs-voice-check k8s-sandbox clean
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check k8s-sandbox clean
 
 help: ## Show available developer targets.
 	@awk 'BEGIN { \
@@ -31,6 +31,13 @@ typecheck: ## Run mypy over source and tests.
 build: ## Build sdist/wheel locally and validate package metadata.
 	$(PYTHON) setup.py sdist bdist_wheel
 	$(TWINE) check dist/*
+
+bench-concurrency: ## Run the opt-in mock-BMC concurrency benchmark.
+	$(PYTHON) tests/request_benchmark.py \
+		--levels 1,8,32,128 \
+		--requests-per-level 128 \
+		--concurrency-report reports/concurrency-benchmark.json \
+		--summary-report reports/concurrency-benchmark.md
 
 docker-test: ## Build and run the Linux offline test image.
 	./docker/run-tests.sh

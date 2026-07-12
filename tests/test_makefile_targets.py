@@ -8,6 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_TARGETS = {
+    "bench-concurrency",
     "help",
     "test",
     "lint",
@@ -44,6 +45,7 @@ def test_make_dry_run_uses_expected_safe_local_commands() -> None:
             "make",
             "-n",
             "build",
+            "bench-concurrency",
             "docker-test",
             "docker-image",
             "docs-voice-check",
@@ -58,6 +60,7 @@ def test_make_dry_run_uses_expected_safe_local_commands() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "setup.py sdist bdist_wheel" in result.stdout
+    assert "concurrency-benchmark.json" in result.stdout
     assert "twine check" in result.stdout
     assert "docker/run-tests.sh" in result.stdout
     assert "docker build" in result.stdout
