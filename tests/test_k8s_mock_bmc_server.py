@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from vendor_corpus import corpus_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_MODULE = REPO_ROOT / "k8s" / "sandbox" / "mock_bmc_server.py"
@@ -20,12 +21,8 @@ HELM_VALUES = REPO_ROOT / "charts" / "redfish-controller" / "values.yaml"
 SIMULATION_DOC = REPO_ROOT / "docs" / "simulation-and-replay.md"
 GRACEFUL_RESTART_TRACE = REPO_ROOT / "tests" / "write_traces" / "graceful_restart.yaml"
 SUPERMICRO_RULES = REPO_ROOT / "tests" / "mutation_rules" / "supermicro_gb300.yaml"
-GB300_CORPUS = (
-    REPO_ROOT
-    / "tests"
-    / "supermicro_gb300_corpus"
-    / "json_responses"
-    / "172.25.230.37"
+GB300_CORPUS = corpus_dir(
+    REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
 
 SYSTEM = "/redfish/v1/Systems/System_0"
@@ -147,7 +144,7 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     assert "FROM python:3.12-slim" in dockerfile
     assert "--chown=mockbmc:mockbmc" in dockerfile
     assert "k8s/sandbox/mock_bmc_server.py" in dockerfile
-    assert "tests/supermicro_gb300_corpus/json_responses/172.25.230.37" in dockerfile
+    assert "tests/supermicro_gb300_corpus.tar.gz" in dockerfile
     assert "MOCK_BMC_CORPUS_DIR=/corpus/gb300" in dockerfile
     assert "/corpus/gb300" in dockerfile
     assert "/corpus/172.25.230.37" not in dockerfile

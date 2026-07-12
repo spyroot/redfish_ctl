@@ -1,8 +1,0 @@
-{
-    "@odata.context": "/redfish/v1/$metadata#SessionCollection.SessionCollection",
-    "@odata.type": "#SessionCollection.SessionCollection",
-    "@odata.id": "/redfish/v1/SessionService/Sessions",
-    "Name": "Session Collection",
-    "Members": [],
-    "Members@odata.count": 0
-}

@@ -1,20 +1,18 @@
-# Supermicro GB300 raw crawl corpus
+# Supermicro GB300 corpus
 
-`tests/supermicro_gb300_corpus/json_responses/`, copied from the local
-`/Users/spyroot/.json_responses` crawl cache on 2026-07-09, preserves the full
-GB300 lab Redfish corpus for offline research and regression work. Four
-non-empty account `Password` response fields were replaced with `<redacted>`
-before commit.
+The Supermicro GB300 lab Redfish crawl (host `172.25.230.37`, copied from the
+local `~/.json_responses` crawl cache on 2026-07-09) is committed as the filtered
+Git-LFS tarball `tests/supermicro_gb300_corpus.tar.gz`, built by
+`tools/pack_corpus.py`. Tests extract it on demand with
+`tests/vendor_corpus.corpus_dir`, and the sandbox mock-BMC image unpacks it into
+`/corpus/gb300`. Four non-empty account `Password` response fields were replaced
+with `<redacted>` before commit.
 
-The flat `tests/supermicro_fixtures/` directory remains the active pytest
-fixture overlay. Keep this raw corpus separate so multi-host snapshots,
-archives, and map artifacts do not change mock request resolution.
+The flat `tests/supermicro_fixtures/` directory remains the active mock overlay;
+this corpus stays separate so its snapshots do not change mock request
+resolution.
 
-Current contents:
-
-- 4043 copied files.
-- 4035 JSON Redfish artifacts.
-- Host snapshots under `172.25.230.37`, `192.168.254.120`,
-  `192.168.254.119`, and `10.43.3.209`.
-- Original snapshots under `orig/`, plus the downloaded `json_data.tar.gz`
-  metadata and crawl map files.
+This directory also retains the downloaded IGC dataset metadata that shipped with
+the crawl — `json_responses/dataset.json`, `json_responses/json_data.tar.gz`, and
+its `.md5` — which the `igc` project consumes. The Redfish JSON itself now lives
+in the tarball above, not under `json_responses/`.

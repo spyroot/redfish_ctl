@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
+from vendor_corpus import corpus_dir
 
 REPO = Path(__file__).resolve().parent.parent
 PROFILE_DIR = REPO / "specs" / "profiles"
@@ -20,11 +21,7 @@ PROFILE_DIR = REPO / "specs" / "profiles"
 # vendor -> committed BIOS attribute registry captured from real hardware.
 REGISTRY_BY_VENDOR = {
     "supermicro": (
-        REPO
-        / "tests"
-        / "supermicro_gb300_corpus"
-        / "json_responses"
-        / "172.25.230.37"
+        corpus_dir(REPO / "tests" / "supermicro_gb300_corpus.tar.gz", "172.25.230.37")
         / "_redfish_v1_Registries_BiosAttributeRegistry_BiosAttributeRegistry.json"
     ),
     "dell": (

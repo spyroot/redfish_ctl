@@ -1,7 +1,0 @@
-{
-  "@odata.id": "/redfish/v1/Chassis/Riser_Slot2_BlueField_3_Card/TrustedComponents",
-  "@odata.type": "#TrustedComponentCollection.TrustedComponentCollection",
-  "Members": [],
-  "Members@odata.count": 0,
-  "Name": "Trusted Component Collection"
-}

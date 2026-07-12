@@ -5,15 +5,13 @@ from pathlib import Path
 
 import pytest
 import yaml
+from vendor_corpus import corpus_dir
 
 from redfish_ctl.fleet import cmd_fleet
 from redfish_ctl.fleet.cmd_fleet import FleetInventory, FleetNode, read_fleet
 
-GB300_CORPUS = (
-    Path(__file__).parent
-    / "supermicro_gb300_corpus"
-    / "json_responses"
-    / "172.25.230.37"
+GB300_CORPUS = corpus_dir(
+    Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
 GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
 

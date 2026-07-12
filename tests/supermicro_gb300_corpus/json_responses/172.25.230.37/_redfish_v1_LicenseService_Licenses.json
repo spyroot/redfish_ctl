@@ -1,7 +1,0 @@
-{
-  "@odata.id": "/redfish/v1/LicenseService/Licenses",
-  "@odata.type": "#LicenseCollection.LicenseCollection",
-  "Members": [],
-  "Members@odata.count": 0,
-  "Name": "License Collection"
-}

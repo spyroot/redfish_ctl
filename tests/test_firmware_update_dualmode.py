@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from vendor_corpus import corpus_dir
+
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -11,10 +13,7 @@ SIMPLE_UPDATE_TARGET = (
 )
 MULTIPART_PUSH_TARGET = "/redfish/v1/UpdateService/update-multipart"
 GB300_UPDATE_SERVICE = (
-    Path(__file__).parent
-    / "supermicro_gb300_corpus"
-    / "json_responses"
-    / "172.25.230.37"
+    corpus_dir(Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37")
     / "_redfish_v1_UpdateService.json"
 )
 

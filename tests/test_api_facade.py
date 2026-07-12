@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from vendor_corpus import corpus_dir
 
 from redfish_ctl.api import (
     BiosProfileApplyResult,
@@ -38,11 +39,8 @@ from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
-GB300_CORPUS = (
-    Path(__file__).parent
-    / "supermicro_gb300_corpus"
-    / "json_responses"
-    / "172.25.230.37"
+GB300_CORPUS = corpus_dir(
+    Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
 GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
 

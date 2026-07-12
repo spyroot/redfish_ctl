@@ -30,9 +30,14 @@ WORKDIR /app
 
 COPY --chown=mockbmc:mockbmc k8s/sandbox/mock_bmc_server.py \
     /app/mock_bmc_server.py
-COPY --chown=mockbmc:mockbmc \
-    tests/supermicro_gb300_corpus/json_responses/172.25.230.37 \
-    /corpus/gb300
+# The GB300 corpus ships as a filtered LFS tarball (tests/supermicro_gb300_corpus.tar.gz,
+# built by tools/pack_corpus.py). Unpack its flat _redfish_v1_*.json into /corpus/gb300;
+# --strip-components=1 drops the tarball's top-level 172.25.230.37/ arc directory.
+COPY tests/supermicro_gb300_corpus.tar.gz /tmp/gb300_corpus.tar.gz
+RUN mkdir -p /corpus/gb300 \
+    && tar -xzf /tmp/gb300_corpus.tar.gz --strip-components=1 -C /corpus/gb300 \
+    && rm /tmp/gb300_corpus.tar.gz \
+    && chown -R mockbmc:mockbmc /corpus/gb300
 
 USER mockbmc
 

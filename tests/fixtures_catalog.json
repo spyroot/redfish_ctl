@@ -54,11 +54,12 @@
       "key": "supermicro-gb300-corpus",
       "vendor": "supermicro",
       "generation": "gb300",
-      "path": "tests/supermicro_gb300_corpus/json_responses",
-      "status": "active",
+      "path": "tests/supermicro_gb300_corpus.tar.gz",
+      "status": "pending",
       "redfish_version": "1.17.0",
       "oem_types": ["Supermicro", "Nvidia"],
-      "source": "Full committed GB300 crawl used by corpus-backed telemetry and controller tests."
+      "source": "Full committed GB300 crawl used by corpus-backed telemetry and controller tests.",
+      "reason": "Packed as a filtered Git-LFS tarball (tools/pack_corpus.py); extract on demand with tests/vendor_corpus.corpus_dir rather than resolving a live JSON directory."
     },
     {
       "key": "supermicro-x10",
