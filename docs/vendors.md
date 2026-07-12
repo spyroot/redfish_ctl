@@ -2,7 +2,7 @@
 
 Author: Mus <spyroot@gmail.com>
 
-I keep vendor facts in capability profiles so the Redfish core can stay product-neutral. Dell,
+Vendor facts live in capability profiles so the Redfish core can stay product-neutral. Dell,
 Supermicro, HPE, and generic Redfish now all have fixture-backed coverage, but they do not have the
 same control surface.
 

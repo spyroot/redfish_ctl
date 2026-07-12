@@ -112,7 +112,7 @@ mkdir -p .internal
 cat > .internal/redfish.env <<'EOF'
 REDFISH_IP=192.0.2.10
 REDFISH_USERNAME=root
-REDFISH_PASSWORD=replace-me
+REDFISH_PASSWORD=change-this-password
 REDFISH_PORT=443
 EOF
 ```

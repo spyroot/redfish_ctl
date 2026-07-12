@@ -9,7 +9,7 @@ TWINE ?= twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build docker-test docker-image k8s-sandbox clean
+.PHONY: help test lint typecheck build docker-test docker-image docs-voice-check k8s-sandbox clean
 
 help: ## Show available developer targets.
 	@awk 'BEGIN { \
@@ -42,6 +42,9 @@ docker-image: ## Build the production CLI image locally.
 		exit 2; \
 	}
 	$(DOCKER) build -f docker/Dockerfile -t $(IMAGE) .
+
+docs-voice-check: ## Reject first-person wording in public docs.
+	! grep -rnE '\b(I|me|my|mine|myself)\b' README.md docs/
 
 k8s-sandbox: ## Run the local Kubernetes read-path sandbox when present.
 	./k8s/sandbox/run-sandbox.sh
