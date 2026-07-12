@@ -25,7 +25,8 @@ attribute registry, and its value must be allowable there. This is enforced by
 committed registries:
 
 - `supermicro` → the GB300 corpus registry
-  (`tests/supermicro_gb300_corpus/.../_redfish_v1_Registries_BiosAttributeRegistry_BiosAttributeRegistry.json`).
+  (`_redfish_v1_Registries_BiosAttributeRegistry_BiosAttributeRegistry.json`, packed in
+  `tests/supermicro_gb300_corpus.tar.gz`).
 - `dell` → `tests/idrac_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios_BiosRegistry.json`.
 
 GB300 is a Grace-Blackwell (ARM) platform: its registry exposes knobs such as

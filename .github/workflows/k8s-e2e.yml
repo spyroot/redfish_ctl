@@ -42,6 +42,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The mock-BMC image bakes the GB300 corpus from the LFS-tracked
+          # tarball (tests/supermicro_gb300_corpus.tar.gz), so its object must
+          # be fetched before `make k8s-sandbox` builds the image.
+          lfs: true
       - name: Install kind and kubectl
         uses: helm/kind-action@v1
         with:

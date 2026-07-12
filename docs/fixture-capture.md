@@ -22,8 +22,9 @@ Pick the path that matches what you are contributing — the two are deliberatel
 
 `redfish_ctl` can capture its own test data. The `discovery` command does a deep crawl of a BMC and
 writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/` —
-exactly the layout the committed corpora use (`tests/supermicro_gb300_corpus/`,
-`tests/supermicro_x10_fixtures/`). To contribute coverage for a BMC this project has not seen:
+exactly the layout the committed corpora pack (the filtered `tests/supermicro_gb300_corpus.tar.gz`
+LFS tarball, or overlay sets like `tests/supermicro_x10_fixtures/`). To contribute coverage for a
+BMC this project has not seen:
 
 1. **Crawl an approved lab BMC** (read-only; never production, never someone else's hardware):
 

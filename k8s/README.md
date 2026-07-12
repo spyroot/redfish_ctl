@@ -152,9 +152,9 @@ SSH keys are the supported path today.
 
 ## Scenario (GB300 / NV72): know the silicon before the OS boots
 
-The captured GB300 tree in `tests/supermicro_gb300_corpus/` is a faithful
-mirror of a real NVL system, and every command below runs against it in the
-sandbox exactly as it runs against the real machine:
+The captured GB300 tree packed in `tests/supermicro_gb300_corpus.tar.gz` is a
+faithful mirror of a real NVL system, and every command below runs against it in
+the sandbox exactly as it runs against the real machine:
 
 ```bash
 redfish_ctl gpu-metrics        # per-GPU power/temperature/clocks/memory, out-of-band

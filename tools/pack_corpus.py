@@ -5,7 +5,8 @@ A raw BMC crawl is mostly generic definitions a device mock never needs: DMTF
 ``JsonSchemas``/``Schemas``, message ``Registries``, and timestamped log/event
 *entry* collections. This keeps every device resource (Systems / Chassis /
 Managers / Storage / Fabrics and vendor OEM) plus the TelemetryService metric
-definitions and reports, and drops the rest, then writes a ``.tar.gz`` (tracked
+definitions and reports and the BIOS attribute registry, and drops the rest,
+then writes a ``.tar.gz`` (tracked
 by Git LFS via the ``*.gz`` rule) so the repo carries one file per corpus instead
 of thousands of loose JSON files.
 
@@ -26,11 +27,14 @@ import tarfile
 from pathlib import Path
 
 # A flattened fixture name is dropped as junk when it matches any of these.
+# The BIOS attribute registry is device-specific data (it defines a box's real
+# BIOS knobs, unlike the generic DMTF message registries), so it is kept even
+# though it lives under /Registries/.
 _DROP = re.compile(
-    r"^_redfish_v1_JsonSchemas_"     # DMTF/vendor schema definitions
-    r"|^_redfish_v1_Schemas_"        # CSDL schema documents
-    r"|^_redfish_v1_Registries"      # message registries
-    r"|_Entries",                    # log/event entry collections + members
+    r"^_redfish_v1_JsonSchemas_"                           # DMTF/vendor schema definitions
+    r"|^_redfish_v1_Schemas_"                              # CSDL schema documents
+    r"|^_redfish_v1_Registries(?!_BiosAttributeRegistry)"  # message registries (keep BiosAttributeRegistry)
+    r"|_Entries",                                          # log/event entry collections + members
 )
 
 

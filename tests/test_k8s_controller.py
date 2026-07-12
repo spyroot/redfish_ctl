@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from vendor_corpus import corpus_dir
 
 from redfish_ctl.api import (
     FanReading,
@@ -22,12 +23,8 @@ from redfish_ctl.idrac_manager import IDracManager
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER_MODULE = REPO_ROOT / "k8s" / "controller" / "redfish_endpoint_controller.py"
 CRD_MANIFEST = REPO_ROOT / "k8s" / "controller" / "redfish-endpoint-crd.yaml"
-GB300_CORPUS = (
-    REPO_ROOT
-    / "tests"
-    / "supermicro_gb300_corpus"
-    / "json_responses"
-    / "172.25.230.37"
+GB300_CORPUS = corpus_dir(
+    REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
 GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
 

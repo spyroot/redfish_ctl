@@ -9,8 +9,9 @@ reinforcement-learning agent can train against. The three layers below build on 
 
 ## Layer 1: corpus as simulator (reads)
 
-A full `discovery` crawl of a real BMC is committed under `tests/supermicro_gb300_corpus/` (and
-smaller vendor sets). Every URL maps to one flat `_redfish_v1_..._.json` file. Offline tests replay
+A full `discovery` crawl of a real BMC is committed as the filtered Git-LFS tarball
+`tests/supermicro_gb300_corpus.tar.gz` (packed by `tools/pack_corpus.py`, with smaller vendor sets
+alongside it). Every URL maps to one flat `_redfish_v1_..._.json` file inside it. Offline tests replay
 this tree through `requests_mock`, and the sandbox mock BMC (`k8s/sandbox/mock_bmc_server.py`) serves
 it read-only over HTTP. A new read command needs a thin behavioral test, not a bespoke fixture —
 the captured tree is the simulator.
