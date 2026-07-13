@@ -5,7 +5,7 @@ Two kinds of corpus artifact exist in this project, and they are **separate**:
 | kind | purpose | producer | location | `artifact_type` |
 | --- | --- | --- | --- | --- |
 | **compact mock** | fast offline tests + the mock BMC | `tools/pack_corpus.py` (filters) | `tests/*_corpus.tar.gz` (public, LFS) | `compact_mock` |
-| **full training** | complete capture for training/analysis | `tools/pack_full_corpus.py` (no filter) | private / gitignored (see below) | `full_training` |
+| **full training** | complete capture for training/analysis | `tools/pack_full_corpus.py` (no filter) | `full_corpus/*.tar.gz` (committed, LFS) | `full_training` |
 
 A compact mock **must not** overwrite, replace, or be mistaken for a full training
 corpus. The mock may drop schemas/registries/log entries; the full corpus **may not**.
@@ -28,14 +28,15 @@ same-run `rest_api_map.npy`, and `corpus_manifest.json`.
 
 ## Redaction — credentials + usernames ONLY
 `pack_full_corpus.py` scrubs only credential/secret values (Password, SHA256Password,
-IPMIKey, MD5v3Key, community strings, tokens, private keys, …) and account **usernames**.
+IPMIKey, MD5v3Key, community strings, tokens, private keys, …) and account **usernames** —
+a leaked password hash / IPMI key / community string is a real secret even on lab gear.
 **Everything else is left original** — serials, MACs, IPs, hostnames, schemas, registries.
-Because it still carries internal identifiers, a full corpus is **INTERNAL/PRIVATE**:
 
-- **This repository is PUBLIC**, so full corpora are **NOT committed to `tests/`**. They
-  are written under a gitignored location (`full_corpus/`) or a private store. Only the
-  sanitized compact mock is public. A public full corpus would require further
-  sanitization of IPs/serials/hostnames (a separate `redaction_status`).
+The captured hosts are **ephemeral lab gear** (destroyed within weeks), so their IPs, MACs,
+hostnames, and serials are **not secret**. The full corpus is therefore **committed
+publicly** in Git-LFS under `full_corpus/` — a **separate** structure from the compact mock
+in `tests/` — with only credentials and usernames redacted; everything else is published as
+captured.
 
 ## `rest_api_map.npy` contract
 Loads with `np.load(path, allow_pickle=True).item()` and has exactly two required
