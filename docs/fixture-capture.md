@@ -178,6 +178,21 @@ secret_pattern="${secret_pattern}|[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}"
 rg -n "$secret_pattern" /tmp/fixture-candidates
 ```
 
+A bare `Password`-is-null check is **not** enough: vendor OEM attribute maps store
+credentials under dotted attribute keys the generic pattern misses. On Dell the
+`DellAttributes` file (`_redfish_v1_Managers_*_Oem_Dell_DellAttributes_*.json`)
+carries live `Users.<n>.SHA256Password`, `Users.<n>.SHA256PasswordSalt`,
+`Users.<n>.IPMIKey`, `Users.<n>.MD5v3Key`, and SNMP `IPMILan.1.CommunityName` /
+`SNMP.1.AgentCommunity` values. `tools/redact_corpus.py` catches these by matching
+the last dotted segment against its credential-suffix set, and
+`tests/test_corpus_no_secrets.py` fails the build if any committed corpus still
+carries a non-empty credential value — run both before adding a capture:
+
+```bash
+rg -n 'SHA256Password|SHA256PasswordSalt|IPMIKey|MD5v3Key|CommunityName|AgentCommunity' \
+  /tmp/fixture-candidates
+```
+
 This scan is only a guardrail. Read the files yourself before committing them.
 
 ### Validate
