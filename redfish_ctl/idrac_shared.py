@@ -108,6 +108,7 @@ class ApiRequestType(Enum):
     Logs = auto()
     EthernetInterfaces = auto()
     SecureBoot = auto()
+    CertificatesQuery = auto()
     FirmwareUpdate = auto()
     Triggers = auto()
     NetworkPorts = auto()
