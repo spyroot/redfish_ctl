@@ -306,6 +306,7 @@ First-run problems are almost always the connection, not the command:
 - [Telemetry Exporter](docs/telemetry-exporter.md) - the `hw.*` metric exporter and deployment model.
 - [Simulation and replay](docs/simulation-and-replay.md) - the hardware-free mock and mutation replay.
 - [Testing](docs/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
+- [Corpus library](docs/corpus-library.md) - manifest-indexed Redfish corpus tarballs and pull-all extraction.
 - [Docker](docker/README.md) - production image and Linux offline-test image usage.
 - [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
 - [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
