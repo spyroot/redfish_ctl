@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before deeper inventory or any staged change.
 
-The table below follows the 116 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the 122 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -101,6 +101,7 @@ Safety labels:
 | `boot-sources` | List boot source members. | Read |
 | `boot-state` | Infer what the host will boot (target/order/media). | Read |
 | `capability-report` | Export registered vendor capability profiles for IaC and inventory tooling. | Read |
+| `certificates` | Read CertificateService and linked certificate inventory metadata without certificate bodies. | Read |
 | `change-boot-order` | Change boot order and boot options. | Write |
 | `chassis` | Read chassis services. | Read |
 | `chassis-reset` | Change chassis power state. | Write |
