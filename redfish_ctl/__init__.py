@@ -67,6 +67,7 @@ from .virtual_media.cmd_smc_virtual_media import *
 from .cmd_current_boot import *
 
 from .cmd_query import *
+from .cmd_get import *
 from .cmd_wait import *
 
 # storage

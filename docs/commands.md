@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before deeper inventory or any staged change.
 
-The table below follows the 122 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the 124 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -53,11 +53,14 @@ redfish_ctl logs
 redfish_ctl accounts --usernames
 redfish_ctl storage-list
 redfish_ctl get_vm
+redfish_ctl get /redfish/v1/Managers
 ```
 
 `system` returns the host ComputerSystem. `manager` returns the BMC manager. `sensors`, defined in
 `redfish_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns readings with units.
 `logs`, defined in `redfish_ctl/logs/cmd_logs.py`, follows system and manager LogService entries.
+`get`, defined in `redfish_ctl/cmd_get.py`, reads any Redfish resource URI when a dedicated command
+does not exist yet.
 
 ## Registered Commands
 
@@ -122,6 +125,7 @@ Safety labels:
 | `firmware-update` | Run UpdateService SimpleUpdate or a discovered push upload URI; `--dry_run` previews, `--confirm` writes. | Guarded |
 | `firmware_inventory` | Read firmware inventory. | Read |
 | `fleet` | Read a YAML fleet inventory and summarize per-node health, sensor count, and temperature max. | Read |
+| `get` | Read an arbitrary Redfish resource URI. | Read |
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
 | `insert_vm` | Insert virtual media from a URI. | Write |

@@ -68,7 +68,7 @@ enumeration is task X10-ENUM.
 
 ## Engine gaps to IMPLEMENT (prerequisites — one PR each, mutating = Claude-gated)
 1. **generalize `insert_vm`/`eject_vm`** — discover Manager id (kills the `iDRAC.Embedded.1` 404).
-2. **`redfish_ctl get <uri>` / `raw`** — generic read so no script ever needs curl.
+2. **`redfish_ctl get <uri>` / `raw`** — generic read so no script ever needs curl. ✅
 3. **`identify-led`** — PATCH LocationIndicatorActive/IndicatorLED on Chassis/System.
 4. **`ntp-set --clear`** — restore an empty NTP list.
 5. **`subscription-create` / `subscription-delete`** — EventDestination lifecycle.
