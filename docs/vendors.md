@@ -12,20 +12,18 @@ same control surface.
 coverage. The common ids are `System.Embedded.1` and `iDRAC.Embedded.1`. Dell remains the primary
 control target.
 
-**Supermicro GB300.** Proof lives in `tests/supermicro_fixtures/`, captured from a read-only GB300
-Redfish 1.17 crawl. The important ids are `System_0`, `HGX_Baseboard_0`, `BMC_0`, and `HGX_BMC_0`.
-Read/query and telemetry are validated; job scheduling stays conservative.
+**Supermicro GB300.** Proof lives in `tests/supermicro_fixtures/` and the full-device corpus indexed
+in [Redfish Corpus Library](corpus-library.md). The important ids are `System_0`, `HGX_Baseboard_0`,
+`BMC_0`, and `HGX_BMC_0`. Read/query and telemetry are validated; job scheduling stays conservative.
 
-**Supermicro X10 (early Redfish).** Validated live only — no committed fixture — so treat "Supermicro"
-as a range, not one target. An X10SDV-TLN4F (Xeon-D, ASPEED AST2400, BMC 3.88, **Redfish 1.0.1**)
-returns `403` on its Redfish service root and everything under it until the **SFT-DCMS** license is
-activated (the raw hex key goes in the BMC web-UI license field, not the Redfish
-`LicenseManager.ActivateLicense` action). Once licensed, `system`, `console-info`, `chassis`, and
-`manager-time` work over Redfish, but this early 1.0.1 firmware is thin: `boot-state` returns empty
-boot data and `UpdateService`/`FirmwareInventory` are a `403`/`404` stub, so there is no Redfish
-firmware update. Flashing this board BMC 3.88 -> 4.00 (verified live) did **not** change that: it
-stayed `RedfishVersion 1.0.1` with `UpdateService` still `403` and `FirmwareInventory` still `404`, so
-the X10SDV has no Redfish update path on any BMC firmware — use the BMC web UI or Supermicro SUM. The
+**Supermicro X10 (early Redfish).** Proof lives in `tests/supermicro_x10_fixtures/` and
+`tests/supermicro_x10_corpus.tar.gz`, a curated read set indexed in
+[Redfish Corpus Library](corpus-library.md). Treat Supermicro as a range, not one target: the
+X10SDV-TLN4F fixture overlay reports **Redfish 1.0.1**, while the corpus tarball uses a synthesized
+ServiceRoot so replay can start from `/redfish/v1`. The captured X10 surface is read-oriented and
+thin: `system`, `console-info`, `chassis`, and
+`manager-time` work, but `UpdateService`, `FirmwareInventory`, `Bios`, and standard VirtualMedia are
+absent or stubbed. Use the BMC web UI or Supermicro SUM for firmware updates on this generation; the
 fuller `UpdateService`/`FirmwareInventory` in Supermicro's *Redfish Reference Guide 2.0a* applies to
 newer platforms (X11/X12/H12+), not the X10.
 
@@ -86,12 +84,16 @@ Start small and prove the read path first:
 
 1. Add `redfish_ctl/vendors/<name>/capabilities.py` with only facts you have verified.
 2. Add a fixture overlay under `tests/<vendor>_fixtures/`; include upstream license files when the
-   corpus requires them.
+   corpus requires them. For a captured physical box, also pack the sanitized tree with
+   `tools/pack_corpus.py` and add a row to `tests/corpus/manifest.json`, the corpus index used by
+   `tools/corpus.py`.
 3. Use `redfish_mock_factory("<vendor>")`, defined in `tests/conftest.py`, so tests exercise the same
    request path as the CLI.
 4. Cover ServiceRoot classification, host/manager id discovery, sensors, inventory, network, logs, or
    telemetry before adding vendor-specific writes.
-5. Add a live or emulator canary only when it is read-only or explicitly guarded.
+5. Run `python tools/corpus.py verify` and `pytest -q tests/test_corpus_manifest.py` when you add a
+   corpus tarball.
+6. Add a live or emulator canary only when it is read-only or explicitly guarded.
 
 The first useful vendor does not need command parity with Dell. It needs honest capability flags,
 fixtures, and proof that standard Redfish reads work.
