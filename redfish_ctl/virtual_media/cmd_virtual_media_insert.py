@@ -77,24 +77,17 @@ import warnings
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_exceptions import InvalidJsonSpec
-from ..cmd_utils import from_json_spec
-from ..idrac_shared import IdracApiRespond
-from ..redfish_shared import RedfishJson
-from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
-from ..cmd_utils import save_if_needed
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..command_shared import (
+    ApiRequestType,
+    RedfishCommandRespond,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
 
 
-
-class VirtualMediaInsert(IDracManager,
+class VirtualMediaInsert(CommandBase,
                          scm_type=ApiRequestType.VirtualMediaInsert,
                          name='virtual_disk_insert',
                          metaclass=Singleton):
@@ -226,7 +219,7 @@ class VirtualMediaInsert(IDracManager,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

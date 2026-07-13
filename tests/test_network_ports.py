@@ -3,7 +3,7 @@
 Walks Chassis -> NetworkAdapters -> Ports and returns per-port link state. Verified
 on the GB300 and HPE iLO corpora; this is the per-port view network-adapters omits.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 
 def test_network_ports_supermicro(redfish_mock_factory):

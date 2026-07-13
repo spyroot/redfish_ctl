@@ -4,7 +4,7 @@ A real read-only discovery capture from a home-lab X10SDV (BMC 4.00, Redfish
 1.0.1) committed as a test corpus — the "thin firmware" counterpart to the fuller
 GB300 supermicro_fixtures. Served via redfish_mock_factory("supermicro_x10").
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 
 def test_x10_serviceroot_is_redfish_101(redfish_mock_factory):

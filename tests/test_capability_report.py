@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.vendors import capability_report, get_vendor
 
@@ -74,9 +74,9 @@ def test_capability_report_cli_runs_without_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
     ):
         env.pop(name, None)
 

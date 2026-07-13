@@ -4,9 +4,9 @@ import re
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -27,7 +27,7 @@ def _normalize_profile_mask(profile_mask: str) -> str:
     return f"0x{value:x}"
 
 
-class WorkloadPower(IDracManager,
+class WorkloadPower(CommandBase,
                     scm_type=ApiRequestType.WorkloadPower,
                     name="workload-power",
                     metaclass=Singleton):

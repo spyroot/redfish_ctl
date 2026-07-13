@@ -11,11 +11,11 @@ directory named after the placeholder IP.
 Usage::
 
     python tools/redact_corpus.py ~/.json_responses/10.20.30.40 \
-        --out tests/supermicro_new_corpus/json_responses
+        --out build/corpus-staging/supermicro_new/json_responses
 
     # explicit source IP(s) and a custom placeholder:
     python tools/redact_corpus.py /path/to/crawl \
-        --out tests/acme_corpus/json_responses \
+        --out build/corpus-staging/acme/json_responses \
         --source-ip 10.20.30.40 --source-ip 10.20.30.41 \
         --placeholder-ip 203.0.113.10
 
@@ -30,6 +30,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+import numpy as np
 
 # RFC 5737 TEST-NET-3 — a documentation address that identifies no real hardware.
 DEFAULT_PLACEHOLDER_IP = "203.0.113.10"
@@ -66,6 +68,7 @@ class Counts:
         self.key_redactions = 0
         self.ip_replacements = 0
         self.mac_scrubs = 0
+        self.map_entries = 0
 
 
 def _redact_string(s: str, source_ips: list[str], placeholder_ip: str, counts: Counts) -> str:
@@ -116,6 +119,47 @@ def _infer_source_ip(input_dir: Path) -> list[str]:
     return [name] if _IPV4_RE.match(name) else []
 
 
+def _relative_response_path(raw_path: object, input_dir: Path) -> str:
+    """Return a response-file path relative to ``input_dir``."""
+    text = str(raw_path)
+    path = Path(text)
+    try:
+        return path.relative_to(input_dir).as_posix()
+    except ValueError:
+        pass
+    parts = path.parts
+    if input_dir.name in parts:
+        index = parts.index(input_dir.name)
+        if index + 1 < len(parts):
+            return Path(*parts[index + 1:]).as_posix()
+    return path.name
+
+
+def _write_rest_api_maps(input_dir: Path, dest: Path, counts: Counts) -> None:
+    """Write portable JSON and legacy NPY rest_api maps with relative file paths."""
+    map_path = input_dir / "rest_api_map.npy"
+    if not map_path.is_file():
+        return
+    raw_map = np.load(map_path, allow_pickle=True).item()
+    url_file_mapping = raw_map.get("url_file_mapping")
+    allowed_methods_mapping = raw_map.get("allowed_methods_mapping")
+    if not isinstance(url_file_mapping, dict) or not isinstance(allowed_methods_mapping, dict):
+        raise ValueError(f"{map_path} must contain url_file_mapping and allowed_methods_mapping")
+    portable = {
+        "url_file_mapping": {},
+        "allowed_methods_mapping": dict(allowed_methods_mapping),
+    }
+    for url, response_path in sorted(url_file_mapping.items()):
+        rel = _relative_response_path(response_path, input_dir)
+        if not (dest / rel).is_file():
+            raise ValueError(f"rest_api_map points at missing redacted response: {rel}")
+        portable["url_file_mapping"][url] = rel
+    counts.map_entries = len(portable["url_file_mapping"])
+    (dest / "rest_api_map.v1.json").write_text(
+        json.dumps(portable, indent=2, sort_keys=True) + "\n")
+    np.save(dest / "rest_api_map.npy", portable)
+
+
 def process_tree(input_dir: Path, out_root: Path, source_ips: list[str],
                  placeholder_ip: str) -> Counts:
     """Redact every *.json under ``input_dir`` into ``out_root/<placeholder_ip>/``."""
@@ -130,11 +174,7 @@ def process_tree(input_dir: Path, out_root: Path, source_ips: list[str],
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(cleaned, indent=4))
         counts.files += 1
-    # .npy rest-api maps embed the source path/IP and cannot be redacted here.
-    npy = list(input_dir.rglob("*.npy"))
-    if npy:
-        print(f"warning: {len(npy)} .npy file(s) skipped — regenerate them from the "
-              f"redacted tree or leave them out of the corpus", file=sys.stderr)
+    _write_rest_api_maps(input_dir, dest, counts)
     return counts
 
 
@@ -161,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  key redactions: {counts.key_redactions}")
     print(f"  ip replacements: {counts.ip_replacements}")
     print(f"  mac scrubs: {counts.mac_scrubs}")
+    print(f"  rest_api_map entries: {counts.map_entries}")
     print("Now read the output and run the secret scan in docs/fixture-capture.md "
           "before committing.")
     return 0

@@ -7,6 +7,8 @@ directory pass including the <ip> rename.
 """
 import json
 
+import numpy as np
+
 from tools.redact_corpus import (
     DEFAULT_PLACEHOLDER_IP,
     SENSITIVE_KEYS,
@@ -97,3 +99,36 @@ def test_process_tree_writes_placeholder_dir_and_scrubs(tmp_path):
     assert counts.files == 1
     # The original management IP must not survive anywhere in the output.
     assert "10.20.30.40" not in written.read_text()
+
+
+def test_process_tree_preserves_portable_and_legacy_rest_api_maps(tmp_path):
+    """rest_api maps keep methods and rewrite response files relative to the capture."""
+    src_dir = tmp_path / "10.20.30.40"
+    src_dir.mkdir()
+    (src_dir / "_redfish_v1.json").write_text(json.dumps({
+        "@odata.id": "/redfish/v1",
+        "Id": "RootService",
+    }))
+    np.save(
+        src_dir / "rest_api_map.npy",
+        {
+            "url_file_mapping": {
+                "/redfish/v1": str(src_dir / "_redfish_v1.json"),
+            },
+            "allowed_methods_mapping": {
+                "/redfish/v1": ["GET", "HEAD"],
+            },
+        },
+    )
+    out_root = tmp_path / "out"
+
+    process_tree(src_dir, out_root, ["10.20.30.40"], DEFAULT_PLACEHOLDER_IP)
+
+    dest = out_root / DEFAULT_PLACEHOLDER_IP
+    portable = json.loads((dest / "rest_api_map.v1.json").read_text())
+    legacy = np.load(dest / "rest_api_map.npy", allow_pickle=True).item()
+
+    assert set(portable) == {"url_file_mapping", "allowed_methods_mapping"}
+    assert portable["url_file_mapping"] == {"/redfish/v1": "_redfish_v1.json"}
+    assert portable["allowed_methods_mapping"] == {"/redfish/v1": ["GET", "HEAD"]}
+    assert legacy == portable

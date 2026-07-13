@@ -14,8 +14,8 @@ from typing import Optional
 
 import requests
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_exceptions import RedfishForbidden
 from ..redfish_manager import CommandResult
 from ..redfish_shared import env_first
@@ -37,7 +37,7 @@ DEFAULT_DISCOVERY_MAX_DEPTH = 32
 LOG_ENTRY_MEMBER_RE = re.compile(r"/LogServices/[^/]+/Entries/.+")
 
 
-class Discovery(IDracManager,
+class Discovery(CommandBase,
                 scm_type=ApiRequestType.Discovery,
                 name='discovery',
                 metaclass=Singleton):
@@ -173,18 +173,18 @@ class Discovery(IDracManager,
         Tunable via env: ``REDFISH_DISCOVERY_RETRIES`` (default 4),
         ``REDFISH_DISCOVERY_BACKOFF`` seconds (default 2.0, exponential), and
         ``REDFISH_DISCOVERY_PACE_MS`` (default 0) to throttle the request rate and
-        be gentle on a fragile BMC (legacy ``IDRAC_DISCOVERY_*`` still honored).
+        be gentle on a fragile BMC.
 
         :param resource_path: canonical Redfish resource path to fetch.
         :return: the ``base_query`` CommandResult.
         :raises: the last transport exception if all attempts fail.
         """
         attempts = max(1, int(env_first(
-            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
+            "REDFISH_DISCOVERY_RETRIES", "REDFISH_DISCOVERY_RETRIES", default="4")))
         backoff = float(env_first(
-            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
+            "REDFISH_DISCOVERY_BACKOFF", "REDFISH_DISCOVERY_BACKOFF", default="2.0"))
         pace = float(env_first(
-            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+            "REDFISH_DISCOVERY_PACE_MS", "REDFISH_DISCOVERY_PACE_MS", default="0")) / 1000.0
         last_exc = None
         for attempt in range(attempts):
             try:

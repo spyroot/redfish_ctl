@@ -9,14 +9,14 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from .idrac_manager import IDracManager
-from .idrac_shared import Singleton, ApiRequestType
+from .base_manager import CommandBase
+from .command_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
 class QueryIDRAC(
-    IDracManager,
-    scm_type=ApiRequestType.QueryIdrac,
+    CommandBase,
+    scm_type=ApiRequestType.QueryRedfish,
     name='query_idrac',
     metaclass=Singleton):
     """A command query iDRAC resource based on a resource path.

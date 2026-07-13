@@ -43,10 +43,6 @@ What it does across the whole server lifecycle:
   events, the BMC clock, and a `wait` that blocks until the BMC answers after a reboot.
 - **Discovery** — scan a subnet for BMCs, classify their vendor, and crawl a Redfish tree.
 
-> The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
-> backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
-> `IDRAC_IP`/`IDRAC_USERNAME`/`IDRAC_PASSWORD`/`IDRAC_PORT` env vars all keep working.
-
 Author: Mus <spyroot@gmail.com>
 
 ## Quick start
@@ -71,10 +67,6 @@ redfish_ctl --help             # every subcommand
 Reads are safe. Commands that change hardware (power, BIOS, boot, storage, virtual media, firmware)
 follow a read-first, guarded-write model — they preview with `--dry_run` and only act with
 `--confirm`. See [Mutating Commands](#mutating-commands) below.
-
-> **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
-> and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
-> `idrac_ctl` PyPI package (≤ 1.0.13) is the pre-rename tool; new work should `pip install redfish_ctl`.
 
 ## Install
 
@@ -182,9 +174,8 @@ export REDFISH_PASSWORD='your-password'
 export REDFISH_PORT=443
 ```
 
-Any of these can be overridden per-invocation by a CLI flag. The flags keep their legacy names —
-`--idrac_ip`, `--idrac_username`, `--idrac_password`, `--idrac_port` — so existing scripts don't
-break; the `REDFISH_*` env vars above are the preferred way to configure the connection.
+Any of these can be overridden per-invocation by `--redfish_ip`,
+`--redfish_username`, `--redfish_password`, and `--redfish_port`.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.
@@ -298,6 +289,7 @@ First-run problems are almost always the connection, not the command:
 ## More Docs
 
 - [Command reference](docs/commands.md) - registered subcommands and safe workflow patterns.
+- [Redfish corpora](docs/corpus-library.md) - pull, verify, and materialize mock and dataset corpus artifacts.
 - [Examples](examples/README.md) - one-line index of every script under `examples/`.
 - [BIOS profiles](docs/bios-profiles.md) - low-latency, Dell System Profile, custom, Intel, and AMD
   profile examples.

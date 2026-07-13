@@ -10,17 +10,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
 
 
-class BootOptionsClearPending(IDracManager,
+class BootOptionsClearPending(CommandBase,
                               scm_type=ApiRequestType.BootOptionsClearPending,
                               name='clear_pending',
                               metaclass=Singleton):
@@ -72,7 +67,7 @@ class BootOptionsClearPending(IDracManager,
             do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

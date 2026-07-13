@@ -2,9 +2,9 @@
  read only , none read only , subset etc
 
  Before you run unit test.
-IDRAC_IP=IP
-IDRAC_PASSWORD=PASS
-IDRAC_USERNAME=root
+REDFISH_IP=IP
+REDFISH_PASSWORD=PASS
+REDFISH_USERNAME=root
 # set PYTHONWARNINGS as well, so it will not output warning about insecure.
 PYTHONWARNINGS=ignore:Unverified HTTPS request
 
@@ -20,37 +20,37 @@ from unittest import TestCase
 import pytest
 
 import redfish_ctl
-from redfish_ctl.idrac_manager import CommandResult, IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase, CommandResult
+from redfish_ctl.command_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
 
 
 # Integration tests: require a reachable iDRAC.
-# Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
+# Skipped automatically unless REDFISH_IP is set (see tests/conftest.py).
 pytestmark = pytest.mark.live
 
 class TestBiosRegistry(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> IDracManager:
-        redfish_api = IDracManager(
-            idrac_ip=os.environ.get('IDRAC_IP', ''),
-            idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
-            idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
+    def setUpClass(cls) -> CommandBase:
+        redfish_api = CommandBase(
+            idrac_ip=os.environ.get('REDFISH_IP', ''),
+            idrac_username=os.environ.get('REDFISH_USERNAME', 'root'),
+            idrac_password=os.environ.get('REDFISH_PASSWORD', ''),
             insecure=True,
             is_debug=False)
         return redfish_api
 
     def setUp(self) -> None:
         self.assertTrue(
-            len(os.environ.get('IDRAC_IP', '')) > 0, "IDRAC_IP is none")
+            len(os.environ.get('REDFISH_IP', '')) > 0, "REDFISH_IP is none")
         self.assertTrue(
-            len(os.environ.get('IDRAC_USERNAME', '')) > 0, "IDRAC_USERNAME is none")
+            len(os.environ.get('REDFISH_USERNAME', '')) > 0, "REDFISH_USERNAME is none")
         self.assertTrue(
-            len(os.environ.get('IDRAC_PASSWORD', '')) > 0, "IDRAC_PASSWORD is none")
+            len(os.environ.get('REDFISH_PASSWORD', '')) > 0, "REDFISH_PASSWORD is none")
 
     def test_basic_bios_registry_query(self):
         """test basic query
@@ -89,7 +89,7 @@ class TestBiosRegistry(TestCase):
         self.assertTrue(generated_file.exists(),
                         "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec("/tmp/bios_registry.json")
+        json_file = redfish_ctl.from_json_spec("/tmp/bios_registry.json")
         try:
             _ = json.dumps(json_file, sort_keys=True)
         except JSONDecodeError as _:
@@ -119,7 +119,7 @@ class TestBiosRegistry(TestCase):
         self.assertTrue(
             generated_file.exists(), "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec(
+        json_file = redfish_ctl.from_json_spec(
             filename)
         try:
             _ = json.dumps(json_file, sort_keys=True)

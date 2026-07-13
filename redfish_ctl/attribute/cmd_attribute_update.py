@@ -13,16 +13,15 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
 class AttributesUpdate(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.AttributesUpdate,
     name='attribute_update',
     metaclass=Singleton):
@@ -90,7 +89,7 @@ class AttributesUpdate(
             do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

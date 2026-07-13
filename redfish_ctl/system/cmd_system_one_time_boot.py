@@ -14,14 +14,14 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument, PostRequestFailed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
 class ImportOneTimeBoot(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.ImportOneTimeBoot,
     name='import_sysconfig',
     metaclass=Singleton):

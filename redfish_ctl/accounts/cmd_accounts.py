@@ -7,15 +7,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IDRAC_JSON
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishData, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
-class QueryAccounts(IDracManager,
+class QueryAccounts(CommandBase,
                     scm_type=ApiRequestType.QueryAccounts,
                     name='query_accounts',
                     metaclass=Singleton):
@@ -63,7 +61,7 @@ class QueryAccounts(IDracManager,
         if is_username_only or do_expanded:
             is_expanded = True
 
-        cmd_result = self.base_query(IDRAC_API.Accounts,
+        cmd_result = self.base_query(RedfishEndpoint.Accounts,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=is_expanded)
@@ -73,11 +71,11 @@ class QueryAccounts(IDracManager,
             members = accounts_data[RedfishJson.Members]
             usernames = [
                 {
-                    IDRAC_JSON.Username: m[IDRAC_JSON.Username],
-                    IDRAC_JSON.AccountId: m[IDRAC_JSON.AccountId]
+                    RedfishData.Username: m[RedfishData.Username],
+                    RedfishData.AccountId: m[RedfishData.AccountId]
                 }
                 for m in members
-                if isinstance(m, dict) and IDRAC_JSON.Username in m and len(m[IDRAC_JSON.Username]) > 0]
+                if isinstance(m, dict) and RedfishData.Username in m and len(m[RedfishData.Username]) > 0]
 
             cmd_result = CommandResult(usernames, None, None, None)
 

@@ -1,4 +1,4 @@
-"""Offline unit tests for the pure helpers in idrac_ctl.cmd_utils.
+"""Offline unit tests for the pure helpers in redfish_ctl.cmd_utils.
 
 Author Mus spyroot@gmail.com
 """

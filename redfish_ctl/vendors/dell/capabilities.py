@@ -2,7 +2,7 @@
 
 Encodes facts from the Dell iDRAC Redfish API docs (query parameters, recurring
 JobService scheduling, lifecycle events). Dell-specific command modules migrate
-into this package incrementally (today they live in ``redfish_ctl/idrac_manager.py``
+into this package incrementally (today they live in ``redfish_ctl/base_manager.py``
 and ``redfish_ctl/delloem/``); this profile lets commands gate Dell-only behavior.
 
 Author Mus spyroot@gmail.com
@@ -21,15 +21,15 @@ DELL_SCHEDULABLE_URIS = (
 )
 
 DELL_SERVICE_ROOT_EVIDENCE = (
-    "tests/idrac_fixtures/_redfish_v1.json: "
+    "tests/dell_fixtures/_redfish_v1.json: "
     "Dell ServiceRoot fixture for query-gated reads"
 )
 DELL_JOB_SERVICE_EVIDENCE = (
-    "tests/idrac_fixtures/_redfish_v1_Managers_iDRAC.Embedded.1_"
+    "tests/dell_fixtures/_redfish_v1_Managers_iDRAC.Embedded.1_"
     "Oem_Dell_DellJobService.json: Dell OEM job service fixture"
 )
 DELL_EVENT_SERVICE_EVIDENCE = (
-    "tests/idrac_fixtures/_redfish_v1_EventService.json: "
+    "tests/dell_fixtures/_redfish_v1_EventService.json: "
     "Dell EventService fixture"
 )
 DELL_EVIDENCE = {

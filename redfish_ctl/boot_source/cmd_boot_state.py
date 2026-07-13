@@ -17,12 +17,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootState(IDracManager,
+class BootState(CommandBase,
                 scm_type=ApiRequestType.BootState,
                 name='boot-state',
                 metaclass=Singleton):

@@ -17,8 +17,8 @@ from typing import Optional
 
 import requests
 
-from .idrac_manager import IDracManager
-from .idrac_shared import ApiRequestType, Singleton
+from .base_manager import CommandBase
+from .command_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
@@ -110,7 +110,7 @@ def wait_reachable(url: str, auth, verify: bool,
     return out
 
 
-class WaitReady(IDracManager,
+class WaitReady(CommandBase,
                 scm_type=ApiRequestType.WaitReady,
                 name='wait',
                 metaclass=Singleton):

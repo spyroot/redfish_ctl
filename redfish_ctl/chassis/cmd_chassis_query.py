@@ -7,17 +7,17 @@ Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
 from typing import Optional
-from ..idrac_shared import IDRAC_API
+
+from ..base_manager import CommandBase
+from ..command_shared import (
+    ApiRequestType,
+    RedfishEndpoint,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
-from ..cmd_exceptions import FailedDiscoverAction
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_exceptions import UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
-from ..idrac_shared import IDRAC_JSON
 
 
-class ChassisQuery(IDracManager,
+class ChassisQuery(CommandBase,
                    scm_type=ApiRequestType.ChassisQuery,
                    name='chassis_service_query',
                    metaclass=Singleton):
@@ -69,7 +69,7 @@ class ChassisQuery(IDracManager,
         if data_filter:
             do_expanded = True
 
-        cmd_result = self.base_query(IDRAC_API.Chassis,
+        cmd_result = self.base_query(RedfishEndpoint.Chassis,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=do_expanded)

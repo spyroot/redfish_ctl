@@ -1,11 +1,11 @@
-"""Unit tests for idrac_ctl.redfish_query.RedfishQuery (offline).
+"""Unit tests for redfish_ctl.redfish_query.RedfishQuery (offline).
 
 Author Mus spyroot@gmail.com
 """
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_main import (
     _redfish_query_from_args,
     _validate_redfish_query_for_vendor,
@@ -161,7 +161,7 @@ def test_get_with_query_enforces_one_param(redfish_mock):
 def test_invoke_attaches_global_query_to_base_query(redfish_mock, redfish_service):
     """Dispatch stores global query flags so base_query appends them to GETs."""
     result = redfish_mock.sync_invoke(
-        ApiRequestType.QueryIdrac,
+        ApiRequestType.QueryRedfish,
         "query_idrac",
         resource="/redfish/v1/Managers",
         redfish_query=RedfishQuery(top=1),

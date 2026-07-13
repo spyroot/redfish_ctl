@@ -106,7 +106,7 @@ ISO_DURATION = re.compile(
     r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
     r")?$"
 )
-SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
+SECRET_ARG_NAMES = {"--redfish_password", "--redfish-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
 # datapoint endpoint (…/v2/datapoint), never a bare host.
@@ -155,18 +155,16 @@ def build_identity_dimensions(
     }
 
 
-# Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
-# the legacy IDRAC_* keys still work as a fallback during the rename.
+# Credential-file keys the exporter honors.
 _EXPORTER_CRED_KEYS = frozenset({
     "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
-    "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
 })
 
 
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
-    Accepts REDFISH_IP/USERNAME/PASSWORD/PORT and the legacy IDRAC_* names.
+    Accepts REDFISH_IP/USERNAME/PASSWORD/PORT.
     """
     values = {}
     for raw_line in Path(path).read_text().splitlines():
@@ -195,21 +193,17 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
     """Apply exporter credential-file values to an argparse namespace in place."""
     file_path = path or getattr(args, "exporter_credential_file", None)
     file_path = (file_path
-                 or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE")
-                 or os.environ.get("IDRAC_EXPORTER_CREDENTIAL_FILE"))
+                 or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE"))
     if not file_path:
         return
     values = load_exporter_env_file(file_path)
-    # (namespace attr, REDFISH_* key, legacy IDRAC_* key). REDFISH_* wins when both
-    # are present in the file; IDRAC_* is the fallback.
     mapping = (
-        ("idrac_ip", "REDFISH_IP", "IDRAC_IP"),
-        ("idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
-        ("idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
-        ("idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
+        ("idrac_ip", "REDFISH_IP"),
+        ("idrac_username", "REDFISH_USERNAME"),
+        ("idrac_password", "REDFISH_PASSWORD"),
+        ("idrac_port", "REDFISH_PORT"),
     )
-    for attr, redfish_key, idrac_key in mapping:
-        key = redfish_key if redfish_key in values else idrac_key
+    for attr, key in mapping:
         if key not in values:
             continue
         is_password = attr == "idrac_password"

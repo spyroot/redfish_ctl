@@ -8,13 +8,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
 class VolumeQuery(
-    IDracManager, scm_type=ApiRequestType.VolumeQuery,
+    CommandBase, scm_type=ApiRequestType.VolumeQuery,
     name='vol_query',
     metaclass=Singleton):
     """A command query job_service_query.

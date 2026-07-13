@@ -14,7 +14,6 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /src
 
 COPY pyproject.toml setup.py requirements.txt README.md LICENSE ./
-COPY idrac_ctl ./idrac_ctl
 COPY redfish_ctl ./redfish_ctl
 
 RUN python -m pip install --upgrade pip \

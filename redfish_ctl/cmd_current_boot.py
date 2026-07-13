@@ -15,12 +15,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from .idrac_manager import IDracManager
-from .idrac_shared import Singleton, ApiRequestType
+from .base_manager import CommandBase
+from .command_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
-class GetCurrentBoot(IDracManager,
+class GetCurrentBoot(CommandBase,
                      scm_type=ApiRequestType.CurrentBoot,
                      name='current_boot_query',
                      metaclass=Singleton):

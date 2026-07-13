@@ -8,19 +8,16 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_shared import RedfishJson
-from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import (
+    ApiRequestType,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
+from ..redfish_shared import RedfishJson
 
 
-class BootSourcePending(IDracManager,
+class BootSourcePending(CommandBase,
                         scm_type=ApiRequestType.BootSourcePending,
                         name='query_pending',
                         metaclass=Singleton):

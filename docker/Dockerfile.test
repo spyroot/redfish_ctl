@@ -25,7 +25,7 @@ COPY . /app
 # Install the package with its dev/test extras (pytest, ruff, requests-mock, ...).
 RUN pip install --no-cache-dir -e ".[dev]" pytest-cov
 
-# Default: the offline suite (live tests auto-skip with no IDRAC_IP).
+# Default: the offline suite (live tests auto-skip with no REDFISH_IP).
 CMD ["pytest", "-q"]
 
 # Manual equivalent of run-tests.sh:

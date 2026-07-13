@@ -12,7 +12,7 @@ it counts how many TCP connections the client actually opens and *wedges* (drops
 new connections) once a small budget is exceeded — exactly what the real BMC did.
 A many-request "crawl" must then complete fully **without** tripping the wedge,
 which is only possible if the client reuses connections. No external network, no
-iDRAC, no IDRAC_IP required.
+iDRAC, no REDFISH_IP required.
 
 Author Mus spyroot@gmail.com
 """
@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.base_manager import CommandBase
 from redfish_ctl.redfish_manager import RedfishManager
 
 
@@ -75,7 +75,7 @@ def _start_fragile_bmc(max_connections):
     return server, thread, state, f"http://{host}:{port}"
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, CommandBase])
 def test_full_crawl_stays_within_fragile_bmc_budget(manager_cls, monkeypatch):
     """Many sequential GETs (a 'full dump') never exceed the BMC's connection budget.
 
@@ -84,7 +84,7 @@ def test_full_crawl_stays_within_fragile_bmc_budget(manager_cls, monkeypatch):
     request succeeds — the crawl gets a full dump without nuking the BMC. If reuse
     regressed to one-connection-per-request, the 4th GET would wedge the server.
     """
-    monkeypatch.setenv("IDRAC_HTTP_POOL", "2")
+    monkeypatch.setenv("REDFISH_HTTP_POOL", "2")
     budget = 3
     server, thread, state, base = _start_fragile_bmc(max_connections=budget)
     try:
@@ -108,14 +108,14 @@ def test_full_crawl_stays_within_fragile_bmc_budget(manager_cls, monkeypatch):
         thread.join(timeout=5)
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, CommandBase])
 def test_crawl_reuses_a_single_connection_for_many_requests(manager_cls, monkeypatch):
     """With a generous budget, a burst of GETs still collapses onto ~1 connection.
 
     Directly measures the anti-nuke property: connection count stays tiny and flat
     as request count grows, instead of climbing one-per-request.
     """
-    monkeypatch.setenv("IDRAC_HTTP_POOL", "4")
+    monkeypatch.setenv("REDFISH_HTTP_POOL", "4")
     server, thread, state, base = _start_fragile_bmc(max_connections=1000)
     try:
         mgr = manager_cls()

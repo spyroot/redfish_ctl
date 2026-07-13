@@ -27,7 +27,7 @@ REGISTRY_BY_VENDOR = {
     "dell": (
         REPO
         / "tests"
-        / "idrac_fixtures"
+        / "dell_fixtures"
         / "_redfish_v1_Systems_System.Embedded.1_Bios_BiosRegistry.json"
     ),
 }

@@ -2,7 +2,7 @@
 import json
 
 from redfish_ctl.attribute.cmd_attribute_clear_pending import AttributeClearPending
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -72,7 +72,7 @@ def test_attribute_update_patches_manager_attributes_in_mock_mode(
 ):
     """attribute_update PATCHes the manager attribute payload from a JSON spec."""
     spec = tmp_path / "attribute_update.json"
-    payload = {"Attributes": {"OwnerInfo.1.OwnerName": "idrac_ctl"}}
+    payload = {"Attributes": {"OwnerInfo.1.OwnerName": "redfish_ctl"}}
     spec.write_text(json.dumps(payload))
 
     result = redfish_mock.sync_invoke(
@@ -93,7 +93,7 @@ def test_attribute_update_patches_manager_attributes_in_mock_mode(
         "attribute_inventory",
         attr_filter="OwnerInfo.1.OwnerName",
     )
-    assert current.data == {"OwnerInfo.1.OwnerName": "idrac_ctl"}
+    assert current.data == {"OwnerInfo.1.OwnerName": "redfish_ctl"}
 
 
 def test_attribute_clear_pending_posts_discovered_action_in_mock_mode(

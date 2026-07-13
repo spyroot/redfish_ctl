@@ -5,7 +5,7 @@
       "key": "dell-idrac-overlay",
       "vendor": "dell",
       "generation": "idrac",
-      "path": "tests/idrac_fixtures",
+      "path": "tests/dell_fixtures",
       "status": "active",
       "redfish_version": "1.15.0",
       "oem_types": ["Dell"],
@@ -54,12 +54,12 @@
       "key": "supermicro-gb300-corpus",
       "vendor": "supermicro",
       "generation": "gb300",
-      "path": "tests/supermicro_gb300_corpus.tar.gz",
+      "path": "corpora/mock/supermicro_gb300.tar.gz",
       "status": "pending",
       "redfish_version": "1.17.0",
       "oem_types": ["Supermicro", "Nvidia"],
-      "source": "Full committed GB300 crawl used by corpus-backed telemetry and controller tests.",
-      "reason": "Packed as a filtered Git-LFS tarball (tools/pack_corpus.py); extract on demand with tests/vendor_corpus.corpus_dir rather than resolving a live JSON directory."
+      "source": "Filtered mock GB300 corpus used by corpus-backed telemetry and controller tests.",
+      "reason": "Packed as a mock Git-LFS archive in the canonical corpus manifest; materialize on demand with tests/vendor_corpus.corpus_dir rather than resolving a live JSON directory."
     },
     {
       "key": "supermicro-x10",

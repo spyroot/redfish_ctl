@@ -5,9 +5,9 @@ import re
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _MAX_NTP_SERVERS = 4
@@ -57,7 +57,7 @@ def _is_plausible_ntp_server(server: str) -> bool:
     return all(_HOST_LABEL.fullmatch(label) for label in labels)
 
 
-class NtpSet(IDracManager,
+class NtpSet(CommandBase,
              scm_type=ApiRequestType.NtpSet,
              name='ntp-set',
              metaclass=Singleton):

@@ -3,7 +3,7 @@
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 
 def _mutating_requests(service):

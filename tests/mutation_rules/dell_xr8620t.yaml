@@ -2,7 +2,7 @@
 #
 # Consumed by the mock BMC server's MutationRules engine
 # (k8s/sandbox/mock_bmc_server.py, --mutation-rules) against the committed
-# tests/dell_xr8620t_corpus. Same rule grammar as supermicro_gb300.yaml; every
+# corpora/mock/dell_xr8620t.tar.gz. Same rule grammar as supermicro_gb300.yaml; every
 # path/field/value below was read from that corpus. Dell uses the iDRAC path
 # scheme (System.Embedded.1 / iDRAC.Embedded.1), not the GB300 System_0 / BMC_0.
 #

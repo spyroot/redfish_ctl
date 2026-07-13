@@ -18,13 +18,13 @@ from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgumentFormat
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class JobList(IDracManager,
+class JobList(CommandBase,
               scm_type=ApiRequestType.Jobs,
               name='jobs_sources_query',
               metaclass=Singleton):

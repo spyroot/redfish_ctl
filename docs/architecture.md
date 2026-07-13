@@ -3,13 +3,13 @@
 Author: Mus <spyroot@gmail.com>
 
 Use `redfish_ctl system` as the first sanity check: it starts at the CLI, runs a self-registering
-command module, uses `IDracManager`, and ends in the generic Redfish HTTP client. The important rule
+command module, uses `CommandBase`, and ends in the generic Redfish HTTP client. The important rule
 is that Redfish stays product-neutral; Dell behavior sits above it.
 
 ```text
 CLI (`redfish_main.py`, argparse)
   -> command modules (`cmd_*.py`, `<domain>/cmd_*.py`)
-  -> `IDracManager` for iDRAC/Dell behavior and host-system selection
+  -> `CommandBase` for iDRAC/Dell behavior and host-system selection
   -> `RedfishManager` for product-neutral HTTP and response parsing
   -> requests over Redfish HTTPS
 ```
@@ -19,9 +19,9 @@ CLI (`redfish_main.py`, argparse)
 - `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, owns connection settings, HTTP verbs,
   Redfish response parsing, and the `CommandResult(data, discovered, extra, error)` return shape. It
   never imports vendor packages.
-- `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, adds Dell/iDRAC defaults, task/job polling,
+- `CommandBase`, defined in `redfish_ctl/base_manager.py`, adds Dell/iDRAC defaults, task/job polling,
   Dell OEM helpers, and host ComputerSystem resolution.
-- Commands, defined in `redfish_ctl/cmd_*.py` and domain packages, subclass `IDracManager` with an
+- Commands, defined in `redfish_ctl/cmd_*.py` and domain packages, subclass `CommandBase` with an
   `ApiRequestType` and `name=`. They self-register through `__init_subclass__`, so adding a command is
   adding a module, not editing a central switch.
 
@@ -40,7 +40,7 @@ dumps the responses, and records allowed methods.
 ## Vendors
 
 `redfish_ctl/vendors/<name>/` holds capability profiles. The Dell command code still lives mostly in
-`IDracManager` and `redfish_ctl/delloem/`; moving that code into `vendors/dell/` is planned, not done.
+`CommandBase` and `redfish_ctl/delloem/`; moving that code into `vendors/dell/` is planned, not done.
 
 Current vendor maturity is summarized in [Vendors](vendors.md). Short version:
 
@@ -57,7 +57,7 @@ The generic core never imports vendor packages.
 ## Host-System Selection
 
 Some hosts expose more than one ComputerSystem. A Supermicro GB300 can expose the host as `System_0`
-and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `IDracManager.discover_computer_system_ids()`,
+and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `CommandBase.discover_computer_system_ids()`,
 `discover_manager_ids()`, and `_host_system()` prefer the member with `Bios` or `Boot` links so host
 commands route to the host system instead of a baseboard.
 
@@ -69,7 +69,7 @@ event loop. A future fleet proxy would build on those helpers; the proxy itself 
 
 ## Known Structural Debt
 
-- `IDracManager` is large; transport and retry behavior belongs lower in
+- `CommandBase` is large; transport and retry behavior belongs lower in
   `RedfishManager`.
 - Power, boot, and BIOS control paths need library-callable APIs, not only the CLI
   argument path, so a future proxy and other callers can reuse them directly.

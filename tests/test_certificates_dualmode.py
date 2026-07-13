@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -100,7 +100,7 @@ def test_certificates_tolerates_root_without_certificate_links():
         mocker.patch(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=get_cb)
         mocker.delete(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = CommandBase(
             idrac_ip="mock-no-certs",
             idrac_username="root",
             idrac_password="mock",

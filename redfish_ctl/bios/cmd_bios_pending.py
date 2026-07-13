@@ -8,13 +8,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
-class BiosQueryPending(IDracManager,
+class BiosQueryPending(CommandBase,
                        scm_type=ApiRequestType.BiosQueryPending,
                        name='bios_query_pending',
                        metaclass=Singleton):

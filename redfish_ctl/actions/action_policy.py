@@ -1,7 +1,7 @@
 """Destructiveness policy for Redfish actions.
 
 The single source of truth for how risky each Redfish action is, keyed by its
-full ``#Type.Action`` name. ``invoke_action`` (idrac_manager.py) consults this to
+full ``#Type.Action`` name. ``invoke_action`` (base_manager.py) consults this to
 decide whether an action runs freely, runs with a one-line notice, defaults to a
 dry-run unless ``--confirm`` is given, or additionally needs an explicit
 "I understand this is irreversible" token.

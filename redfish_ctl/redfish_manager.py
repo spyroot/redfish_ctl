@@ -29,7 +29,6 @@ from .redfish_exceptions import (
 )
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
-from .telemetry import tracing
 from .redfish_respond_error import RedfishError
 from .redfish_shared import (
     RedfishApi,
@@ -39,6 +38,7 @@ from .redfish_shared import (
     RedfishJsonSpec,
     env_first,
 )
+from .telemetry import tracing
 
 """Each command encapsulate result in named tuple"""
 CommandResult = collections.namedtuple("cmd_result",
@@ -213,17 +213,17 @@ class RedfishManager:
         transport-level backoff for transient drops. Verify / auth / timeout
         semantics of the GET itself are unchanged. Tunable via env:
         ``REDFISH_HTTP_POOL`` (pool size), ``REDFISH_HTTP_RETRIES``,
-        ``REDFISH_HTTP_BACKOFF`` (legacy ``IDRAC_HTTP_*`` still honored).
-        Inherited by IDracManager.
+        ``REDFISH_HTTP_BACKOFF``.
+        Inherited by CommandBase.
         """
         session = getattr(self, "_session_cache", None)
         if session is None:
             session = requests.Session()
-            pool = int(env_first("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4"))
+            pool = int(env_first("REDFISH_HTTP_POOL", "REDFISH_HTTP_POOL", default="4"))
             retries = Retry(
-                total=int(env_first("REDFISH_HTTP_RETRIES", "IDRAC_HTTP_RETRIES", default="3")),
+                total=int(env_first("REDFISH_HTTP_RETRIES", "REDFISH_HTTP_RETRIES", default="3")),
                 backoff_factor=float(
-                    env_first("REDFISH_HTTP_BACKOFF", "IDRAC_HTTP_BACKOFF", default="0.5")),
+                    env_first("REDFISH_HTTP_BACKOFF", "REDFISH_HTTP_BACKOFF", default="0.5")),
                 status_forcelist=(500, 502, 503, 504),
                 allowed_methods=frozenset(["GET"]),
                 raise_on_status=False,
@@ -250,7 +250,7 @@ class RedfishManager:
             headers.update(hdr)
 
         # Bound every GET so a hung/unreachable BMC can't block forever.
-        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
+        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "REDFISH_HTTP_TIMEOUT", default="30"))
         # Reuse one pooled keep-alive connection across GETs (see _http_session):
         # opening a fresh TLS connection per request wedges fragile BMCs.
         session = self._http_session()

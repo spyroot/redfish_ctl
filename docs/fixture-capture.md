@@ -4,6 +4,7 @@ This guide explains how to contribute the offline test data `redfish_ctl` runs a
 Redfish resources that let the pytest mock service in `tests/conftest.py` serve real-shaped responses
 for any vendor — Dell iDRAC, Supermicro, HPE iLO, or generic DMTF Redfish — with no hardware in the
 loop. It is written for anyone adding coverage, not just the maintainers.
+For the canonical corpus artifact layout and pull workflow, see [docs/corpus-library.md](corpus-library.md).
 
 Default rule: never capture from production, or from hardware you are not authorized to read. Use an
 approved lab BMC and a short-lived read-only account, sanitize every file before it enters the repo,
@@ -11,19 +12,19 @@ and prove the data with the offline suite before committing.
 
 Pick the path that matches what you are contributing — the two are deliberately separate:
 
-- **Path A — a full BMC crawl.** Capture the *entire* Redfish tree with `redfish_ctl` itself and
-  commit it as a vendor corpus. Best when adding a **new vendor or model**; one capture then backs
-  many later commands with only a thin behavioral test. This is how the Supermicro GB300 and X10
-  corpora were contributed.
+- **Path A — a BMC crawl.** Capture the selected Redfish tree with `redfish_ctl` itself and
+  package it as either a dataset artifact or a filtered mock artifact. Best when adding a
+  **new vendor or model**; one capture then backs many later commands with only a thin behavioral
+  test. This is how the Supermicro GB300 and X10 mock corpora were contributed.
 - **Path B — a curated fixture set.** Hand-pick, sanitize, and import only the *handful* of resources
   one specific test needs. Best when adding or fixing **one command on an already-covered vendor**.
 
-## Path A — Full BMC crawl (whole tree → vendor corpus)
+## Path A — BMC Crawl (captured tree → dataset or mock artifact)
 
 `redfish_ctl` can capture its own test data. The `discovery` command does a deep crawl of a BMC and
-writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/` —
-exactly the layout the committed corpora pack (the filtered `tests/supermicro_gb300_corpus.tar.gz`
-LFS tarball, or overlay sets like `tests/supermicro_x10_fixtures/`). To contribute coverage for a
+writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/`.
+Corpus archives are indexed in `corpora/manifest.v1.json`; see
+[docs/corpus-library.md](corpus-library.md) before packaging a new capture. To contribute coverage for a
 BMC this project has not seen:
 
 1. **Crawl an approved lab BMC** (read-only; never production, never someone else's hardware):
@@ -35,21 +36,23 @@ BMC this project has not seen:
    redfish_ctl discovery                        # writes ~/.json_responses/<ip>/
    ```
 
-2. **Sanitize the tree — this is mandatory** (a full crawl carries identifiers). Run the bundled
+2. **Sanitize the tree — this is mandatory** (a crawl carries identifiers). Run the bundled
    redactor, which replaces the source management IP with an RFC 5737 documentation address, renames
    the `<ip>` directory, and scrubs identifier fields (serial/service tag, asset tag, UUID, MAC,
-   hostname). It writes a clean copy straight into a corpus directory matching the existing
-   convention (`tests/<vendor>_<model>_corpus/json_responses/<placeholder-ip>/`):
+   hostname). It writes a clean copy into a staging directory for review before
+   packaging it under `corpora/dataset/` or filtering it into a mock artifact under `corpora/mock/`:
 
    ```bash
    python tools/redact_corpus.py ~/.json_responses/<ip> \
-     --out tests/<vendor>_<model>_corpus/json_responses
+     --out build/corpus-staging/<vendor>_<model>/json_responses
    ```
 
-   It reports only counts (never values) and skips `.npy` maps (regenerate those from the redacted
-   tree or leave them out). Treat it as a **first pass, not a guarantee**: then apply the [Redact
-   Before Import](#redact-before-import) rules by hand for anything vendor-specific, run that
-   section's secret scan over the output, and read the files yourself before committing.
+   It reports only counts (never values). When the source contains `rest_api_map.npy`, the redactor
+   preserves `allowed_methods_mapping`, rewrites `url_file_mapping` to sanitized relative paths,
+   writes `rest_api_map.v1.json`, regenerates the legacy `rest_api_map.npy`, and validates every
+   mapped file exists. Treat it as a **first pass, not a guarantee**: then apply the [Redact Before
+   Import](#redact-before-import) rules by hand for anything vendor-specific, run that section's
+   secret scan over the output, and read the files yourself before committing.
 
 3. **Add a thin corpus-backed test** (see `tests/test_supermicro_gb300_corpus.py` and
    `tests/test_supermicro_x10_fixtures.py`) that loads the corpus and asserts a command's contract
@@ -69,7 +72,7 @@ BMC this project has not seen:
 Use this path to add or fix a single command on a vendor the suite already covers. You hand-pick,
 sanitize, and import only the resources that test needs. The commands and file examples below use a
 Dell iDRAC for concreteness, but the same steps apply to any vendor — capture from the approved lab
-BMC, redact, and import under that vendor's fixture directory (`tests/idrac_fixtures/`,
+BMC, redact, and import under that vendor's fixture directory (`tests/dell_fixtures/`,
 `tests/supermicro_fixtures/`, `tests/hpe_fixtures/`, `tests/generic_fixtures/`, …).
 
 ### Required Tools
@@ -79,7 +82,7 @@ BMC, redact, and import under that vendor's fixture directory (`tests/idrac_fixt
   creates a file tree from a live Redfish service.
 - `tools/redfish_validate.py`, the repository schema helper, validates standard
   Redfish surfaces against cached DMTF schemas.
-- `tests/idrac_fixtures/`, the Dell overlay directory loaded by
+- `tests/dell_fixtures/`, the Dell overlay directory loaded by
   `tests/conftest.py`, holds hand-curated fixture JSON for missing Dell paths.
 - `redfish_ctl/json_responses/`, the captured DMTF mockup base tree used by the
   default mock service, stays generic and should not receive Dell-only overlays.
@@ -135,10 +138,10 @@ Example mapping:
 
 ```text
 /redfish/v1/Systems/System.Embedded.1/Bios
-  -> tests/idrac_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json
+  -> tests/dell_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json
 
 /redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService
-  -> tests/idrac_fixtures/_redfish_v1_Managers_iDRAC.Embedded.1_Oem_Dell_DellJobService.json
+  -> tests/dell_fixtures/_redfish_v1_Managers_iDRAC.Embedded.1_Oem_Dell_DellJobService.json
 ```
 
 The fixture filename is the Redfish path with slashes replaced by underscores
@@ -148,7 +151,7 @@ depends on the expanded fields.
 
 ### Redact Before Import
 
-Review every selected JSON file before it enters `tests/idrac_fixtures/`.
+Review every selected JSON file before it enters `tests/dell_fixtures/`.
 Remove or replace:
 
 - BMC passwords, session tokens, cookies, auth headers, and API keys.
@@ -186,7 +189,7 @@ First prove the JSON parses:
 
 ```bash
 python -m json.tool \
-  tests/idrac_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json \
+  tests/dell_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json \
   >/dev/null
 ```
 
@@ -196,7 +199,7 @@ network fetches and requires schemas already cached under `tools/redfish-schemas
 
 ```bash
 REDFISH_SCHEMA_OFFLINE=1 \
-  python tools/redfish_validate.py tests/idrac_fixtures
+  python tools/redfish_validate.py tests/dell_fixtures
 ```
 
 The validator classifies each JSON file as valid, error, or skipped. Use
@@ -207,7 +210,7 @@ that depends on the OEM fields.
 
 ### Import
 
-Copy only the redacted candidate files into `tests/idrac_fixtures/`. Do not copy
+Copy only the redacted candidate files into `tests/dell_fixtures/`. Do not copy
 the whole Mockup Creator tree into the Dell overlay. If the full raw capture is
 needed for later analysis, keep it outside the repository or in an approved
 private artifact store.
@@ -233,7 +236,7 @@ ruff check \
   tests/test_<package>_dualmode.py
 
 python -m json.tool \
-  tests/idrac_fixtures/<changed-fixture>.json \
+  tests/dell_fixtures/<changed-fixture>.json \
   >/dev/null
 ```
 

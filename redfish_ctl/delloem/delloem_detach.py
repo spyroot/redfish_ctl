@@ -7,14 +7,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
 class DellOemDetach(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.DellOemDetach,
     name='delloem_detach',
     metaclass=Singleton):
@@ -57,7 +56,7 @@ class DellOemDetach(
             target_api,
             do_async=do_async, expected_status=200)
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

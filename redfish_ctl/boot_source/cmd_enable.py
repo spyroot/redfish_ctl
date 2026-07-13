@@ -17,18 +17,18 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..command_shared import (
+    ApiRequestType,
+    RedfishCommandRespond,
+    ResetType,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
 
 
-class EnableBootOptions(IDracManager,
+class EnableBootOptions(CommandBase,
                         scm_type=ApiRequestType.EnableBootOptions,
                         name='boot_enable',
                         metaclass=Singleton):
@@ -121,7 +121,7 @@ class EnableBootOptions(IDracManager,
             target_dev, payload=payload,
             do_async=do_async
         )
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

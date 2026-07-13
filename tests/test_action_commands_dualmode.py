@@ -1,7 +1,7 @@
 """Dual-mode-style mock tests for vendor-neutral action commands."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

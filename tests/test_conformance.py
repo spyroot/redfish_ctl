@@ -8,7 +8,7 @@ from redfish_ctl.vendors import get_vendor
 
 TESTS_ROOT = Path(__file__).resolve().parent
 FIXTURE_ROOTS = {
-    "dell": TESTS_ROOT / "idrac_fixtures",
+    "dell": TESTS_ROOT / "dell_fixtures",
     "hpe": TESTS_ROOT / "hpe_fixtures",
     "supermicro": TESTS_ROOT / "supermicro_fixtures",
 }

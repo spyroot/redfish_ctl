@@ -8,15 +8,20 @@ import time
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, CliJobTypes, JobState
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import ResetType
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import (
+    ApiRequestType,
+    CliJobTypes,
+    JobState,
+    RedfishCommandRespond,
+    RedfishEndpoint,
+    ResetType,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
 
 
-class JobApply(IDracManager,
+class JobApply(CommandBase,
                scm_type=ApiRequestType.JobApply,
                name='job_apply',
                metaclass=Singleton):
@@ -74,7 +79,7 @@ class JobApply(IDracManager,
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """
-        target_api = f"{self.idrac_members}/{IDRAC_API.Jobs}"
+        target_api = f"{self.idrac_members}/{RedfishEndpoint.Jobs}"
         bios = f"{self.idrac_manage_servers}/Bios/Settings"
         boot_options = f"{self.idrac_manage_servers}/BootOptions"
 
@@ -141,7 +146,7 @@ class JobApply(IDracManager,
                     self.fetch_task(job)
 
         cmd_result, api_resp = self.base_post(target_api, pd, do_async=do_async)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

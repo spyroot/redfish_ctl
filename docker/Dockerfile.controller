@@ -23,7 +23,7 @@ RUN groupadd --system --gid 10001 redfish \
 WORKDIR /app
 
 COPY pyproject.toml setup.py requirements.txt README.md LICENSE ./
-COPY idrac_ctl ./idrac_ctl
+COPY redfish_ctl ./redfish_ctl
 COPY redfish_ctl ./redfish_ctl
 COPY k8s/controller ./k8s/controller
 

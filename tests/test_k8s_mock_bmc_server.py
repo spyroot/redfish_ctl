@@ -144,7 +144,7 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     assert "FROM python:3.12-slim" in dockerfile
     assert "--chown=mockbmc:mockbmc" in dockerfile
     assert "k8s/sandbox/mock_bmc_server.py" in dockerfile
-    assert "tests/supermicro_gb300_corpus.tar.gz" in dockerfile
+    assert "corpora/mock/supermicro_gb300.tar.gz" in dockerfile
     assert "MOCK_BMC_CORPUS_DIR=/corpus/gb300" in dockerfile
     assert "/corpus/gb300" in dockerfile
     assert "/corpus/172.25.230.37" not in dockerfile
@@ -152,7 +152,6 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     assert "EXPOSE 8080" in dockerfile
     assert "ENTRYPOINT" in dockerfile
     assert "REDFISH_PASSWORD" not in dockerfile
-    assert "IDRAC_PASSWORD" not in dockerfile
 
 
 def test_mock_bmc_manifest_exposes_read_only_service_without_secrets() -> None:

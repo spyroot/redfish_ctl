@@ -16,13 +16,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class DellOemAttach(IDracManager, scm_type=ApiRequestType.OemAttach,
+class DellOemAttach(CommandBase, scm_type=ApiRequestType.OemAttach,
                     name='delloem_attach',
                     metaclass=Singleton):
     """A command uses dell oem to attach ISO
@@ -92,7 +91,7 @@ class DellOemAttach(IDracManager, scm_type=ApiRequestType.OemAttach,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

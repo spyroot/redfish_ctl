@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -205,9 +205,9 @@ def test_bios_profile_cli_runs_without_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
     ):
         env.pop(name, None)
 
@@ -243,9 +243,9 @@ def test_bios_profile_diff_cli_requires_bmc_connection():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
     ):
         env.pop(name, None)
 
@@ -270,7 +270,7 @@ def test_bios_profile_diff_cli_requires_bmc_connection():
     )
 
     assert result.returncode == 1
-    assert "Please indicate the idrac ip." in result.stdout
+    assert "Please indicate the Redfish BMC IP." in result.stdout
 
 
 def test_bios_profile_apply_cli_requires_bmc_credentials():
@@ -279,9 +279,9 @@ def test_bios_profile_apply_cli_requires_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
     ):
         env.pop(name, None)
 
@@ -306,4 +306,4 @@ def test_bios_profile_apply_cli_requires_bmc_credentials():
     )
 
     assert result.returncode == 1
-    assert "Please indicate the idrac ip." in result.stdout
+    assert "Please indicate the Redfish BMC IP." in result.stdout

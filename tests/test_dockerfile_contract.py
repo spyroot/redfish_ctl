@@ -34,7 +34,7 @@ def test_production_dockerfile_header_shows_safe_runtime_examples() -> None:
     assert "redfish_ctl system" in header
     assert "exporter --output otlp" in header
     assert "REDFISH_PASSWORD=" not in dockerfile
-    assert "IDRAC_PASSWORD=" not in dockerfile
+    assert "REDFISH_PASSWORD=" not in dockerfile
     assert "DOCKERHUB_TOKEN" not in dockerfile
 
 

@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 OS_DEPLOYMENT = "/redfish/v1/Dell/Systems/System.Embedded.1/DellOSDeploymentService"
@@ -69,7 +69,7 @@ def test_dell_oem_attach_posts_network_iso_payload(
 ):
     """delloem_attach POSTs the network ISO payload to the discovered action."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -107,7 +107,7 @@ def test_dell_oem_boot_network_iso_posts_discovered_action_payload(
 ):
     """oem-boot-netios POSTs share details to BootToNetworkISO."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -193,7 +193,7 @@ def test_dell_oem_empty_action_posts_use_discovered_targets(
 ):
     """Dell OEM empty-body commands POST to their discovered action targets."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -239,7 +239,7 @@ def test_dell_oem_network_iso_boot_posts_network_iso_payload(
 ):
     """delloem_netios_boot POSTs the network ISO payload to BootToNetworkISO."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )

@@ -9,13 +9,13 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class JobGet(IDracManager,
+class JobGet(CommandBase,
              scm_type=ApiRequestType.JobGet,
              name='job_query',
              metaclass=Singleton):

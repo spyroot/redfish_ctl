@@ -9,8 +9,8 @@ this test does, for both scan commands. All network I/O is mocked.
 """
 import requests
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase
+from redfish_ctl.command_shared import ApiRequestType
 
 
 class _Resp:
@@ -35,7 +35,7 @@ def _fake_get(url, **_):
 
 def _invoke_scan(api_type, name, **scan_kwargs):
     """Mimic redfish_main scan-mode dispatch: empty creds, invoke() not sync_invoke."""
-    api = IDracManager(idrac_ip="", idrac_username="", idrac_password="")
+    api = CommandBase(idrac_ip="", idrac_username="", idrac_password="")
     orig, requests.get = requests.get, _fake_get
     try:
         return api.invoke(

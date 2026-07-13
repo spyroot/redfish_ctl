@@ -2,7 +2,7 @@
 import json
 from urllib.parse import unquote, urlsplit
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 SYSTEM_RESOURCE = "/redfish/v1/Systems/System.Embedded.1"
@@ -32,7 +32,7 @@ def _assert_manager_collection(result):
 def test_query_idrac_returns_requested_resource(redfish_api):
     """query_idrac GETs the caller-provided Redfish resource."""
     result = redfish_api.sync_invoke(
-        ApiRequestType.QueryIdrac,
+        ApiRequestType.QueryRedfish,
         "query_idrac",
         resource=SYSTEM_RESOURCE,
     )
@@ -43,7 +43,7 @@ def test_query_idrac_returns_requested_resource(redfish_api):
 def test_query_idrac_returns_manager_collection(redfish_api):
     """query_idrac can fetch the Manager collection resource directly."""
     result = redfish_api.sync_invoke(
-        ApiRequestType.QueryIdrac,
+        ApiRequestType.QueryRedfish,
         "query_idrac",
         resource=MANAGERS_RESOURCE,
     )
@@ -57,7 +57,7 @@ def test_query_idrac_expanded_sends_expand_query_in_mock_mode(
 ):
     """query_idrac with do_expanded=True sends $expand on the raw path."""
     result = redfish_mock.sync_invoke(
-        ApiRequestType.QueryIdrac,
+        ApiRequestType.QueryRedfish,
         "query_idrac",
         resource=SYSTEM_RESOURCE,
         do_expanded=True,

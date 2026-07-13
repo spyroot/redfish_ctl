@@ -74,10 +74,10 @@ def test_delete_returns_ok(redfish_mock):
     assert resp.status_code == 200
 
 
-# --- dual-mode fixture: offline by default, live when IDRAC_IP is set --------
+# --- dual-mode fixture: offline by default, live when REDFISH_IP is set --------
 
 def test_redfish_api_runs_in_mock_mode(redfish_api):
-    """Without IDRAC_IP, redfish_api yields a mock-backed client that works offline."""
+    """Without REDFISH_IP, redfish_api yields a mock-backed client that works offline."""
     resp = redfish_api.api_get_call(
         "https://mock-idrac/redfish/v1/Managers", {}
     )

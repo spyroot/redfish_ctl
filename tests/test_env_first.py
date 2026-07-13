@@ -1,37 +1,29 @@
-"""env_first: REDFISH_* names win, IDRAC_* is the fallback, else the default.
+"""env_first helper behavior for REDFISH_* runtime settings."""
 
-Backs the env-var consistency pass — every tuning knob (HTTP timeout/retries/pool/
-backoff, discovery retries/backoff/pace, exporter credential file) reads the
-going-forward REDFISH_* name first while the legacy IDRAC_* name still works.
-"""
 from redfish_ctl.redfish_shared import env_first
 
 
 def test_prefers_first_name(monkeypatch):
-    """The REDFISH_* name (passed first) wins when both are set."""
+    """The first configured name wins when several candidates are provided."""
     monkeypatch.setenv("REDFISH_HTTP_TIMEOUT", "5")
-    monkeypatch.setenv("IDRAC_HTTP_TIMEOUT", "30")
-    assert env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30") == "5"
-
-
-def test_falls_back_to_legacy(monkeypatch):
-    """With REDFISH_* unset, the legacy IDRAC_* value is used."""
-    monkeypatch.delenv("REDFISH_HTTP_TIMEOUT", raising=False)
-    monkeypatch.setenv("IDRAC_HTTP_TIMEOUT", "45")
-    assert env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30") == "45"
+    monkeypatch.setenv("REDFISH_HTTP_TIMEOUT_FALLBACK", "30")
+    assert env_first(
+        "REDFISH_HTTP_TIMEOUT",
+        "REDFISH_HTTP_TIMEOUT_FALLBACK",
+        default="30",
+    ) == "5"
 
 
 def test_default_when_none_set(monkeypatch):
-    """Neither set -> the provided default (even for empty-string names)."""
+    """Neither set -> the provided default."""
     monkeypatch.delenv("REDFISH_HTTP_POOL", raising=False)
-    monkeypatch.delenv("IDRAC_HTTP_POOL", raising=False)
-    assert env_first("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4") == "4"
+    assert env_first("REDFISH_HTTP_POOL", default="4") == "4"
 
 
 def test_empty_string_value_is_honored(monkeypatch):
-    """An explicitly empty value is a real value, not 'unset' -> not the default."""
+    """An explicitly empty value is a real value, not unset."""
     monkeypatch.setenv("REDFISH_HTTP_POOL", "")
-    assert env_first("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4") == ""
+    assert env_first("REDFISH_HTTP_POOL", default="4") == ""
 
 
 def test_default_is_none_without_arg(monkeypatch):

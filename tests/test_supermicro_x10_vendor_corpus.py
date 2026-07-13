@@ -1,6 +1,6 @@
 """Contracts for the Supermicro X10 (ASPEED BMC) vendor corpus + mutation rules.
 
-The corpus under tests/supermicro_x10_corpus is a real capture from a home-lab
+The corpus under corpora/mock/supermicro_x10sdv.tar.gz is a real capture from a home-lab
 X10 board. The crawl did not capture the ServiceRoot, so a minimal synthetic
 _redfish_v1.json links the collections that WERE captured (and is marked as
 synthesized); everything else is the untouched capture. This board exposes no

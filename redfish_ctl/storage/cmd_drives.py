@@ -4,13 +4,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import find_ids
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class DrivesQuery(IDracManager,
+class DrivesQuery(CommandBase,
                   scm_type=ApiRequestType.Drives,
                   name='drives_query',
                   metaclass=Singleton):

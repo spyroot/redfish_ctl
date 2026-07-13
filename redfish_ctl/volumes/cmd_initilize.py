@@ -8,13 +8,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class VolumeInit(IDracManager,
+class VolumeInit(CommandBase,
                  scm_type=ApiRequestType.VolumeInit,
                  name='chassis_service_query',
                  metaclass=Singleton):

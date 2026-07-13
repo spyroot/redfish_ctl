@@ -3,12 +3,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Thermal(IDracManager,
+class Thermal(CommandBase,
               scm_type=ApiRequestType.Thermal,
               name="thermal",
               metaclass=Singleton):
@@ -124,7 +124,7 @@ class Thermal(IDracManager,
             "fan_collections": [],
             "fans": [],
         }
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(RedfishEndpoint.Chassis, do_async=do_async)
         chassis_uris = self._members(chassis.data)
 
         for chassis_uri in chassis_uris:

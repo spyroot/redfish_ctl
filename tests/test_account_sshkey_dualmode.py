@@ -2,7 +2,7 @@
 
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 RSA_KEY = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ0abcdef user@host"
@@ -89,7 +89,7 @@ def test_account_import_sshkey_confirm_patches_hpe_sshkeys_payload(
     assert result.error is None
     assert result.data["action"] == "import-ssh-key"
     assert result.data["target"] == "sshuser"
-    assert result.data["status"] == "IdracApiRespond.Ok"
+    assert result.data["status"] == "RedfishCommandRespond.Ok"
     assert [request.method for request in service.requests] == ["GET", "GET", "PATCH"]
     assert len(patch_requests) == 1
     assert patch_requests[0].path.lower() == ACCOUNT_URI.lower()

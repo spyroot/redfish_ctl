@@ -8,7 +8,7 @@ mocked; no real hosts are touched.
 """
 import requests
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 
 class _Resp:

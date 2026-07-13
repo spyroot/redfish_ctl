@@ -1,6 +1,6 @@
 """Offline regression test: importing the discovery command must not import numpy.
 
-The discovery command (idrac_ctl/discovery/cmd_discovery.py) only needs numpy for
+The discovery command (redfish_ctl/discovery/cmd_discovery.py) only needs numpy for
 ``np.save`` inside ``save_url_file_mapping``. A top-level ``import numpy`` made the
 whole module unimportable in environments without numpy, which blocked collecting
 the offline pytest suite. The import is now lazy, so importing the module must not
@@ -21,7 +21,7 @@ def test_discovery_module_imports_without_numpy(monkeypatch):
     numpy reloads it — a warning on CPython, a ``RecursionError`` on some numpy
     builds (e.g. the conda env). Restoring keeps the rest of the suite clean.
     """
-    module_name = "idrac_ctl.discovery.cmd_discovery"
+    module_name = "redfish_ctl.discovery.cmd_discovery"
 
     # Drop cached copies so the import re-executes the module body; delitem
     # records the originals and puts them back when the test finishes.
@@ -31,6 +31,6 @@ def test_discovery_module_imports_without_numpy(monkeypatch):
     importlib.import_module(module_name)
 
     assert "numpy" not in sys.modules, (
-        "importing idrac_ctl.discovery.cmd_discovery must not import numpy; "
+        "importing redfish_ctl.discovery.cmd_discovery must not import numpy; "
         "the numpy import should be lazy inside save_url_file_mapping"
     )

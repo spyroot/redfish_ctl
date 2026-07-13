@@ -9,14 +9,14 @@ import json
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootSourceUpdate(IDracManager,
+class BootSourceUpdate(CommandBase,
                        scm_type=ApiRequestType.BootSourceUpdate,
                        name='update',
                        metaclass=Singleton):
@@ -173,13 +173,13 @@ class BootSourceUpdate(IDracManager,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
-        elif api_resp in (IdracApiRespond.Success, IdracApiRespond.Ok):
+        elif api_resp in (RedfishCommandRespond.Success, RedfishCommandRespond.Ok):
             if do_commit:
                 self.logger.info("Commit changes and rebooting.")
                 # we commit with a reboot

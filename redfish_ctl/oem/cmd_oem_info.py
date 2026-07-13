@@ -15,12 +15,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class OemInfo(IDracManager,
+class OemInfo(CommandBase,
              scm_type=ApiRequestType.OemInfo,
              name='oem-info',
              metaclass=Singleton):
@@ -60,7 +60,7 @@ class OemInfo(IDracManager,
                 roots.extend(finder() or [])
             except Exception:
                 continue
-        roots.extend(self._members(self._get(IDRAC_API.Chassis, do_async)))
+        roots.extend(self._members(self._get(RedfishEndpoint.Chassis, do_async)))
         return roots
 
     def execute(self,

@@ -3,7 +3,7 @@
 Author: Mus <spyroot@gmail.com>
 
 This reference is generated from the Supermicro GB300 fixture files packed in
-`tests/supermicro_gb300_corpus.tar.gz`, the captured Redfish JSON corpus used by
+`corpora/mock/supermicro_gb300.tar.gz`, the captured Redfish JSON corpus used by
 the offline tests, so this page does not require a live BMC or private endpoint.
 
 ## How To Read This

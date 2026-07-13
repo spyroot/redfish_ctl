@@ -5,25 +5,16 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_exceptions import InvalidJsonSpec
-from ..cmd_utils import from_json_spec
-from ..idrac_shared import IdracApiRespond
-from ..redfish_shared import RedfishJson
-from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import (
+    ApiRequestType,
+    RedfishCommandRespond,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
 
 
-
-
-class JobRmDellServices(IDracManager,
+class JobRmDellServices(CommandBase,
                         scm_type=ApiRequestType.JobRmDellServices,
                         name='job_delete_all',
                         metaclass=Singleton):
@@ -78,7 +69,7 @@ class JobRmDellServices(IDracManager,
         cmd_result, api_resp = self.base_post(target_api, do_async=do_async,
                                               payload=payload,
                                               expected_status=200)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

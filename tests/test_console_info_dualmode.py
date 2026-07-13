@@ -1,13 +1,13 @@
 """Dual-mode test for the console-info command."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_console_info_dualmode_returns_read_only_console_rows(request, monkeypatch):
     """console-info reports Manager console capabilities without mutating state."""
-    monkeypatch.delenv("IDRAC_IP", raising=False)
+    monkeypatch.delenv("REDFISH_IP", raising=False)
     redfish_api = request.getfixturevalue("redfish_api")
     redfish_service = request.getfixturevalue("redfish_service")
 

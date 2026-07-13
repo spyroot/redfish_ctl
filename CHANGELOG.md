@@ -83,14 +83,14 @@ Targets the next minor release (1.3.0). Everything below is already on `main`.
 
 ## [1.2.0] - 2026-07-10
 ### Added
-- Renamed the package to `redfish_ctl` (the `idrac_ctl` console script and
+- Renamed the package to `redfish_ctl` (the `redfish_ctl` console script and
   import alias are retained). Published to PyPI and as a multi-arch container
   image on release tags.
 - Native OTLP metrics exporter (`--output otlp`, `[otlp]` extra), a pooled
   Redfish session, and the fixture-capture SOP.
 
 ## [1.1.0] - [1.1.4]
-- Initial `redfish_ctl` releases on PyPI with the `idrac_ctl` alias.
+- Initial `redfish_ctl` releases on PyPI with the `redfish_ctl` alias.
 
 [Unreleased]: https://github.com/spyroot/redfish_ctl/compare/v1.2.0...HEAD
 [1.2.0]: https://github.com/spyroot/redfish_ctl/releases/tag/v1.2.0

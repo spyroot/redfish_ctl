@@ -27,14 +27,14 @@ def test_capabilities_evidence_defaults_to_empty_mapping():
 def test_dell_profile_records_evidence_for_non_default_claims():
     """Dell-only capability claims carry local fixture or source provenance."""
     evidence = get_vendor("dell").evidence
-    assert evidence["query_select"].startswith("tests/idrac_fixtures/")
-    assert evidence["query_filter"].startswith("tests/idrac_fixtures/")
-    assert evidence["query_expand"].startswith("tests/idrac_fixtures/")
-    assert evidence["query_top"].startswith("tests/idrac_fixtures/")
-    assert evidence["query_only"].startswith("tests/idrac_fixtures/")
+    assert evidence["query_select"].startswith("tests/dell_fixtures/")
+    assert evidence["query_filter"].startswith("tests/dell_fixtures/")
+    assert evidence["query_expand"].startswith("tests/dell_fixtures/")
+    assert evidence["query_top"].startswith("tests/dell_fixtures/")
+    assert evidence["query_only"].startswith("tests/dell_fixtures/")
     assert evidence["one_query_param_per_uri"].startswith("tests/test_query.py")
-    assert evidence["job_scheduling"].startswith("tests/idrac_fixtures/")
-    assert evidence["lifecycle_events_sse"].startswith("tests/idrac_fixtures/")
+    assert evidence["job_scheduling"].startswith("tests/dell_fixtures/")
+    assert evidence["lifecycle_events_sse"].startswith("tests/dell_fixtures/")
 
 
 def test_dell_evidence_paths_exist():

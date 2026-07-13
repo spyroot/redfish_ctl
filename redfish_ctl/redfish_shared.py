@@ -6,8 +6,7 @@ from typing import Optional
 def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
     """Return the value of the first environment variable that is set among ``names``.
 
-    Used so settings honor the going-forward ``REDFISH_*`` names first and fall back
-    to the legacy ``IDRAC_*`` names during the rename. Pass the REDFISH_* name first.
+    Used by runtime settings that accept one or more canonical ``REDFISH_*`` names.
     """
     for name in names:
         value = os.environ.get(name)

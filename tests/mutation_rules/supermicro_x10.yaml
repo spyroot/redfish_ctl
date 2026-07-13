@@ -1,6 +1,6 @@
 # Order-independent mutation rules for a Supermicro X10 (ASPEED BMC) board.
 #
-# Consumed by the mock BMC server against tests/supermicro_x10_corpus. This is
+# Consumed by the mock BMC server against corpora/mock/supermicro_x10sdv.tar.gz. This is
 # the home-lab X10 hardware, captured from a real board. It uses the numeric
 # Redfish scheme (Systems/1, Managers/1) and an ASPEED BMC. The ComputerSystem
 # exposes no Bios resource and only a Supermicro-proprietary VirtualMedia

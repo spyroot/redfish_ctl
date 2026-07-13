@@ -1,8 +1,8 @@
 """Dual-mode test for the storage-drives query command.
 
-Runs offline by default against the mock service (using the iDRAC-shaped Storage
-fixture in tests/idrac_fixtures/, which carries a Drives navigation list), and
-against real hardware when IDRAC_IP is set. Modeled on test_cmd_boot_dualmode.py.
+Runs offline by default against the mock service (using the Dell-shaped Storage
+fixture in tests/dell_fixtures/, which carries a Drives navigation list), and
+against real hardware when REDFISH_IP is set. Modeled on test_cmd_boot_dualmode.py.
 
 This is also a regression test for a missing import: cmd_drives.py walks the
 Storage payload with find_ids(...) but never imported it, so the offline
@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 # The controller + drive the Storage fixture's Drives navigation list points at.
@@ -226,7 +226,7 @@ def test_storage_convert_to_raid_posts_nonraid_pdarray_in_mock_mode(
 def test_storage_drives_live_returns_command_result(redfish_api):
     """Against real hardware, storage-drives returns a CommandResult.
 
-    Skipped unless IDRAC_IP is set (see conftest). Read-only: it only queries the
+    Skipped unless REDFISH_IP is set (see conftest). Read-only: it only queries the
     storage subsystem. Uses the default controller discovery rather than a
     hardcoded controller id, since live drive ids vary per box.
     """

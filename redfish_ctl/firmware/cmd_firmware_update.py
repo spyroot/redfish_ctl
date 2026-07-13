@@ -20,13 +20,13 @@ from typing import Optional
 
 import requests
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class FirmwareUpdate(IDracManager,
+class FirmwareUpdate(CommandBase,
                      scm_type=ApiRequestType.FirmwareUpdate,
                      name='firmware-update',
                      metaclass=Singleton):
@@ -183,7 +183,7 @@ class FirmwareUpdate(IDracManager,
         except Exception as exc:
             return CommandResult(data, None, None, exc)
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             data["task_id"] = self.job_id_from_header(response)
         else:
             data.update(self.api_success_msg(api_resp))

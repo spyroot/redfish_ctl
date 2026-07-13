@@ -15,14 +15,14 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
+from ..command_shared import ApiRequestType, RedfishCommandRespond, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ChassisUpdate(IDracManager,
+class ChassisUpdate(CommandBase,
                     scm_type=ApiRequestType.ChassisUpdate,
                     name='update_chassis',
                     metaclass=Singleton):
@@ -110,14 +110,14 @@ class ChassisUpdate(IDracManager,
                 f"Check check {from_spec} it looks like empty spec."
             )
 
-        r = f"{IDRAC_API.Chassis}/{chassis_id}"
+        r = f"{RedfishEndpoint.Chassis}/{chassis_id}"
 
         cmd_result, api_resp = self.base_patch(
             r, payload=payload, do_async=do_async,
             data_type=data_type
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(cmd_result.data['task_id'])
             cmd_result.data['task_state'] = task_state

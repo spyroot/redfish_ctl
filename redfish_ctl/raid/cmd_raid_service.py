@@ -17,13 +17,13 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class RaidServiceQuery(IDracManager,
+class RaidServiceQuery(CommandBase,
                        scm_type=ApiRequestType.RaidServiceQuery,
                        name='raid_service_query',
                        metaclass=Singleton):

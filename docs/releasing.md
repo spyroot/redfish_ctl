@@ -46,7 +46,7 @@ tag step stays a deliberate human action.
 workflow `release.yml`. After that, no token is needed to release.
 
 The manual steps below remain valid as a fallback (e.g. before the trusted publisher is configured, or
-to publish the one-off `idrac_ctl` deprecation shim under `packaging/idrac_ctl_deprecation/`).
+to publish the one-off `redfish_ctl` deprecation shim under `packaging/redfish_ctl_deprecation/`).
 
 ## Release Checklist
 

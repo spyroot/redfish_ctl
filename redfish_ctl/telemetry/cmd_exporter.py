@@ -11,8 +11,8 @@ observability demo.
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 from . import exporter
 from .exporter import (
@@ -27,7 +27,7 @@ from .exporter import (
 )
 
 
-class Exporter(IDracManager,
+class Exporter(CommandBase,
                scm_type=ApiRequestType.Exporter,
                name='exporter',
                metaclass=Singleton):
@@ -59,14 +59,14 @@ class Exporter(IDracManager,
             help="output format for --once or push mode")
         cmd_parser.add_argument(
             "--label-bmc-ip", dest="label_bmc_ip", default=None, type=str,
-            help="BMC IP used only for metric dimensions when different from IDRAC_IP")
+            help="BMC IP used only for metric dimensions when different from REDFISH_IP")
         cmd_parser.add_argument(
             "--vendor", default=None, type=str,
             help="vendor dimension override, e.g. supermicro or dell")
         cmd_parser.add_argument(
             "--credential-file", dest="exporter_credential_file", default=None, type=str,
             help="gitignored KEY=VALUE runtime file for "
-                 "REDFISH_IP/USERNAME/PASSWORD/PORT (legacy IDRAC_* also accepted)")
+                 "REDFISH_IP/USERNAME/PASSWORD/PORT")
         cmd_parser.add_argument(
             "--push-signalfx", action="store_true", default=False,
             help="push SignalFx datapoints instead of returning/serving Prometheus output")
@@ -127,7 +127,7 @@ class Exporter(IDracManager,
         """Walk Chassis EnvironmentMetrics links and return their payloads."""
         rows = []
         try:
-            chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async).data or {}
+            chassis = self.base_query(RedfishEndpoint.Chassis, do_async=do_async).data or {}
         except Exception:
             return rows
         for chassis_uri in self._members(chassis):

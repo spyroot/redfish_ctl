@@ -1,4 +1,4 @@
-"""Opt-in live canary: idrac_ctl against a running HPE iLO emulator over HTTP.
+"""Opt-in live canary: redfish_ctl against a running HPE iLO emulator over HTTP.
 
 Skipped by default (CI stays offline). To run it, start HPE's iLO Redfish
 emulator (see examples/hpe_ilo_canary.sh) and export the connection:
@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 _IP = os.environ.get("HPE_EMULATOR_IP")
 
@@ -22,9 +22,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _manager():
-    """Build an IDracManager pointed at the running emulator."""
-    from redfish_ctl.idrac_manager import IDracManager
-    return IDracManager(
+    """Build an CommandBase pointed at the running emulator."""
+    from redfish_ctl.base_manager import CommandBase
+    return CommandBase(
         idrac_ip=_IP,
         idrac_username=os.environ.get("HPE_EMULATOR_USER", "root"),
         idrac_password=os.environ.get("HPE_EMULATOR_PASSWORD", "root_password"),

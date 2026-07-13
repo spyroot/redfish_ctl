@@ -48,17 +48,13 @@ setup_info = dict(name='redfish_ctl',
                       "Topic :: System :: Systems Administration",
                       "Topic :: Utilities",
                   ],
-                  # redfish_ctl is the real package; idrac_ctl is a backward-compat alias package.
-                  packages=['redfish_ctl', 'idrac_ctl'] + ['redfish_ctl.' + pkg for pkg in find_packages('redfish_ctl')],
+                  packages=['redfish_ctl'] + ['redfish_ctl.' + pkg for pkg in find_packages('redfish_ctl')],
                   license="MIT",
                   python_requires='>=3.10',
                   install_requires=requirements,
                   entry_points={
                       'console_scripts': [
-                          # redfish_ctl is the going-forward name; idrac_ctl stays as a
-                          # backward-compatible alias (same entry point).
                           'redfish_ctl = redfish_ctl.redfish_main:redfish_main_ctl',
-                          'idrac_ctl = redfish_ctl.redfish_main:redfish_main_ctl',
                           'redfish-discover = redfish_ctl.discover.cli:redfish_discover_main',
                       ]
                   },

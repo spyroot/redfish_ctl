@@ -8,15 +8,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgumentFormat
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IDRAC_JSON
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, RedfishData, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class QueryAccount(IDracManager,
+class QueryAccount(CommandBase,
                    scm_type=ApiRequestType.QueryAccount,
                    name='query_account',
                    metaclass=Singleton):
@@ -69,12 +67,12 @@ class QueryAccount(IDracManager,
             query_result = self.sync_invoke(
                 ApiRequestType.QueryAccounts, "query_accounts", is_username_only=True)
             usernames = query_result.data
-            accounts_id = [u[IDRAC_JSON.AccountId] for u in usernames
-                           if u[IDRAC_JSON.Username].lower() == account.lower()]
+            accounts_id = [u[RedfishData.AccountId] for u in usernames
+                           if u[RedfishData.Username].lower() == account.lower()]
             if len(accounts_id) > 0:
                 account = accounts_id[-1]
 
-        return self.base_query(f"{IDRAC_API.Account}{account}",
+        return self.base_query(f"{RedfishEndpoint.Account}{account}",
                                filename=filename,
                                do_async=do_async,
                                do_expanded=do_expanded)

@@ -1,6 +1,6 @@
-"""iDRAC reset manager ,
+"""Redfish manager reset command.
 
-command reset-reboot IDRAC manger.
+Reset or reboot the BMC manager service.
 
 Author Mus spyroot@gmail.com
 """
@@ -8,16 +8,16 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ManagerReset(IDracManager,
+class ManagerReset(CommandBase,
                    scm_type=ApiRequestType.ManagerReset,
                    name='manager_reset',
                    metaclass=Singleton):
-    """iDRAC Manager server Command, fetch manager service,
+    """BMC manager reset command,
     caller can save to a file or output to a file or pass downstream.
     """
 
@@ -56,7 +56,7 @@ class ManagerReset(IDracManager,
             dest="wait_timeout", default=300.0,
             help="with --wait: max seconds to wait for the BMC (default 300).")
 
-        help_text = "command reboot idrac manager"
+        help_text = "command reboot BMC manager"
         return cmd_arg, "manager-reboot", help_text
 
     def execute(self,
@@ -68,7 +68,7 @@ class ManagerReset(IDracManager,
                 do_wait: Optional[bool] = False,
                 wait_timeout: Optional[float] = 300.0,
                 **kwargs) -> CommandResult:
-        """Reset IDRAC manager services
+        """Reset BMC manager services.
         :param do_async will not wait
         :param do_graceful
         :param verbose:
@@ -94,7 +94,7 @@ class ManagerReset(IDracManager,
             expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

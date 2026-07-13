@@ -3,14 +3,14 @@
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from .report import capability_report
 
 
-class CapabilityReport(IDracManager,
+class CapabilityReport(CommandBase,
                        scm_type=ApiRequestType.CapabilityReport,
                        name="capability-report",
                        metaclass=Singleton):

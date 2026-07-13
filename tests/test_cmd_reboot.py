@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.base_manager import CommandBase
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
@@ -12,7 +12,7 @@ log = logging.getLogger("LOG")
 
 
 # Integration tests: require a reachable iDRAC.
-# Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
+# Skipped automatically unless REDFISH_IP is set (see tests/conftest.py).
 pytestmark = pytest.mark.live
 
 class TestReboot(TestCase):
@@ -22,22 +22,22 @@ class TestReboot(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> IDracManager:
-        redfish_api = IDracManager(
-            idrac_ip=os.environ.get('IDRAC_IP', ''),
-            idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
-            idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
+    def setUpClass(cls) -> CommandBase:
+        redfish_api = CommandBase(
+            idrac_ip=os.environ.get('REDFISH_IP', ''),
+            idrac_username=os.environ.get('REDFISH_USERNAME', 'root'),
+            idrac_password=os.environ.get('REDFISH_PASSWORD', ''),
             insecure=True,
             is_debug=False)
         return redfish_api
 
     def setUp(self) -> None:
         self.assertTrue(
-            len(os.environ.get('IDRAC_IP', '')) > 0, "IDRAC_IP is none")
+            len(os.environ.get('REDFISH_IP', '')) > 0, "REDFISH_IP is none")
         self.assertTrue(
-            len(os.environ.get('IDRAC_USERNAME', '')) > 0, "IDRAC_USERNAME is none")
+            len(os.environ.get('REDFISH_USERNAME', '')) > 0, "REDFISH_USERNAME is none")
         self.assertTrue(
-            len(os.environ.get('IDRAC_PASSWORD', '')) > 0, "IDRAC_PASSWORD is none")
+            len(os.environ.get('REDFISH_PASSWORD', '')) > 0, "REDFISH_PASSWORD is none")
 
     def test_base_reboot(self):
         """test base reboot seq

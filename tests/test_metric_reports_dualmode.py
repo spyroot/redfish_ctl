@@ -1,13 +1,13 @@
 """Dual-mode smoke tests for the read-only metric-reports command."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_metric_reports_dualmode_returns_json_list_without_post(request, monkeypatch):
     """metric-reports returns a JSON list in offline dual-mode mock transport."""
-    monkeypatch.delenv("IDRAC_IP", raising=False)
+    monkeypatch.delenv("REDFISH_IP", raising=False)
     redfish_api = request.getfixturevalue("redfish_api")
     redfish_service = request.getfixturevalue("redfish_service")
 

@@ -200,7 +200,7 @@ def test_controller_image_runs_kopf_without_credentials() -> None:
     assert 'ENTRYPOINT ["kopf"]' in dockerfile
     assert "redfish_endpoint_controller.py" in dockerfile
     assert "REDFISH_PASSWORD" not in dockerfile
-    assert "IDRAC_PASSWORD" not in dockerfile
+    assert "REDFISH_PASSWORD" not in dockerfile
 
 
 def test_ilo_sim_image_builds_public_hpe_emulator_without_credentials() -> None:
@@ -215,7 +215,7 @@ def test_ilo_sim_image_builds_public_hpe_emulator_without_credentials() -> None:
     assert "USER ilosim" in dockerfile
     assert "ENTRYPOINT" in dockerfile
     assert "REDFISH_PASSWORD" not in dockerfile
-    assert "IDRAC_PASSWORD" not in dockerfile
+    assert "REDFISH_PASSWORD" not in dockerfile
 
 
 def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:

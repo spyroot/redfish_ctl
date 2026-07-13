@@ -13,16 +13,15 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import find_ids
-from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..cmd_utils import find_ids, save_if_needed
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class AttributesQuery(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.AttributesQuery,
     name='attribute_inventory',
     metaclass=Singleton):

@@ -35,8 +35,8 @@ from redfish_ctl.api import (
     reboot,
     set_ntp,
 )
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 GB300_CORPUS = corpus_dir(
@@ -79,7 +79,7 @@ def gb300_corpus_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = CommandBase(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",
@@ -411,7 +411,7 @@ def test_set_ntp_returns_typed_apply_result_when_confirmed():
             {
                 "Manager": "BMC_0",
                 "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                "status": "IdracApiRespond.Ok",
+                "status": "RedfishCommandRespond.Ok",
                 "error": None,
             }
         ],
@@ -438,7 +438,7 @@ def test_set_ntp_returns_typed_apply_result_when_confirmed():
             NtpApplied(
                 manager="BMC_0",
                 target="/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                status="IdracApiRespond.Ok",
+                status="RedfishCommandRespond.Ok",
                 error=None,
                 raw=payload["applied"][0],
             ),

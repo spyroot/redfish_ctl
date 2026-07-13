@@ -23,12 +23,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class SmcVirtualMediaMount(IDracManager,
+class SmcVirtualMediaMount(CommandBase,
                            scm_type=ApiRequestType.SmcVirtualMediaMount,
                            name='vm-mount',
                            metaclass=Singleton):
@@ -52,7 +52,7 @@ class SmcVirtualMediaMount(IDracManager,
                              help="path to the ISO on the share, e.g. /dl/ubuntu.iso")
         cmd_arg.add_argument('--share_user', required=False, type=str, default="",
                              help="CIFS share username (optional; renamed to avoid the "
-                                  "global --idrac_password/user collision)")
+                                  "global --redfish_password/user collision)")
         cmd_arg.add_argument('--share_pass', required=False, type=str, default="",
                              help="CIFS share password (optional)")
         cmd_arg.add_argument('--unmount', action='store_true', dest="do_unmount",

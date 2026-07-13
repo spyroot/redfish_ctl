@@ -30,9 +30,9 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 # Our hand-authored iDRAC fixtures are the gate. The captured DMTF mockup tree
 # (json_responses/) is third-party reference data from older schema versions;
 # validate it only when REDFISH_SCHEMA_ALL=1.
-_FIXTURES = sorted(glob.glob(str(_ROOT / "tests" / "idrac_fixtures" / "*.json")))
+_FIXTURES = sorted(glob.glob(str(_ROOT / "tests" / "dell_fixtures" / "*.json")))
 if os.environ.get("REDFISH_SCHEMA_ALL"):
-    _FIXTURES += sorted(glob.glob(str(_ROOT / "idrac_ctl" / "json_responses" / "*.json")))
+    _FIXTURES += sorted(glob.glob(str(_ROOT / "redfish_ctl" / "json_responses" / "*.json")))
 
 
 @pytest.mark.schema

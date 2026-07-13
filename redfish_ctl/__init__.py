@@ -16,7 +16,7 @@ from .dell_lc.cmd_dell_lc_services import *
 from .compute.cmd_power_state import *
 from .compute.cmd_compute_setting import *
 
-from .idrac_shared import *
+from .command_shared import *
 from .raid.cmd_raid_service import *
 #
 # bios commands
@@ -163,3 +163,4 @@ from .discovery.cmd_discovery import *
 from .discovery.cmd_bmc_scan import *
 from .fleet.cmd_fleet import *
 from .vendors.cmd_capability_report import *
+from .cmd_corpus import *

@@ -14,7 +14,7 @@ Triggers on pushes to `main` and on every pull request.
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
 - Uses **no secrets**, never contacts a BMC (live `@pytest.mark.live` tests auto-skip with no
-  `IDRAC_IP`), and does **not** fetch Git LFS (the offline suite reads JSON fixtures only, never the
+  `REDFISH_IP`), and does **not** fetch Git LFS (the offline suite reads JSON fixtures only, never the
   LFS-tracked firmware binaries).
 
 Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls
@@ -37,7 +37,7 @@ One-time maintainer setup on PyPI (Project → Settings → Publishing → Add a
 `spyroot`, repo `redfish_ctl`, workflow `release.yml`. After that, releasing is just
 `tools/bump_version.py` → commit → push a `vX.Y.Z` tag; see [Releasing](releasing.md).
 
-The one-off `idrac_ctl` deprecation shim (`packaging/idrac_ctl_deprecation/`) is **not** automated —
+The one-off `redfish_ctl` deprecation shim (`packaging/redfish_ctl_deprecation/`) is **not** automated —
 it is published manually and rarely.
 
 ## The runner and Node.js

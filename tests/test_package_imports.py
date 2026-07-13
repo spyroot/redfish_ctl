@@ -1,4 +1,4 @@
-"""Offline smoke test: every idrac_ctl module imports cleanly.
+"""Offline smoke test: every redfish_ctl module imports cleanly.
 
 This guards the import cleanup in bios/cmd_change_bios.py (duplicate and unused
 imports removed) and, more generally, catches any command module that breaks at
@@ -27,7 +27,7 @@ def test_module_imports(module_name: str):
 
 def test_bios_change_command_is_registered():
     """The de-duplicated bios change module still exposes its command class."""
+    from redfish_ctl.base_manager import CommandBase
     from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
-    from redfish_ctl.idrac_manager import IDracManager
 
-    assert issubclass(BiosChangeSettings, IDracManager)
+    assert issubclass(BiosChangeSettings, CommandBase)

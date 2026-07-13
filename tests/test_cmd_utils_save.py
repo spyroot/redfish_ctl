@@ -1,4 +1,4 @@
-"""Offline unit tests for idrac_ctl.cmd_utils.save_if_needed.
+"""Offline unit tests for redfish_ctl.cmd_utils.save_if_needed.
 
 These are regressions for two bugs:
 

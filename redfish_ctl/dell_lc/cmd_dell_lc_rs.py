@@ -4,12 +4,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishCommandRespond, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class GetRemoteRssAPIStatus(IDracManager,
+class GetRemoteRssAPIStatus(CommandBase,
                             scm_type=ApiRequestType.RemoteServicesRssAPIStatus,
                             name='dell_lc_rs_status',
                             metaclass=Singleton):
@@ -46,11 +46,11 @@ class GetRemoteRssAPIStatus(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        target_api = f"{self.idrac_members}/{IDRAC_API.DellLCService}" \
+        target_api = f"{self.idrac_members}/{RedfishEndpoint.DellLCService}" \
                      f"/Actions/DellLCService.GetRSStatus"
         cmd_result, api_resp = self.base_post(target_api, payload={})
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

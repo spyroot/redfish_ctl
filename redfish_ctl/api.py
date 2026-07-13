@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Protocol
 
-from .idrac_shared import ApiRequestType
+from .command_shared import ApiRequestType
 from .redfish_manager import CommandResult
 
 

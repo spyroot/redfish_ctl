@@ -9,7 +9,7 @@ from redfish_ctl.accounts.cmd_account_sshkey import (
     AccountImportSSHKey,
     validate_ssh_key,
 )
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 RSA = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ0abcdef user@host"
 

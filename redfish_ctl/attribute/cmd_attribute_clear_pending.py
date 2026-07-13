@@ -8,16 +8,15 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import FailedDiscoverAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class AttributeClearPending(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.AttributeClearPending,
     name='clear_pending',
     metaclass=Singleton):
@@ -82,7 +81,7 @@ class AttributeClearPending(
             )
 
         cmd_result, api_resp = self.base_post(target, do_async=do_async)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

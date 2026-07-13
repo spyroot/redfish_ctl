@@ -16,7 +16,7 @@
 #
 # All matching rules apply, so conditional side effects compose: a reset both
 # powers the system down and, only when a one-time boot is armed, reverts it.
-# Every path/field below exists in tests/supermicro_gb300_corpus.
+# Every path/field below exists in corpora/mock/supermicro_gb300.tar.gz.
 #
 # This is a fuller capture of the GB300 platform (a 2nd node) that DID capture
 # the SEL LogService's ClearLog action (the primary GB300 corpus did not), so a

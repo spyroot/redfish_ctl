@@ -6,15 +6,16 @@ Author: Mus <spyroot@gmail.com>
 against captured real-hardware behavior. This exists for three reasons: fast offline tests, an
 end-to-end Kubernetes sandbox with no BMC, and a deterministic Redfish environment that a
 reinforcement-learning agent can train against. The three layers below build on each other.
+Dataset artifacts and filtered mock artifacts are separate; see
+[docs/corpus-library.md](corpus-library.md) for the manifest contract and materialization flow.
 
 ## Layer 1: corpus as simulator (reads)
 
-A full `discovery` crawl of a real BMC is committed as the filtered Git-LFS tarball
-`tests/supermicro_gb300_corpus.tar.gz` (packed by `tools/pack_corpus.py`, with smaller vendor sets
-alongside it). Every URL maps to one flat `_redfish_v1_..._.json` file inside it. Offline tests replay
-this tree through `requests_mock`, and the sandbox mock BMC (`k8s/sandbox/mock_bmc_server.py`) serves
-it read-only over HTTP. A new read command needs a thin behavioral test, not a bespoke fixture —
-the captured tree is the simulator.
+Mock-ready artifacts are committed as Git-LFS archives under `corpora/mock/` and indexed by
+`corpora/manifest.v1.json`. Offline tests materialize those archives through the shared corpus API,
+and the sandbox mock BMC (`k8s/sandbox/mock_bmc_server.py`) serves the materialized tree read-only
+over HTTP. A new read command needs a thin behavioral test, not a bespoke fixture; the captured tree
+is the simulator.
 
 The same crawl output (`~/.json_responses/<ip>/` JSON dumps plus the `rest_api_map.npy` API map
 written by `redfish_ctl discovery`) is the observation and schema source the `igc` project consumes
@@ -33,13 +34,31 @@ The backend set is selected with `SANDBOX_BACKENDS` (see `k8s/sandbox/run-sandbo
 Additional backends (the DMTF Redfish-Interface-Emulator and Dell's published iDRAC mockups) are
 planned so the matrix spans several independent Redfish services with no hardware.
 
-## Layer 3: stateful mutation replay (writes)
+## Layer 3: stateful mutations (writes)
 
 Reads alone cannot exercise a mutation. Layer 3 teaches the mock BMC to accept writes and flip the
-served state exactly as observed on real hardware, driven by a **trace** captured from a mutation
-that was already verified live. This turns a static corpus into a *mutate-able* environment.
+served state through one of two mutually exclusive engines:
 
-The mock BMC enters replay mode when started with a trace file. In the container image, the
+- **ReplayState** is ordered. Only the next pending trace step can match, and the match includes the
+  method, normalized path, optional body subset, and optional `body_contains` checks.
+- **MutationRules** are order-independent. Every write is evaluated against every rule, preconditions
+  read the current effective state, all matching transitions compose, and the first matching response
+  is returned. Seeded failure injection is deterministic after reset, and failed writes apply no
+  transition.
+
+Both engines apply in-memory overlays above the captured fixture and fleet identity overlay; neither
+mutates JSON files on disk. The effective read order is captured fixture, then fleet identity overlay,
+then the replay or mutation overlay. Fleet identity does not override `Id` or `@odata.id`, so link
+walking stays stable. The mock exposes `POST /__set_scenario` for scenario selection and reset.
+Replay mode also exposes `GET /__replay_status`.
+
+### Ordered ReplayState
+
+ReplayState is driven by a **trace** captured from a mutation that was already verified live. This
+turns a static corpus into a deterministic sequence such as stage, verify pending, reset, and verify
+applied.
+
+The mock BMC enters ordered replay mode when started with a trace file. In the container image, the
 committed GB300 corpus is mounted at `/corpus/gb300`:
 
 ```bash
@@ -93,6 +112,21 @@ remain pending, and whether the scenario is `complete`. A test asserts the clien
 recorded sequence with nothing missing or extra — so a code change that sends an unexpected write
 fails even when the write itself "succeeds". Coverage lives in
 `tests/test_k8s_mock_bmc_server.py`.
+
+### Order-Independent MutationRules
+
+MutationRules mode is selected with a mutation-rule sidecar instead of a replay trace. Rules match a
+write by method, normalized or glob path, optional body subset, and optional `body_contains`
+fragments. `when` conditions read the effective resource state: captured fixture, then fleet identity
+overlay, then all previous replay or mutation overlays.
+
+Every matching rule applies its `state_transitions`. This is what allows a single reset to both
+change power state and consume a one-time boot override, or to apply staged BIOS settings while
+removing them from the pending Settings resource. The first matching response supplies the HTTP
+status and body; additional matches may still contribute transitions. Reset clears overlays, applied
+and failed history, and the seeded random generator so repeated episodes produce the same injected
+failure sequence. Thread-safe accounting records exactly which rules applied under concurrent
+writes.
 
 ## Consuming this as a reinforcement-learning environment (igc)
 

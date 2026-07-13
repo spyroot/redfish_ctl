@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 from .api import RedfishApiError, SyncInvoker
-from .idrac_shared import ApiRequestType
+from .command_shared import ApiRequestType
 
 
 @dataclass(frozen=True)

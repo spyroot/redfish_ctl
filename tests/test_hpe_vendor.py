@@ -1,4 +1,4 @@
-"""Offline proof that idrac_ctl is vendor-neutral on an HPE iLO tree.
+"""Offline proof that redfish_ctl is vendor-neutral on an HPE iLO tree.
 
 Serves a redacted-free slice of an HPE ProLiant DL380a (iLO) Redfish tree
 (tests/hpe_fixtures/, from HPE's BSD-3 iLO emulator mockups) through the real
@@ -7,7 +7,7 @@ requests path via redfish_mock_factory("hpe"). HPE uses a THIRD id scheme
 System_0 — so these tests prove the discovery-first, link-navigated commands
 work on a vendor they were never special-cased for.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.command_shared import ApiRequestType
 
 
 def test_hpe_discovery_resolves_ilo_ids(redfish_mock_factory):

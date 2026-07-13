@@ -14,7 +14,8 @@ Usage:
     scripts/pack_corpus.py <corpus_leaf_dir> <output.tar.gz> [--arcname NAME] [--dry-run]
 
 ``corpus_leaf_dir`` is the directory holding the flattened ``_redfish_v1_*.json``
-files (e.g. ``tests/dell_xr8620t_corpus/json_responses/10.252.252.209``). The tar
+files (for example, ``build/corpus-staging/dell_xr8620t/json_responses/<capture-id>``).
+The tar
 stores files under ``<arcname>/`` (default: the leaf dir name), so extracting it
 recreates a usable corpus directory.
 """

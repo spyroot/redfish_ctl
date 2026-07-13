@@ -2,9 +2,9 @@
 attribute.
 
 Before you run unit test.
-IDRAC_IP=IP
-IDRAC_PASSWORD=PASS
-IDRAC_USERNAME=root
+REDFISH_IP=IP
+REDFISH_PASSWORD=PASS
+REDFISH_USERNAME=root
 # set PYTHONWARNINGS as well, so it will not output warning about insecure.
 PYTHONWARNINGS=ignore:Unverified HTTPS request
 
@@ -19,8 +19,8 @@ from unittest import TestCase
 import pytest
 
 from redfish_ctl import save_if_needed
-from redfish_ctl.idrac_manager import CommandResult, IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase, CommandResult
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_exceptions import RedfishException
 from redfish_ctl.redfish_shared import RedfishJson
 
@@ -29,7 +29,7 @@ log = logging.getLogger("LOG")
 
 
 # Integration tests: require a reachable iDRAC.
-# Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
+# Skipped automatically unless REDFISH_IP is set (see tests/conftest.py).
 pytestmark = pytest.mark.live
 
 class TestUpdateAttribute(TestCase):
@@ -39,13 +39,13 @@ class TestUpdateAttribute(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> IDracManager:
+    def setUpClass(cls) -> CommandBase:
         """Setup required envs.
         :return:
         """
-        redfish_api = IDracManager(idrac_ip=os.environ.get('IDRAC_IP', ''),
-                                   idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
-                                   idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
+        redfish_api = CommandBase(idrac_ip=os.environ.get('REDFISH_IP', ''),
+                                   idrac_username=os.environ.get('REDFISH_USERNAME', 'root'),
+                                   idrac_password=os.environ.get('REDFISH_PASSWORD', ''),
                                    insecure=True,
                                    is_debug=False)
         return redfish_api
@@ -54,9 +54,9 @@ class TestUpdateAttribute(TestCase):
         """Check envs
         :return:
         """
-        self.assertTrue(len(os.environ.get('IDRAC_IP', '')) > 0, "IDRAC_IP is none")
-        self.assertTrue(len(os.environ.get('IDRAC_USERNAME', '')) > 0, "IDRAC_USERNAME is none")
-        self.assertTrue(len(os.environ.get('IDRAC_PASSWORD', '')) > 0, "IDRAC_PASSWORD is none")
+        self.assertTrue(len(os.environ.get('REDFISH_IP', '')) > 0, "REDFISH_IP is none")
+        self.assertTrue(len(os.environ.get('REDFISH_USERNAME', '')) > 0, "REDFISH_USERNAME is none")
+        self.assertTrue(len(os.environ.get('REDFISH_PASSWORD', '')) > 0, "REDFISH_PASSWORD is none")
 
     def test_basic_attribute_query(self):
         """test basic query before we do any update
@@ -82,7 +82,7 @@ class TestUpdateAttribute(TestCase):
         self.assertTrue(RedfishJson.Data_id in query_result.data,
                         f"Failed to fetch mandatory {RedfishJson.Data_id} key")
 
-    def test_basic_update(self, default_value="idrac_ctl"):
+    def test_basic_update(self, default_value="redfish_ctl"):
         """Test basic update, query sequence
         :return:
         """
@@ -137,7 +137,7 @@ class TestUpdateAttribute(TestCase):
         )
 
     def test_basic_update_none_existing(
-            self, default_value="idrac_ctl"):
+            self, default_value="redfish_ctl"):
         """Test basic update, with wrong key.
         :return:
         """

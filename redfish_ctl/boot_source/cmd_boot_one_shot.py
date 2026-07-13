@@ -15,13 +15,18 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, BootSourceOverrideMode, IdracApiRespond, Singleton
+from ..command_shared import (
+    ApiRequestType,
+    BootSourceOverrideMode,
+    RedfishCommandRespond,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
 
 
-class BootOneShot(IDracManager,
+class BootOneShot(CommandBase,
                   scm_type=ApiRequestType.BootOneShot,
                   name='boot_one_shot',
                   metaclass=Singleton):
@@ -203,7 +208,7 @@ class BootOneShot(IDracManager,
             do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             cmd_result.data['task_id'] = task_id
             task_state = self.fetch_task(task_id)

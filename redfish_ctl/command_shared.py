@@ -1,6 +1,6 @@
 """Shared resource
 
-This is shared Enum, Classes used by idrac ctl.
+Shared enums and response wrappers used by redfish_ctl.
 Many classes mapped directly to JSON schem.
 
 Author Mus spyroot@gmail.com
@@ -46,11 +46,11 @@ class ApiRequestType(Enum):
     GetNetworkIsoAttachStatus = auto()
     OemAttach = auto()
     DellOemActions = auto()
-    QueryIdrac = auto()
+    QueryRedfish = auto()
 
     BootOptions = auto()
     SystemConfigQuery = auto()
-    IDracQuery = auto()
+    RedfishQuery = auto()
 
     # firmware
     FirmwareQuery = auto()
@@ -139,7 +139,7 @@ class ApiRequestType(Enum):
     AttributesUpdate = auto()
     AttributeClearPending = auto()
 
-    # idrac manager
+    # BMC manager
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
     NtpSet = auto()
@@ -181,6 +181,7 @@ class ApiRequestType(Enum):
     Discovery = auto()
     FleetInventory = auto()
     CapabilityReport = auto()
+    Corpus = auto()
 
 
 class ScheduleJobType(Enum):
@@ -364,7 +365,7 @@ class CliJobTypes(Enum):
     RebootNoForce = "reboot_no_force"
 
 
-class IDRACJobType(Enum):
+class RedfishJobType(Enum):
     """idrac job types
     """
     OSDeploy = "OSDeploy"
@@ -454,7 +455,7 @@ class RedfishSupermicro:
     BMC_Backup = f"{RedfishApi.Version}/UpdateService/FirmwareInventory/Backup_BMC"
 
 
-class IdracJobSvcActions(Enum):
+class DellJobServiceActions(Enum):
     """Dell IDRAC job services actions."""
 
     # The CreateRebootJob action is used for creating a reboot job.
@@ -466,22 +467,20 @@ class IdracJobSvcActions(Enum):
     SetDeleteOnCompletionTimeout = "SetDeleteOnCompletionTimeout"
 
 
-class IdracResetActions(Enum):
-    """IDRAC Reset actions."""
+class RedfishResetActions(Enum):
+    """Redfish reset actions."""
     ComputerSystemReset = "ComputerSystem.Reset"
     ChassisReset = "Chassis.Reset"
     ManagerReset = "Manager.Reset"
 
 
-class IDRAC_API:
-    """
-    Idrac api supported actions
-    """
-    IDRAC_MANAGER = RedfishApi.Managers
-    IDRAC_DELL_MANAGERS = f"{RedfishApi.Version}/Dell/Managers"
+class RedfishEndpoint:
+    """Redfish endpoint fragments used by command modules."""
+    Managers = RedfishApi.Managers
+    DellManagers = f"{RedfishApi.Version}/Dell/Managers"
     Tasks = f"{RedfishApi.Version}/TaskService/Tasks/"
 
-    IDRAC_LLC = "/iDRAC.Embedded.1/DellLCService"
+    DellLCServicePath = "/iDRAC.Embedded.1/DellLCService"
     BiosRegistry = "/Bios/BiosRegistry"
 
     Chassis = f"{RedfishApi.Version}/Chassis"
@@ -527,9 +526,8 @@ class IDRAC_API:
 
 # $select=SecurityCertificate.*
 
-class IDRAC_JSON:
-    """All Keys we expect idrac uses based on specification.
-    """
+class RedfishData:
+    """Redfish payload keys used across command modules."""
     Id = "Id"
     # Describes the source of the payload.
     Data_id = "@odata.id"
@@ -546,7 +544,7 @@ class IDRAC_JSON:
     Members = "Members"
     Datatime = "DateTime"
     Location = "Location"
-    IDracFirmwareVersion = "FirmwareVersion"
+    ManagerFirmwareVersion = "FirmwareVersion"
     Links = RedfishJsonSpec.Links
     Attributes = RedfishJson.Attributes
     RegistryEntries = "RegistryEntries"
@@ -598,7 +596,7 @@ class JobApplyTypes:
     Immediate = "Immediate"
 
 
-class IdracApiRespond(Enum):
+class RedfishCommandRespond(Enum):
     """We need report to a client either redfish created task and accepted
     or ok and success.  Note that some API has mismatch between
     200/204  hence it better differentiate each case
@@ -689,29 +687,28 @@ class DellBootSource:
         return self._name
 
 
-class IdracRequestHeaders:
+class RedfishRequestHeaders:
     http_x_auth_token = "X-AUTH-TOKEN"
     xsrf_token = "XSRF-TOKEN"
 
 
-class IdracRespondHeaders:
+class RedfishResponseHeaders:
     http_allow = "Allow"
     http_www_authentication = "WWW-Authenticate"
     http_www_authentication_realm = "Basic realm=\"RedfishService\""
 
 
-class IdracRebootJobTypes(Enum):
-    """IdracRebootJobTypes is reboot job types for CreateRebootJobReq
-    """
+class DellRebootJobTypes(Enum):
+    """Dell reboot job types for CreateRebootJobReq."""
     GracefulRebootWithForcedShutdown = "GracefulRebootWithForcedShutdown"
     GracefulRebootWithoutForcedShutdown = "GracefulRebootWithoutForcedShutdown"
     PowerCycle = "PowerCycle"
 
 
 class CreateRebootJobReq:
-    def __init__(self, reboot_job_type: IdracRebootJobTypes, target: str, title: str):
+    def __init__(self, reboot_job_type: DellRebootJobTypes, target: str, title: str):
         """The CreateRebootJob action is used for creating a reboot job.
-        :param reboot_job_type: IdracRebootJobTypes:  a reboot job type IdracRebootJobTypes
+        :param reboot_job_type: Dell reboot job type.
         :param target: Link to invoke action
         :param title: name
         """

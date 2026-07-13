@@ -7,18 +7,16 @@ Author Mus spyroot@gmail.com
 """
 import argparse
 import asyncio
-
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootSettings(IDracManager,
+class BootSettings(CommandBase,
                    scm_type=ApiRequestType.BootSettingsQuery,
                    name='boot_settings_query',
                    metaclass=Singleton):

@@ -1,6 +1,6 @@
 # Order-independent mutation rules for an HPE iLO 5 (ProLiant DL360 Gen10).
 #
-# Consumed by the mock BMC server against tests/hpe_dl360_corpus. HPE uses the
+# Consumed by the mock BMC server against corpora/mock/hpe_dl360.tar.gz. HPE uses the
 # numeric scheme (Systems/1, Managers/1) but its own resource @odata.ids mix
 # case: the ComputerSystem is /redfish/v1/Systems/1 while its Bios link is the
 # lowercase /redfish/v1/systems/1/bios. Paths below match the real @odata.ids;

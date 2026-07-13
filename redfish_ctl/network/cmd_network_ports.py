@@ -16,12 +16,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 
 
-class NetworkPorts(IDracManager,
+class NetworkPorts(CommandBase,
                    scm_type=ApiRequestType.NetworkPorts,
                    name='network-ports',
                    metaclass=Singleton):
@@ -68,7 +68,7 @@ class NetworkPorts(IDracManager,
                 **kwargs) -> CommandResult:
         """Walk every chassis adapter's Ports and collect per-port link state."""
         rows = []
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(RedfishEndpoint.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):
             adapters_uri = self._link(self._get(chassis_uri, do_async), "NetworkAdapters")
             if not adapters_uri:

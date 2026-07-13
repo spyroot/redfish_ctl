@@ -44,9 +44,9 @@ python_files = ["test_*.py"]
 # tree regardless of how pytest is launched.
 pythonpath = ["."]
 # Tests that need a reachable iDRAC must be marked @pytest.mark.live; they are
-# skipped automatically by tests/conftest.py unless IDRAC_IP is set.
+# skipped automatically by tests/conftest.py unless REDFISH_IP is set.
 markers = [
-    "live: integration test that requires a reachable iDRAC (set IDRAC_IP to run)",
+    "live: integration test that requires a reachable iDRAC (set REDFISH_IP to run)",
     "schema: validates fixtures against DMTF Redfish schemas (run tools/fetch_schemas.sh first)",
 ]
 filterwarnings = [

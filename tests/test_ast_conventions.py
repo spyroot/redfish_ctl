@@ -5,13 +5,13 @@ on code shapes that are known bugs, so the class of mistake cannot be
 reintroduced anywhere — including in files that do not exist yet.
 
 Rule 1 — no enum-member truthiness on API respond values.
-``base_post``/``base_patch``/``base_delete`` return an ``IdracApiRespond``
+``base_post``/``base_patch``/``base_delete`` return an ``RedfishCommandRespond``
 enum member. Testing it with attribute access (``api_resp.Success``)
 fetches the always-truthy class member instead of comparing, so an Error
 response satisfied success branches; three commands escalated a FAILED
 write into a commit with reboot before this was fixed. The only valid
 member references are through the enum class itself
-(``IdracApiRespond.Success``); comparisons must use ``==``/``in``.
+(``RedfishCommandRespond.Success``); comparisons must use ``==``/``in``.
 
 Author Mus spyroot@gmail.com
 """
@@ -28,27 +28,27 @@ MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confi
 # New command code should expose one of MUTATION_GUARD_ARGS or route through
 # invoke_action instead of extending this list.
 LEGACY_UNGUARDED_MUTATION_CALLS = {
-    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:84 execute base_post",
-    "redfish_ctl/attribute/cmd_attribute_update.py:88 execute base_patch",
+    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:83 execute base_post",
+    "redfish_ctl/attribute/cmd_attribute_update.py:87 execute base_patch",
     "redfish_ctl/bios/cmd_bios_clear_pending.py:78 execute base_post",
-    "redfish_ctl/bios/cmd_change_bios.py:356 execute base_patch",
+    "redfish_ctl/bios/cmd_change_bios.py:362 execute base_patch",
     "redfish_ctl/bios/cmd_change_boot_order.py:176 execute base_patch",
-    "redfish_ctl/boot_source/cmd_clear_pending.py:70 execute base_post",
+    "redfish_ctl/boot_source/cmd_clear_pending.py:65 execute base_post",
     "redfish_ctl/boot_source/cmd_enable.py:120 execute base_patch",
     "redfish_ctl/boot_source/cmd_update.py:171 execute base_patch",
     "redfish_ctl/chassis/cmd_chasis_reset.py:114 execute base_post",
     "redfish_ctl/chassis/cmd_update_chassis.py:115 execute base_patch",
     "redfish_ctl/dell_lc/cmd_dell_lc_api.py:52 execute base_post",
     "redfish_ctl/dell_lc/cmd_dell_lc_rs.py:51 execute base_post",
-    "redfish_ctl/delloem/delloem_attach.py:90 execute base_post",
+    "redfish_ctl/delloem/delloem_attach.py:89 execute base_post",
     "redfish_ctl/delloem/delloem_attach_status.py:66 execute base_post",
-    "redfish_ctl/delloem/delloem_boot_netios.py:97 execute base_post",
-    "redfish_ctl/delloem/delloem_detach.py:56 execute base_post",
-    "redfish_ctl/delloem/delloem_disconnect.py:55 execute base_post",
-    "redfish_ctl/delloem/delloem_get_networkios.py:65 execute base_post",
-    "redfish_ctl/jobs/cmd_job_apply.py:143 execute base_post",
-    "redfish_ctl/jobs/cmd_job_del.py:61 execute base_delete",
-    "redfish_ctl/jobs/cmd_job_delete_all.py:78 execute base_post",
+    "redfish_ctl/delloem/delloem_boot_netios.py:92 execute base_post",
+    "redfish_ctl/delloem/delloem_detach.py:55 execute base_post",
+    "redfish_ctl/delloem/delloem_disconnect.py:54 execute base_post",
+    "redfish_ctl/delloem/delloem_get_networkios.py:64 execute base_post",
+    "redfish_ctl/jobs/cmd_job_apply.py:148 execute base_post",
+    "redfish_ctl/jobs/cmd_job_del.py:60 execute base_delete",
+    "redfish_ctl/jobs/cmd_job_delete_all.py:69 execute base_post",
     "redfish_ctl/manager/cmd_manager_reset.py:92 execute base_post",
     "redfish_ctl/manager/cmd_manager_time.py:108 execute base_patch",
     "redfish_ctl/storage/cmd_convert_none_raid.py:114 execute base_post",
@@ -58,8 +58,8 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:122 execute base_post",
     "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:135 execute base_patch",
     "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:142 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:110 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:224 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:109 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:217 execute base_post",
     "redfish_ctl/volumes/cmd_initilize.py:78 execute base_post",
 }
 
@@ -77,7 +77,7 @@ def _accessed_on(node: ast.Attribute) -> str | None:
 def _enum_member_truthiness_findings() -> list:
     """Every ``<variable>.Success``-style access in the package.
 
-    Enum classes are CamelCase (``IdracApiRespond``, ``TaskStatus``), so a
+    Enum classes are CamelCase (``RedfishCommandRespond``, ``TaskStatus``), so a
     member fetched from a capitalized name is a legitimate class reference;
     fetched from a lowercase name it is a respond value being misused.
     """
@@ -130,7 +130,7 @@ def _unguarded_direct_mutation_findings() -> list[str]:
     """Direct write helpers in command modules without an explicit guard arg."""
     findings = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        if path.name == "idrac_manager.py":
+        if path.name == "base_manager.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         parents = _parent_map(tree)
@@ -155,7 +155,7 @@ def test_no_enum_member_truthiness_on_respond_values():
 
     A finding here means code like ``if api_resp.Success:`` — always truthy,
     treating failures as success. Compare with ``==`` or ``in`` against
-    ``IdracApiRespond`` members instead.
+    ``RedfishCommandRespond`` members instead.
     """
     assert _enum_member_truthiness_findings() == []
 

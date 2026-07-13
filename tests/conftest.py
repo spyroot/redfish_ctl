@@ -1,8 +1,8 @@
 """Shared pytest fixtures and collection rules for redfish_ctl tests.
 
-The default unit suite runs fully offline. Tests that talk to a real iDRAC
+The default unit suite runs fully offline. Tests that talk to a real BMC
 must be marked ``@pytest.mark.live``; those are skipped automatically unless
-``IDRAC_IP`` is present in the environment, so ``pytest`` is green on a laptop
+``REDFISH_IP`` is present in the environment, so ``pytest`` is green on a laptop
 or in CI without any hardware.
 
 Import-path note: the repo root directory is itself named ``redfish_ctl`` and
@@ -63,9 +63,9 @@ if not _correct:
     spec.loader.exec_module(_pkg)
 
 
-def _has_live_idrac() -> bool:
-    """True when an iDRAC endpoint is configured via the environment."""
-    return bool(os.environ.get("IDRAC_IP", "").strip())
+def _has_live_redfish() -> bool:
+    """True when a Redfish endpoint is configured via the environment."""
+    return bool(os.environ.get("REDFISH_IP", "").strip())
 
 
 @pytest.fixture(autouse=True)
@@ -73,39 +73,39 @@ def _reset_command_singletons():
     """Drop cached command-singleton instances between tests.
 
     redfish_ctl commands use the ``Singleton`` metaclass, and instances memoize
-    per-box state via ``cached_property`` (notably ``idrac_manage_servers``). Left
+    per-box state via ``cached_property`` (notably manager resource discovery). Left
     alone, the first vendor a command runs against would freeze that state for the
     whole session, so a Dell test and a Supermicro test sharing a command class
     (e.g. ``reboot``) would poison each other depending on collection order. The
     command ``_registry`` (used for dispatch) is a separate dict and is untouched.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.command_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip ``live`` tests when no iDRAC endpoint is configured."""
-    if _has_live_idrac():
+    """Skip ``live`` tests when no Redfish endpoint is configured."""
+    if _has_live_redfish():
         return
-    skip_live = pytest.mark.skip(reason="no IDRAC_IP set; skipping live iDRAC test")
+    skip_live = pytest.mark.skip(reason="no REDFISH_IP set; skipping live Redfish test")
     for item in items:
         if "live" in item.keywords:
             item.add_marker(skip_live)
 
 
-# Hand-authored iDRAC-shaped fixtures (Dell paths like System.Embedded.1) that the
+# Hand-authored Dell-shaped fixtures (Dell paths like System.Embedded.1) that the
 # generic DMTF capture does not contain. These overlay the captured tree so
 # command-level tests can run offline.
-_IDRAC_FIXTURE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / "idrac_fixtures"
+_DELL_FIXTURE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / "dell_fixtures"
 
 # Case-insensitive index of the fixture tree. requests-mock lowercases
 # request.path, and Redfish paths are mixed-case (e.g. /redfish/v1/Managers), so
 # we must match without relying on a case-insensitive filesystem (macOS hides the
-# bug; Linux/CI would not). idrac_fixtures/ wins over the captured DMTF tree.
+# bug; Linux/CI would not). dell_fixtures/ wins over the captured DMTF tree.
 _FIXTURE_INDEX = {}
-for _dir in (_FIXTURE_DIR, _IDRAC_FIXTURE_DIR):
+for _dir in (_FIXTURE_DIR, _DELL_FIXTURE_DIR):
     if _dir.exists():
         for _f in _dir.glob("*.json"):
             _FIXTURE_INDEX[_f.name.lower()] = _f
@@ -225,10 +225,10 @@ class MockRedfishService:
         return self.requests[-1] if self.requests else None
 
 
-def _make_idrac(idrac_ip, username, password):
-    from redfish_ctl.idrac_manager import IDracManager
-    return IDracManager(
-        idrac_ip=idrac_ip,
+def _make_redfish_manager(redfish_ip, username, password):
+    from redfish_ctl.base_manager import CommandBase
+    return CommandBase(
+        idrac_ip=redfish_ip,
         idrac_username=username,
         idrac_password=password,
         insecure=True,
@@ -241,12 +241,12 @@ def _reset_command_singletons():
     """Give every test fresh command singletons so no cached state leaks.
 
     Commands use ``metaclass=Singleton`` and cache per-host state
-    (``idrac_manage_servers`` and friends) on the instance. Without a reset, the
+    (manager discovery and related cached resources) on the instance. Without a reset, the
     first vendor a command sees wins for the whole session — which only bites
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
     Clearing the instance registry before each test isolates them.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.command_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -272,22 +272,22 @@ def redfish_service():
 
 @pytest.fixture
 def redfish_mock(redfish_service):
-    """An IDracManager wired to the mocked Redfish service (offline, no hardware).
+    """A CommandBase wired to the mocked Redfish service (offline, no hardware).
 
     Backed by the captured DMTF mockup tree; exercises the real ``requests`` code
     path. Requires the ``requests-mock`` dev dependency; skips cleanly without it.
     """
-    yield _make_idrac("mock-idrac", "root", "mock")
+    yield _make_redfish_manager("mock-idrac", "root", "mock")
 
 
 @pytest.fixture
 def redfish_mock_factory():
-    """Factory for a VENDOR-shaped offline IDracManager.
+    """Factory for a vendor-shaped offline CommandBase.
 
     ``mgr, svc = factory("supermicro")`` serves the DMTF base overlaid by
-    ``tests/supermicro_fixtures/`` (NOT the Dell ``idrac_fixtures/``), so the same
+    ``tests/supermicro_fixtures/`` (NOT the Dell ``dell_fixtures/``), so the same
     command/transport code runs against a real non-Dell tree (System_0/BMC_0)
-    instead of System.Embedded.1. Returns ``(IDracManager, MockRedfishService)``.
+    instead of System.Embedded.1. Returns ``(CommandBase, MockRedfishService)``.
     """
     requests_mock = pytest.importorskip("requests_mock")
     _started = []
@@ -303,7 +303,7 @@ def redfish_mock_factory():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         _started.append(mocker)
-        return _make_idrac(f"mock-{vendor}", "root", "mock"), service
+        return _make_redfish_manager(f"mock-{vendor}", "root", "mock"), service
 
     yield _factory
     for _m in _started:
@@ -312,21 +312,21 @@ def redfish_mock_factory():
 
 @pytest.fixture
 def redfish_api(request):
-    """Dual-mode iDRAC client: **live** when ``IDRAC_IP`` is set, else **mock**.
+    """Dual-mode Redfish client: **live** when ``REDFISH_IP`` is set, else **mock**.
 
     Write a command/transport test once against this fixture and it runs offline
-    by default (mock mode) and against real hardware when ``IDRAC_IP`` is exported
+    by default (mock mode) and against real hardware when ``REDFISH_IP`` is exported
     (live mode). A test that mutates state should also carry ``@pytest.mark.live``
-    so it only runs against an approved iDRAC, never just because IDRAC_IP is set.
+    so it only runs against an approved BMC, never just because REDFISH_IP is set.
     """
-    if _has_live_idrac():
-        yield _make_idrac(
-            os.environ["IDRAC_IP"],
-            os.environ.get("IDRAC_USERNAME", "root"),
-            os.environ.get("IDRAC_PASSWORD", ""),
+    if _has_live_redfish():
+        yield _make_redfish_manager(
+            os.environ["REDFISH_IP"],
+            os.environ.get("REDFISH_USERNAME", "root"),
+            os.environ.get("REDFISH_PASSWORD", ""),
         )
     else:
         # Reuse the mock service fixture so mock mode is fully offline.
         service = request.getfixturevalue("redfish_service")
-        yield _make_idrac("mock-idrac", "root", "mock")
+        yield _make_redfish_manager("mock-idrac", "root", "mock")
         _ = service  # keep the mock mounted for the test duration

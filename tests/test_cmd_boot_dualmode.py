@@ -1,7 +1,7 @@
 """Dual-mode test for the boot-source query command.
 
-Runs offline by default against the mock service (using the iDRAC-shaped fixture
-in tests/idrac_fixtures/), and against real hardware when IDRAC_IP is set. This is
+Runs offline by default against the mock service (using the Dell-shaped fixture
+in tests/dell_fixtures/), and against real hardware when REDFISH_IP is set. This is
 the template for porting the remaining live-only command tests: invoke the command
 through sync_invoke and assert the CommandResult shape.
 
@@ -12,8 +12,8 @@ import json
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.compute.cmd_power_state import RebootHost
-from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

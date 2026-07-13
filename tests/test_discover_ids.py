@@ -8,12 +8,12 @@ returning ALL members so callers can stop assuming a singleton. No network.
 """
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.base_manager import CommandBase
 from redfish_ctl.redfish_manager import CommandResult
 
 
 class TestMemberIds:
-    """IDracManager._member_ids extracts @odata.id from a Members list."""
+    """CommandBase._member_ids extracts @odata.id from a Members list."""
 
     def test_member_ids_extracts_all(self):
         """A two-member list yields both ids, in order."""
@@ -21,7 +21,7 @@ class TestMemberIds:
             {"@odata.id": "/redfish/v1/Systems/System_0"},
             {"@odata.id": "/redfish/v1/Systems/HGX_Baseboard_0"},
         ]
-        assert IDracManager._member_ids(members) == [
+        assert CommandBase._member_ids(members) == [
             "/redfish/v1/Systems/System_0",
             "/redfish/v1/Systems/HGX_Baseboard_0",
         ]
@@ -33,7 +33,7 @@ class TestMemberIds:
             {"name": "no_id"},
             {"@odata.id": "/redfish/v1/Systems/HGX_Baseboard_0"},
         ]
-        assert IDracManager._member_ids(members) == [
+        assert CommandBase._member_ids(members) == [
             "/redfish/v1/Systems/System_0",
             "/redfish/v1/Systems/HGX_Baseboard_0",
         ]
@@ -45,17 +45,17 @@ class TestMemberIds:
             {"@odata.id": 123},
             {"@odata.id": None},
         ]
-        assert IDracManager._member_ids(members) == ["/redfish/v1/Systems/System_0"]
+        assert CommandBase._member_ids(members) == ["/redfish/v1/Systems/System_0"]
 
     @pytest.mark.parametrize("bad", [None, "x", {}, 5])
     def test_member_ids_non_list_input(self, bad):
         """A non-list payload returns [] rather than raising."""
-        assert IDracManager._member_ids(bad) == []
+        assert CommandBase._member_ids(bad) == []
 
 
 def _manager_with(members):
-    """Build an IDracManager (no __init__) whose base_query serves ``members``."""
-    inst = IDracManager.__new__(IDracManager)
+    """Build an CommandBase (no __init__) whose base_query serves ``members``."""
+    inst = CommandBase.__new__(CommandBase)
     inst.base_query = lambda *a, **k: CommandResult(members, None, None, None)
     return inst
 

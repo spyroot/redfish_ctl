@@ -1,6 +1,6 @@
 """Contracts for the HPE iLO 5 (ProLiant DL360 Gen10) vendor corpus + rules.
 
-The corpus under tests/hpe_dl360_corpus is a real iLO 5 capture. The crawl did
+The corpus under corpora/mock/hpe_dl360.tar.gz is a real iLO 5 capture. The crawl did
 not capture the ServiceRoot or the Systems/Managers collection index files, so
 minimal synthetic index files (flagged Oem.redfish_ctl.Synthesized) link the
 captured members; everything else is untouched. HPE mixes case in its own

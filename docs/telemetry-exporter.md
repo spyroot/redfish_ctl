@@ -114,7 +114,7 @@ other NVLink error counters.
 ## Credentials
 
 For exporter runs, keep BMC credentials in environment variables or a gitignored runtime file. Do not
-put the password on argv; the exporter rejects `--idrac_password`.
+put the password on argv; the exporter rejects `--redfish_password`.
 
 `.internal/idrac_exporter.env`, created by the operator before runtime, is a simple `KEY=VALUE` file:
 

@@ -1,6 +1,6 @@
 """Dual-mode tests for the manager reset command."""
 
-from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.command_shared import ApiRequestType, JobState
 from redfish_ctl.manager.cmd_manager_reset import ManagerReset
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -62,7 +62,7 @@ def test_manager_reset_wait_posts_reset_and_attaches_reachability(
         return {"reachable": True, "went_down": True, "waited_s": 0.25}
 
     monkeypatch.setattr(ManagerReset, "fetch_task", fetch_task)
-    monkeypatch.setattr("idrac_ctl.cmd_wait.wait_reachable", wait_reachable)
+    monkeypatch.setattr("redfish_ctl.cmd_wait.wait_reachable", wait_reachable)
 
     result = redfish_mock.sync_invoke(
         ApiRequestType.ManagerReset,

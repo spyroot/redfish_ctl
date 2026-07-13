@@ -3,13 +3,13 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class Certificates(IDracManager,
+class Certificates(CommandBase,
                    scm_type=ApiRequestType.CertificatesQuery,
                    name="certificates",
                    metaclass=Singleton):

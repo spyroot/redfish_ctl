@@ -1,8 +1,8 @@
 """Dual-mode tests for virtual-media commands."""
 import json
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType, IdracApiRespond
+from redfish_ctl.base_manager import CommandBase
+from redfish_ctl.command_shared import ApiRequestType, RedfishCommandRespond
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -79,7 +79,7 @@ def test_virtual_media_insert_posts_action_payload(
 ):
     """virtual_disk_insert POSTs to the member InsertMedia action target."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -114,7 +114,7 @@ def test_virtual_media_eject_posts_action_payload(
 ):
     """virtual_disk_eject POSTs an empty body to the member EjectMedia target."""
     monkeypatch.setattr(
-        IDracManager,
+        CommandBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -146,5 +146,5 @@ def test_virtual_media_eject_skips_post_when_device_is_already_empty(
     )
 
     assert isinstance(result, CommandResult)
-    assert result.data == {"Status": IdracApiRespond.Ok}
+    assert result.data == {"Status": RedfishCommandRespond.Ok}
     assert redfish_service.last_request.method == "GET"

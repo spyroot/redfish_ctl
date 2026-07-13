@@ -7,16 +7,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
 
 
 class QueryBootSourceRegistry(
-    IDracManager,
+    CommandBase,
     scm_type=ApiRequestType.BootSourceRegistry,
     name='boot_source_registry',
     metaclass=Singleton):
@@ -45,7 +42,7 @@ class QueryBootSourceRegistry(
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes boot source registry query command.
-        
+
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param filename: if filename indicate call will save a bios setting to a file.
@@ -58,7 +55,7 @@ class QueryBootSourceRegistry(
         # change-boot-order / boot-one-shot commands).
         try:
             return self.base_query(
-                f"{self.idrac_manage_servers}{IDRAC_API.BootSourcesRegistryQuery}",
+                f"{self.idrac_manage_servers}{RedfishEndpoint.BootSourcesRegistryQuery}",
                 filename=filename, do_async=do_async, do_expanded=do_expanded)
         except Exception:
             return CommandResult(

@@ -1,6 +1,6 @@
 """Contracts for the Dell iDRAC (PowerEdge XR8620t) vendor corpus + mutation rules.
 
-The corpus under tests/dell_xr8620t_corpus is a real iDRAC Redfish capture; the
+The corpus under corpora/mock/dell_xr8620t.tar.gz is a real iDRAC Redfish capture; the
 mock serves it unchanged and the dell_xr8620t.yaml mutation rules drive its
 write classes. Dell uses the iDRAC path scheme (System.Embedded.1 /
 iDRAC.Embedded.1), so these rules are distinct from the GB300 set.

@@ -1,9 +1,9 @@
 """This a unit test for query accounts in redfish/idrac
 
 Before you run unit test.
-IDRAC_IP=IP
-IDRAC_PASSWORD=PASS
-IDRAC_USERNAME=root
+REDFISH_IP=IP
+REDFISH_PASSWORD=PASS
+REDFISH_USERNAME=root
 # set PYTHONWARNINGS as well, so it will not output warning about insecure.
 PYTHONWARNINGS=ignore:Unverified HTTPS request
 
@@ -17,8 +17,8 @@ from unittest import TestCase
 
 import pytest
 
-from redfish_ctl.idrac_manager import CommandResult, IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.base_manager import CommandBase, CommandResult
+from redfish_ctl.command_shared import ApiRequestType
 from redfish_ctl.redfish_shared import RedfishJson
 
 logging.basicConfig()
@@ -26,25 +26,25 @@ log = logging.getLogger("LOG")
 
 
 # Integration tests: require a reachable iDRAC.
-# Skipped automatically unless IDRAC_IP is set (see tests/conftest.py).
+# Skipped automatically unless REDFISH_IP is set (see tests/conftest.py).
 pytestmark = pytest.mark.live
 
 class TestAccounts(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> IDracManager:
-        redfish_api = IDracManager(idrac_ip=os.environ.get('IDRAC_IP', ''),
-                                   idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
-                                   idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
+    def setUpClass(cls) -> CommandBase:
+        redfish_api = CommandBase(idrac_ip=os.environ.get('REDFISH_IP', ''),
+                                   idrac_username=os.environ.get('REDFISH_USERNAME', 'root'),
+                                   idrac_password=os.environ.get('REDFISH_PASSWORD', ''),
                                    insecure=True,
                                    is_debug=False)
         return redfish_api
 
     def setUp(self) -> None:
-        self.assertTrue(len(os.environ.get('IDRAC_IP', '')) > 0, "IDRAC_IP is none")
-        self.assertTrue(len(os.environ.get('IDRAC_USERNAME', '')) > 0, "IDRAC_USERNAME is none")
-        self.assertTrue(len(os.environ.get('IDRAC_PASSWORD', '')) > 0, "IDRAC_PASSWORD is none")
+        self.assertTrue(len(os.environ.get('REDFISH_IP', '')) > 0, "REDFISH_IP is none")
+        self.assertTrue(len(os.environ.get('REDFISH_USERNAME', '')) > 0, "REDFISH_USERNAME is none")
+        self.assertTrue(len(os.environ.get('REDFISH_PASSWORD', '')) > 0, "REDFISH_PASSWORD is none")
 
     def test_basic_accounts_query(self):
         """test basic query

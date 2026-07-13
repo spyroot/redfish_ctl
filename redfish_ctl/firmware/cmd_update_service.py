@@ -2,14 +2,14 @@
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, RedfishEndpoint, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class UpdateServiceQuery(IDracManager,
+class UpdateServiceQuery(CommandBase,
                          scm_type=ApiRequestType.UpdateServiceQuery,
                          name='update_service',
                          metaclass=Singleton):
@@ -69,7 +69,7 @@ class UpdateServiceQuery(IDracManager,
         update_service = root.get("UpdateService")
         if isinstance(update_service, dict) and update_service.get("@odata.id"):
             return update_service["@odata.id"]
-        return IDRAC_API.UpdateServiceQuery
+        return RedfishEndpoint.UpdateServiceQuery
 
     def execute(self,
                 filename: Optional[str] = None,

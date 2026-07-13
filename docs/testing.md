@@ -13,14 +13,17 @@ ruff check <changed>
 fixture. If `REDFISH_IP` is still exported from real hardware work, `redfish_api` switches to live mode,
 so unset those variables for the default suite.
 
+Mock and dataset corpus artifacts are indexed by `corpora/manifest.v1.json`; see
+[docs/corpus-library.md](corpus-library.md) for pull and materialization commands.
+
 ## Which Lane To Use
 
 **Mock lane, default.** `tests/conftest.py` builds `MockRedfishService` from the captured DMTF tree in
-`redfish_ctl/json_responses/`. Dell-shaped gaps are overlaid from `tests/idrac_fixtures/`. The service
+`redfish_ctl/json_responses/`. Dell-shaped gaps are overlaid from `tests/dell_fixtures/`. The service
 handles `GET`, `POST`, `PATCH`, `DELETE`, and action-style POSTs, so mutating command tests can stay
 offline.
 
-Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock, and
+Use the `redfish_mock` fixture when you need an `CommandBase` wired to the mock, and
 `redfish_service` when you need to inspect requests or state changes.
 
 **Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
@@ -41,7 +44,7 @@ returning to the default suite.
 
 **Vendor-aware mock lane.** `redfish_mock_factory`, defined in `tests/conftest.py`, overlays
 `tests/<vendor>_fixtures/` on the DMTF base. The repo has four corpora now: Dell
-(`tests/idrac_fixtures/`), Supermicro GB300 (`tests/supermicro_fixtures/`), HPE iLO
+(`tests/dell_fixtures/`), Supermicro GB300 (`tests/supermicro_fixtures/`), HPE iLO
 (`tests/hpe_fixtures/`), and generic DMTF (`tests/generic_fixtures/`).
 
 Worked examples:
@@ -65,7 +68,7 @@ REDFISH_EMULATOR_URL=http://127.0.0.1:8000 pytest tests/test_emulator_smoke.py
 
 ## Fixtures And Faithfulness
 
-The captured DMTF tree is generic. Dell-only resources belong in `tests/idrac_fixtures/`, and
+The captured DMTF tree is generic. Dell-only resources belong in `tests/dell_fixtures/`, and
 non-Dell overlays belong in `tests/<vendor>_fixtures/`. Supermicro coverage is fixture-derived from a
 read-only GB300 observation. HPE coverage comes from the HPE iLO emulator corpus plus the optional
 `examples/hpe_ilo_canary.sh` live-emulator flow.

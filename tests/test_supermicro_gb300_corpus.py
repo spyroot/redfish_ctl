@@ -1,6 +1,6 @@
 """Contract for the primary Supermicro GB300 corpus (packed as an LFS tarball).
 
-The full GB300 lab crawl ships as ``tests/supermicro_gb300_corpus.tar.gz`` (built
+The GB300 mock-ready artifact ships as ``corpora/mock/supermicro_gb300.tar.gz`` (built
 by ``tools/pack_corpus.py``, tracked by Git LFS) and is the corpus the telemetry,
 controller, and mutation tests replay. This pins that the packed corpus still
 serves as a Supermicro GB300, that every extracted fixture is valid JSON, and

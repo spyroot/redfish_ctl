@@ -2,12 +2,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ManagerNetworkProtocol(IDracManager,
+class ManagerNetworkProtocol(CommandBase,
                              scm_type=ApiRequestType.ManagerNetworkProtocol,
                              name='manager-network',
                              metaclass=Singleton):

@@ -2,9 +2,9 @@
 from abc import abstractmethod
 from typing import Iterable, Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -51,7 +51,7 @@ def build_volume_payload(name: str, raid_type: str, drive_uris: list[str]) -> di
     }
 
 
-class _VolumeMutationBase(IDracManager):
+class _VolumeMutationBase(CommandBase):
     """Shared Storage/Volume collection helpers for guarded mutations."""
 
     def _storage(self, controller: str, do_async: bool = False) -> dict:

@@ -16,7 +16,7 @@
 #
 # All matching rules apply, so conditional side effects compose: a reset both
 # powers the system down and, only when a one-time boot is armed, reverts it.
-# Every path/field below exists in tests/supermicro_gb300_corpus.
+# Every path/field below exists in corpora/mock/supermicro_gb300.tar.gz.
 #
 # The GB300 is a GPU compute node; its corpus has no Volumes collection or
 # clearable LogService, so storage-volume and log-clear classes are covered by

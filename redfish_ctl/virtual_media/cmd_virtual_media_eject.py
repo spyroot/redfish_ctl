@@ -14,14 +14,13 @@ import warnings
 from abc import abstractmethod
 from typing import Optional
 
+from ..base_manager import CommandBase
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..command_shared import ApiRequestType, RedfishCommandRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class VirtualMediaEject(IDracManager,
+class VirtualMediaEject(CommandBase,
                         scm_type=ApiRequestType.VirtualMediaEject,
                         name='virtual_disk_eject',
                         metaclass=Singleton):
@@ -98,11 +97,11 @@ class VirtualMediaEject(IDracManager,
 
         if 'image' in inserted:
             if do_strict:
-                raise InvalidArgument(f"Image already ejected")
+                raise InvalidArgument("Image already ejected")
             else:
                 return CommandResult(
                     {
-                        "Status": IdracApiRespond.Ok
+                        "Status": RedfishCommandRespond.Ok
                      }, None, None, None)
 
         eject_rest = [a['EjectMedia'].target for a in actions][-1]
@@ -112,7 +111,7 @@ class VirtualMediaEject(IDracManager,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishCommandRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

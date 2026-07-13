@@ -3,8 +3,8 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from ..telemetry.exporter import (
@@ -18,7 +18,7 @@ from ..telemetry.exporter import (
 from .common import link, members, nvidia_oem, resource_id
 
 
-class GpuMetrics(IDracManager,
+class GpuMetrics(CommandBase,
                  scm_type=ApiRequestType.GpuMetrics,
                  name="gpu-metrics",
                  metaclass=Singleton):

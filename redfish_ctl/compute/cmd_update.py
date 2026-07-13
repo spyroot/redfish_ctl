@@ -11,12 +11,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..base_manager import CommandBase
+from ..command_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class UpdateCompute(IDracManager,
+class UpdateCompute(CommandBase,
                     scm_type=ApiRequestType.ComputeUpdate,
                     name='update',
                     metaclass=Singleton):
@@ -58,7 +58,7 @@ class UpdateCompute(IDracManager,
         :return:
         """
 
-        idrac_version = self.idrac_manager_version
+        idrac_version = self.base_manager_version
         ver_by_parts = idrac_version.split(".")
         major = int(ver_by_parts[0])
         minor = int(ver_by_parts[1])
