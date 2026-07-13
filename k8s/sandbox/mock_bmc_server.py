@@ -24,6 +24,11 @@ DEFAULT_CORPUS_DIR = Path(
 )
 
 
+class MockBMCServer(ThreadingHTTPServer):
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def _build_fixture_index(corpus_dir: Path) -> dict[str, Path]:
     root = Path(corpus_dir)
     return {path.name.lower(): path for path in root.glob("*.json")}
@@ -658,7 +663,7 @@ def run_server(
     mutation_rules: Path | None = None,
     seed: int = 0,
 ) -> Iterator[ThreadingHTTPServer]:
-    server = ThreadingHTTPServer(
+    server = MockBMCServer(
         (host, port),
         make_handler(
             corpus_dir,
@@ -716,7 +721,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     server = None
     try:
-        server = ThreadingHTTPServer(
+        server = MockBMCServer(
             (args.host, args.port),
             make_handler(
                 args.corpus_dir,

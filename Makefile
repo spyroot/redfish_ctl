@@ -1,11 +1,24 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
-PYTHON ?= python
-PYTEST ?= pytest
-RUFF ?= ruff
-MYPY ?= mypy
-TWINE ?= twine
+CONDA_ENV ?= redfish_ctl
+CONDA ?= $(shell \
+	if command -v conda >/dev/null 2>&1; then \
+		command -v conda; \
+	elif [ -x "$$HOME/miniconda3/condabin/conda" ]; then \
+		printf '%s' "$$HOME/miniconda3/condabin/conda"; \
+	elif [ -x "$$HOME/miniconda3/bin/conda" ]; then \
+		printf '%s' "$$HOME/miniconda3/bin/conda"; \
+	else \
+		printf '%s' conda; \
+	fi)
+CONDA_RUN ?= $(CONDA) run -n $(CONDA_ENV)
+
+PYTHON ?= $(CONDA_RUN) python
+PYTEST ?= $(CONDA_RUN) pytest
+RUFF ?= $(CONDA_RUN) ruff
+MYPY ?= $(CONDA_RUN) mypy
+TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 

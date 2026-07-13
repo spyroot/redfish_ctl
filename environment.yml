@@ -22,6 +22,7 @@ dependencies:
   - requests-mock>=1.10
   - ruff
   - mypy
+  - twine
   # Schema validation (tools/redfish_validate.py)
   - jsonschema>=4.18
   - referencing

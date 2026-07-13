@@ -20,6 +20,7 @@ NETWORK_PROTOCOL = "/redfish/v1/Managers/BMC_0/NetworkProtocol"
 CHASSIS = "/redfish/v1/Chassis/Chassis_0"
 
 MAX_CONCURRENT_SECONDS = 20.0
+MIN_REQUEST_QUEUE_SIZE = 64
 
 
 def _load_server_module() -> Any:
@@ -155,6 +156,15 @@ def test_mock_bmc_serves_many_concurrent_reads(tmp_path: Path) -> None:
     for status, payload in results:
         assert status == 200
         assert payload == expected_payloads[payload["@odata.id"]]
+
+
+def test_mock_bmc_server_backlog_covers_concurrency_contract(tmp_path: Path) -> None:
+    """The listen backlog should not reset clients in the concurrency tests."""
+    module = _load_server_module()
+    corpus, _ = _tiny_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        assert server.request_queue_size >= MIN_REQUEST_QUEUE_SIZE
 
 
 def test_mutation_rules_serialize_concurrent_writes_with_reads(tmp_path: Path) -> None:
