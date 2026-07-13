@@ -73,25 +73,13 @@ python redfish_ctl.py insert_virtual_media --uri_path http://my_ip/ubuntu-22.04.
 Author Mus spyroot@gmail.com
 """
 import argparse
-import warnings
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_exceptions import InvalidJsonSpec
-from ..cmd_utils import from_json_spec
-from ..idrac_shared import IdracApiRespond
-from ..redfish_shared import RedfishJson
-from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
-from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
-
 
 
 class VirtualMediaInsert(IDracManager,
@@ -166,17 +154,10 @@ class VirtualMediaInsert(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        new_api = False
         virtual_media = self.sync_invoke(
             ApiRequestType.VirtualMediaGet,
             "virtual_disk_query"
         )
-        if self.version_api:
-            new_api = True
-            # this for a future issue if old API doesn't work
-
-        if new_api is False:
-            warnings.warn("Detected old rest API.")
 
         members = virtual_media.data['Members']
         actions = [self.discover_redfish_actions(self, m) for m

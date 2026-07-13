@@ -10,14 +10,12 @@ Will eject virtual device id 1
 Author Mus spyroot@gmail.com
 """
 import argparse
-import warnings
 from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -69,16 +67,10 @@ class VirtualMediaEject(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        new_api = False
         virtual_media = self.sync_invoke(
             ApiRequestType.VirtualMediaGet,
             "virtual_disk_query"
         )
-        if self.version_api:
-            new_api = True
-
-        if new_api is False:
-            warnings.warn("Old api")
 
         members = virtual_media.data['Members']
         actions = [
@@ -98,7 +90,7 @@ class VirtualMediaEject(IDracManager,
 
         if 'image' in inserted:
             if do_strict:
-                raise InvalidArgument(f"Image already ejected")
+                raise InvalidArgument("Image already ejected")
             else:
                 return CommandResult(
                     {

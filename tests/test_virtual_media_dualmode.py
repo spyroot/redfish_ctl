@@ -22,6 +22,37 @@ def test_virtual_media_query_returns_collection(redfish_api):
     assert [member["Id"] for member in result.data["Members"]] == ["1", "2"]
 
 
+def test_virtual_media_query_prefers_dell_system_link_when_both_exist(
+    redfish_mock, redfish_service
+):
+    """Dell-shaped resources keep the historical System VirtualMedia path."""
+    manager_path = "/redfish/v1/Managers/iDRAC.Embedded.1"
+    system_path = "/redfish/v1/Systems/System.Embedded.1"
+    manager_state = dict(redfish_service._state(manager_path))
+    system_state = dict(redfish_service._state(system_path))
+    manager_state["VirtualMedia"] = {
+        "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/VirtualMedia"
+    }
+    system_state["VirtualMedia"] = {
+        "@odata.id": "/redfish/v1/Systems/System.Embedded.1/VirtualMedia"
+    }
+    for path, state in (
+        (manager_path, manager_state),
+        (manager_path.lower(), manager_state),
+        (system_path, system_state),
+        (system_path.lower(), system_state),
+    ):
+        redfish_service._overlay[path] = state
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.VirtualMediaGet, "virtual_disk_query"
+    )
+
+    assert result.data["@odata.id"] == (
+        "/redfish/v1/Systems/System.Embedded.1/VirtualMedia"
+    )
+
+
 def test_virtual_media_query_filters_by_device_id(redfish_api):
     """device_id returns the matching virtual-media member."""
     result = redfish_api.sync_invoke(
@@ -72,6 +103,56 @@ def test_virtual_media_query_reports_missing_device(redfish_api):
 
     assert isinstance(result, CommandResult)
     assert result.data == {"Status": "device id 99 not found"}
+
+
+def test_virtual_media_query_hydrates_manager_members(redfish_mock_factory):
+    """Supermicro exposes VirtualMedia under the Manager and returns member links."""
+    manager, _service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.VirtualMediaGet,
+        "virtual_disk_query",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["@odata.id"] == "/redfish/v1/Managers/BMC_0/VirtualMedia"
+    members = {member["Id"]: member for member in result.data["Members"]}
+    assert {"USB1", "USB2", "Slot_0"} <= members.keys()
+    assert members["USB1"]["Actions"]["#VirtualMedia.InsertMedia"]["target"] == (
+        "/redfish/v1/Managers/BMC_0/VirtualMedia/USB1/"
+        "Actions/VirtualMedia.InsertMedia"
+    )
+
+
+def test_virtual_media_insert_uses_manager_action_target(
+    redfish_mock_factory, monkeypatch
+):
+    """insert_vm uses the discovered Manager VirtualMedia action target."""
+    manager, service = redfish_mock_factory("supermicro")
+    monkeypatch.setattr(
+        IDracManager,
+        "fetch_task",
+        lambda self, task_id: {"TaskState": "Completed"},
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.VirtualMediaInsert,
+        "virtual_disk_insert",
+        uri_path="http://example.test/gb300.iso",
+        device_id="USB1",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.last_request.path == (
+        "/redfish/v1/managers/bmc_0/virtualmedia/usb1/"
+        "actions/virtualmedia.insertmedia"
+    )
+    assert service.last_request.json() == {
+        "Image": "http://example.test/gb300.iso",
+        "Inserted": True,
+        "WriteProtected": True,
+    }
 
 
 def test_virtual_media_insert_posts_action_payload(
