@@ -22,9 +22,9 @@ loose files.
 | Supermicro | GB300 | 1.17.0 | 1235 | full device + telemetry |
 | NVIDIA / Supermicro | GB300 (node2) | 1.15.0 | 1646 | full device + telemetry |
 
-That is **4009 JSON resources** across five boxes. The table is generated from
-`tests/corpus/manifest.json`; run `python tools/corpus.py list` to print the
-current index (it stays in sync with the manifest as more boxes are added).
+That is **4009 JSON resources** across five boxes. The canonical index is
+`tests/corpus/manifest.json`; this table mirrors it. Run `python tools/corpus.py list` to print the
+current index as more boxes are added.
 
 ## Pull the entire corpus (all vendors, all JSON)
 
@@ -52,16 +52,16 @@ python tools/corpus.py extract-all --dest /path/to/redfish_corpus
 ```
 
 `pull` wraps `git lfs pull --include=<tarballs>`, so `git lfs` must be installed
-(`git lfs install` once per machine). To confirm the download succeeded and every
-count matches the manifest:
+(`git lfs install` once per machine). To check the manifest and, when LFS objects are present, their
+JSON counts:
 
 ```bash
 python tools/corpus.py verify
 ```
 
-`verify` reports `ok` per corpus, or `pointer` for a tarball that has not been
-pulled yet (it does not fail on un-pulled pointers, so the check is safe on a
-fresh checkout).
+`verify` reports `ok` per corpus when the tarball is present, or `pointer` for a tarball that has
+not been pulled yet. It does not fail on un-pulled pointers, so the check is safe on a fresh
+checkout; after `pull`, extraction-ready output should contain only `ok` lines.
 
 ### Pull or extract a single vendor
 

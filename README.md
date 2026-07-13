@@ -223,9 +223,10 @@ temperature, power, fan, and voltage readings with units. `discovery`, defined i
 
 ## Vendor Reach
 
-Dell iDRAC is the main control target. Supermicro GB300, HPE iLO, and generic DMTF Redfish trees are
-covered by offline fixture corpora, with HPE also covered by the opt-in emulator canary in
-`examples/hpe_ilo_canary.sh`. The current support matrix is in [Vendors](docs/vendors.md).
+Dell iDRAC is the main control target. Vendor-neutral reads are fixture-backed for Dell iDRAC,
+Supermicro GB300/X10, HPE iLO, and generic DMTF Redfish corpora, with HPE also covered by the
+opt-in emulator canary in `examples/hpe_ilo_canary.sh`. See [Vendors](docs/vendors.md) and the
+[Corpus Library](docs/corpus-library.md) for exact coverage.
 
 ## Mutating Commands
 
@@ -310,7 +311,7 @@ First-run problems are almost always the connection, not the command:
 - [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
 - [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
 - [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
-- [Telemetry exporter](docs/telemetry-exporter.md) - BMC metrics for Prometheus and SignalFx.
+- [Corpus Library](docs/corpus-library.md) - committed Redfish corpora and extraction workflow.
 - [Telemetry metrics](docs/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
 - [Releasing](docs/releasing.md) - local verification, package build, PyPI upload, and tagging.
