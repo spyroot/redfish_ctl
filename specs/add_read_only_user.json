@@ -13,11 +13,8 @@
     "Users.3.UseEmail": "Disabled",
     "Users.3.EmailAddress": "",
     "Users.3.RSASecurID2FA": "Disabled",
-    "Users.3.UserName": "test",
-    "Users.3.Password": "test123",
+    "Users.3.UserName": "readonly",
+    "Users.3.Password": "REPLACE_WITH_STRONG_PASSWORD",
     "Users.3.PrivacyProtocol": "AES"
   }
 }
-
-
-//https://10.252.252.209/redfish/v1/Managers/iDRAC.Embedded.1/Attributes
