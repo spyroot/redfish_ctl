@@ -52,6 +52,45 @@ SENSITIVE_KEYS: dict[str, str] = {
     "token": "REDACTED",
 }
 
+# Credential attribute names whose VALUE is always a secret, matched on the last
+# dotted segment of the key so vendor OEM attribute maps (Dell stores flat dotted
+# keys like ``Users.2.SHA256Password`` / ``IPMILan.1.CommunityName`` inside an
+# ``Attributes`` object) are caught even though the exact key is not a bare name.
+# Last-segment (not substring) matching avoids scrubbing benign toggles such as
+# ``EnableSNMPv3Passphrase`` (a boolean flag, not the passphrase itself).
+SECRET_SUFFIXES: dict[str, str] = {
+    "password": "REDACTED",
+    "sha256password": "REDACTED",
+    "sha256passwordsalt": "REDACTED",
+    "ipmikey": "REDACTED",
+    "md5v3key": "REDACTED",
+    "shav3key": "REDACTED",
+    "communityname": "REDACTED",
+    "agentcommunity": "REDACTED",
+    "snmpv3passphrase": "REDACTED",
+    "passphrase": "REDACTED",
+    "token": "REDACTED",
+    "authtoken": "REDACTED",
+    "privatekey": "REDACTED",
+    "sharedsecret": "REDACTED",
+    "presharedkey": "REDACTED",
+    "chapsecret": "REDACTED",
+    "chapsecretreverse": "REDACTED",
+}
+
+
+def secret_placeholder(key: str, sensitive_keys: dict[str, str]) -> str | None:
+    """Placeholder for a key that is a secret, or None.
+
+    A key matches when its exact lowercased form is in ``sensitive_keys`` OR the
+    last dotted segment is a known credential suffix (:data:`SECRET_SUFFIXES`).
+    """
+    kl = key.lower()
+    if kl in sensitive_keys:
+        return sensitive_keys[kl]
+    return SECRET_SUFFIXES.get(kl.rsplit(".", 1)[-1])
+
+
 # Any MAC-shaped string anywhere is scrubbed as a safety net for unexpected fields.
 _MAC_RE = re.compile(r"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b")
 _MAC_PLACEHOLDER = "00:00:00:00:00:00"
@@ -92,7 +131,7 @@ def redact_obj(obj, source_ips: list[str], placeholder_ip: str,
     if isinstance(obj, dict):
         out = {}
         for key, value in obj.items():
-            placeholder = sensitive_keys.get(key.lower())
+            placeholder = secret_placeholder(key, sensitive_keys)
             if placeholder is not None and isinstance(value, str):
                 out[key] = placeholder
                 counts.key_redactions += 1
