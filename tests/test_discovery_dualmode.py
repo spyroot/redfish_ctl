@@ -67,4 +67,9 @@ def test_discovery_reads_service_root_in_mock_mode(
     assert redfish_service.requests[0].path.rstrip("/").lower() == "/redfish/v1"
     discovery_dir = tmp_path / ".json_responses" / "mock-idrac"
     assert discovery_dir.is_dir()
-    assert list(discovery_dir.iterdir()) == []
+    # The ServiceRoot itself is now persisted in execute() — previously it was
+    # fetched to seed the crawl but never written, so the one resource every
+    # consumer needs (the entry point) was missing from the corpus.
+    assert [p.name for p in discovery_dir.iterdir()] == ["_redfish_v1.json"]
+    saved_root = json.loads((discovery_dir / "_redfish_v1.json").read_text())
+    assert saved_root == service_root

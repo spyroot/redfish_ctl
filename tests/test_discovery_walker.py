@@ -16,6 +16,8 @@ client is never constructed. The whole module runs green with no IDRAC_IP set.
 
 Author Mus spyroot@gmail.com
 """
+from pathlib import Path
+
 import pytest
 import requests
 
@@ -25,50 +27,75 @@ from redfish_ctl.discovery.cmd_discovery import (
     LOG_ENTRY_MEMBER_RE,
     Discovery,
 )
-from redfish_ctl.redfish_exceptions import RedfishForbidden, RedfishNotFound
+from redfish_ctl.redfish_exceptions import RedfishNotFound
 from redfish_ctl.redfish_manager import CommandResult
+
+
+class _FakeResp:
+    """Minimal stand-in for a ``requests.Response`` the capture path reads."""
+
+    def __init__(self, status, body, allow=None):
+        self.status_code = status
+        self._body = body
+        self.headers = {"Allow": allow} if allow else {}
+
+    def json(self):
+        return self._body
 
 
 class _FakeGraph:
     """In-memory Redfish service backed by a ``normalized path -> payload`` map.
 
-    Stands in for ``Discovery.base_query``: the walker normalizes a path and
+    Stands in for ``Discovery._fetch_capture``: the walker normalizes a path and
     calls this with the canonical form, so the map is keyed on canonical paths.
     Each call is tallied in :attr:`fetch_counts` so a test can prove a logical
     resource was fetched exactly once even when its links spell it many ways.
-    A path absent from the graph raises ``RedfishNotFound`` to mimic a 404.
+    Returns ``(status, body, allow_header)`` like the real ``_fetch_capture``; a
+    path absent from the graph comes back as a captured ``404`` (no raise), so
+    the walker records it as error ground truth instead of dropping it.
     """
 
     def __init__(self, graph):
         self.graph = graph
         self.fetch_counts = {}
 
-    def base_query(self, resource_path, *args, **kwargs):
+    def fetch_capture(self, resource_path):
         self.fetch_counts[resource_path] = self.fetch_counts.get(resource_path, 0) + 1
         if resource_path not in self.graph:
-            raise RedfishNotFound(resource_path)
-        # extra="GET" -> the Allow header the walker records as allowed methods.
-        return CommandResult(self.graph[resource_path], None, "GET", None)
+            return 404, {"error": {"code": "Base.1.0.ResourceMissingAtURI"}}, None
+        # allow="GET" -> the Allow header the walker records as allowed methods.
+        return 200, self.graph[resource_path], "GET"
 
 
 def _make_discovery(tmp_path, graph, query_filter=None):
-    """Build a Discovery whose ``base_query`` serves ``graph``, no network.
+    """Build a Discovery whose ``_fetch_capture`` serves ``graph``, no network.
 
     ``__init__`` (which would construct a real Redfish client) is bypassed; we
-    set only the attributes ``recursive_discovery`` actually reads. JSON dumps
-    land in ``tmp_path``. Returns ``(discovery, fake_graph)``.
+    set only the attributes ``recursive_discovery`` actually reads, including the
+    new ``_http_status`` / ``_error_file_mapping`` capture maps, plus the fields
+    ``_fetch_capture`` needs to build a URL (``_default_method`` / ``redfish_ip``)
+    for the retry tests that mock ``api_get_call``. JSON dumps land in
+    ``tmp_path``. Returns ``(discovery, fake_graph)``.
     """
     disc = Discovery.__new__(Discovery)
     disc.visited_urls = {}
     disc._discovered_url_file_mapping = {}
     disc._api_allowed_methods = {}
+    disc._http_status = {}
+    disc._error_file_mapping = {}
     disc.default_query_filter = list(query_filter or [])
     disc.json_response_dir = str(tmp_path)
+    # redfish_ip is a read-only property over these backing fields; the real
+    # _fetch_capture (exercised only by the retry tests, which mock api_get_call)
+    # reads redfish_ip to build the request URL.
+    disc._default_method = "https://"
+    disc._redfish_ip = "10.0.0.9"
+    disc._port = ""
 
     fake = _FakeGraph(graph)
     # Instance attribute shadows the bound method, so it is called with just
-    # the resource path (no implicit self), matching base_query's real call.
-    disc.base_query = fake.base_query
+    # the resource path (no implicit self), matching _fetch_capture's real call.
+    disc._fetch_capture = fake.fetch_capture
     return disc, fake
 
 
@@ -416,8 +443,14 @@ def test_non_redfish_path_is_ignored(tmp_path):
     assert "/some/other/path" not in disc.visited_urls
 
 
-def test_forbidden_marks_visited_and_reports(tmp_path, capsys):
-    """A 403 on a child is swallowed: marked visited, sibling walk continues."""
+def test_error_child_is_captured_and_walk_continues(tmp_path):
+    """A non-2xx (e.g. 403) on a child is CAPTURED — status + body kept as error
+    ground truth for the sim — and the sibling walk still continues.
+
+    This is the lossless-capture behavior: the old crawl swallowed a 403 and lost
+    it; now the URL is recorded in ``_error_file_mapping`` with its status, an
+    ``.error.json`` body is written, and it is NOT put in the 2xx resource map.
+    """
     graph = {
         "/redfish/v1/A": {
             "@odata.id": "/redfish/v1/A",
@@ -428,23 +461,29 @@ def test_forbidden_marks_visited_and_reports(tmp_path, capsys):
     }
     disc, fake = _make_discovery(tmp_path, graph)
 
-    def base_query(resource_path, *args, **kwargs):
+    def fetch_capture(resource_path):
         fake.fetch_counts[resource_path] = fake.fetch_counts.get(resource_path, 0) + 1
         if resource_path == "/redfish/v1/Secret":
-            raise RedfishForbidden("403 on Secret")
-        return CommandResult(graph[resource_path], None, "GET", None)
+            return 403, {"error": {"code": "Base.1.0.InsufficientPrivilege"}}, None
+        return 200, graph[resource_path], "GET"
 
-    disc.base_query = base_query
+    disc._fetch_capture = fetch_capture
     disc.recursive_discovery("/redfish/v1/A")
 
+    # the 403 is captured, not dropped
     assert disc.visited_urls.get("/redfish/v1/Secret") is True
+    assert disc._http_status["/redfish/v1/Secret"] == 403
+    assert "/redfish/v1/Secret" in disc._error_file_mapping
+    assert "/redfish/v1/Secret" not in disc._discovered_url_file_mapping
+    # the error body was written under a .error.json name
+    assert (Path(disc.json_response_dir) / "_redfish_v1_Secret.error.json").exists()
+    # sibling walk still proceeds
     assert fake.fetch_counts["/redfish/v1/B"] == 1
-    out = capsys.readouterr().out
-    assert "Forbidden:" in out
 
 
-def test_generic_error_is_not_mislabeled_forbidden(tmp_path, capsys):
-    """A non-403 failure reports a generic discovery error, not "Forbidden:".
+def test_generic_fetch_error_is_reported_and_does_not_abort(tmp_path, capsys):
+    """An unexpected (non-HTTP) error during a fetch is reported as a discovery
+    error and marked visited, so one bad resource cannot abort the whole crawl.
 
     Regression for the handler that printed "Forbidden:" for every Exception.
     """
@@ -456,13 +495,13 @@ def test_generic_error_is_not_mislabeled_forbidden(tmp_path, capsys):
     }
     disc, fake = _make_discovery(tmp_path, graph)
 
-    def base_query(resource_path, *args, **kwargs):
+    def fetch_capture(resource_path):
         fake.fetch_counts[resource_path] = fake.fetch_counts.get(resource_path, 0) + 1
         if resource_path == "/redfish/v1/Boom":
             raise RuntimeError("connection reset")
-        return CommandResult(graph[resource_path], None, "GET", None)
+        return 200, graph[resource_path], "GET"
 
-    disc.base_query = base_query
+    disc._fetch_capture = fetch_capture
     disc.recursive_discovery("/redfish/v1/A")
 
     assert disc.visited_urls.get("/redfish/v1/Boom") is True
