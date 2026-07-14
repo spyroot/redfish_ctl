@@ -126,6 +126,77 @@ def test_redaction_only_touches_credentials_and_username(good_host):
     assert member["SerialNumber"] == "ABC123"  # NOT redacted — full corpus keeps identifiers
 
 
+def test_snmpv3_key_family_is_redacted():
+    """Regression: EVERY SNMPv3 localized key variant is scrubbed, not just the ones
+    spelled out in the set. A Dell ``SHA1v3Key`` once leaked because the exact-match
+    set held ``shav3key`` (no such Dell key) while the real ``SHA1v3Key`` lowercases
+    to ``sha1v3key``; its siblings ``MD5v3Key``/``SHA256Password`` were scrubbed, so
+    the corpus shipped 3 live SNMPv3 auth keys. The ``*v3key`` suffix pattern closes
+    this whole class."""
+    body = {
+        "Attributes": {
+            "Users.2.SHA1v3Key": "0123456789abcdef0123456789abcdef01234567",
+            "Users.3.SHA256v3Key": "deadbeef" * 8,
+            "Users.4.MD5v3Key": "cafebabecafebabecafebabecafebabe",
+            "Users.5.ShaV3Key": "feedface" * 5,
+        }
+    }
+    cleaned = pack_full_corpus._redact_credentials(body)["Attributes"]
+    for k in body["Attributes"]:
+        assert cleaned[k] == "REDACTED", f"{k} survived redaction"
+
+
+def test_community_and_extra_secret_key_classes_redacted():
+    """Community strings and the newly-covered key classes are scrubbed. ``*community``
+    catches RO/RW/Agent community; ``EncryptionKey`` (IPMI) and ``BindPassword`` (LDAP)
+    are added exact keys — all secret material a full corpus must not ship."""
+    body = {
+        "ROCommunity": "not-public-secret",
+        "RWCommunity": "not-private-secret",
+        "SNMPAlert.1.SNMPv3Community": "custom-community",
+        "IPMILan.1.EncryptionKey": "1122334455667788990011223344556677889900",
+        "LDAP.1.BindPassword": "s3cr3t-bind",
+    }
+    cleaned = pack_full_corpus._redact_credentials(body)
+    for k in body:
+        assert cleaned[k] == "REDACTED", f"{k} survived redaction"
+
+
+def test_non_secret_config_keys_are_not_over_redacted():
+    """The redactor must NOT collapse non-secret config that merely resembles a secret
+    key. Password-*policy* fields, protocol names, and numeric values stay ORIGINAL so
+    the corpus keeps its device configuration faithful."""
+    body = {
+        "PasswordExpiration": "90",          # policy value, last segment != 'password'
+        "MinimumPasswordLength": 8,           # non-string, untouched
+        "SNMPProtocol": "SNMPv3",             # protocol name, not a key
+        "CommunityNameEnabled": "true",       # boolean-ish flag, last segment not matched
+        "SerialNumber": "CN7016327K0033",     # identifier, kept by policy
+    }
+    cleaned = pack_full_corpus._redact_credentials(body)
+    assert cleaned == body, "a non-secret config value was over-redacted"
+
+
+def test_dell_dellattributes_shape_redaction():
+    """On the real Dell DellAttributes shape (dotted composite keys under Attributes),
+    only the SNMPv3 key + account username are scrubbed; the alert destination and
+    other attributes stay original."""
+    body = {
+        "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellAttributes/iDRAC.Embedded.1",
+        "Attributes": {
+            "Users.2.SHA1v3Key": "0123456789abcdef0123456789abcdef01234567",
+            "Users.2.UserName": "root",
+            "SNMPAlert.1.Destination": "10.0.0.5",
+            "Time.1.Timezone": "US/Central",
+        },
+    }
+    attrs = pack_full_corpus._redact_credentials(body)["Attributes"]
+    assert attrs["Users.2.SHA1v3Key"] == "REDACTED"
+    assert attrs["Users.2.UserName"] == "REDACTED"
+    assert attrs["SNMPAlert.1.Destination"] == "10.0.0.5"   # not a secret — kept
+    assert attrs["Time.1.Timezone"] == "US/Central"
+
+
 def test_full_pack_roundtrips_and_revalidates(good_host, tmp_path):
     """Packing produces a tarball that unpacks to one host dir with map+manifest and re-validates."""
     out = tmp_path / "acme_x_full_corpus.tar.gz"
