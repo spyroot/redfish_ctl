@@ -143,6 +143,7 @@ class ApiRequestType(Enum):
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
     NtpSet = auto()
+    IdentifyLed = auto()
     ManagerReset = auto()
 
     # bios related

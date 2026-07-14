@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before deeper inventory or any staged change.
 
-The table below follows the 123 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -125,6 +125,7 @@ Safety labels:
 | `fleet` | Read a YAML fleet inventory and summarize per-node health, sensor count, and temperature max. | Read |
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
+| `identify-led` | Read or set a chassis/system identify LED; requires `--confirm` to write. | Guarded |
 | `insert_vm` | Insert virtual media from a URI. | Write |
 | `job` | Read one Dell job. | Read |
 | `job-apply` | Apply pending jobs. | Write |
