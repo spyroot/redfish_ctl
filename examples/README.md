@@ -30,7 +30,9 @@ Platform/vendor labels:
 
 ## Index
 
-Run examples from the repository root with `bash examples/<script>`.
+Run **Read** examples from the repository root with `bash examples/<script>`. For **Guarded** and
+**Write** examples, inspect the script first, confirm each live step, and run only on an approved
+target.
 
 | Example | Platform/vendor | Safety | Purpose |
 |---|---|---|---|
