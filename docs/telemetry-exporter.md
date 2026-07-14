@@ -175,7 +175,13 @@ falls back to the reported sensor name.
 ## SignalFx
 
 SignalFx push mode uses `SPLUNK_ACCESS_TOKEN`, the ingest token read from the process environment,
-and `SPLUNK_INGEST_URL`, the ingest URL read from the process environment.
+and `SPLUNK_INGEST_URL`, the ingest URL read from the process environment. The ingest URL must be the
+full SignalFx datapoint endpoint ending in `/v2/datapoint` (for example
+`https://ingest.us1.signalfx.com/v2/datapoint`); the exporter POSTs it verbatim, so a bare host such
+as `https://ingest.us1.observability.splunkcloud.com` is rejected because it would accept the request
+but silently drop every datapoint. Override the default with `--signalfx-ingest-url`.
+
+Without `--once`, push mode scrapes and pushes on a loop every `--interval` seconds:
 
 ```bash
 redfish_ctl exporter \
@@ -185,8 +191,20 @@ redfish_ctl exporter \
   --push-signalfx
 ```
 
-For tests and dry runs, use `--once --output signalfx`. That prints the SignalFx datapoint envelope
-without posting anything.
+Add `--once` to scrape, POST the datapoints exactly once, and return the pushed body plus the ingest
+HTTP status:
+
+```bash
+redfish_ctl exporter \
+  --credential-file .internal/idrac_exporter.env \
+  --vendor supermicro \
+  --once \
+  --output signalfx \
+  --push-signalfx
+```
+
+For a dry run, use `--once --output signalfx` without `--push-signalfx`. That prints the SignalFx
+datapoint envelope without posting anything.
 
 ## OTLP (OpenTelemetry)
 

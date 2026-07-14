@@ -210,6 +210,9 @@ def test_full_pack_roundtrips_and_revalidates(good_host, tmp_path):
     manifest = json.loads((root / "corpus_manifest.json").read_text())
     assert manifest["artifact_type"] == "full_training"
     assert manifest["redaction_status"] == "credentials_username_redacted"
+    assert manifest["artifact_checksum"].startswith("sha256:")
+    assert len(manifest["artifact_checksum"]) == len("sha256:") + 64
+    assert manifest["artifact_checksum"] == pack_full_corpus.artifact_payload_checksum(root)
     # re-validate the unpacked corpus
     api = pack_full_corpus.load_api_map(root)
     files = sorted(p for p in root.glob("*.json") if p.name != "corpus_manifest.json")

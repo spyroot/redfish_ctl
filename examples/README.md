@@ -64,7 +64,7 @@ target.
 | `example_provision_boot_iso.sh` | generic/vendor-neutral | Write | Mount an installer ISO and boot from it once. |
 | `example_sensors_read.sh` | generic/vendor-neutral | Read | Read and filter temperatures, fans, power supplies, and voltages. |
 | `example_supermicro_provision_from_iso.sh` | Supermicro/GB300 | Write | Mount Supermicro virtual media and boot once. |
-| `example_wait.sh` | generic/vendor-neutral | Write | Wait for Redfish service recovery around a BMC manager reboot. |
+| `example_wait.sh` | generic/vendor-neutral | Read | Wait for Redfish service recovery after an approved BMC restart. |
 | `hpe_ilo_canary.sh` | HPE iLO | Guarded | Run read-only commands and a dry-run reset against the iLO emulator. |
 
 For BIOS profile flow, see [BIOS profiles](../docs/bios-profiles.md). For every command name, see

@@ -47,6 +47,7 @@ class ApiRequestType(Enum):
     OemAttach = auto()
     DellOemActions = auto()
     QueryIdrac = auto()
+    RawGet = auto()
 
     BootOptions = auto()
     SystemConfigQuery = auto()
@@ -105,6 +106,8 @@ class ApiRequestType(Enum):
     ActionList = auto()
     EventSubmitTest = auto()
     EventServiceQuery = auto()
+    SubscriptionCreate = auto()
+    SubscriptionDelete = auto()
     SystemReset = auto()
     Logs = auto()
     EthernetInterfaces = auto()
@@ -143,6 +146,7 @@ class ApiRequestType(Enum):
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
     NtpSet = auto()
+    IdentifyLed = auto()
     ManagerReset = auto()
 
     # bios related
@@ -166,6 +170,7 @@ class ApiRequestType(Enum):
     ChassisQuery = auto()
     ChassisReset = auto()
     ChassisUpdate = auto()
+    AssetTagSet = auto()
 
     JobGet = auto()
     JobDel = auto()

@@ -90,4 +90,7 @@ still validate.
 `corpus_manifest.json` records `schema_version`, `artifact_type`, vendor/model/host_id,
 `redfish_version`, the counts (`json_file_count`, `url_file_mapping_count`,
 `error_file_mapping_count`, `allowed_methods_mapping_count`), per-method `method_counts`,
-`http_status_counts`, `redaction_status`, and `artifact_checksum`.
+`http_status_counts`, `redaction_status`, and `artifact_checksum`. The `artifact_checksum`
+field is a deterministic `sha256:` digest over the
+staged payload files, excluding `corpus_manifest.json` so the checksum can be stored inside the
+manifest without a self-reference cycle.

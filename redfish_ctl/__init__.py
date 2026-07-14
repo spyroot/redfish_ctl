@@ -67,6 +67,7 @@ from .virtual_media.cmd_smc_virtual_media import *
 from .cmd_current_boot import *
 
 from .cmd_query import *
+from .cmd_get import *
 from .cmd_wait import *
 
 # storage
@@ -80,6 +81,8 @@ from .storage.cmd_convert_to_raid import *
 # chassis cmd
 from .chassis.cmd_chassis_query import *
 from .chassis.cmd_chasis_reset import *
+from .chassis.cmd_asset_tag_set import *
+from .chassis.cmd_identify_led import *
 from .sensors.cmd_sensors import *
 from .controls.cmd_controls import *
 from .thermal.cmd_thermal import *
@@ -100,6 +103,7 @@ from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *
 from .events.cmd_event_service import *
 from .events.cmd_event_submit_test import *
+from .events.cmd_subscription_lifecycle import *
 from .compute.cmd_system_reset import *
 from .logs.cmd_logs import *
 from .network.cmd_ethernet_interfaces import *
