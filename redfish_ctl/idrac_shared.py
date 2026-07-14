@@ -47,6 +47,7 @@ class ApiRequestType(Enum):
     OemAttach = auto()
     DellOemActions = auto()
     QueryIdrac = auto()
+    RawGet = auto()
 
     BootOptions = auto()
     SystemConfigQuery = auto()

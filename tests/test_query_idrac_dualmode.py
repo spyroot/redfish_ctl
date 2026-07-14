@@ -1,8 +1,10 @@
 """Dual-mode tests for the raw query command."""
+import argparse
 import json
 from urllib.parse import unquote, urlsplit
 
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_main import create_cmd_tree
 from redfish_ctl.redfish_manager import CommandResult
 
 SYSTEM_RESOURCE = "/redfish/v1/Systems/System.Embedded.1"
@@ -35,6 +37,27 @@ def test_query_idrac_returns_requested_resource(redfish_api):
         ApiRequestType.QueryIdrac,
         "query_idrac",
         resource=SYSTEM_RESOURCE,
+    )
+
+    _assert_system_resource(result)
+
+
+def test_get_command_is_registered_with_positional_uri():
+    """get registers as an operator-friendly alias for raw URI reads."""
+    parser = argparse.ArgumentParser()
+    commands = create_cmd_tree(parser)
+
+    assert "get" in commands
+    parsed = parser.parse_args(["get", SYSTEM_RESOURCE])
+    assert parsed.uri == SYSTEM_RESOURCE
+
+
+def test_raw_get_returns_requested_resource(redfish_api):
+    """raw_get GETs the caller-provided Redfish resource."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.RawGet,
+        "raw_get",
+        uri=SYSTEM_RESOURCE,
     )
 
     _assert_system_resource(result)
