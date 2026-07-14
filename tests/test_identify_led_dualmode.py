@@ -66,6 +66,24 @@ def test_identify_led_dry_run_previews_chassis_patch(redfish_mock_factory):
     assert _mutating_requests(service) == []
 
 
+def test_identify_led_matches_target_id_case_insensitively(redfish_mock_factory):
+    """Users can pass a target Id with different case than the Redfish payload."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.IdentifyLed,
+        "identify-led",
+        resource="system",
+        target_id="system_0",
+    )
+
+    assert result.error is None
+    assert result.data["target_id"] == "System_0"
+    assert result.data["target"] == "/redfish/v1/Systems/System_0"
+    assert result.data["read_only"] is True
+    assert _mutating_requests(service) == []
+
+
 def test_identify_led_confirm_patches_and_rereads_system_state(redfish_mock_factory):
     """identify-led --confirm PATCHes only the LED property and returns observed state."""
     manager, service = redfish_mock_factory("supermicro")

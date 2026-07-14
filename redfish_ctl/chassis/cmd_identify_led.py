@@ -110,6 +110,10 @@ class IdentifyLed(IDracManager,
             return {property_name: bool(active)}
         return {property_name: "Lit" if active else "Off"}
 
+    @staticmethod
+    def _target_matches(uri, resource_id, target_id):
+        return resource_id.casefold() == target_id.casefold() or uri == target_id
+
     def _get(self, uri, do_async):
         result = self.base_query(uri, do_async=do_async)
         if result.error is not None:
@@ -128,7 +132,7 @@ class IdentifyLed(IDracManager,
         for uri in self._members(collection):
             data = self._get(uri, do_async)
             resource_id = self._resource_id(uri, data)
-            if resource_id != target_id and uri != target_id:
+            if not self._target_matches(uri, resource_id, target_id):
                 continue
             led_property = self._property_for(data, property_name)
             return {
