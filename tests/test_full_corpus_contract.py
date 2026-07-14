@@ -104,6 +104,18 @@ def test_gate_fails_on_missing_mapped_file(good_host):
     assert any("mapped file missing" in p for p in problems)
 
 
+def test_gate_fails_on_missing_serviceroot(good_host):
+    """A corpus without the ServiceRoot (_redfish_v1.json) fails the gate."""
+    (good_host / "_redfish_v1.json").unlink()
+    api = pack_full_corpus.load_api_map(good_host)
+    del api["url_file_mapping"]["/redfish/v1/"]
+    np.save(good_host / "rest_api_map.npy", api)
+    api = pack_full_corpus.load_api_map(good_host)
+    files = sorted(good_host.glob("*.json"))
+    problems = pack_full_corpus.validate(good_host, api, files)
+    assert any("ServiceRoot" in p for p in problems)
+
+
 def test_redaction_only_touches_credentials_and_username(good_host):
     """Redaction scrubs Password + UserName; leaves SerialNumber (and all else) original."""
     body = json.loads((good_host / "_redfish_v1_Managers_1_Accounts.json").read_text())
