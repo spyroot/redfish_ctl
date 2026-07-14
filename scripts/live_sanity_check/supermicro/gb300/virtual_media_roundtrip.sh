@@ -10,7 +10,7 @@ set -euo pipefail
 : "${REDFISH_PASSWORD:?set REDFISH_PASSWORD}"
 : "${VM_IMAGE_URI:?set VM_IMAGE_URI to an ISO URI reachable by the BMC}"
 
-RCTL=(redfish_ctl --nocolor --json_only)
+RCTL=(redfish_ctl --nocolor --json_only --confirm)
 DEVICE_ID="${VM_DEVICE_ID:-USB1}"
 CAPTURE_DIR="${CAPTURE_DIR:-scripts/live_sanity_check/captures/supermicro/gb300}"
 OK_CAPTURE="$CAPTURE_DIR/virtual_media.ok.json"
@@ -101,21 +101,19 @@ if [ "$after_inserted" != "true" ] || [ "$after_image" != "$VM_IMAGE_URI" ]; the
   exit 1
 fi
 
-if [ "${RUN_NEGATIVE:-0}" = "1" ]; then
-  set +e
-  negative_out="$("${RCTL[@]}" insert_vm --device_id "__invalid__" --uri_path "$VM_IMAGE_URI" 2>&1)"
-  negative_rc=$?
-  set -e
-  jq -n \
-    --arg step "insert-invalid-device" \
-    --arg command "redfish_ctl insert_vm --device_id __invalid__ --uri_path <VM_IMAGE_URI>" \
-    --arg output "$negative_out" \
-    --argjson exit_code "$negative_rc" \
-    '{step: $step, command: $command, exit_code: $exit_code, output: $output}' >> "$ERR_CAPTURE"
-  if [ "$negative_rc" -eq 0 ]; then
-    echo "FAIL: invalid device insert unexpectedly succeeded" >&2
-    exit 1
-  fi
+set +e
+negative_out="$("${RCTL[@]}" insert_vm --device_id "__invalid__" --uri_path "$VM_IMAGE_URI" 2>&1)"
+negative_rc=$?
+set -e
+jq -n \
+  --arg step "insert-invalid-device" \
+  --arg command "redfish_ctl insert_vm --device_id __invalid__ --uri_path <VM_IMAGE_URI>" \
+  --arg output "$negative_out" \
+  --argjson exit_code "$negative_rc" \
+  '{step: $step, command: $command, exit_code: $exit_code, output: $output}' >> "$ERR_CAPTURE"
+if [ "$negative_rc" -eq 0 ]; then
+  echo "FAIL: invalid device insert unexpectedly succeeded" >&2
+  exit 1
 fi
 
 eject_out="$("${RCTL[@]}" eject_vm --device_id "$DEVICE_ID")"
