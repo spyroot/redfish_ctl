@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import numpy as np
 import pytest
 import yaml
 from vendor_corpus import corpus_dir
@@ -54,6 +55,63 @@ def _http(base: str, path: str, method: str = "GET", body=None):
         return exc.code, (json.loads(raw) if raw else None)
 
 
+def _fixture_name(path: str) -> str:
+    return "_" + path.strip("/").replace("/", "_") + ".json"
+
+
+def _write_status_map_corpus(tmp_path: Path) -> Path:
+    corpus = tmp_path / "status-map-corpus"
+    corpus.mkdir()
+    normal_path = "/redfish/v1/Systems/1"
+    error_cases = {
+        "/redfish/v1/Secret": (
+            403,
+            "_redfish_v1_Secret.error.json",
+            {"error": {"code": "Base.1.17.InsufficientPrivilege"}},
+        ),
+        "/redfish/v1/Missing": (
+            404,
+            "_redfish_v1_Missing.error.json",
+            {"error": {"code": "Base.1.17.ResourceMissingAtURI"}},
+        ),
+        "/redfish/v1/ReadOnly": (
+            405,
+            "_redfish_v1_ReadOnly.error.json",
+            {"error": {"code": "Base.1.17.ActionNotSupported"}},
+        ),
+    }
+
+    (corpus / _fixture_name("/redfish/v1")).write_text(
+        json.dumps({"@odata.id": "/redfish/v1/"}),
+        encoding="utf-8",
+    )
+    (corpus / _fixture_name(normal_path)).write_text(
+        json.dumps({"@odata.id": normal_path}),
+        encoding="utf-8",
+    )
+    for _path, (_status, filename, payload) in error_cases.items():
+        (corpus / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+    np.save(
+        corpus / "rest_api_map.npy",
+        {
+            "url_file_mapping": {
+                "/redfish/v1/": _fixture_name("/redfish/v1"),
+                normal_path: _fixture_name(normal_path),
+            },
+            "http_status_mapping": {
+                "/redfish/v1/": 200,
+                normal_path: 200,
+                **{path: status for path, (status, _name, _body) in error_cases.items()},
+            },
+            "error_file_mapping": {
+                path: filename for path, (_status, filename, _body) in error_cases.items()
+            },
+        },
+    )
+    return corpus
+
+
 def test_mock_bmc_maps_redfish_paths_to_gb300_corpus() -> None:
     """Redfish URLs resolve to the flattened files in the GB300 corpus."""
     module = _load_server_module()
@@ -92,6 +150,33 @@ def test_mock_bmc_serves_json_read_only_over_http() -> None:
             assert exc.code == 405
         else:  # pragma: no cover - the assertion above is the expected path.
             raise AssertionError("POST unexpectedly succeeded")
+
+
+@pytest.mark.parametrize(
+    ("path", "status", "code"),
+    [
+        ("/redfish/v1/Secret", 403, "Base.1.17.InsufficientPrivilege"),
+        ("/redfish/v1/Missing", 404, "Base.1.17.ResourceMissingAtURI"),
+        ("/redfish/v1/ReadOnly", 405, "Base.1.17.ActionNotSupported"),
+    ],
+)
+def test_mock_bmc_replays_captured_error_status_map(
+    tmp_path: Path,
+    path: str,
+    status: int,
+    code: str,
+) -> None:
+    module = _load_server_module()
+    corpus = _write_status_map_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+
+        assert _http(base, "/redfish/v1/Systems/1")[0] == 200
+        observed_status, payload = _http(base, path)
+
+    assert observed_status == status
+    assert payload == {"error": {"code": code}}
 
 
 def test_mock_bmc_replay_graceful_restart_updates_system_state() -> None:
@@ -142,6 +227,7 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
 
     assert "FROM python:3.12-slim" in dockerfile
+    assert "numpy" in dockerfile
     assert "--chown=mockbmc:mockbmc" in dockerfile
     assert "k8s/sandbox/mock_bmc_server.py" in dockerfile
     assert "tests/supermicro_gb300_corpus.tar.gz" in dockerfile

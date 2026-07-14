@@ -43,6 +43,10 @@ re-seeds the sequence.
 `CorpusRequestHandler`, defined in `k8s/sandbox/mock_bmc_server.py`, exposes:
 
 - `GET`, `HEAD`, and `OPTIONS` for corpus resources under `/redfish/v1`.
+- When `rest_api_map.npy`, written by discovery and packed with the corpus,
+  is present, reads honor `url_file_mapping`, `http_status_mapping`, and
+  `error_file_mapping`: captured 403/404/405 responses return their original
+  status and error envelope instead of being normalized to `200`.
 - `GET /__replay_status`, which reports replay or mutation-rule status when a
   write engine is enabled.
 - `POST /__set_scenario`, which calls the active engine's `reset()` and returns
