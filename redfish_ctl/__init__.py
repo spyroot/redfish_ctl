@@ -102,6 +102,7 @@ from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *
 from .events.cmd_event_service import *
 from .events.cmd_event_submit_test import *
+from .events.cmd_subscription_lifecycle import *
 from .compute.cmd_system_reset import *
 from .logs.cmd_logs import *
 from .network.cmd_ethernet_interfaces import *
