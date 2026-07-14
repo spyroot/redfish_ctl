@@ -16,7 +16,6 @@ import requests
 
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_exceptions import RedfishForbidden
 from ..redfish_manager import CommandResult
 from ..redfish_shared import env_first
 
@@ -53,6 +52,13 @@ class Discovery(IDracManager,
         super(Discovery, self).__init__(*args, **kwargs)
         self._discovered_url_file_mapping = {}
         self._api_allowed_methods = {}
+        # Original HTTP status for EVERY URL the crawl touched (2xx and errors),
+        # and the saved body file for each non-2xx response. These make the crawl
+        # lossless: the corpus keeps the exact status + body the BMC returned, so
+        # a sim can replay a 404/405/400 faithfully instead of the crawl silently
+        # dropping it (as it did before). Both are written into rest_api_map.npy.
+        self._http_status = {}
+        self._error_file_mapping = {}
 
         self.visited_urls = {}
         home_dir = str(Path.home())
@@ -198,6 +204,48 @@ class Discovery(IDracManager,
                     time.sleep(backoff * (2 ** attempt))
         raise last_exc
 
+    def _fetch_capture(self, resource_path):
+        """Fetch ``resource_path`` and return ``(status_code, body, allow_header)``
+        WITHOUT raising on an HTTP error status.
+
+        ``base_query`` runs ``default_error_handler`` and raises on any non-2xx, so
+        the old crawl lost the body and status of every 404/405/403 (real ground
+        truth a sim needs). This goes straight to ``api_get_call`` (the raw
+        ``requests.Response``) so the ORIGINAL status code and body are always
+        captured. Only transport failures raise; they are retried with the same
+        bounded backoff as ``_query_with_retry`` and re-raised if all attempts fail.
+
+        The body is the parsed JSON when the response is JSON; a non-JSON body is
+        preserved verbatim as ``{"_raw_text": <text>}`` so nothing is discarded.
+
+        :param resource_path: canonical Redfish resource path to fetch.
+        :return: ``(int status_code, body, Optional[str] allow_header)``.
+        :raises: the last transport exception if every attempt fails.
+        """
+        attempts = max(1, int(env_first(
+            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
+        backoff = float(env_first(
+            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
+        pace = float(env_first(
+            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+        req = f"{self._default_method}{self.redfish_ip}{resource_path}"
+        last_exc = None
+        for attempt in range(attempts):
+            try:
+                response = self.api_get_call(req, {})
+                if pace:
+                    time.sleep(pace)
+                try:
+                    body = response.json()
+                except ValueError:
+                    body = {"_raw_text": response.text}
+                return response.status_code, body, response.headers.get("Allow")
+            except requests.exceptions.RequestException as exc:
+                last_exc = exc
+                if attempt + 1 < attempts:
+                    time.sleep(backoff * (2 ** attempt))
+        raise last_exc
+
     def recursive_discovery(self,
                             resource_path,
                             depth: int = 0,
@@ -238,35 +286,48 @@ class Discovery(IDracManager,
             return
 
         try:
-            result = self._query_with_retry(resource_path)
-            allow_header = result.extra
-            if allow_header is not None:
-                allowed_methods = [method.strip() for method in allow_header.split(",")]
-            else:
-                allowed_methods = []
-
-            print("Discovery: {} {}".format(resource_path, allowed_methods))
-
+            status, body, allow_header = self._fetch_capture(resource_path)
+        except requests.exceptions.RequestException as exc:
+            # Transport failure after all retries: the BMC was unreachable for this
+            # URL. Record the attempt as status 0 so the crawl notes it, then move
+            # on (there is no body to save).
             self.visited_urls[resource_path] = True
-            response_filename = os.path.join(
-                self.json_response_dir, resource_path.replace("/", "_") + ".json")
-
-            with open(response_filename, "w") as file:
-                json.dump(result.data, file, indent=4)
-
-            self._discovered_url_file_mapping[resource_path] = response_filename
-            self._api_allowed_methods[resource_path] = allowed_methods
-
-            odata_ids = list(self.extract_odata_ids(result.data))
-
-            for r in odata_ids:
-                self.recursive_discovery(r, depth + 1, max_depth)
-        except RedfishForbidden as e:
-            self.visited_urls[resource_path] = True
-            print("Forbidden: {}".format(e))
+            self._http_status[resource_path] = 0
+            print("Discovery transport error at {}: {}".format(resource_path, exc))
+            return
         except Exception as other_err:
             self.visited_urls[resource_path] = True
             print("Discovery error at {}: {}".format(resource_path, other_err))
+            return
+
+        allowed_methods = (
+            [method.strip() for method in allow_header.split(",")]
+            if allow_header is not None else [])
+        self.visited_urls[resource_path] = True
+        self._http_status[resource_path] = status
+
+        # ALWAYS persist the original response body — success AND error — so the
+        # corpus/sim keeps the exact bytes and status the BMC returned. A non-2xx
+        # body is saved under a ``.error.json`` name so a URL-keyed replay consumer
+        # (mock BMC) never mistakes a captured 404/405 envelope for a live 200.
+        is_ok = 200 <= status < 300
+        suffix = ".json" if is_ok else ".error.json"
+        response_filename = os.path.join(
+            self.json_response_dir, resource_path.replace("/", "_") + suffix)
+        with open(response_filename, "w") as file:
+            json.dump(body, file, indent=4)
+        self._api_allowed_methods[resource_path] = allowed_methods
+
+        if is_ok:
+            print("Discovery: {} {} {}".format(resource_path, status, allowed_methods))
+            self._discovered_url_file_mapping[resource_path] = response_filename
+            for r in self.extract_odata_ids(body):
+                self.recursive_discovery(r, depth + 1, max_depth)
+        else:
+            # A non-2xx (404/405/400/403...) is real ground truth for the sim.
+            # Keep its body + status, but do NOT recurse into an error envelope.
+            print("Discovery: {} {} (error captured)".format(resource_path, status))
+            self._error_file_mapping[resource_path] = response_filename
 
     def save_url_file_mapping(self):
         """Save the URL-to-file mapping to a JSON respond file
@@ -280,7 +341,12 @@ class Discovery(IDracManager,
         filename = os.path.join(self.json_response_dir, "rest_api_map.npy")
         mappings = {
             "url_file_mapping": self._discovered_url_file_mapping,
-            "allowed_methods_mapping": self._api_allowed_methods
+            "allowed_methods_mapping": self._api_allowed_methods,
+            # New, additive: original status for every touched URL, and the saved
+            # body file for each captured error. Consumers that only read the two
+            # legacy keys are unaffected.
+            "http_status_mapping": self._http_status,
+            "error_file_mapping": self._error_file_mapping,
         }
         filename = os.path.join(self.json_response_dir, filename)
         np.save(filename, mappings)
@@ -345,6 +411,19 @@ class Discovery(IDracManager,
                                  filename=filename,
                                  do_async=do_async,
                                  do_expanded=do_expanded)
+
+        # Persist the ServiceRoot itself. base_query fetches it only to seed the
+        # crawl, so historically it was never written to disk or mapped — the one
+        # resource every consumer needs was missing. Save it, map it, and record
+        # its status like any other resource (it is a successful 2xx GET here).
+        service_root_key = "/redfish/v1/"
+        service_root_file = os.path.join(self.json_response_dir, "_redfish_v1.json")
+        with open(service_root_file, "w") as file:
+            json.dump(result.data, file, indent=4)
+        self._discovered_url_file_mapping[service_root_key] = service_root_file
+        self._api_allowed_methods[service_root_key] = (
+            [m.strip() for m in result.extra.split(",")] if result.extra else [])
+        self._http_status[service_root_key] = 200
 
         # Seed normalized keys so a child link back to the root (e.g. the
         # bare "/redfish/v1") matches and is not re-walked.

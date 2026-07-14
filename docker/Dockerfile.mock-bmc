@@ -10,10 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MOCK_BMC_CORPUS_DIR=/corpus/gb300
 
-# PyYAML lets the mock load YAML replay traces and mutation-rules files; the
-# server itself is otherwise stdlib-only. Without it the mock can only read
-# plain-JSON traces (see mock_bmc_server._load_trace).
-RUN pip install --no-cache-dir "pyyaml>=6,<7"
+# PyYAML loads YAML replay traces/rules. NumPy loads the rest_api_map.npy file
+# written by discovery so captured non-2xx responses replay with their status.
+RUN pip install --no-cache-dir \
+    "numpy>=1.26,<3" \
+    "pyyaml>=6,<7"
 
 # Pin a numeric uid/gid so Kubernetes can verify runAsNonRoot without a
 # runAsUser override (a named user cannot be checked at admission).

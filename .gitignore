@@ -209,3 +209,4 @@ bios_firmware/
 # live-sanity-check raw capture traces — local until sanitized (see RF-CORPUS pipeline)
 scripts/live_sanity_check/captures/**
 !scripts/live_sanity_check/captures/.gitkeep
+

@@ -9,6 +9,7 @@ and apply only on an approved target.
 Safety labels:
 
 - **Read**: reads BMC state only.
+- **Guarded**: previews by default or requires an explicit apply flag such as `--confirm`.
 - **Write**: stages or applies BMC or host state.
 
 Platform/vendor labels:
@@ -35,6 +36,18 @@ Use these files with the command's `--from_spec` option unless the table says ot
 | `realtime.opt.spec.json` | `bios-change` | CPU/platform | Write | Low-latency BIOS attributes. |
 | `set_profile_example.json` | `bios-change` | Dell/iDRAC, CPU/platform | Write | Select a Dell `WorkloadProfile`. |
 | `theramal_setting_and_boot_once_example.json` | `attr-update` | Dell/iDRAC, CPU/platform | Write | Thermal and first-boot attributes. |
+
+## Named BIOS Profiles
+
+`specs/profiles/`, the committed named-profile directory, defines profiles for the `bios-profile`
+command. `bios-profile list` and `bios-profile show` are local reads; `bios-profile apply` is guarded
+and stages only with `--confirm`.
+
+| Spec | Command | Platform/vendor | Safety | Purpose |
+|---|---|---|---|---|
+| `profiles/dell-cstates-off.json` | `bios-profile apply` | Dell/iDRAC, CPU/platform | Guarded | Disable processor C-states for latency-sensitive Dell PowerEdge workloads. |
+| `profiles/gb300-extended-gpu-memory.json` | `bios-profile apply` | Supermicro/GB300 | Guarded | Enable Extended GPU Memory on Grace-Blackwell nodes. |
+| `profiles/gb300-power-capped.json` | `bios-profile apply` | Supermicro/GB300 | Guarded | Use 1 s input-power capping for smoother rack-level power draw. |
 
 For command flags, see [Command reference](../docs/commands.md). For the BIOS workflow around these
 files, see [BIOS profiles](../docs/bios-profiles.md).

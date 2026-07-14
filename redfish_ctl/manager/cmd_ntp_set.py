@@ -14,7 +14,11 @@ _MAX_NTP_SERVERS = 4
 _HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
-def _normalize_ntp_servers(servers) -> list[str]:
+def _normalize_ntp_servers(servers, clear: bool = False) -> list[str]:
+    if clear:
+        if servers:
+            raise InvalidArgument("--clear cannot be used with --server")
+        return []
     if servers is None:
         raise InvalidArgument("at least one NTP server is required")
     if isinstance(servers, str):
@@ -73,7 +77,10 @@ class NtpSet(IDracManager,
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--server', action='append', dest='servers', metavar='HOST',
-            required=True, help="NTP hostname or IP; repeat for up to 4 servers")
+            help="NTP hostname or IP; repeat for up to 4 servers")
+        cmd_parser.add_argument(
+            '--clear', action='store_true', dest='clear', default=False,
+            help="restore an empty NTP server list")
         cmd_parser.add_argument(
             '--manager', type=str, dest='manager_id', default=None, metavar='ID',
             help="optional Manager id to patch; default patches NTP-capable managers")
@@ -95,7 +102,10 @@ class NtpSet(IDracManager,
             return {}
 
     def _ntp_plan(self, servers, manager_id, do_async):
-        payload = {"NTP": {"NTPServers": servers, "ProtocolEnabled": True}}
+        ntp_payload = {"NTPServers": servers}
+        if servers:
+            ntp_payload["ProtocolEnabled"] = True
+        payload = {"NTP": ntp_payload}
         plan = []
         skipped = []
 
@@ -140,10 +150,11 @@ class NtpSet(IDracManager,
                 do_expanded: Optional[bool] = False,
                 servers=None,
                 manager_id: Optional[str] = None,
+                clear: Optional[bool] = False,
                 confirm: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Preview or apply NTP servers on ManagerNetworkProtocol resources."""
-        normalized_servers = _normalize_ntp_servers(servers)
+        normalized_servers = _normalize_ntp_servers(servers, bool(clear))
         plan, skipped = self._ntp_plan(normalized_servers, manager_id, do_async)
 
         if not confirm:

@@ -24,22 +24,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_exceptions import InvalidJsonSpec
-from ..cmd_utils import from_json_spec
-from ..idrac_shared import IdracApiRespond
-from ..redfish_shared import RedfishJson
-from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
+from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
-
-
+from ..redfish_shared import RedfishJson
 
 
 class VirtualMediaGet(IDracManager,
@@ -101,12 +91,19 @@ class VirtualMediaGet(IDracManager,
 
         # Resolve the VirtualMedia collection from whichever resource exposes it
         # (a Manager on iLO/Supermicro, the ComputerSystem on Dell) — no hardcoded id.
-        vm_uri = self.discover_virtual_media_uri()
+        try:
+            vm_uri = self.discover_virtual_media_uri()
+        except ResourceNotFound as exc:
+            status = str(exc)
+            return CommandResult({"Status": status}, None, None, status)
         r = f"{self._default_method}{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)
         self.default_error_handler(response)
         data = response.json()
+        data["Members"] = self._hydrate_member_links(
+            data.get("Members"), do_async=do_async
+        )
         if device_id is not None and len(device_id) > 0:
             member_data = data['Members']
             target_device = None
@@ -131,3 +128,27 @@ class VirtualMediaGet(IDracManager,
 
         save_if_needed(filename, data)
         return CommandResult(data, None, None, None)
+
+    def _hydrate_member_links(self, members, do_async: Optional[bool] = False):
+        """Fetch linked VirtualMedia members when the service did not expand them."""
+        if not isinstance(members, list):
+            return members
+        hydrated = []
+        for member in members:
+            if not isinstance(member, dict):
+                hydrated.append(member)
+                continue
+            if "Id" in member and "Actions" in member:
+                hydrated.append(member)
+                continue
+            uri = member.get(RedfishJson.Data_id)
+            if not isinstance(uri, str):
+                hydrated.append(member)
+                continue
+            try:
+                detail = self.base_query(uri, do_async=do_async).data
+            except Exception:
+                hydrated.append(member)
+                continue
+            hydrated.append(detail if isinstance(detail, dict) else member)
+        return hydrated
