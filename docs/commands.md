@@ -144,7 +144,7 @@ Safety labels:
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
-| `ntp-set` | Set ManagerNetworkProtocol NTP servers; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
+| `ntp-set` | Set or clear ManagerNetworkProtocol NTP servers; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
 | `nvlink-ports` | Read GPU NVLink port resources where the BMC exposes them. | Read |
 | `oem-actions` | Read supported Dell OEM OS deployment actions. | Read |
 | `oem-attach` | Attach a network ISO through a Dell OEM action. | Write |
