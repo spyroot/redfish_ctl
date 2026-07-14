@@ -123,6 +123,10 @@ def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]
     ufm = api_map["url_file_mapping"]
     amm = api_map["allowed_methods_mapping"]
     names = {p.name for p in json_files}
+    if "_redfish_v1.json" not in names:
+        problems.append("ServiceRoot missing: no _redfish_v1.json (the entry point must be captured)")
+    if "/redfish/v1/" not in ufm and "/redfish/v1" not in ufm:
+        problems.append("ServiceRoot URL /redfish/v1/ not in url_file_mapping")
     for p in json_files:
         try:
             json.loads(p.read_text())
