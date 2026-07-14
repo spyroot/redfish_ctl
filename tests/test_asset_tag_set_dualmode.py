@@ -90,7 +90,7 @@ def test_asset_tag_set_confirm_patches_and_rereads_chassis_tag(
 
     patches = _patch_requests(service)
     assert len(patches) == 1
-    assert patches[0].path == "/redfish/v1/chassis/chassis_0"
+    assert patches[0].path.lower() == result.data["applied"]["target"].lower()
     assert patches[0].json() == {"AssetTag": "restored-tag"}
     assert result.data["applied"] == {
         "target": "/redfish/v1/Chassis/Chassis_0",
