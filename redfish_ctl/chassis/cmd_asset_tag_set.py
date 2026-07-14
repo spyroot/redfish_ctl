@@ -39,7 +39,7 @@ class AssetTagSet(IDracManager,
             "--target-id",
             required=True,
             dest="target_id",
-            help="resource Id to read or patch, such as Chassis_0 or System_0",
+            help="resource Id or @odata.id URI to read or patch",
         )
         cmd_parser.add_argument(
             "--asset-tag",
@@ -74,7 +74,10 @@ class AssetTagSet(IDracManager,
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     def _get(self, uri, do_async):
-        return self.base_query(uri, do_async=do_async).data or {}
+        result = self.base_query(uri, do_async=do_async)
+        if result.error:
+            raise InvalidArgument(f"failed to query {uri}: {result.error}")
+        return result.data or {}
 
     def _resolve(self, resource, target_id, do_async):
         if resource not in _COLLECTIONS:
@@ -128,7 +131,6 @@ class AssetTagSet(IDracManager,
             target["target"],
             payload=payload,
             do_async=do_async,
-            expected_status=200,
         )
         observed = self._get(target["target"], do_async).get("AssetTag")
         return CommandResult({
