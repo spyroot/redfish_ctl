@@ -175,6 +175,8 @@ Safety labels:
 | `storage-drives` | Read storage drive members. | Read |
 | `storage-get` | Read one storage controller with optional `--filter Drives,Volumes`. | Read |
 | `storage-list` | List storage devices. | Read |
+| `subscription-create` | Create an EventDestination subscription; dry-run by default and `--confirm` POSTs. | Guarded |
+| `subscription-delete` | Delete an EventDestination subscription by id or URI; dry-run by default and `--confirm` DELETEs. | Guarded |
 | `system` | Read ComputerSystem data. | Read |
 | `system-export` | Export system configuration. | Read |
 | `system-import` | Import system configuration; may reboot depending on options. | Write |

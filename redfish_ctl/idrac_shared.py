@@ -105,6 +105,8 @@ class ApiRequestType(Enum):
     ActionList = auto()
     EventSubmitTest = auto()
     EventServiceQuery = auto()
+    SubscriptionCreate = auto()
+    SubscriptionDelete = auto()
     SystemReset = auto()
     Logs = auto()
     EthernetInterfaces = auto()
