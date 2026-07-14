@@ -112,6 +112,42 @@ def _write_status_map_corpus(tmp_path: Path) -> Path:
     return corpus
 
 
+def _write_url_map_corpus(tmp_path: Path) -> Path:
+    corpus = tmp_path / "url-map-corpus"
+    corpus.mkdir()
+    mapped_dir = corpus / "mapped"
+    mapped_dir.mkdir()
+
+    (corpus / _fixture_name("/redfish/v1")).write_text(
+        json.dumps({"@odata.id": "/redfish/v1/"}),
+        encoding="utf-8",
+    )
+    (mapped_dir / "aliased-system.json").write_text(
+        json.dumps(
+            {
+                "@odata.id": "/redfish/v1/Systems/Original",
+                "Id": "Original",
+            }
+        ),
+        encoding="utf-8",
+    )
+    np.save(
+        corpus / "rest_api_map.npy",
+        {
+            "url_file_mapping": {
+                "/redfish/v1/": _fixture_name("/redfish/v1"),
+                "/redfish/v1/Alias": "mapped/aliased-system.json",
+            },
+            "http_status_mapping": {
+                "/redfish/v1/": 200,
+                "/redfish/v1/Alias": 200,
+            },
+            "error_file_mapping": {},
+        },
+    )
+    return corpus
+
+
 def test_mock_bmc_maps_redfish_paths_to_gb300_corpus() -> None:
     """Redfish URLs resolve to the flattened files in the GB300 corpus."""
     module = _load_server_module()
@@ -177,6 +213,69 @@ def test_mock_bmc_replays_captured_error_status_map(
 
     assert observed_status == status
     assert payload == {"error": {"code": code}}
+
+
+def test_mock_bmc_serves_url_file_mapping_alias(tmp_path: Path) -> None:
+    """URL mappings can serve fixtures whose names do not derive from the URL."""
+    module = _load_server_module()
+    corpus = _write_url_map_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        status, payload = _http(base, "/redfish/v1/Alias")
+
+    assert status == 200
+    assert payload == {
+        "@odata.id": "/redfish/v1/Systems/Original",
+        "Id": "Original",
+    }
+
+
+def test_rest_api_map_rejects_malformed_status_values(tmp_path: Path) -> None:
+    """A bad status map fails startup instead of silently dropping a status."""
+    module = _load_server_module()
+    corpus = _write_status_map_corpus(tmp_path)
+    np.save(
+        corpus / "rest_api_map.npy",
+        {
+            "url_file_mapping": {"/redfish/v1/": _fixture_name("/redfish/v1")},
+            "http_status_mapping": {"/redfish/v1/Broken": "not-a-status"},
+            "error_file_mapping": {},
+        },
+    )
+
+    with pytest.raises(ValueError, match="http_status_mapping"):
+        module.make_handler(corpus)
+
+
+def test_absolute_mapped_fixture_names_are_ignored(tmp_path: Path) -> None:
+    """Mapped fixture names stay corpus-relative instead of accepting paths."""
+    module = _load_server_module()
+    corpus = _write_status_map_corpus(tmp_path)
+
+    assert module._resolve_mapped_fixture(
+        corpus,
+        "/tmp/_redfish_v1_Missing.error.json",
+    ) is None
+
+
+def test_head_to_captured_error_status_suppresses_body(tmp_path: Path) -> None:
+    """HEAD returns captured error headers without writing an error body."""
+    module = _load_server_module()
+    corpus = _write_status_map_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        request = urllib.request.Request(
+            base + "/redfish/v1/Missing",
+            method="HEAD",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(request, timeout=5)
+
+    assert exc_info.value.code == 404
+    assert exc_info.value.read() == b""
+    assert int(exc_info.value.headers["Content-Length"]) > 0
 
 
 def test_mock_bmc_replay_graceful_restart_updates_system_state() -> None:

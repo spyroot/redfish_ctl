@@ -41,14 +41,42 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
     try:
         import numpy as np
     except ModuleNotFoundError:
-        return {}
+        raise ValueError(
+            f"NumPy is required to load Redfish API map: {map_path}"
+        ) from None
     try:
         data = np.load(map_path, allow_pickle=True).item()
     except Exception as exc:  # noqa: BLE001 - include loader context.
         raise ValueError(f"failed to load Redfish API map: {map_path}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"Redfish API map must contain an object: {map_path}")
+    _validate_rest_api_map(data, map_path)
     return data
+
+
+def _validate_rest_api_map(api_map: dict[str, Any], map_path: Path) -> None:
+    for key in ("url_file_mapping", "http_status_mapping", "error_file_mapping"):
+        value = api_map.get(key)
+        if value is not None and not isinstance(value, dict):
+            raise ValueError(f"{key} must be an object in Redfish API map: {map_path}")
+
+    status_mapping = api_map.get("http_status_mapping")
+    if not isinstance(status_mapping, dict):
+        return
+    for request_path, raw_status in list(status_mapping.items()):
+        try:
+            status = int(raw_status)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "http_status_mapping values must be integer HTTP statuses "
+                f"in Redfish API map: {map_path} ({request_path!r})"
+            ) from exc
+        if status < 100 or status > 599:
+            raise ValueError(
+                "http_status_mapping values must be valid HTTP statuses "
+                f"in Redfish API map: {map_path} ({request_path!r})"
+            )
+        status_mapping[request_path] = status
 
 
 def _mapping_dict(api_map: dict[str, Any], key: str) -> dict[str, Any]:
@@ -76,8 +104,9 @@ def _resolve_mapped_fixture(corpus_dir: Path, mapped_name: Any) -> Path | None:
     root = Path(corpus_dir)
     mapped_path = Path(mapped_name)
     candidates: list[Path] = []
-    if not mapped_path.is_absolute():
-        candidates.append(root / mapped_path)
+    if mapped_path.is_absolute():
+        return None
+    candidates.append(root / mapped_path)
     candidates.append(root / mapped_path.name)
     for candidate in candidates:
         if candidate.is_file():
@@ -490,10 +519,7 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
             _mapping_dict(api_map, "http_status_mapping"),
             path,
         )
-        try:
-            status = int(raw_status)
-        except (TypeError, ValueError):
-            status = None
+        status = int(raw_status) if raw_status is not None else None
         error_fixture = _resolve_mapped_fixture(
             getattr(type(self), "corpus_dir"),
             _lookup_mapping(_mapping_dict(api_map, "error_file_mapping"), path),
