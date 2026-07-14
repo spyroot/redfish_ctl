@@ -24,6 +24,7 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
+from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
@@ -90,7 +91,11 @@ class VirtualMediaGet(IDracManager,
 
         # Resolve the VirtualMedia collection from whichever resource exposes it
         # (a Manager on iLO/Supermicro, the ComputerSystem on Dell) — no hardcoded id.
-        vm_uri = self.discover_virtual_media_uri()
+        try:
+            vm_uri = self.discover_virtual_media_uri()
+        except ResourceNotFound as exc:
+            status = str(exc)
+            return CommandResult({"Status": status}, None, None, status)
         r = f"{self._default_method}{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)

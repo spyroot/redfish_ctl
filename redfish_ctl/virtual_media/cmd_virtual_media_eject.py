@@ -71,6 +71,8 @@ class VirtualMediaEject(IDracManager,
             ApiRequestType.VirtualMediaGet,
             "virtual_disk_query"
         )
+        if virtual_media.error is not None:
+            return virtual_media
 
         members = virtual_media.data['Members']
         actions = [

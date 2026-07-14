@@ -137,6 +137,41 @@ def test_virtual_media_discovery_reports_missing_roots(redfish_mock, monkeypatch
         redfish_mock.discover_virtual_media_uri()
 
 
+@pytest.mark.parametrize(
+    ("api_call", "name", "kwargs"),
+    [
+        (ApiRequestType.VirtualMediaGet, "virtual_disk_query", {}),
+        (
+            ApiRequestType.VirtualMediaInsert,
+            "virtual_disk_insert",
+            {"uri_path": "http://example.test/gb300.iso", "device_id": "USB1"},
+        ),
+        (
+            ApiRequestType.VirtualMediaEject,
+            "virtual_disk_eject",
+            {"device_id": "USB1"},
+        ),
+    ],
+)
+def test_virtual_media_commands_report_missing_collection(
+    redfish_mock, monkeypatch, api_call, name, kwargs
+):
+    """Commands report missing VirtualMedia as a command error, not a traceback."""
+    monkeypatch.setattr(IDracManager, "idrac_manage_servers", property(lambda self: ""))
+    monkeypatch.setattr(redfish_mock, "discover_manager_ids", lambda: [])
+    monkeypatch.setattr(redfish_mock, "discover_computer_system_ids", lambda: [])
+    monkeypatch.setattr(IDracManager, "discover_manager_ids", lambda self: [])
+    monkeypatch.setattr(IDracManager, "discover_computer_system_ids", lambda self: [])
+
+    result = redfish_mock.sync_invoke(api_call, name, **kwargs)
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {
+        "Status": "VirtualMedia collection not found in Managers or Systems"
+    }
+    assert result.error == "VirtualMedia collection not found in Managers or Systems"
+
+
 def test_virtual_media_insert_uses_manager_action_target(
     redfish_mock_factory, monkeypatch
 ):
