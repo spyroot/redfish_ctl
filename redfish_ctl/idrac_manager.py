@@ -65,9 +65,9 @@ from .idrac_shared import (
 from .idrac_shared import ResetType as ResetType
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import CommandResult, RedfishManager
-from .telemetry import tracing
 from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .redfish_task_state import TaskState, TaskStatus
+from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
 
@@ -1570,13 +1570,30 @@ class IDracManager(RedfishManager):
         the first that advertises a VirtualMedia link. Falls back to the Dell
         ``{system}/VirtualMedia`` subpath so existing Dell behavior is unchanged.
         """
-        # System first (Dell exposes VirtualMedia there), then Managers (iLO and
-        # Supermicro expose it under a Manager). Return the first with the link.
-        roots = [self.idrac_manage_servers]
+        # Managers first for iLO/Supermicro/OpenBMC; keep the historical Dell
+        # System.Embedded.1 preference when both System and Manager advertise it.
+        manager_roots = []
         try:
-            roots.extend(self.discover_manager_ids() or [])
+            manager_roots.extend(self.discover_manager_ids() or [])
         except Exception:
             pass
+        try:
+            host_system = self.idrac_manage_servers
+        except Exception:
+            host_system = ""
+        system_roots = []
+        if not host_system:
+            try:
+                system_roots.extend(self.discover_computer_system_ids() or [])
+            except Exception:
+                pass
+        roots = []
+        if host_system.endswith("/System.Embedded.1"):
+            roots.append(host_system)
+        roots.extend(root for root in manager_roots if root not in roots)
+        if host_system and host_system not in roots:
+            roots.append(host_system)
+        roots.extend(root for root in system_roots if root not in roots)
         for root in roots:
             try:
                 data = self.base_query(root, do_async=do_async).data or {}
@@ -1586,7 +1603,10 @@ class IDracManager(RedfishManager):
             uri = link.get("@odata.id") if isinstance(link, dict) else None
             if uri:
                 return uri
-        return f"{self.idrac_manage_servers}/VirtualMedia"
+        fallback_system = host_system or (system_roots[0] if system_roots else "")
+        if fallback_system:
+            return f"{fallback_system}/VirtualMedia"
+        raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
 
     @staticmethod
     def _flatten_action_targets(resource):
