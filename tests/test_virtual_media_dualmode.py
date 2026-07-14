@@ -1,6 +1,9 @@
 """Dual-mode tests for virtual-media commands."""
 import json
 
+import pytest
+
+from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType, IdracApiRespond
 from redfish_ctl.redfish_manager import CommandResult
@@ -124,6 +127,16 @@ def test_virtual_media_query_hydrates_manager_members(redfish_mock_factory):
     )
 
 
+def test_virtual_media_discovery_reports_missing_roots(redfish_mock, monkeypatch):
+    """Discovery raises the shared not-found exception when no root is available."""
+    redfish_mock.__dict__["idrac_manage_servers"] = ""
+    monkeypatch.setattr(redfish_mock, "discover_manager_ids", lambda: [])
+    monkeypatch.setattr(redfish_mock, "discover_computer_system_ids", lambda: [])
+
+    with pytest.raises(ResourceNotFound):
+        redfish_mock.discover_virtual_media_uri()
+
+
 def test_virtual_media_insert_uses_manager_action_target(
     redfish_mock_factory, monkeypatch
 ):
@@ -153,6 +166,38 @@ def test_virtual_media_insert_uses_manager_action_target(
         "Inserted": True,
         "WriteProtected": True,
     }
+
+
+def test_virtual_media_eject_uses_hydrated_manager_action_target(
+    redfish_mock_factory, monkeypatch
+):
+    """eject_vm uses hydrated member links from the Manager VirtualMedia collection."""
+    manager, service = redfish_mock_factory("supermicro")
+    device_path = "/redfish/v1/Managers/BMC_0/VirtualMedia/USB1"
+    device_state = dict(service._state(device_path))
+    device_state["Inserted"] = True
+    device_state["Image"] = "http://example.test/gb300.iso"
+    service._overlay[device_path] = device_state
+    service._overlay[device_path.lower()] = device_state
+    monkeypatch.setattr(
+        IDracManager,
+        "fetch_task",
+        lambda self, task_id: {"TaskState": "Completed"},
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.VirtualMediaEject,
+        "virtual_disk_eject",
+        device_id="USB1",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.last_request.path == (
+        "/redfish/v1/managers/bmc_0/virtualmedia/usb1/"
+        "actions/virtualmedia.ejectmedia"
+    )
+    assert service.last_request.json() == {}
 
 
 def test_virtual_media_insert_posts_action_payload(
