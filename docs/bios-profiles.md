@@ -4,25 +4,32 @@ Author: Mus <spyroot@gmail.com>
 
 BIOS profiles make host tuning repeatable and reviewable: each profile is a named set of BIOS
 attributes that can be inspected, previewed, staged, and verified as one unit instead of as ad-hoc
-edits. The working pattern is always the same: inspect the registry, preview the change, stage it,
-then verify after the reset.
+edits. The working pattern is always the same: inspect the registry, preview the change, stage it
+only after approval, then verify after the approved maintenance reset.
 
 The spec files used below are indexed with vendor and safety labels in [Specs](../specs/README.md).
 
-## The Safe Pattern
+## Read, Preview, Stage, Verify
 
 ```bash
 redfish_ctl bios-registry --attr_name SysProfile
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
-redfish_ctl jobs
-redfish_ctl bios --filter SysProfile,ProcCStates,MemFrequency
 ```
 
-Use `-r` only when you are ready for the host reset:
+After approval, stage the pending BIOS change and verify the pending state:
+
+```bash
+redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl bios-pending
+redfish_ctl jobs
+```
+
+Use `-r` only during an approved maintenance window, then verify after the host returns:
 
 ```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl jobs
+redfish_ctl bios --filter SysProfile,ProcCStates,MemFrequency
 ```
 
 `bios-change`, defined in `redfish_ctl/bios/cmd_change_bios.py`, requires an apply mode:
@@ -44,11 +51,11 @@ redfish_ctl bios-profile show gb300-power-capped
 
 Use the catalog by operator purpose first, then inspect the exact attributes before staging anything:
 
-| Profile | Target | Operator purpose | Key attribute |
-|---|---|---|---|
-| `gb300-power-capped` | Supermicro GB300 | Smooth rack-level power draw by using a 1 s input-power capping timescale. | `ServerPowerControl=InputPowerCappingUsing1sTimescale` |
-| `gb300-extended-gpu-memory` | Supermicro GB300 | Enable Extended GPU Memory so Grace CPU memory can expand the usable memory pool for large model runs. | `EGM=true` |
-| `dell-cstates-off` | Dell PowerEdge | Reduce wakeup jitter for latency-sensitive workloads that can trade away idle power savings. | `ProcCStates=Disabled` |
+| Profile | Platform/vendor | Safety | Verify with | Key attribute |
+|---|---|---|---|---|
+| `gb300-power-capped` | Supermicro/GB300 | Guarded | `bios-pending`, `bios --filter ServerPowerControl` | `ServerPowerControl=InputPowerCappingUsing1sTimescale` |
+| `gb300-extended-gpu-memory` | Supermicro/GB300 | Guarded | `bios-pending`, `bios --filter EGM` | `EGM=true` |
+| `dell-cstates-off` | Dell/iDRAC, CPU/platform | Guarded | `bios-pending`, `bios --filter ProcCStates` | `ProcCStates=Disabled` |
 
 The intended named-profile workflow is read, compare, then stage:
 
@@ -57,7 +64,6 @@ redfish_ctl bios-profile list
 redfish_ctl bios-profile show gb300-power-capped
 redfish_ctl bios-profile diff gb300-power-capped
 redfish_ctl bios-profile apply gb300-power-capped --dry_run
-redfish_ctl bios-profile apply gb300-power-capped --confirm
 ```
 
 The catalog command ships all four actions: `list` and `show` read only the local catalog, `diff`
@@ -65,6 +71,11 @@ compares a profile against the current BIOS attributes over a read-only BMC quer
 `apply` previews by default and stages only with `--confirm`, capturing a rollback snapshot first.
 Applying a profile stages BIOS settings and can require a host reset; only run the apply step during
 an approved maintenance window.
+
+```bash
+redfish_ctl bios-profile apply gb300-power-capped --confirm
+redfish_ctl bios-pending
+```
 
 ## Included Examples
 
@@ -84,6 +95,11 @@ tests, then enables high-performance memory and SR-IOV knobs where the platform 
 
 ```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+```
+
+After approval:
+
+```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
 
@@ -97,6 +113,11 @@ Dell PowerEdge systems often expose one high-level `SysProfile` attribute:
 ```bash
 redfish_ctl bios-registry --attr_name SysProfile
 redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset --show
+```
+
+After approval:
+
+```bash
 redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset -r
 ```
 
@@ -116,10 +137,15 @@ A custom profile is just a JSON spec with an `Attributes` object:
 }
 ```
 
-Save it, preview it, then apply it:
+Save it and preview it:
 
 ```bash
 redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset --show
+```
+
+After approval:
+
+```bash
 redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
 ```
 

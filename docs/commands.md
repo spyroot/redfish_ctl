@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before deeper inventory or any staged change.
 
-The table below follows the 122 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -236,15 +236,22 @@ Before running either kind of write, use the same four phases:
 ```bash
 redfish_ctl bios --filter ProcCStates,SysProfile,WorkloadProfile
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+```
+
+After target approval, staging and reset commands stay separate from read/preview commands:
+
+```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl bios-pending
 redfish_ctl jobs
 ```
 
-Many BIOS changes remain pending until an apply job and host reset. Add `-r` only when you are ready
-for the host reset:
+Many BIOS changes remain pending until an apply job and host reset. Use `-r` only during an approved
+maintenance window:
 
 ```bash
 redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl jobs
 ```
 
 Named profiles under `specs/profiles/` use the same staging path but add an automatic rollback
@@ -254,12 +261,16 @@ snapshot before the profile is previewed or staged:
 redfish_ctl bios-profile list
 redfish_ctl bios-profile show dell-cstates-off
 redfish_ctl bios-profile apply dell-cstates-off
-redfish_ctl bios-profile apply dell-cstates-off --confirm
 ```
 
 `bios-profile apply` is a dry-run by default. It reads the current BIOS values for the named
 attributes, returns a rollback spec, and only stages the profile through `bios-change` when
-`--confirm` is present.
+`--confirm` is present:
+
+```bash
+redfish_ctl bios-profile apply dell-cstates-off --confirm
+redfish_ctl bios-pending
+```
 
 ### Secure Boot
 
@@ -267,6 +278,11 @@ attributes, returns a rollback spec, and only stages the profile through `bios-c
 redfish_ctl secure-boot
 redfish_ctl bios-registry --attr_name SecureBoot
 redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset --show
+```
+
+After approval for a host reset:
+
+```bash
 redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset -r
 redfish_ctl secure-boot
 ```
@@ -275,12 +291,17 @@ redfish_ctl secure-boot
 
 ```bash
 redfish_ctl get_vm
-redfish_ctl eject_vm --device_id 1
-redfish_ctl insert_vm --uri_path http://10.0.0.10/ubuntu.iso --device_id 1
-redfish_ctl get_vm
 redfish_ctl boot-one-shot --device Cd --dry_run
+```
+
+After approval for live media and next-boot changes:
+
+```bash
+redfish_ctl eject_vm --device_id 1
+redfish_ctl insert_vm --uri_path http://192.0.2.10/ubuntu.iso --device_id 1
+redfish_ctl get_vm
 redfish_ctl boot-one-shot --device Cd -r
-redfish_ctl current_boot
+redfish_ctl boot-state
 ```
 
 ### Power Reset
@@ -288,6 +309,11 @@ redfish_ctl current_boot
 ```bash
 redfish_ctl system
 redfish_ctl system-reset --reset_type GracefulRestart --dry_run
+```
+
+After approval for a live host reset:
+
+```bash
 redfish_ctl system-reset --reset_type GracefulRestart --confirm
 redfish_ctl system
 ```
@@ -301,8 +327,13 @@ unless `--dry_run` is supplied; `--wait` only waits after a real reset.
 ```bash
 redfish_ctl firmware_inventory
 redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
-redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
 redfish_ctl firmware-update --image_file ./firmware.bin --dry_run
+```
+
+After approval for a live firmware update:
+
+```bash
+redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
 redfish_ctl firmware-update --image_file ./firmware.bin --confirm
 redfish_ctl tasks
 ```

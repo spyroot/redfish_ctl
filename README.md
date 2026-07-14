@@ -7,41 +7,10 @@
 
 `redfish_ctl` is a standalone command-line tool for driving server BMCs entirely through the
 Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
-with JSON or YAML output (`--yaml`, and save-to-file), both synchronous and asynchronous calls,
-optional server-side `$expand` on large collection reads, and a read-first, guarded-write model
-(mutating commands preview with `--dry_run` and require `--confirm`). It is vendor-neutral by design — Dell iDRAC,
-Supermicro (including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish — built on
-a product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
-
-What it does across the whole server lifecycle:
-
-- **Inventory & health** — system, chassis, manager, processors, memory, PCI, storage, drives,
-  network adapters/ports, NVLink ports, ethernet interfaces, and firmware inventory.
-- **BIOS** — read and stage attributes, pending management, the attribute registry, transactional
-  snapshots/restore points for rollback, and curated tuning profiles (low-latency, Dell
-  System/Workload, Intel, AMD).
-- **Boot** — boot order, one-time boot (UEFI or Legacy), boot sources, and next-boot inference.
-- **Power & reset** — vendor-neutral host reset / power-cycle (discovers `ComputerSystem.Reset`),
-  chassis reset, manager reboot, and a guarded `system-reset`.
-- **Storage & RAID** — controllers, drives, volumes, the RAID service, RAID/non-RAID conversion,
-  and volume initialize.
-- **Virtual media & OS provisioning** — mount/eject ISOs, one-shot ISO boot, Supermicro OEM
-  virtual media (CfgCD), and Dell OEM network-ISO boot.
-- **Serial console & SOL** — report and enable host BIOS serial redirection together with the BMC
-  Serial-over-LAN service, in one step, vendor-neutrally.
-- **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
-  an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
-  — to Prometheus, SignalFx, and Splunk Observability. The
-  [telemetry exporter guide](docs/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
-  model and the supported consumer modes.
-- **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
-- **Accounts & security** — create/update/delete accounts, SSH-key import, the account and privilege
-  services, Secure Boot, and SPDM component-integrity attestation.
-- **Jobs & tasks** — Dell Lifecycle Controller jobs and the standard Redfish Job/Task services,
-  with watch/apply/delete.
-- **Config, logs & events** — system config export/import, system and manager logs (SEL), test
-  events, the BMC clock, and a `wait` that blocks until the BMC answers after a reboot.
-- **Discovery** — scan a subnet for BMCs, classify their vendor, and crawl a Redfish tree.
+with JSON or YAML output (`--yaml`, and save-to-file), synchronous and asynchronous calls, and
+optional server-side `$expand` on large collection reads. It is vendor-neutral by design — Dell
+iDRAC, Supermicro (including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish —
+built on a product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
 
 > The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
 > backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
@@ -69,12 +38,45 @@ redfish_ctl --help             # every subcommand
 ```
 
 Reads are safe. Commands that change hardware (power, BIOS, boot, storage, virtual media, firmware)
-follow a read-first, guarded-write model — they preview with `--dry_run` and only act with
-`--confirm`. See [Mutating Commands](#mutating-commands) below.
+vary by safety label: **Guarded** commands require an intent flag such as `--confirm`, while
+**Write** commands may mutate as soon as they are invoked. Check the
+[Command reference](docs/commands.md) before changing hardware.
 
 > **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
 > and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
 > `idrac_ctl` PyPI package (≤ 1.0.13) is the pre-rename tool; new work should `pip install redfish_ctl`.
+
+## Capabilities
+
+What it does across the whole server lifecycle:
+
+- **Inventory & health** — system, chassis, manager, processors, memory, PCI, storage, drives,
+  network adapters/ports, NVLink ports, ethernet interfaces, and firmware inventory.
+- **BIOS** — read and stage attributes, pending management, the attribute registry, transactional
+  snapshots/restore points for rollback, and curated tuning profiles (low-latency, Dell
+  System/Workload, Intel, AMD).
+- **Boot** — boot order, one-time boot (UEFI or Legacy), boot sources, and next-boot inference.
+- **Power & reset** — discover host reset / power-cycle actions, chassis reset, manager reboot, and
+  the guarded `system-reset` command. These are live hardware actions, not quickstart commands.
+- **Storage & RAID** — controllers, drives, volumes, the RAID service, RAID/non-RAID conversion,
+  and volume initialize.
+- **Virtual media & OS provisioning** — mount/eject ISOs, one-shot ISO boot, Supermicro OEM
+  virtual media (CfgCD), and Dell OEM network-ISO boot.
+- **Serial console & SOL** — report and enable host BIOS serial redirection together with the BMC
+  Serial-over-LAN service, in one step, vendor-neutrally.
+- **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
+  an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
+  — to Prometheus, SignalFx, and Splunk Observability. The
+  [telemetry exporter guide](docs/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
+  model and the supported consumer modes.
+- **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
+- **Accounts & security** — create/update/delete accounts, SSH-key import, the account and privilege
+  services, Secure Boot, and SPDM component-integrity attestation.
+- **Jobs & tasks** — Dell Lifecycle Controller jobs and the standard Redfish Job/Task services,
+  with watch/apply/delete.
+- **Config, logs & events** — system config export/import, system and manager logs (SEL), test
+  events, the BMC clock, and a `wait` that blocks until the BMC answers after a reboot.
+- **Discovery** — scan a subnet for BMCs, classify their vendor, and crawl a Redfish tree.
 
 ## Install
 
@@ -232,7 +234,8 @@ opt-in emulator canary in `examples/hpe_ilo_canary.sh`. See [Vendors](docs/vendo
 
 Some commands change real hardware: power, BIOS, boot order, storage conversion, virtual media,
 firmware update, and manager reset. Read current state first, preview when the command has
-`--show` or `--dry_run`, then verify after the job or task completes.
+`--show` or `--dry_run`, run live apply commands only on an approved target, then verify after the
+job or task completes.
 
 ```bash
 redfish_ctl system-reset --reset_type GracefulRestart --dry_run
@@ -240,8 +243,9 @@ redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
 redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
 ```
 
-Use `--confirm` only when you mean to perform a guarded action such as `system-reset` or
-`firmware-update`.
+Use `--confirm`, `--commit`, or reset/apply flags only when you mean to perform the approved live
+action. See the [Command reference](docs/commands.md) for the **Read**, **Guarded**, and **Write**
+safety labels.
 
 ## Observability with Splunk
 
@@ -289,8 +293,9 @@ First-run problems are almost always the connection, not the command:
   default, so this usually means you passed `--verify-ssl` against a BMC without a trusted chain;
   drop the flag, or point it at a BMC whose certificate you trust.
 - **Connection timeout / refused / no route** — the BMC IP is unreachable, on a different network,
-  or Redfish is on a non-default port. Confirm reachability (`ping`, `curl -k https://$REDFISH_IP/redfish/v1`)
-  and set `REDFISH_PORT` if it isn't 443. After a reboot, `redfish_ctl wait` blocks until the BMC answers again.
+  or Redfish is on a non-default port. Confirm basic network reachability if your environment allows
+  it, then run `redfish_ctl --debug system` and set `REDFISH_PORT` if it is not 443. After a reboot,
+  `redfish_ctl wait` blocks until the BMC answers again.
 - **A command exists but returns little on your hardware** — Redfish trees differ by vendor and
   model. Use `redfish_ctl discovery` to see what your BMC actually exposes.
 - **More detail** — add `--debug` (or `--verbose`) to any command to see the Redfish requests and
@@ -312,7 +317,6 @@ First-run problems are almost always the connection, not the command:
 - [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
 - [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
 - [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
-- [Corpus Library](docs/corpus-library.md) - committed Redfish corpora and extraction workflow.
 - [Telemetry metrics](docs/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
 - [Releasing](docs/releasing.md) - local verification, package build, PyPI upload, and tagging.
