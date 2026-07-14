@@ -34,14 +34,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 _METHODS = ("GET", "HEAD", "OPTIONS", "POST", "PATCH", "PUT", "DELETE")
 # Credential/secret + account-identity keys to scrub (matched on the last dotted
-# segment, case-insensitive). Everything NOT in this set is left ORIGINAL — a full
+# segment, case-insensitive). Everything NOT matched is left ORIGINAL — a full
 # corpus keeps serials, MACs, IPs, hostnames, schemas, registries as captured.
 _REDACT_SUFFIXES = {
     "password", "sha256password", "sha256passwordsalt", "ipmikey", "md5v3key",
-    "shav3key", "communityname", "agentcommunity", "snmpv3passphrase", "passphrase",
-    "token", "authtoken", "privatekey", "sharedsecret", "presharedkey",
-    "chapsecret", "chapsecretreverse", "username", "usernames",
+    "shav3key", "sha1v3key", "sha256v3key", "communityname", "agentcommunity",
+    "snmpv3passphrase", "passphrase", "token", "authtoken", "privatekey",
+    "sharedsecret", "presharedkey", "chapsecret", "chapsecretreverse",
+    "encryptionkey", "bindpassword", "username", "usernames",
 }
+# Suffix PATTERNS so a new vendor variant of a known secret class can't slip
+# through an exact-match gap (the reason a Dell `SHA1v3Key` once leaked while its
+# siblings `MD5v3Key`/`SHA256Password` were scrubbed). A last dotted segment that
+# ENDS WITH any of these is treated as the same secret class:
+#   *v3key      -> all SNMPv3 localized key material (md5/sha/sha1/sha256 v3key)
+#   *community  -> ro/rw/agent/snmp community strings (bare `communityname` in the set)
+_REDACT_SUFFIX_PATTERNS = ("v3key", "community")
+
+
+def _is_secret_key(key: str) -> bool:
+    """True if this key's last dotted segment names a credential/secret to scrub."""
+    last = key.lower().rsplit(".", 1)[-1]
+    if last in _REDACT_SUFFIXES:
+        return True
+    return any(last.endswith(pat) for pat in _REDACT_SUFFIX_PATTERNS)
 
 
 def _redact_credentials(obj):
@@ -49,10 +65,9 @@ def _redact_credentials(obj):
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
-            last = k.lower().rsplit(".", 1)[-1]
-            if last in _REDACT_SUFFIXES and isinstance(v, str) and v.strip() and v.lower() != "null":
+            if _is_secret_key(k) and isinstance(v, str) and v.strip() and v.lower() != "null":
                 out[k] = "REDACTED"
-            elif last in _REDACT_SUFFIXES and isinstance(v, list) and all(isinstance(x, str) for x in v):
+            elif _is_secret_key(k) and isinstance(v, list) and all(isinstance(x, str) for x in v):
                 out[k] = ["REDACTED" for _ in v]
             else:
                 out[k] = _redact_credentials(v)
