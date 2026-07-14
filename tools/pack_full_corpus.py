@@ -95,11 +95,18 @@ def build_manifest(host_dir: Path, api_map: dict, vendor: str, model: str,
     """Assemble corpus_manifest.json (counts derived from the map + files)."""
     ufm = api_map["url_file_mapping"]
     amm = api_map["allowed_methods_mapping"]
+    efm = api_map.get("error_file_mapping", {}) or {}
+    hsm = api_map.get("http_status_mapping", {}) or {}
     method_counts = {m: 0 for m in _METHODS}
     for methods in amm.values():
         for m in methods:
             if m in method_counts:
                 method_counts[m] += 1
+    # bucket captured HTTP statuses (empty on pre-capture corpora)
+    status_counts: dict[str, int] = {}
+    for status in hsm.values():
+        bucket = "unreachable" if status == 0 else f"{status // 100}xx"
+        status_counts[bucket] = status_counts.get(bucket, 0) + 1
     redfish_version = ""
     sr = host_dir / "_redfish_v1.json"
     if sr.exists():
@@ -125,18 +132,28 @@ def build_manifest(host_dir: Path, api_map: dict, vendor: str, model: str,
         "redfish_ctl_commit": commit,
         "json_file_count": len(json_files),
         "url_file_mapping_count": len(ufm),
+        "error_file_mapping_count": len(efm),
         "allowed_methods_mapping_count": len(amm),
         "method_counts": method_counts,
+        "http_status_counts": status_counts,
         "redaction_status": redaction_status,
         "artifact_checksum": "",
     }
 
 
 def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]:
-    """Return a list of contract violations (empty = valid). Fail closed on any."""
+    """Return a list of contract violations (empty = valid). Fail closed on any.
+
+    Backward compatible: ``error_file_mapping`` and ``http_status_mapping`` are
+    optional (absent on pre-capture corpora → treated as empty). ``url_file_mapping``
+    stays 2xx-only; captured non-2xx responses live in ``error_file_mapping`` and
+    every resource JSON on disk must be mapped by exactly one of the two.
+    """
     problems: list[str] = []
     ufm = api_map["url_file_mapping"]
     amm = api_map["allowed_methods_mapping"]
+    efm = api_map.get("error_file_mapping", {}) or {}
+    hsm = api_map.get("http_status_mapping", {}) or {}
     names = {p.name for p in json_files}
     if "_redfish_v1.json" not in names:
         problems.append("ServiceRoot missing: no _redfish_v1.json (the entry point must be captured)")
@@ -147,22 +164,37 @@ def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]
             json.loads(p.read_text())
         except (ValueError, OSError) as e:
             problems.append(f"unparseable JSON {p.name}: {e}")
-    if len(ufm) != len(json_files):
-        problems.append(f"json_file_count {len(json_files)} != url_file_mapping {len(ufm)}")
-    if len(amm) != len(ufm):
-        problems.append(f"allowed_methods_mapping {len(amm)} != url_file_mapping {len(ufm)}")
-    for url, fname in ufm.items():
+    overlap = set(ufm) & set(efm)
+    if overlap:
+        problems.append(f"url in BOTH url_file_mapping and error_file_mapping: {sorted(overlap)[:5]}")
+    if len(json_files) != len(ufm) + len(efm):
+        problems.append(
+            f"json_file_count {len(json_files)} != url_file_mapping {len(ufm)} "
+            f"+ error_file_mapping {len(efm)}")
+    # methods may cover just the 2xx set (legacy) or the 2xx+error set (new capture)
+    if len(amm) not in (len(ufm), len(ufm) + len(efm)):
+        problems.append(
+            f"allowed_methods_mapping {len(amm)} != url_file_mapping {len(ufm)} "
+            f"(or +error_file_mapping {len(efm)})")
+    for url, fname in list(ufm.items()) + list(efm.items()):
         if Path(fname).name not in names:
             problems.append(f"mapped file missing from corpus: {url} -> {fname}")
-    mapped = {Path(f).name for f in ufm.values()}
+    mapped = {Path(f).name for f in ufm.values()} | {Path(f).name for f in efm.values()}
     for p in json_files:
         if p.name == "rest_api_map.npy" or p.name == "corpus_manifest.json":
             continue
         if p.name not in mapped:
-            problems.append(f"resource JSON not in url_file_mapping: {p.name}")
+            problems.append(f"resource JSON not mapped (url_file/error_file): {p.name}")
     for url in amm:
-        if url not in ufm:
-            problems.append(f"url in allowed_methods_mapping but not url_file_mapping: {url}")
+        if url not in ufm and url not in efm:
+            problems.append(f"url in allowed_methods_mapping but not in url/error mapping: {url}")
+    # http_status keys must resolve to a mapped resource, unless status 0 (an
+    # unreachable/transport-failed URL that legitimately has no saved body).
+    for url, status in hsm.items():
+        if status == 0:
+            continue
+        if url not in ufm and url not in efm:
+            problems.append(f"http_status_mapping url not mapped: {url} ({status})")
     return problems
 
 

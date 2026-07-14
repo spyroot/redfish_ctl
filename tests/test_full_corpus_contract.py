@@ -90,7 +90,7 @@ def test_gate_fails_on_unmapped_resource(good_host):
     api = pack_full_corpus.load_api_map(good_host)
     files = sorted(good_host.glob("*.json"))
     problems = pack_full_corpus.validate(good_host, api, files)
-    assert any("not in url_file_mapping" in p for p in problems)
+    assert any("not mapped" in p for p in problems)
 
 
 def test_gate_fails_on_missing_mapped_file(good_host):
@@ -218,3 +218,108 @@ def test_full_pack_roundtrips_and_revalidates(good_host, tmp_path):
     acct = json.loads((root / "_redfish_v1_Managers_1_Accounts.json").read_text())
     assert acct["Members"][0]["Password"] == "REDACTED"
     assert acct["Members"][0]["SerialNumber"] == "ABC123"
+
+
+def _write_capture_host(root):
+    """A host dir shaped like the lossless capture: ServiceRoot, a 2xx resource,
+    and a captured non-2xx response (``.error.json``) with the additive
+    ``http_status_mapping`` + ``error_file_mapping`` the producer now writes."""
+    host = root / "10.0.0.9"
+    host.mkdir()
+    (host / "_redfish_v1.json").write_text(json.dumps(
+        {"@odata.id": "/redfish/v1/", "RedfishVersion": "1.6.0"}, indent=4))
+    (host / "_redfish_v1_Systems_1.json").write_text(json.dumps(
+        {"@odata.id": "/redfish/v1/Systems/1"}, indent=4))
+    # a real captured 404 Redfish error envelope, saved under a .error.json name
+    (host / "_redfish_v1_Chassis_1_PCIeDevices_178.error.json").write_text(json.dumps(
+        {"error": {"code": "Base.1.17.ResourceMissingAtURI",
+                   "@Message.ExtendedInfo": [{"MessageId": "Base.1.17.ResourceMissingAtURI"}]}}, indent=4))
+    api = {
+        "url_file_mapping": {
+            "/redfish/v1/": "_redfish_v1.json",
+            "/redfish/v1/Systems/1": "_redfish_v1_Systems_1.json",
+        },
+        "allowed_methods_mapping": {
+            "/redfish/v1/": ["GET", "HEAD"],
+            "/redfish/v1/Systems/1": ["GET", "HEAD", "PATCH"],
+            "/redfish/v1/Chassis/1/PCIeDevices/178": ["GET", "HEAD"],
+        },
+        "http_status_mapping": {
+            "/redfish/v1/": 200,
+            "/redfish/v1/Systems/1": 200,
+            "/redfish/v1/Chassis/1/PCIeDevices/178": 404,
+        },
+        "error_file_mapping": {
+            "/redfish/v1/Chassis/1/PCIeDevices/178":
+                "_redfish_v1_Chassis_1_PCIeDevices_178.error.json",
+        },
+    }
+    np.save(host / "rest_api_map.npy", api)
+    return host
+
+
+def test_error_capture_corpus_validates(tmp_path):
+    """A corpus that captured a non-2xx response is valid: the error body is a
+    mapped resource (via error_file_mapping), not an orphan, and json_file_count
+    reconciles url_file_mapping + error_file_mapping."""
+    host = _write_capture_host(tmp_path)
+    api = pack_full_corpus.load_api_map(host)
+    files = sorted(host.glob("*.json"))
+    assert pack_full_corpus.validate(host, api, files) == []
+
+
+def test_error_capture_manifest_counts(tmp_path):
+    """The manifest surfaces the captured status distribution + error count so a
+    consumer can see the corpus carries error ground truth."""
+    host = _write_capture_host(tmp_path)
+    api = pack_full_corpus.load_api_map(host)
+    files = sorted(host.glob("*.json"))
+    m = pack_full_corpus.build_manifest(host, api, "acme", "x", files, "x")
+    assert m["url_file_mapping_count"] == 2
+    assert m["error_file_mapping_count"] == 1
+    assert m["json_file_count"] == 3
+    assert m["http_status_counts"].get("2xx") == 2
+    assert m["http_status_counts"].get("4xx") == 1
+
+
+def test_error_file_orphan_still_fails(tmp_path):
+    """An .error.json on disk that is NOT in error_file_mapping is still an orphan
+    (fail closed) — capture must map every file it writes."""
+    host = _write_capture_host(tmp_path)
+    (host / "_redfish_v1_Ghost.error.json").write_text('{"error":{}}')
+    api = pack_full_corpus.load_api_map(host)
+    files = sorted(host.glob("*.json"))
+    problems = pack_full_corpus.validate(host, api, files)
+    assert any("not mapped" in p for p in problems)
+
+
+def test_url_in_both_url_and_error_mapping_fails(tmp_path):
+    """A URL must be EITHER a 2xx (url_file_mapping) OR an error
+    (error_file_mapping), never both — an overlap is a producer bug, fail closed."""
+    host = _write_capture_host(tmp_path)
+    api = pack_full_corpus.load_api_map(host)
+    api["error_file_mapping"]["/redfish/v1/Systems/1"] = "_redfish_v1_Systems_1.json"
+    np.save(host / "rest_api_map.npy", api)
+    api = pack_full_corpus.load_api_map(host)
+    files = sorted(host.glob("*.json"))
+    problems = pack_full_corpus.validate(host, api, files)
+    assert any("BOTH" in p for p in problems)
+
+
+def test_error_capture_full_pack_roundtrips(tmp_path):
+    """Packing a capture corpus round-trips: the error body + both additive
+    mappings survive, and the unpacked corpus re-validates."""
+    host = _write_capture_host(tmp_path)
+    out = tmp_path / "acme_x_full_corpus.tar.gz"
+    rc = pack_full_corpus.pack(host, out, "acme", "x", redact=True)
+    assert rc == 0 and out.exists()
+    unpack = tmp_path / "unpack"
+    with tarfile.open(out) as tar:
+        tar.extractall(unpack)
+    root = unpack / host.name
+    assert (root / "_redfish_v1_Chassis_1_PCIeDevices_178.error.json").exists()
+    api = pack_full_corpus.load_api_map(root)
+    assert api["http_status_mapping"]["/redfish/v1/Chassis/1/PCIeDevices/178"] == 404
+    assert "/redfish/v1/Chassis/1/PCIeDevices/178" in api["error_file_mapping"]
+    files = sorted(p for p in root.glob("*.json") if p.name != "corpus_manifest.json")
+    assert pack_full_corpus.validate(root, api, files) == []
