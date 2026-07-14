@@ -141,6 +141,18 @@ def build_manifest(host_dir: Path, api_map: dict, vendor: str, model: str,
     }
 
 
+def artifact_payload_checksum(root: Path) -> str:
+    """Return a deterministic checksum for payload files, excluding the manifest."""
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "corpus_manifest.json"):
+        rel = path.relative_to(root).as_posix().encode("utf-8")
+        digest.update(rel)
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return "sha256:" + digest.hexdigest()
+
+
 def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]:
     """Return a list of contract violations (empty = valid). Fail closed on any.
 
@@ -230,13 +242,12 @@ def pack(host_dir: Path, output: Path, vendor: str, model: str,
         (dest / p.name).write_text(json.dumps(data, indent=4))
     # copy the EXACT rest_api_map.npy (same-run; no credentials in URLs/methods)
     (dest / "rest_api_map.npy").write_bytes((host_dir / "rest_api_map.npy").read_bytes())
+    manifest["artifact_checksum"] = artifact_payload_checksum(dest)
     (dest / "corpus_manifest.json").write_text(json.dumps(manifest, indent=2))
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(output, "w:gz") as tar:
         tar.add(dest, arcname=host_dir.name)
-    manifest["artifact_checksum"] = "sha256:" + hashlib.sha256(output.read_bytes()).hexdigest()
-    (dest / "corpus_manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"wrote {output} (full_training, {len(json_files)} json + map + manifest)")
     return 0
 
