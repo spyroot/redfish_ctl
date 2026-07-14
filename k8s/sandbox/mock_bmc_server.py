@@ -103,14 +103,22 @@ def _resolve_mapped_fixture(corpus_dir: Path, mapped_name: Any) -> Path | None:
         return None
     root = Path(corpus_dir)
     mapped_path = Path(mapped_name)
-    candidates: list[Path] = []
     if mapped_path.is_absolute():
         return None
-    candidates.append(root / mapped_path)
-    candidates.append(root / mapped_path.name)
+    root_resolved = root.resolve()
+    candidates: list[Path] = [root / mapped_path, root / mapped_path.name]
     for candidate in candidates:
-        if candidate.is_file():
-            return candidate
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        # Containment guard: a mapped name from rest_api_map with '..' segments
+        # must never resolve outside the corpus dir. Without this, a crafted
+        # url_file_mapping entry like "../../etc/passwd" would be served.
+        if not resolved.is_relative_to(root_resolved):
+            continue
+        if resolved.is_file():
+            return resolved
     return None
 
 

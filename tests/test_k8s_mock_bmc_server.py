@@ -259,6 +259,23 @@ def test_absolute_mapped_fixture_names_are_ignored(tmp_path: Path) -> None:
     ) is None
 
 
+def test_mapped_fixture_names_cannot_escape_corpus_dir(tmp_path: Path) -> None:
+    """A rest_api_map entry with '..' segments must never resolve outside the
+    corpus dir. A real secret file is planted next to (not inside) the corpus;
+    a crafted ``../`` mapping must not serve it (path-traversal guard)."""
+    module = _load_server_module()
+    corpus = _write_status_map_corpus(tmp_path)
+    secret = tmp_path / "secret.json"
+    secret.write_text('{"leaked": true}', encoding="utf-8")
+
+    # relative traversal that would land on the planted secret one level up
+    assert module._resolve_mapped_fixture(corpus, "../secret.json") is None
+    assert module._resolve_mapped_fixture(corpus, "../../etc/hostname") is None
+    # a legitimate in-corpus name still resolves
+    good = next(corpus.glob("*.json"))
+    assert module._resolve_mapped_fixture(corpus, good.name) == good.resolve()
+
+
 def test_head_to_captured_error_status_suppresses_body(tmp_path: Path) -> None:
     """HEAD returns captured error headers without writing an error body."""
     module = _load_server_module()
