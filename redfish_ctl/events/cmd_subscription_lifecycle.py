@@ -1,12 +1,10 @@
 """Create and delete Redfish EventDestination subscriptions."""
 
-import json
-from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, RedfishJsonSpec, Singleton
+from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -57,8 +55,12 @@ class _SubscriptionBase(IDracManager):
             raise InvalidArgument("subscription id or URI is required")
         value = str(subscription).strip()
         if value.startswith("/redfish/"):
+            if value.rstrip("/") == subscriptions_uri.rstrip("/"):
+                raise InvalidArgument(
+                    f"subscription member URI under {subscriptions_uri} is required"
+                )
             prefix = subscriptions_uri.rstrip("/") + "/"
-            if value != subscriptions_uri and not value.startswith(prefix):
+            if not value.startswith(prefix):
                 raise InvalidArgument(
                     f"subscription URI must be under {subscriptions_uri}"
                 )
@@ -80,7 +82,6 @@ class SubscriptionCreate(_SubscriptionBase,
         super(SubscriptionCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
-    @abstractmethod
     def register_subcommand(cls):
         """Register the guarded subscription-create subcommand."""
         cmd_parser = cls.base_parser()
@@ -140,18 +141,6 @@ class SubscriptionCreate(_SubscriptionBase,
             payload["Context"] = str(context)
         return payload
 
-    def _post_subscription(self, target, payload):
-        headers = {}
-        headers.update(self.json_content_type)
-        response = self.api_post_call(
-            f"{self._default_method}{self.redfish_ip}{target}",
-            json.dumps(payload),
-            headers,
-        )
-        status = self.default_post_success(response, expected=201)
-        location = response.headers.get(RedfishJsonSpec.Location)
-        return status, location
-
     def execute(self,
                 filename: Optional[str] = None,
                 data_type: Optional[str] = "json",
@@ -187,26 +176,20 @@ class SubscriptionCreate(_SubscriptionBase,
                 "note": "preview only; re-run with --confirm to create subscription",
             }, None, None, None)
 
-        if do_async:
-            result, status = self.base_post(
-                target,
-                payload=payload,
-                do_async=do_async,
-                expected_status=201,
-            )
-            location = None
-            error = result.error
-        else:
-            status, location = self._post_subscription(target, payload)
-            error = None
+        result, status = self.base_post(
+            target,
+            payload=payload,
+            do_async=do_async,
+            expected_status=201,
+        )
         data = {
             "action": "create",
             "target": target,
             "status": str(status),
-            "location": location,
-            "error": error,
+            "location": None,
+            "error": result.error,
         }
-        return CommandResult(data, None, None, error)
+        return CommandResult(data, None, None, result.error)
 
 
 class SubscriptionDelete(_SubscriptionBase,
@@ -219,13 +202,12 @@ class SubscriptionDelete(_SubscriptionBase,
         super(SubscriptionDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
-    @abstractmethod
     def register_subcommand(cls):
         """Register the guarded subscription-delete subcommand."""
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--subscription", required=True, dest="subscription", metavar="ID_OR_URI",
-            help="subscription member id or /redfish/v1/EventService/Subscriptions URI")
+            help="subscription member id or member URI")
         cmd_parser.add_argument(
             "--confirm", action="store_true", dest="confirm", default=False,
             help="delete the subscription; without it the command only previews")
@@ -259,7 +241,7 @@ class SubscriptionDelete(_SubscriptionBase,
         result, status = self.base_delete(
             target,
             do_async=do_async,
-            expected_status=200,
+            expected_status=204,
         )
         data = {
             "action": "delete",

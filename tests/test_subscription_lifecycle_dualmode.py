@@ -1,5 +1,11 @@
 """Dual-mode tests for EventDestination subscription lifecycle commands."""
 
+import os
+import shutil
+import subprocess
+import textwrap
+from pathlib import Path
+
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
@@ -105,6 +111,33 @@ def test_subscription_create_confirm_posts_event_destination_payload(
     }
 
 
+def test_subscription_create_splits_comma_separated_filters(
+    redfish_mock_factory,
+):
+    """subscription-create accepts repeated or comma-separated filter values."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionCreate"),
+        "subscription-create",
+        destination=DESTINATION,
+        event_types=["Alert,StatusChange", "ResourceUpdated"],
+        registry_prefixes="Base, TaskEvent",
+        resource_types=["Task, MetricReport"],
+        confirm=False,
+    )
+
+    assert result.error is None
+    assert _mutating_requests(service) == []
+    assert result.data["payload"]["EventTypes"] == [
+        "Alert",
+        "StatusChange",
+        "ResourceUpdated",
+    ]
+    assert result.data["payload"]["RegistryPrefixes"] == ["Base", "TaskEvent"]
+    assert result.data["payload"]["ResourceTypes"] == ["Task", "MetricReport"]
+
+
 def test_subscription_delete_dry_run_resolves_member_without_delete(
     redfish_mock_factory,
 ):
@@ -152,6 +185,42 @@ def test_subscription_delete_confirm_deletes_resolved_member(
     assert result.data["status"] == "IdracApiRespond.Ok"
     assert len(deletes) == 1
     assert deletes[0].path.lower() == SUBSCRIPTION_ONE_PATH.lower()
+
+
+def test_subscription_delete_rejects_collection_uri_without_delete(
+    redfish_mock_factory,
+):
+    """subscription-delete never accepts the collection URI as a delete target."""
+    manager, service = redfish_mock_factory("supermicro")
+    _seed_subscription(service)
+
+    with pytest.raises(InvalidArgument, match="subscription member URI"):
+        manager.sync_invoke(
+            _request_type("SubscriptionDelete"),
+            "subscription-delete",
+            subscription=SUBSCRIPTIONS_PATH,
+            confirm=True,
+        )
+
+    assert all(request.method != "DELETE" for request in service.requests)
+
+
+def test_subscription_delete_rejects_other_collection_uri_without_delete(
+    redfish_mock_factory,
+):
+    """subscription-delete rejects URIs outside the EventDestination collection."""
+    manager, service = redfish_mock_factory("supermicro")
+    _seed_subscription(service)
+
+    with pytest.raises(InvalidArgument, match="must be under"):
+        manager.sync_invoke(
+            _request_type("SubscriptionDelete"),
+            "subscription-delete",
+            subscription="/redfish/v1/EventService/Other/1",
+            confirm=True,
+        )
+
+    assert all(request.method != "DELETE" for request in service.requests)
 
 
 def test_subscription_commands_fail_closed_without_subscription_collection(
@@ -203,3 +272,92 @@ def test_subscription_commands_expose_cli_entrypoints():
     assert delete_name == "subscription-delete"
     assert "subscription" in create_help.lower()
     assert "subscription" in delete_help.lower()
+    assert "collection URI" not in delete_parser.format_help()
+
+
+def test_gb300_subscription_roundtrip_script_tracks_created_member(tmp_path):
+    """The GB300 live script parses Redfish Members keys during the round-trip."""
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available")
+
+    bin_dir = tmp_path / "bin"
+    capture_dir = tmp_path / "captures"
+    state_file = tmp_path / "state"
+    bin_dir.mkdir()
+    state_file.write_text("initial\n")
+
+    fake_redfish_ctl = bin_dir / "redfish_ctl"
+    fake_redfish_ctl.write_text(
+        textwrap.dedent(
+            f"""\
+            #!{bash}
+            set -euo pipefail
+
+            while [[ "$#" -gt 0 && "$1" == --* ]]; do
+              shift
+            done
+
+            command="${{1:-}}"
+            shift || true
+            state="$(cat "{state_file}")"
+
+            case "$command" in
+              event-service)
+                if [[ "$state" == created ]]; then
+                  printf '%s\\n' '{{"data":{{"Subscriptions":{{"Members":[{{"@odata.id":"{SUBSCRIPTION_ONE_PATH}"}},{{"@odata.id":"{SUBSCRIPTIONS_PATH}/new"}}]}}}}}}'
+                else
+                  printf '%s\\n' '{{"data":{{"Subscriptions":{{"Members":[{{"@odata.id":"{SUBSCRIPTION_ONE_PATH}"}}]}}}}}}'
+                fi
+                ;;
+              subscription-create)
+                printf '%s\\n' created > "{state_file}"
+                printf '%s\\n' '{{"data":{{"location":"{SUBSCRIPTIONS_PATH}/new"}}}}'
+                ;;
+              subscription-delete)
+                if [[ "$state" == deleted ]]; then
+                  printf '%s\\n' '{{"error":"not found"}}'
+                  exit 1
+                fi
+                printf '%s\\n' deleted > "{state_file}"
+                printf '%s\\n' '{{"data":{{"status":"deleted"}}}}'
+                ;;
+              *)
+                echo "unexpected command: $command" >&2
+                exit 2
+                ;;
+            esac
+            """
+        )
+    )
+    fake_redfish_ctl.chmod(0o755)
+
+    fake_sleep = bin_dir / "sleep"
+    fake_sleep.write_text(f"#!{bash}\nexit 0\n")
+    fake_sleep.chmod(0o755)
+
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        "REDFISH_IP": "192.0.2.10",
+        "REDFISH_USERNAME": "root",
+        "REDFISH_PASSWORD": "secret",
+        "SUBSCRIPTION_DESTINATION": DESTINATION,
+        "TRACE_DIR": str(capture_dir),
+    }
+    script = (
+        "scripts/live_sanity_check/supermicro/gb300/"
+        "subscription_roundtrip.sh"
+    )
+
+    result = subprocess.run(
+        [bash, script],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "PASS: subscription created and deleted" in result.stdout

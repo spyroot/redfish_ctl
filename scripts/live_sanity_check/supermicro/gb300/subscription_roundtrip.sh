@@ -21,7 +21,12 @@ import json
 import sys
 
 payload = json.load(sys.stdin)
-members = payload.get("data", {}).get("Subscriptions", {}).get("members") or []
+subscriptions = payload.get("data", {}).get("Subscriptions", {}) or {}
+members = [
+    member.get("@odata.id")
+    for member in subscriptions.get("Members", [])
+    if isinstance(member, dict) and member.get("@odata.id")
+]
 print(json.dumps(members, sort_keys=True))
 '
 }
