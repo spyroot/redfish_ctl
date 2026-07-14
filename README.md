@@ -8,10 +8,10 @@
 `redfish_ctl` is a standalone command-line tool for driving server BMCs entirely through the
 Redfish REST API — no web UI, no vendor GUI. It wraps 100+ subcommands behind one consistent CLI
 with JSON or YAML output (`--yaml`, and save-to-file), both synchronous and asynchronous calls,
-optional server-side `$expand` on large collection reads, and a read-first, guarded-write model
-(mutating commands preview with `--dry_run` and require `--confirm`). It is vendor-neutral by design — Dell iDRAC,
-Supermicro (including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish — built on
-a product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
+optional server-side `$expand` on large collection reads, and safety labels that separate read-only,
+guarded, and immediate-write operations. It is vendor-neutral by design — Dell iDRAC, Supermicro
+(including GB300 / Grace-Blackwell and X10), HPE iLO, and generic DMTF Redfish — built on a
+product-neutral Redfish client with the Dell/iDRAC specifics layered on top.
 
 What it does across the whole server lifecycle:
 
@@ -68,9 +68,11 @@ redfish_ctl system --yaml      # same data as YAML instead of JSON
 redfish_ctl --help             # every subcommand
 ```
 
-Reads are safe. Commands that change hardware (power, BIOS, boot, storage, virtual media, firmware)
-follow a read-first, guarded-write model — they preview with `--dry_run` and only act with
-`--confirm`. See [Mutating Commands](#mutating-commands) below.
+Reads are safe. Commands that change hardware are labeled **Guarded** or **Write** in the
+[command reference](docs/commands.md#registered-commands): Guarded commands require an explicit
+intent flag such as `--confirm`, while Write commands may mutate immediately. Preview with
+`--show` or `--dry_run` when the command supports it, then see [Mutating Commands](#mutating-commands)
+below before applying anything.
 
 > **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
 > and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
@@ -312,7 +314,6 @@ First-run problems are almost always the connection, not the command:
 - [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
 - [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
 - [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
-- [Corpus Library](docs/corpus-library.md) - committed Redfish corpora and extraction workflow.
 - [Telemetry metrics](docs/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
 - [Releasing](docs/releasing.md) - local verification, package build, PyPI upload, and tagging.
