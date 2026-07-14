@@ -34,6 +34,94 @@ def _build_fixture_index(corpus_dir: Path) -> dict[str, Path]:
     return {path.name.lower(): path for path in root.glob("*.json")}
 
 
+def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
+    map_path = Path(corpus_dir) / "rest_api_map.npy"
+    if not map_path.exists():
+        return {}
+    try:
+        import numpy as np
+    except ModuleNotFoundError:
+        raise ValueError(
+            f"NumPy is required to load Redfish API map: {map_path}"
+        ) from None
+    try:
+        data = np.load(map_path, allow_pickle=True).item()
+    except Exception as exc:  # noqa: BLE001 - include loader context.
+        raise ValueError(f"failed to load Redfish API map: {map_path}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"Redfish API map must contain an object: {map_path}")
+    _validate_rest_api_map(data, map_path)
+    return data
+
+
+def _validate_rest_api_map(api_map: dict[str, Any], map_path: Path) -> None:
+    for key in ("url_file_mapping", "http_status_mapping", "error_file_mapping"):
+        value = api_map.get(key)
+        if value is not None and not isinstance(value, dict):
+            raise ValueError(f"{key} must be an object in Redfish API map: {map_path}")
+
+    status_mapping = api_map.get("http_status_mapping")
+    if not isinstance(status_mapping, dict):
+        return
+    for request_path, raw_status in list(status_mapping.items()):
+        try:
+            status = int(raw_status)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "http_status_mapping values must be integer HTTP statuses "
+                f"in Redfish API map: {map_path} ({request_path!r})"
+            ) from exc
+        if status < 100 or status > 599:
+            raise ValueError(
+                "http_status_mapping values must be valid HTTP statuses "
+                f"in Redfish API map: {map_path} ({request_path!r})"
+            )
+        status_mapping[request_path] = status
+
+
+def _mapping_dict(api_map: dict[str, Any], key: str) -> dict[str, Any]:
+    value = api_map.get(key) or {}
+    return value if isinstance(value, dict) else {}
+
+
+def _candidate_map_keys(request_path: str) -> tuple[str, ...]:
+    path = _normalize_request_path(request_path)
+    if path == "/redfish/v1":
+        return (path, "/redfish/v1/")
+    return (path,)
+
+
+def _lookup_mapping(mapping: dict[str, Any], request_path: str) -> Any:
+    for key in _candidate_map_keys(request_path):
+        if key in mapping:
+            return mapping[key]
+    return None
+
+
+def _resolve_mapped_fixture(corpus_dir: Path, mapped_name: Any) -> Path | None:
+    if not isinstance(mapped_name, str) or not mapped_name:
+        return None
+    root = Path(corpus_dir)
+    mapped_path = Path(mapped_name)
+    if mapped_path.is_absolute():
+        return None
+    root_resolved = root.resolve()
+    candidates: list[Path] = [root / mapped_path, root / mapped_path.name]
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        # Containment guard: a mapped name from rest_api_map with '..' segments
+        # must never resolve outside the corpus dir. Without this, a crafted
+        # url_file_mapping entry like "../../etc/passwd" would be served.
+        if not resolved.is_relative_to(root_resolved):
+            continue
+        if resolved.is_file():
+            return resolved
+    return None
+
+
 def _normalize_request_path(request_path: str) -> str:
     path = unquote(urlsplit(request_path).path)
     if path != "/" and path.endswith("/"):
@@ -413,11 +501,42 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
 
     def _fixture_for_request(self) -> Path | None:
         fixture_index = getattr(type(self), "fixture_index")
+        api_map = getattr(type(self), "api_map", {})
+        corpus_dir = getattr(type(self), "corpus_dir")
         path = _normalize_request_path(self.path)
         if not path.startswith("/redfish/v1"):
             return None
+        mapped_name = _lookup_mapping(
+            _mapping_dict(api_map, "url_file_mapping"),
+            path,
+        )
+        mapped_fixture = _resolve_mapped_fixture(corpus_dir, mapped_name)
+        if mapped_fixture is not None:
+            return mapped_fixture
         key = "_" + path.strip("/").replace("/", "_") + ".json"
         return fixture_index.get(key.lower())
+
+    def _captured_error_for_request(self) -> tuple[int, Path | None] | None:
+        api_map = getattr(type(self), "api_map", {})
+        if not api_map:
+            return None
+        path = _normalize_request_path(self.path)
+        if not path.startswith("/redfish/v1"):
+            return None
+        raw_status = _lookup_mapping(
+            _mapping_dict(api_map, "http_status_mapping"),
+            path,
+        )
+        status = int(raw_status) if raw_status is not None else None
+        error_fixture = _resolve_mapped_fixture(
+            getattr(type(self), "corpus_dir"),
+            _lookup_mapping(_mapping_dict(api_map, "error_file_mapping"), path),
+        )
+        if error_fixture is None:
+            if status is None or status < 400:
+                return None
+            return status, None
+        return status or 500, error_fixture
 
     def _active_writer(self) -> "ReplayState | MutationRules | None":
         """The write engine in effect (mutation-rules takes precedence)."""
@@ -463,6 +582,24 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _serve_fixture(self, send_body: bool) -> None:
+        captured_error = self._captured_error_for_request()
+        if captured_error is not None:
+            status, error_fixture = captured_error
+            if error_fixture is None:
+                content = json.dumps(
+                    {"error": f"captured status {status} for {self.path}"},
+                    sort_keys=True,
+                ).encode("utf-8")
+            else:
+                content = error_fixture.read_bytes()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            if send_body:
+                self.wfile.write(content)
+            return
+
         fixture = self._fixture_for_request()
         if fixture is None:
             self._send_json(404, {"error": f"no fixture for {self.path}"})
@@ -637,6 +774,8 @@ def make_handler(
     class Handler(CorpusRequestHandler):
         pass
 
+    Handler.corpus_dir = root
+    Handler.api_map = _load_rest_api_map(root)
     Handler.fixture_index = _build_fixture_index(root)
     if not Handler.fixture_index:
         raise ValueError(f"no JSON fixtures found under {root}")
