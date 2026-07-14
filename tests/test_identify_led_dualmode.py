@@ -151,3 +151,45 @@ def test_identify_led_indicatorled_payload_uses_legacy_values(redfish_mock_facto
     assert result.data["payload"] == {"IndicatorLED": "Off"}
     assert result.data["current"] == "Off"
     assert _mutating_requests(service) == []
+
+
+def test_identify_led_confirm_turns_led_off(redfish_mock_factory):
+    """identify-led --confirm with the off state PATCHes the property to False.
+
+    The existing confirm test only covers turning the LED on (active=True); this
+    covers the turn-OFF mutation path so a regression that inverts or drops the
+    off value is caught.
+    """
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.IdentifyLed,
+        "identify-led",
+        resource="system",
+        target_id="System_0",
+        active=False,
+        confirm=True,
+    )
+
+    patches = _patch_requests(service)
+    assert len(patches) == 1
+    assert patches[0].json() == {"LocationIndicatorActive": False}
+    assert result.data["applied"]["error"] is None
+    assert result.data["observed"] is False
+
+
+def test_identify_led_auto_selects_indicator_led_fallback():
+    """With no explicit --property, a target exposing only the legacy IndicatorLED
+    (no LocationIndicatorActive) auto-selects IndicatorLED and emits the Lit/Off
+    string enum, while LocationIndicatorActive still wins when both are present."""
+    from redfish_ctl.chassis.cmd_identify_led import IdentifyLed
+
+    # auto-fallback: IndicatorLED is chosen when LocationIndicatorActive is absent
+    assert IdentifyLed._property_for({"IndicatorLED": "Off"}, None) == "IndicatorLED"
+    # preference: LocationIndicatorActive wins when both are exposed
+    assert IdentifyLed._property_for(
+        {"IndicatorLED": "Off", "LocationIndicatorActive": False}, None
+    ) == "LocationIndicatorActive"
+    # the legacy property uses the string enum, not a bool
+    assert IdentifyLed._payload("IndicatorLED", True) == {"IndicatorLED": "Lit"}
+    assert IdentifyLed._payload("IndicatorLED", False) == {"IndicatorLED": "Off"}
