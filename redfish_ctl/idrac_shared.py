@@ -166,6 +166,7 @@ class ApiRequestType(Enum):
     ChassisQuery = auto()
     ChassisReset = auto()
     ChassisUpdate = auto()
+    AssetTagSet = auto()
 
     JobGet = auto()
     JobDel = auto()
