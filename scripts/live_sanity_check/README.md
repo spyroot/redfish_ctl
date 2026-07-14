@@ -4,7 +4,7 @@ These scripts drive **real BMCs** to capture how each vendor responds to writes 
 bad-patch), so the simulator is grounded in captured behavior — the golden workflows are *generated tests*,
 never hand-coded simulator logic.
 
-## 🚨 HARD SAFETY BLOCKER (applies to every human + agent — no exceptions)
+## 🚨 HARD SAFETY BLOCKER (applies to every operator and tool run — no exceptions)
 **NEVER reboot, power-cycle, reset, factory-reset, flash firmware, delete a volume, erase a drive, or run ANY
 host- or BMC-disrupting operation on a LIVE system without the operator's explicit per-target approval.**
 These scripts are **read + reversible-config only**. Destructive actions are enumerated and NEVER invoked:
@@ -43,7 +43,7 @@ Standard Redfish URIs shown; the manager/system id is DISCOVERED (never hardcode
 | op | read | mutate | revert | status |
 | --- | --- | --- | --- | --- |
 | virtual-media mount/eject | `get_vm` ✅ | `insert_vm`/`eject_vm` 🔨 **Dell-hardcoded (`iDRAC.Embedded.1`→404) — generalize via discovery** | eject | GAP |
-| ntp | read NetworkProtocol 🔨 (need a `network-protocol` read) | `ntp-set` ✅ (vendor-neutral) 🔨 **add `--clear`/empty to restore empty original** | restore list | GAP |
+| ntp | `manager-network` ✅ | `ntp-set` ✅ (`--clear` restores an originally empty list) | restore list | script ready; live capture pending |
 | identify LED (Chassis_0, System_0) | 🔨 read LocationIndicatorActive | 🔨 **new `identify-led` cmd (PATCH LocationIndicatorActive)** | set back | GAP |
 | test-event (emit only) | — | `event-submit-test` ✅ | none | ✅ DONE (`event_submit_test.sh`, verified live) |
 | event subscription create/delete | `event-service` ✅ (read) | 🔨 **new `subscription-create`/`subscription-delete`** | DELETE created id | GAP |
@@ -66,11 +66,11 @@ enumeration is task X10-ENUM.
 ### Dell (dell/xr8620t) — box DECOMMISSIONED/offline → scripts validate against the committed corpus + mark
 `SKIP: no live Dell target`. Safe ops mirror iLO (AssetTag, LED, NTP, BIOS Admin*).
 
-## Engine gaps to IMPLEMENT (prerequisites — one PR each, mutating = Claude-gated)
+## Engine gaps to IMPLEMENT (prerequisites — one PR each, mutating = gated review)
 1. **generalize `insert_vm`/`eject_vm`** — discover Manager id (kills the `iDRAC.Embedded.1` 404).
 2. **`redfish_ctl get <uri>` / `raw`** — generic read so no script ever needs curl.
 3. **`identify-led`** — PATCH LocationIndicatorActive/IndicatorLED on Chassis/System.
-4. **`ntp-set --clear`** — restore an empty NTP list.
+4. **`ntp-set --clear`** — ✅ command support + GB300 round-trip script ready; live capture pending.
 5. **`subscription-create` / `subscription-delete`** — EventDestination lifecycle.
 6. **`asset-tag-set`** (or a guarded generic property PATCH).
 7. **trace capture** — a `--capture-trace <dir>` flag (or wrapper) that saves request+response per call → sim.

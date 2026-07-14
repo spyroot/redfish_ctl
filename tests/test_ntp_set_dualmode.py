@@ -76,6 +76,46 @@ def test_ntp_set_confirm_patches_only_the_ntp_block(redfish_mock_factory):
     }]
 
 
+def test_ntp_set_clear_patches_empty_server_list_only(redfish_mock_factory):
+    """ntp-set --clear restores an empty NTP server list without toggling NTP."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.NtpSet,
+        "ntp-set",
+        clear=True,
+        confirm=True,
+    )
+
+    patches = [request for request in service.requests if request.method == "PATCH"]
+    assert len(patches) == 1
+    assert patches[0].path == "/redfish/v1/managers/bmc_0/networkprotocol"
+    assert patches[0].json() == {"NTP": {"NTPServers": []}}
+    assert result.data["servers"] == []
+    assert result.data["applied"] == [{
+        "Manager": "BMC_0",
+        "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
+        "status": "IdracApiRespond.Ok",
+        "error": None,
+    }]
+
+
+def test_ntp_set_clear_rejects_explicit_servers(redfish_mock_factory):
+    """ntp-set --clear is mutually exclusive with explicit server values."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    with pytest.raises(InvalidArgument):
+        manager.sync_invoke(
+            ApiRequestType.NtpSet,
+            "ntp-set",
+            servers=["0.pool.ntp.org"],
+            clear=True,
+            confirm=True,
+        )
+
+    assert _mutating_requests(service) == []
+
+
 @pytest.mark.parametrize(
     "servers",
     [
