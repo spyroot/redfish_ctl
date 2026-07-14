@@ -7,7 +7,7 @@ and no real host is touched.
 import requests
 
 from redfish_ctl.cmd_wait import probe_reachable, wait_for
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_wait_for_satisfied_predicate():
@@ -134,14 +134,14 @@ def test_manager_reboot_wait_attaches_wait_block(redfish_mock_factory, monkeypat
     behavior: after the reset, the reboot-cycle wait result is attached.
     """
     import redfish_ctl.cmd_wait as cw
-    from redfish_ctl.idrac_manager import IDracManager
-    from redfish_ctl.idrac_shared import IdracApiRespond
+    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    from redfish_ctl.redfish_manager_shared import IdracApiRespond
     from redfish_ctl.redfish_manager import CommandResult
 
     mgr, _ = redfish_mock_factory("hpe")
-    monkeypatch.setattr(IDracManager, "idrac_members", "/redfish/v1/Managers/1", raising=False)
+    monkeypatch.setattr(RedfishManagerBase, "idrac_members", "/redfish/v1/Managers/1", raising=False)
     monkeypatch.setattr(
-        IDracManager, "base_post",
+        RedfishManagerBase, "base_post",
         lambda self, *a, **k: (CommandResult({"Status": "ok"}, None, None, None), IdracApiRespond.Ok))
     monkeypatch.setattr(
         cw, "wait_reachable",

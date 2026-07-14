@@ -35,8 +35,8 @@ from redfish_ctl.api import (
     reboot,
     set_ntp,
 )
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 GB300_CORPUS = corpus_dir(
@@ -79,7 +79,7 @@ def gb300_corpus_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = RedfishManagerBase(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",

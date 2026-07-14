@@ -13,7 +13,7 @@ direct routes to BMCs.
 The CLI already has the pieces a service would reuse:
 
 - `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, for product-neutral HTTP.
-- `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, for Dell/iDRAC behavior and host-system
+- `RedfishManagerBase`, defined in `redfish_ctl/redfish_manager_base.py`, for Dell/iDRAC behavior and host-system
   selection.
 - `redfish_ctl.proxy`, defined under `redfish_ctl/proxy/`, for the first dependency-light read proxy
   core and optional FastAPI route binding.
@@ -96,7 +96,7 @@ Secret would hold `username` and `password` keys. The proxy would log only metad
 credentials worked.
 
 The Dell-shaped `bmcAddress` is only an example. A real proxy needs the same host-system selection
-now in `IDracManager`: on a GB300, host actions go to `System_0`, not the HGX baseboard member. On
+now in `RedfishManagerBase`: on a GB300, host actions go to `System_0`, not the HGX baseboard member. On
 HPE iLO, the common host and manager ids are `Systems/1` and `Managers/1`.
 
 ## Reconcile Rules

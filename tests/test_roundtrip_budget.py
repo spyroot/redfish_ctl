@@ -16,7 +16,7 @@ of pure waste per command warm-up at the 300ms profile.
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 # Named client->BMC latency profiles (seconds per round trip). Projection
 # only — tests never sleep, so the suite stays fast at any profile.

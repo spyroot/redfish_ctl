@@ -6,7 +6,7 @@ Settings object via Bios.@Redfish.Settings, so BIOS tuning works off Dell. The
 Dell Jobs commit stays behind --commit/--commit_pending. Verified on the HPE iLO
 corpus (Intel tuning attributes) with Dell behavior preserved.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_bios_change_builds_payload_on_ilo(redfish_mock_factory):

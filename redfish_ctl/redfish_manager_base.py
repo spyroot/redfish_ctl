@@ -1,4 +1,4 @@
-"""iDRAC IDracManager
+"""iDRAC RedfishManagerBase
 
 redfish_ctl interacts with iDRAC via REST API interface.
 
@@ -47,7 +47,9 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .idrac_shared import (
+from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
+from .redfish_manager import CommandResult, RedfishManager
+from .redfish_manager_shared import (
     IDRAC_API,
     IDRAC_JSON,
     ApiRequestType,
@@ -62,19 +64,17 @@ from .idrac_shared import (
     RedfishAction,
     ScheduleJobType,
 )
-from .idrac_shared import ResetType as ResetType
-from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
-from .redfish_manager import CommandResult, RedfishManager
+from .redfish_manager_shared import ResetType as ResetType
 from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .redfish_task_state import TaskState, TaskStatus
 from .telemetry import tracing
 
-module_logger = logging.getLogger('redfish_ctl.idrac_manager')
+module_logger = logging.getLogger('redfish_ctl.redfish_manager_base')
 
 
-class IDracManager(RedfishManager):
+class RedfishManagerBase(RedfishManager):
     """
-    IDracManager Class, interact with iDRAC via REST API interface
+    RedfishManagerBase Class, interact with iDRAC via REST API interface
     """
 
     _registry = {t: {} for t in ApiRequestType}
@@ -678,7 +678,7 @@ class IDracManager(RedfishManager):
             raise ResourceNotFound(error_msg)
         if 401 <= response.status_code < 500:
             # we try to parse error.
-            self._redfish_error = IDracManager.parse_error(response)
+            self._redfish_error = RedfishManagerBase.parse_error(response)
         if response.status_code != 200:
             raise UnexpectedResponse(
                 f"Failed acquire result. Status code "
@@ -1213,7 +1213,7 @@ class IDracManager(RedfishManager):
         if 200 <= response.status_code < 300:
             return self._http_code_mapping[response.status_code]
 
-        self._redfish_error = IDracManager.parse_error(response)
+        self._redfish_error = RedfishManagerBase.parse_error(response)
         if 300 <= response.status_code < 500:
             if response.status_code == 400:
                 raise RedfishException(self._redfish_error)

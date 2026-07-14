@@ -26,8 +26,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 # Host serial-console BIOS attribute -> the value that ENABLES redirection.
@@ -38,7 +38,7 @@ _SERIAL_BIOS_ENABLE = {
 }
 
 
-class SerialConsoleConfig(IDracManager,
+class SerialConsoleConfig(RedfishManagerBase,
                           scm_type=ApiRequestType.SerialConsoleConfig,
                           name='serial-console',
                           metaclass=Singleton):

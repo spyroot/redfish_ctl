@@ -8,12 +8,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ManagerReset(IDracManager,
+class ManagerReset(RedfishManagerBase,
                    scm_type=ApiRequestType.ManagerReset,
                    name='manager_reset',
                    metaclass=Singleton):

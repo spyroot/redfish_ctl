@@ -4,7 +4,7 @@ Proves three more standard-Redfish capabilities the coverage audit flagged as
 missing, verified against the HPE iLO and GB300 corpora. firmware-update is a
 guarded mutating action — the tests assert it never POSTs without --confirm.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def _post_count(svc):

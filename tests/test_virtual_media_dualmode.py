@@ -4,8 +4,8 @@ import json
 import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType, IdracApiRespond
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType, IdracApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -157,11 +157,11 @@ def test_virtual_media_commands_report_missing_collection(
     redfish_mock, monkeypatch, api_call, name, kwargs
 ):
     """Commands report missing VirtualMedia as a command error, not a traceback."""
-    monkeypatch.setattr(IDracManager, "idrac_manage_servers", property(lambda self: ""))
+    monkeypatch.setattr(RedfishManagerBase, "idrac_manage_servers", property(lambda self: ""))
     monkeypatch.setattr(redfish_mock, "discover_manager_ids", lambda: [])
     monkeypatch.setattr(redfish_mock, "discover_computer_system_ids", lambda: [])
-    monkeypatch.setattr(IDracManager, "discover_manager_ids", lambda self: [])
-    monkeypatch.setattr(IDracManager, "discover_computer_system_ids", lambda self: [])
+    monkeypatch.setattr(RedfishManagerBase, "discover_manager_ids", lambda self: [])
+    monkeypatch.setattr(RedfishManagerBase, "discover_computer_system_ids", lambda self: [])
 
     result = redfish_mock.sync_invoke(api_call, name, **kwargs)
 
@@ -178,7 +178,7 @@ def test_virtual_media_insert_uses_manager_action_target(
     """insert_vm uses the discovered Manager VirtualMedia action target."""
     manager, service = redfish_mock_factory("supermicro")
     monkeypatch.setattr(
-        IDracManager,
+        RedfishManagerBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -215,7 +215,7 @@ def test_virtual_media_eject_uses_hydrated_manager_action_target(
     service._overlay[device_path] = device_state
     service._overlay[device_path.lower()] = device_state
     monkeypatch.setattr(
-        IDracManager,
+        RedfishManagerBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -240,7 +240,7 @@ def test_virtual_media_insert_posts_action_payload(
 ):
     """virtual_disk_insert POSTs to the member InsertMedia action target."""
     monkeypatch.setattr(
-        IDracManager,
+        RedfishManagerBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -275,7 +275,7 @@ def test_virtual_media_eject_posts_action_payload(
 ):
     """virtual_disk_eject POSTs an empty body to the member EjectMedia target."""
     monkeypatch.setattr(
-        IDracManager,
+        RedfishManagerBase,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )

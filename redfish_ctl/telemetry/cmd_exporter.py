@@ -11,8 +11,8 @@ observability demo.
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from . import exporter
 from .exporter import (
@@ -27,7 +27,7 @@ from .exporter import (
 )
 
 
-class Exporter(IDracManager,
+class Exporter(RedfishManagerBase,
                scm_type=ApiRequestType.Exporter,
                name='exporter',
                metaclass=Singleton):

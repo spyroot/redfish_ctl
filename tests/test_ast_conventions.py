@@ -130,7 +130,7 @@ def _unguarded_direct_mutation_findings() -> list[str]:
     """Direct write helpers in command modules without an explicit guard arg."""
     findings = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        if path.name == "idrac_manager.py":
+        if path.name == "redfish_manager_base.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         parents = _parent_map(tree)

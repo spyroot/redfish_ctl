@@ -15,14 +15,14 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
 class AttributesUpdate(
-    IDracManager,
+    RedfishManagerBase,
     scm_type=ApiRequestType.AttributesUpdate,
     name='attribute_update',
     metaclass=Singleton):

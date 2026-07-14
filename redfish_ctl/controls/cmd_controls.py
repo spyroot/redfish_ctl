@@ -3,12 +3,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Controls(IDracManager,
+class Controls(RedfishManagerBase,
                scm_type=ApiRequestType.ControlsQuery,
                name="controls",
                metaclass=Singleton):

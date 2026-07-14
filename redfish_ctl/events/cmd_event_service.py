@@ -2,12 +2,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class EventServiceQuery(IDracManager,
+class EventServiceQuery(RedfishManagerBase,
                         scm_type=ApiRequestType.EventServiceQuery,
                         name='event-service',
                         metaclass=Singleton):

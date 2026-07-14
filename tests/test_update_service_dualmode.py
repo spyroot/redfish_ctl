@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 UPDATE_SERVICE_PATH = "/redfish/v1/UpdateService"

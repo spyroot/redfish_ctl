@@ -32,12 +32,12 @@ from abc import abstractmethod
 from typing import Optional, Tuple
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class StorageQuery(IDracManager, scm_type=ApiRequestType.StorageQuery,
+class StorageQuery(RedfishManagerBase, scm_type=ApiRequestType.StorageQuery,
                    name='storage_query',
                    metaclass=Singleton):
     """

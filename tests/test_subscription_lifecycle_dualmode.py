@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"
@@ -252,7 +252,7 @@ def test_subscription_commands_fail_closed_without_subscription_collection(
 
 def test_subscription_commands_expose_cli_entrypoints():
     """The subscription lifecycle commands are wired into the package registry."""
-    registry = IDracManager().get_registry()
+    registry = RedfishManagerBase().get_registry()
 
     create_type = _request_type("SubscriptionCreate")
     delete_type = _request_type("SubscriptionDelete")

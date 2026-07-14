@@ -9,14 +9,14 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
+from ..redfish_manager_shared import IDRAC_API
 
 
 class QueryBootSourceRegistry(
-    IDracManager,
+    RedfishManagerBase,
     scm_type=ApiRequestType.BootSourceRegistry,
     name='boot_source_registry',
     metaclass=Singleton):

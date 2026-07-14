@@ -3,8 +3,8 @@
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system_config import ExportSystemConfig
 from redfish_ctl.system.cmd_system_import import ImportSystemConfig  # noqa: F401
@@ -97,7 +97,7 @@ def test_system_export_posts_export_payload_and_records_task(
         assert task_id == redfish_service.JOB_ID
         return task_state
 
-    monkeypatch.setattr(IDracManager, "fetch_task", fetch_task)
+    monkeypatch.setattr(RedfishManagerBase, "fetch_task", fetch_task)
 
     result = redfish_mock.sync_invoke(
         ApiRequestType.SystemConfigQuery,

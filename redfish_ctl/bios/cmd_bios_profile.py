@@ -7,8 +7,8 @@ from tempfile import TemporaryDirectory
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 PROFILE_DIR = Path(__file__).resolve().parents[2] / "specs" / "profiles"
@@ -16,7 +16,7 @@ SUMMARY_KEYS = ("name", "vendor", "model", "description", "risk")
 PROFILE_ID_KEYS = ("name", "vendor", "model", "risk")
 
 
-class BiosProfile(IDracManager,
+class BiosProfile(RedfishManagerBase,
                   scm_type=ApiRequestType.BiosProfile,
                   name="bios-profile",
                   metaclass=Singleton):

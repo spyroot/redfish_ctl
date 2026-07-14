@@ -75,7 +75,7 @@ redfish_ctl oem-info
 ```
 
 These commands are valuable because they start from advertised Redfish links instead of assuming Dell
-resource ids. On multi-system hosts, `IDracManager` also picks the host ComputerSystem by looking for
+resource ids. On multi-system hosts, `RedfishManagerBase` also picks the host ComputerSystem by looking for
 `Bios` or `Boot` links. That keeps a GB300 host (`System_0`) distinct from the HGX baseboard member.
 
 ## Adding A Vendor
@@ -100,5 +100,5 @@ fixtures, and proof that standard Redfish reads work.
 
 ## Migration
 
-Dell command code still lives mostly in `redfish_ctl/idrac_manager.py` and `redfish_ctl/delloem/`.
+Dell command code still lives mostly in `redfish_ctl/redfish_manager_base.py` and `redfish_ctl/delloem/`.
 Moving that code under `vendors/dell/` is planned as commands are split out.

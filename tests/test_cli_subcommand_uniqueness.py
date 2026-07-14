@@ -17,13 +17,13 @@ import argparse
 
 import redfish_ctl  # noqa: F401  — populates the registry with the wired commands
 import redfish_ctl.compute.cmd_update  # noqa: F401  — force-load the un-wired update cmd
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_main import create_cmd_tree
 
 
 def _registered_subcommand_names():
     """Map each CLI subcommand name to the registry entries that claim it."""
-    registry = IDracManager().get_registry()
+    registry = RedfishManagerBase().get_registry()
     names = {}
     for type_key in registry:
         for sub_key in registry[type_key]:

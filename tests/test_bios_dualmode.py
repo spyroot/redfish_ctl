@@ -1,7 +1,7 @@
 """Dual-mode tests for BIOS pending and registry commands."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.redfish_manager_shared import ApiRequestType, JobState
 from redfish_ctl.redfish_manager import CommandResult
 
 

@@ -10,12 +10,12 @@ Author Mus spyroot@gmail.com
 import argparse
 from abc import abstractmethod
 from typing import Optional
-from ..idrac_manager import CommandResult, IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import CommandResult, RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..cmd_utils import save_if_needed
 
 
-class SystemQuery(IDracManager,
+class SystemQuery(RedfishManagerBase,
                   scm_type=ApiRequestType.SystemQuery,
                   name='system_query',
                   metaclass=Singleton):

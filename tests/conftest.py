@@ -79,7 +79,7 @@ def _reset_command_singletons():
     (e.g. ``reboot``) would poison each other depending on collection order. The
     command ``_registry`` (used for dispatch) is a separate dict and is untouched.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_manager_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -226,8 +226,8 @@ class MockRedfishService:
 
 
 def _make_idrac(idrac_ip, username, password):
-    from redfish_ctl.idrac_manager import IDracManager
-    return IDracManager(
+    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    return RedfishManagerBase(
         idrac_ip=idrac_ip,
         idrac_username=username,
         idrac_password=password,
@@ -246,7 +246,7 @@ def _reset_command_singletons():
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
     Clearing the instance registry before each test isolates them.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_manager_shared import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -272,7 +272,7 @@ def redfish_service():
 
 @pytest.fixture
 def redfish_mock(redfish_service):
-    """An IDracManager wired to the mocked Redfish service (offline, no hardware).
+    """An RedfishManagerBase wired to the mocked Redfish service (offline, no hardware).
 
     Backed by the captured DMTF mockup tree; exercises the real ``requests`` code
     path. Requires the ``requests-mock`` dev dependency; skips cleanly without it.
@@ -282,12 +282,12 @@ def redfish_mock(redfish_service):
 
 @pytest.fixture
 def redfish_mock_factory():
-    """Factory for a VENDOR-shaped offline IDracManager.
+    """Factory for a VENDOR-shaped offline RedfishManagerBase.
 
     ``mgr, svc = factory("supermicro")`` serves the DMTF base overlaid by
     ``tests/supermicro_fixtures/`` (NOT the Dell ``idrac_fixtures/``), so the same
     command/transport code runs against a real non-Dell tree (System_0/BMC_0)
-    instead of System.Embedded.1. Returns ``(IDracManager, MockRedfishService)``.
+    instead of System.Embedded.1. Returns ``(RedfishManagerBase, MockRedfishService)``.
     """
     requests_mock = pytest.importorskip("requests_mock")
     _started = []

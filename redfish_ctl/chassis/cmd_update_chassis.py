@@ -17,12 +17,12 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ChassisUpdate(IDracManager,
+class ChassisUpdate(RedfishManagerBase,
                     scm_type=ApiRequestType.ChassisUpdate,
                     name='update_chassis',
                     metaclass=Singleton):

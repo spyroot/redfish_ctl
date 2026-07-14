@@ -6,12 +6,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class DellOemActions(IDracManager,
+class DellOemActions(RedfishManagerBase,
                      scm_type=ApiRequestType.DellOemActions,
                      name='dell_oem_actions',
                      metaclass=Singleton):

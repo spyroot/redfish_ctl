@@ -10,14 +10,14 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class ChangeBootOrder(
-    IDracManager,
+    RedfishManagerBase,
     scm_type=ApiRequestType.ChangeBootOrder,
     name='change_boot_order',
     metaclass=Singleton):

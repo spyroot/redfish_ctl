@@ -26,13 +26,13 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec, UncommittedPendingChanges
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class BiosChangeSettings(IDracManager,
+class BiosChangeSettings(RedfishManagerBase,
                          scm_type=ApiRequestType.BiosChangeSettings,
                          name='bios_change_settings',
                          metaclass=Singleton):

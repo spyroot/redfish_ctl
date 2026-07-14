@@ -10,7 +10,7 @@ hardcode System.Embedded.1 (they use the discovered system id).
 Dell behavior (where the OEM resource exists) is covered by the existing dual-mode
 tests, which still pass.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_dell_oem_readers_graceful_on_ilo(redfish_mock_factory):

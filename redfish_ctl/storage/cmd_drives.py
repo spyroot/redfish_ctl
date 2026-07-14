@@ -5,12 +5,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import find_ids
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class DrivesQuery(IDracManager,
+class DrivesQuery(RedfishManagerBase,
                   scm_type=ApiRequestType.Drives,
                   name='drives_query',
                   metaclass=Singleton):

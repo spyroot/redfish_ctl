@@ -20,13 +20,13 @@ from typing import Optional
 
 import requests
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class FirmwareUpdate(IDracManager,
+class FirmwareUpdate(RedfishManagerBase,
                      scm_type=ApiRequestType.FirmwareUpdate,
                      name='firmware-update',
                      metaclass=Singleton):

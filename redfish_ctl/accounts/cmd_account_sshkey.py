@@ -24,7 +24,7 @@ import os
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from .cmd_account_manage import _AccountBase
 

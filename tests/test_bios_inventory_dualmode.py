@@ -13,7 +13,7 @@ Author Mus spyroot@gmail.com
 """
 import json
 
-from redfish_ctl.idrac_shared import IDRAC_API, ApiRequestType
+from redfish_ctl.redfish_manager_shared import IDRAC_API, ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

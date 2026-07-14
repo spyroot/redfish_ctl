@@ -13,12 +13,12 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class BootSettings(IDracManager,
+class BootSettings(RedfishManagerBase,
                    scm_type=ApiRequestType.BootSettingsQuery,
                    name='boot_settings_query',
                    metaclass=Singleton):

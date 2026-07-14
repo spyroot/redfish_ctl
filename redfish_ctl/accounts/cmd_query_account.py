@@ -9,14 +9,14 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IDRAC_JSON
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API
+from ..redfish_manager_shared import IDRAC_JSON
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class QueryAccount(IDracManager,
+class QueryAccount(RedfishManagerBase,
                    scm_type=ApiRequestType.QueryAccount,
                    name='query_account',
                    metaclass=Singleton):

@@ -4,8 +4,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -15,7 +15,7 @@ _COLLECTIONS = {
 }
 
 
-class AssetTagSet(IDracManager,
+class AssetTagSet(RedfishManagerBase,
                   scm_type=ApiRequestType.AssetTagSet,
                   name="asset-tag-set",
                   metaclass=Singleton):

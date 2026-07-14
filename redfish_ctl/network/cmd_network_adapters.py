@@ -17,12 +17,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class NetworkAdapters(IDracManager,
+class NetworkAdapters(RedfishManagerBase,
                       scm_type=ApiRequestType.NetworkAdapters,
                       name='network-adapters',
                       metaclass=Singleton):

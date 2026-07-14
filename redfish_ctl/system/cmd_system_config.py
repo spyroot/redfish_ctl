@@ -11,12 +11,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class ExportSystemConfig(IDracManager,
+class ExportSystemConfig(RedfishManagerBase,
                          scm_type=ApiRequestType.SystemConfigQuery,
                          name='sysconfig_query',
                          metaclass=Singleton):

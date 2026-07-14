@@ -8,12 +8,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument, UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ChassisReset(IDracManager,
+class ChassisReset(RedfishManagerBase,
                    scm_type=ApiRequestType.ChassisReset,
                    name='reboot',
                    metaclass=Singleton):

@@ -11,13 +11,13 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import MissingResource
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, CliJobTypes, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, CliJobTypes, Singleton
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 
 
-class RebootHost(IDracManager,
+class RebootHost(RedfishManagerBase,
                  scm_type=ApiRequestType.ComputerSystemReset,
                  name='reboot',
                  metaclass=Singleton):

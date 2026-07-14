@@ -1,7 +1,7 @@
 """Dual-mode-style mock test for the NVLink ports command."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

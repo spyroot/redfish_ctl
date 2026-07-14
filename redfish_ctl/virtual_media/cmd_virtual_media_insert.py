@@ -77,12 +77,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class VirtualMediaInsert(IDracManager,
+class VirtualMediaInsert(RedfishManagerBase,
                          scm_type=ApiRequestType.VirtualMediaInsert,
                          name='virtual_disk_insert',
                          metaclass=Singleton):

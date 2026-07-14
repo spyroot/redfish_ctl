@@ -7,15 +7,15 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IDRAC_JSON
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API
+from ..redfish_manager_shared import IDRAC_JSON
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
-class QueryAccounts(IDracManager,
+class QueryAccounts(RedfishManagerBase,
                     scm_type=ApiRequestType.QueryAccounts,
                     name='query_accounts',
                     metaclass=Singleton):

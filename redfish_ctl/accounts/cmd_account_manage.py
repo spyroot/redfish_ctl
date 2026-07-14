@@ -16,8 +16,8 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional, Tuple
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 # RoleId is the standard Redfish privilege model (present on Dell/HPE/Supermicro).
@@ -48,7 +48,7 @@ def _mask(payload: dict) -> dict:
     return {k: ("***" if k == "Password" else v) for k, v in payload.items()}
 
 
-class _AccountBase(IDracManager):
+class _AccountBase(RedfishManagerBase):
     """Shared account resolution for the write commands."""
 
     def _resolve_account(self, username: Optional[str],

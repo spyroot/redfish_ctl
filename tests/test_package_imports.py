@@ -28,6 +28,6 @@ def test_module_imports(module_name: str):
 def test_bios_change_command_is_registered():
     """The de-duplicated bios change module still exposes its command class."""
     from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
-    from redfish_ctl.idrac_manager import IDracManager
+    from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
-    assert issubclass(BiosChangeSettings, IDracManager)
+    assert issubclass(BiosChangeSettings, RedfishManagerBase)
