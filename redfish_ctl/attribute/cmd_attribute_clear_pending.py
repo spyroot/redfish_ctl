@@ -10,7 +10,7 @@ from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import RedfishApiRespond
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
@@ -82,7 +82,7 @@ class AttributeClearPending(
             )
 
         cmd_result, api_resp = self.base_post(target, do_async=do_async)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

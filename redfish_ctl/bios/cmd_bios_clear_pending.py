@@ -8,7 +8,7 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import RedfishApiRespond
 from ..cmd_exceptions import FailedDiscoverAction
 from ..custom_argparser.customer_argdefault import BiosSubcommand
 from .. import RedfishManagerBase, ApiRequestType, Singleton, CommandResult
@@ -80,7 +80,7 @@ class BiosClearPending(RedfishManagerBase,
             do_async=do_async, expected_status=200
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

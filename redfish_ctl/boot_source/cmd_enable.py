@@ -18,14 +18,14 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import str2bool
-from ..redfish_manager_shared import IdracApiRespond, ResetType
+from ..redfish_manager_shared import RedfishApiRespond, ResetType
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..redfish_manager_shared import IDRAC_API
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import RedfishApiRespond
 
 
 class EnableBootOptions(RedfishManagerBase,
@@ -121,7 +121,7 @@ class EnableBootOptions(RedfishManagerBase,
             target_dev, payload=payload,
             do_async=do_async
         )
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

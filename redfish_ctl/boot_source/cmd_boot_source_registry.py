@@ -10,9 +10,9 @@ from typing import Optional
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..redfish_manager_shared import IDRAC_API
+from ..redfish_manager_shared import REDFISH_API
 
 
 class QueryBootSourceRegistry(
@@ -58,7 +58,7 @@ class QueryBootSourceRegistry(
         # change-boot-order / boot-one-shot commands).
         try:
             return self.base_query(
-                f"{self.idrac_manage_servers}{IDRAC_API.BootSourcesRegistryQuery}",
+                f"{self.idrac_manage_servers}{REDFISH_API.BootSourcesRegistryQuery}",
                 filename=filename, do_async=do_async, do_expanded=do_expanded)
         except Exception:
             return CommandResult(

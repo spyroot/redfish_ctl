@@ -4,7 +4,7 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -69,7 +69,7 @@ class UpdateServiceQuery(RedfishManagerBase,
         update_service = root.get("UpdateService")
         if isinstance(update_service, dict) and update_service.get("@odata.id"):
             return update_service["@odata.id"]
-        return IDRAC_API.UpdateServiceQuery
+        return REDFISH_API.UpdateServiceQuery
 
     def execute(self,
                 filename: Optional[str] = None,

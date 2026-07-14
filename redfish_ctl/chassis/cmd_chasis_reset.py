@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument, UnsupportedAction
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_shared import REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -61,7 +61,7 @@ class ChassisReset(RedfishManagerBase,
                 "Failed to discover the reset chassis action"
             )
 
-        redfish_action = chassis_data.discovered[IDRAC_JSON.Reset]
+        redfish_action = chassis_data.discovered[REDFISH_JSON.Reset]
         target_api = redfish_action.target
 
         # Validate the reset type only when the action advertised its allowable
@@ -70,8 +70,8 @@ class ChassisReset(RedfishManagerBase,
         # allowable values, leaving RedfishAction.args None -- defer validation
         # to the BMC in that case rather than raising.
         args = redfish_action.args
-        if args and IDRAC_JSON.ResetType in args:
-            args_options = args[IDRAC_JSON.ResetType]
+        if args and REDFISH_JSON.ResetType in args:
+            args_options = args[REDFISH_JSON.ResetType]
             if reset_type not in args_options:
                 raise InvalidArgument(
                     f"Unsupported reset type {reset_type} "
@@ -109,13 +109,13 @@ class ChassisReset(RedfishManagerBase,
             )
 
         payload = {
-            IDRAC_JSON.ResetType: reset_type
+            REDFISH_JSON.ResetType: reset_type
         }
         cmd_result, api_resp = self.base_post(
             target_api, payload=payload, do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             cmd_result.data['task_id'] = task_id
             if do_watch:

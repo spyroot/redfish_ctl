@@ -31,3 +31,13 @@ def test_bios_change_command_is_registered():
     from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
     assert issubclass(BiosChangeSettings, RedfishManagerBase)
+
+
+@pytest.mark.parametrize("old", ["redfish_ctl.idrac_manager", "redfish_ctl.idrac_shared"])
+def test_old_idrac_module_names_no_longer_resolve(old):
+    """The iDRAC-named base modules were hard-renamed to neutral names with no
+    aliases (idrac_manager -> redfish_manager_base, idrac_shared ->
+    redfish_manager_shared). The old import paths must no longer resolve, guarding
+    against a reintroduction of the pre-rename names."""
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(old)

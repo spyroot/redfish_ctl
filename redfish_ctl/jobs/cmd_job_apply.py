@@ -9,8 +9,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, CliJobTypes, JobState
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import REDFISH_API, CliJobTypes, JobState
+from ..redfish_manager_shared import RedfishApiRespond
 from ..redfish_manager_shared import ResetType
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
@@ -74,7 +74,7 @@ class JobApply(RedfishManagerBase,
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """
-        target_api = f"{self.idrac_members}/{IDRAC_API.Jobs}"
+        target_api = f"{self.idrac_members}/{REDFISH_API.Jobs}"
         bios = f"{self.idrac_manage_servers}/Bios/Settings"
         boot_options = f"{self.idrac_manage_servers}/BootOptions"
 
@@ -141,7 +141,7 @@ class JobApply(RedfishManagerBase,
                     self.fetch_task(job)
 
         cmd_result, api_resp = self.base_post(target_api, pd, do_async=do_async)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

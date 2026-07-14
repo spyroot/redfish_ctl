@@ -7,7 +7,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import RedfishApiRespond
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
@@ -77,7 +77,7 @@ class GetNetworkIsoAttachStatus(RedfishManagerBase,
                 if rk in data:
                     result[rk] = data[rk]
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

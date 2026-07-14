@@ -27,7 +27,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec, UncommittedPendingChanges
 from ..cmd_utils import from_json_spec
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, IDRAC_JSON, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -190,10 +190,10 @@ class BiosChangeSettings(RedfishManagerBase,
         for name, val in zip(attribute_names, attribute_values):
             bios_payload["Attributes"][name.strip()] = val.strip()
 
-        for k, v in bios_payload[IDRAC_JSON.Attributes].items():
+        for k, v in bios_payload[REDFISH_JSON.Attributes].items():
             for current_data in current_config:
                 if k in current_data.values() and current_data['Type'] == "Integer":
-                    bios_payload[IDRAC_JSON.Attributes][k] = int(v)
+                    bios_payload[REDFISH_JSON.Attributes][k] = int(v)
 
         return bios_payload
 
@@ -205,9 +205,9 @@ class BiosChangeSettings(RedfishManagerBase,
         ``/redfish/v1/Registries/<name>`` whose ``Location[].Uri`` is the registry.
         Prefer the Dell subpath when it resolves; otherwise follow the standard chain.
         """
-        dell_uri = f"{self.idrac_manage_servers}{IDRAC_API.BiosRegistry}"
+        dell_uri = f"{self.idrac_manage_servers}{REDFISH_API.BiosRegistry}"
         try:
-            if (self.base_query(dell_uri, do_async=do_async).data or {}).get(IDRAC_JSON.RegistryEntries):
+            if (self.base_query(dell_uri, do_async=do_async).data or {}).get(REDFISH_JSON.RegistryEntries):
                 return dell_uri
         except Exception:
             pass
@@ -240,7 +240,7 @@ class BiosChangeSettings(RedfishManagerBase,
                 return settings["@odata.id"]
         except Exception:
             pass
-        return f"{self.idrac_manage_servers}{IDRAC_API.BiosSettings}"
+        return f"{self.idrac_manage_servers}{REDFISH_API.BiosSettings}"
 
     def execute(self,
                 attr_name: Optional[str] = None,
@@ -297,14 +297,14 @@ class BiosChangeSettings(RedfishManagerBase,
                     return CommandResult(
                         {"Status": "Failed fetch bios registry"}, None, None, None
                     )
-                registry = cmd_result.data.get(IDRAC_JSON.RegistryEntries)
+                registry = cmd_result.data.get(REDFISH_JSON.RegistryEntries)
                 if not isinstance(registry, dict) \
-                        or IDRAC_JSON.Attributes not in registry:
+                        or REDFISH_JSON.Attributes not in registry:
                     return CommandResult(
                         {"Status": "Failed fetch attributes from bios registry"},
                         None, None, None
                     )
-                attribute_data = registry[IDRAC_JSON.Attributes]
+                attribute_data = registry[REDFISH_JSON.Attributes]
                 if not isinstance(attribute_data, list):
                     return CommandResult(
                         {"Status": "Bios registry attributes are malformed"},
@@ -358,12 +358,12 @@ class BiosChangeSettings(RedfishManagerBase,
             do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
-        elif api_resp in (IdracApiRespond.Success, IdracApiRespond.Ok):
+        elif api_resp in (RedfishApiRespond.Success, RedfishApiRespond.Ok):
             if do_commit:
                 self.logger.info("Commit changes and rebooting.")
                 # we commit with a reboot

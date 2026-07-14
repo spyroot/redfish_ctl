@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from . import exporter
 from .exporter import (
@@ -127,7 +127,7 @@ class Exporter(RedfishManagerBase,
         """Walk Chassis EnvironmentMetrics links and return their payloads."""
         rows = []
         try:
-            chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async).data or {}
+            chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async).data or {}
         except Exception:
             return rows
         for chassis_uri in self._members(chassis):

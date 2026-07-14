@@ -10,7 +10,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API
+from ..redfish_manager_shared import REDFISH_API
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
@@ -63,7 +63,7 @@ class JobServices(RedfishManagerBase,
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """
-        cmd_result = self.base_query(IDRAC_API.JobServiceQuery,
+        cmd_result = self.base_query(REDFISH_API.JobServiceQuery,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=do_expanded)

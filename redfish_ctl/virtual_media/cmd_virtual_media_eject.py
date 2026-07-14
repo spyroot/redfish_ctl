@@ -15,7 +15,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -96,7 +96,7 @@ class VirtualMediaEject(RedfishManagerBase,
             else:
                 return CommandResult(
                     {
-                        "Status": IdracApiRespond.Ok
+                        "Status": RedfishApiRespond.Ok
                      }, None, None, None)
 
         eject_rest = [a['EjectMedia'].target for a in actions][-1]
@@ -106,7 +106,7 @@ class VirtualMediaEject(RedfishManagerBase,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

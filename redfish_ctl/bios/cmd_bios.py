@@ -35,8 +35,8 @@ from ..cmd_utils import save_if_needed, find_ids, from_json_spec
 from ..custom_argparser.customer_argdefault import BiosSubcommand
 from ..custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API
-from ..redfish_manager_shared import IDRAC_JSON
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import REDFISH_JSON
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
@@ -140,7 +140,7 @@ class BiosQuery(RedfishManagerBase,
         :return:
         """
         from_file = False
-        idrac_api = f"{self.idrac_manage_servers}{IDRAC_API.BIOS}"
+        idrac_api = f"{self.idrac_manage_servers}{REDFISH_API.BIOS}"
 
         if verbose:
             self.logger.debug(
@@ -167,10 +167,10 @@ class BiosQuery(RedfishManagerBase,
         data = response.json()
         # list of action for bios
         action_dict = self.discover_redfish_actions(self, data)
-        if attr_only is True and IDRAC_JSON.Attributes in data:
+        if attr_only is True and REDFISH_JSON.Attributes in data:
             data = {
-                IDRAC_JSON.Attributes:
-                    data[IDRAC_JSON.Attributes]
+                REDFISH_JSON.Attributes:
+                    data[REDFISH_JSON.Attributes]
             }
 
         if attr_filter_file is not None and len(attr_filter_file) > 0:
@@ -193,7 +193,7 @@ class BiosQuery(RedfishManagerBase,
         # search for value
         extra_data_dict = {}
         if do_deep:
-            api_links = find_ids(data, IDRAC_JSON.Data_id)
+            api_links = find_ids(data, REDFISH_JSON.Data_id)
             api_links = [u for u in api_links if idrac_api != u]
             for api_link in api_links:
                 r = f"{self._default_method}{self.idrac_ip}{api_link}"

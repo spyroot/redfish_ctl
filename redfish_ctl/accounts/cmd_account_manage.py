@@ -17,7 +17,7 @@ from abc import abstractmethod
 from typing import Optional, Tuple
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 # RoleId is the standard Redfish privilege model (present on Dell/HPE/Supermicro).
@@ -61,7 +61,7 @@ class _AccountBase(RedfishManagerBase):
         reject an expanded Accounts query with HTTP 400; each member is fetched
         individually instead.
         """
-        coll = (self.base_query(IDRAC_API.Accounts).data or {})
+        coll = (self.base_query(REDFISH_API.Accounts).data or {})
         for m in coll.get("Members", []):
             data = m if "UserName" in m else (self.base_query(m.get("@odata.id", "")).data or {})
             uri = data.get("@odata.id") or m.get("@odata.id")
@@ -103,7 +103,7 @@ class AccountCreate(_AccountBase,
             return CommandResult(
                 {"dry_run": True, "action": "create", "payload": _mask(payload),
                  "hint": "re-run with --confirm to create"}, None, None, None)
-        res, status = self.base_post(IDRAC_API.Accounts, payload=payload, expected_status=201)
+        res, status = self.base_post(REDFISH_API.Accounts, payload=payload, expected_status=201)
         return CommandResult(
             {"action": "create", "username": acct_user, "role": acct_role,
              "status": str(status), "error": res.error}, None, None, res.error)

@@ -18,7 +18,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -110,14 +110,14 @@ class ChassisUpdate(RedfishManagerBase,
                 f"Check check {from_spec} it looks like empty spec."
             )
 
-        r = f"{IDRAC_API.Chassis}/{chassis_id}"
+        r = f"{REDFISH_API.Chassis}/{chassis_id}"
 
         cmd_result, api_resp = self.base_patch(
             r, payload=payload, do_async=do_async,
             data_type=data_type
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(cmd_result.data['task_id'])
             cmd_result.data['task_state'] = task_state

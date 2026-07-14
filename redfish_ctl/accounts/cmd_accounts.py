@@ -8,8 +8,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API
-from ..redfish_manager_shared import IDRAC_JSON
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import REDFISH_JSON
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
@@ -63,7 +63,7 @@ class QueryAccounts(RedfishManagerBase,
         if is_username_only or do_expanded:
             is_expanded = True
 
-        cmd_result = self.base_query(IDRAC_API.Accounts,
+        cmd_result = self.base_query(REDFISH_API.Accounts,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=is_expanded)
@@ -73,11 +73,11 @@ class QueryAccounts(RedfishManagerBase,
             members = accounts_data[RedfishJson.Members]
             usernames = [
                 {
-                    IDRAC_JSON.Username: m[IDRAC_JSON.Username],
-                    IDRAC_JSON.AccountId: m[IDRAC_JSON.AccountId]
+                    REDFISH_JSON.Username: m[REDFISH_JSON.Username],
+                    REDFISH_JSON.AccountId: m[REDFISH_JSON.AccountId]
                 }
                 for m in members
-                if isinstance(m, dict) and IDRAC_JSON.Username in m and len(m[IDRAC_JSON.Username]) > 0]
+                if isinstance(m, dict) and REDFISH_JSON.Username in m and len(m[REDFISH_JSON.Username]) > 0]
 
             cmd_result = CommandResult(usernames, None, None, None)
 

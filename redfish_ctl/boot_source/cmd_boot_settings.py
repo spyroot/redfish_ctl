@@ -14,7 +14,7 @@ from typing import Optional
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 

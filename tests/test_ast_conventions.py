@@ -5,13 +5,13 @@ on code shapes that are known bugs, so the class of mistake cannot be
 reintroduced anywhere — including in files that do not exist yet.
 
 Rule 1 — no enum-member truthiness on API respond values.
-``base_post``/``base_patch``/``base_delete`` return an ``IdracApiRespond``
+``base_post``/``base_patch``/``base_delete`` return an ``RedfishApiRespond``
 enum member. Testing it with attribute access (``api_resp.Success``)
 fetches the always-truthy class member instead of comparing, so an Error
 response satisfied success branches; three commands escalated a FAILED
 write into a commit with reboot before this was fixed. The only valid
 member references are through the enum class itself
-(``IdracApiRespond.Success``); comparisons must use ``==``/``in``.
+(``RedfishApiRespond.Success``); comparisons must use ``==``/``in``.
 
 Author Mus spyroot@gmail.com
 """
@@ -77,7 +77,7 @@ def _accessed_on(node: ast.Attribute) -> str | None:
 def _enum_member_truthiness_findings() -> list:
     """Every ``<variable>.Success``-style access in the package.
 
-    Enum classes are CamelCase (``IdracApiRespond``, ``TaskStatus``), so a
+    Enum classes are CamelCase (``RedfishApiRespond``, ``TaskStatus``), so a
     member fetched from a capitalized name is a legitimate class reference;
     fetched from a lowercase name it is a respond value being misused.
     """
@@ -155,7 +155,7 @@ def test_no_enum_member_truthiness_on_respond_values():
 
     A finding here means code like ``if api_resp.Success:`` — always truthy,
     treating failures as success. Compare with ``==`` or ``in`` against
-    ``IdracApiRespond`` members instead.
+    ``RedfishApiRespond`` members instead.
     """
     assert _enum_member_truthiness_findings() == []
 

@@ -135,14 +135,14 @@ def test_manager_reboot_wait_attaches_wait_block(redfish_mock_factory, monkeypat
     """
     import redfish_ctl.cmd_wait as cw
     from redfish_ctl.redfish_manager_base import RedfishManagerBase
-    from redfish_ctl.redfish_manager_shared import IdracApiRespond
+    from redfish_ctl.redfish_manager_shared import RedfishApiRespond
     from redfish_ctl.redfish_manager import CommandResult
 
     mgr, _ = redfish_mock_factory("hpe")
     monkeypatch.setattr(RedfishManagerBase, "idrac_members", "/redfish/v1/Managers/1", raising=False)
     monkeypatch.setattr(
         RedfishManagerBase, "base_post",
-        lambda self, *a, **k: (CommandResult({"Status": "ok"}, None, None, None), IdracApiRespond.Ok))
+        lambda self, *a, **k: (CommandResult({"Status": "ok"}, None, None, None), RedfishApiRespond.Ok))
     monkeypatch.setattr(
         cw, "wait_reachable",
         lambda *a, **k: {"reachable": True, "went_down": True, "waited_s": 0.1})

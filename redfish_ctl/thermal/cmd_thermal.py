@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -124,7 +124,7 @@ class Thermal(RedfishManagerBase,
             "fan_collections": [],
             "fans": [],
         }
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         chassis_uris = self._members(chassis.data)
 
         for chassis_uri in chassis_uris:

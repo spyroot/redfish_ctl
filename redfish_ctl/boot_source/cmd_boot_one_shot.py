@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, BootSourceOverrideMode, IdracApiRespond, Singleton
+from ..redfish_manager_shared import ApiRequestType, BootSourceOverrideMode, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -203,7 +203,7 @@ class BootOneShot(RedfishManagerBase,
             do_async=do_async
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             cmd_result.data['task_id'] = task_id
             task_state = self.fetch_task(task_id)

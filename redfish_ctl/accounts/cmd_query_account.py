@@ -10,8 +10,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API
-from ..redfish_manager_shared import IDRAC_JSON
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import REDFISH_JSON
 from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
@@ -69,12 +69,12 @@ class QueryAccount(RedfishManagerBase,
             query_result = self.sync_invoke(
                 ApiRequestType.QueryAccounts, "query_accounts", is_username_only=True)
             usernames = query_result.data
-            accounts_id = [u[IDRAC_JSON.AccountId] for u in usernames
-                           if u[IDRAC_JSON.Username].lower() == account.lower()]
+            accounts_id = [u[REDFISH_JSON.AccountId] for u in usernames
+                           if u[REDFISH_JSON.Username].lower() == account.lower()]
             if len(accounts_id) > 0:
                 account = accounts_id[-1]
 
-        return self.base_query(f"{IDRAC_API.Account}{account}",
+        return self.base_query(f"{REDFISH_API.Account}{account}",
                                filename=filename,
                                do_async=do_async,
                                do_expanded=do_expanded)

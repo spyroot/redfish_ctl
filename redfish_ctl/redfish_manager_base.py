@@ -1,6 +1,7 @@
-"""iDRAC RedfishManagerBase
+"""RedfishManagerBase
 
-redfish_ctl interacts with iDRAC via REST API interface.
+redfish_ctl interacts with any Redfish-capable BMC (Dell iDRAC, Supermicro,
+HPE iLO, and generic DMTF Redfish) via the REST API interface.
 
 Main class command line tools utilizes. Each command must inherit
 from this class. The class itself provides a register pattern where
@@ -50,18 +51,18 @@ from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpForm
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import CommandResult, RedfishManager
 from .redfish_manager_shared import (
-    IDRAC_API,
-    IDRAC_JSON,
+    REDFISH_API,
+    REDFISH_JSON,
     ApiRequestType,
     ApiRespondString,
     CliJobTypes,
     HTTPMethod,
-    IdracApiRespond,
     IDRACJobType,
     JobApplyTypes,
     JobState,
     PowerState,
     RedfishAction,
+    RedfishApiRespond,
     ScheduleJobType,
 )
 from .redfish_manager_shared import ResetType as ResetType
@@ -125,10 +126,10 @@ class RedfishManagerBase(RedfishManager):
         # mapping between rest API respond to respected
         # string that we report to apper layer.
         self._api_respond_to_string = {
-            IdracApiRespond.Ok: ApiRespondString.Ok,
-            IdracApiRespond.Error: ApiRespondString.Error,
-            IdracApiRespond.Success: ApiRespondString.Success,
-            IdracApiRespond.AcceptedTaskGenerated: ApiRespondString.AcceptedTaskGenerated,
+            RedfishApiRespond.Ok: ApiRespondString.Ok,
+            RedfishApiRespond.Error: ApiRespondString.Error,
+            RedfishApiRespond.Success: ApiRespondString.Success,
+            RedfishApiRespond.AcceptedTaskGenerated: ApiRespondString.AcceptedTaskGenerated,
 
         }
 
@@ -141,10 +142,10 @@ class RedfishManagerBase(RedfishManager):
         #  Redfish spec 202 Request has been accepted for processing
         #  but the processing has not been completed
         self._http_code_mapping = {
-            200: IdracApiRespond.Ok,
-            201: IdracApiRespond.Created,
-            202: IdracApiRespond.AcceptedTaskGenerated,
-            204: IdracApiRespond.Success,
+            200: RedfishApiRespond.Ok,
+            201: RedfishApiRespond.Created,
+            202: RedfishApiRespond.AcceptedTaskGenerated,
+            204: RedfishApiRespond.Success,
         }
 
         # mapping a string state to enum, so each cmd can just check a state
@@ -473,9 +474,9 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         # update percent_done and progress bar
-        if IDRAC_JSON.PercentComplete in resp_data:
+        if REDFISH_JSON.PercentComplete in resp_data:
             try:
-                percent_done = int(resp_data[IDRAC_JSON.PercentComplete])
+                percent_done = int(resp_data[REDFISH_JSON.PercentComplete])
                 return percent_done
             except TypeError:
                 pass
@@ -502,11 +503,11 @@ class RedfishManagerBase(RedfishManager):
             return TaskState.Unknown, TaskStatus.Warning
 
         # dodge case
-        if IDRAC_JSON.TaskStatus not in resp_data or IDRAC_JSON.TaskState not in resp_data:
+        if REDFISH_JSON.TaskStatus not in resp_data or REDFISH_JSON.TaskState not in resp_data:
             raise UnexpectedResponse(f"IDRAC returned a {resp_data}, neither task state nor status is present..")
 
-        resp_state = resp_data[IDRAC_JSON.TaskState]
-        resp_status = resp_data[IDRAC_JSON.TaskStatus]
+        resp_state = resp_data[REDFISH_JSON.TaskState]
+        resp_status = resp_data[REDFISH_JSON.TaskStatus]
 
         # update state and status.
         task_state = self._task_state_mapping[resp_state]
@@ -557,9 +558,9 @@ class RedfishManagerBase(RedfishManager):
 
         # if job scheduler or scheduling it make sense to wait otherwise we return state
         # we expect a JobState
-        if IDRAC_JSON.JobState in jb:
+        if REDFISH_JSON.JobState in jb:
 
-            current_state = jb[IDRAC_JSON.JobState]
+            current_state = jb[REDFISH_JSON.JobState]
             if current_state not in self._job_state_mapping:
                 raise UnexpectedResponse(f"IDRAC returned a {current_state} job type that we don't know.")
             _ = self._job_state_mapping[current_state]
@@ -578,7 +579,7 @@ class RedfishManagerBase(RedfishManager):
             while True:
                 # /redfish/v1/TaskService/Tasks/{TaskId}
                 resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}"
-                                         f"{IDRAC_API.Tasks}{task_id}", hdr={})
+                                         f"{REDFISH_API.Tasks}{task_id}", hdr={})
 
                 if 'Retry-After' in resp.headers:
                     retry_after = int(resp.headers["Retry-After"])
@@ -660,7 +661,7 @@ class RedfishManagerBase(RedfishManager):
         return task_state
 
     def default_error_handler(
-            self, response: requests.models.Response) -> IdracApiRespond:
+            self, response: requests.models.Response) -> RedfishApiRespond:
         """Default error handler.
         :param response:
         :return:
@@ -693,8 +694,8 @@ class RedfishManagerBase(RedfishManager):
         headers.update(self.json_content_type)
         r = f"{self._default_method}" \
             f"{self.redfish_ip}" \
-            f"{IDRAC_API.IDRAC_DELL_MANAGERS}" \
-            f"{IDRAC_API.IDRAC_LLC}"
+            f"{REDFISH_API.IDRAC_DELL_MANAGERS}" \
+            f"{REDFISH_API.IDRAC_LLC}"
 
         # r = f"{self._default_method}" \
         #     f"{self.redfish_ip}" \
@@ -714,8 +715,8 @@ class RedfishManagerBase(RedfishManager):
 
         data = response.json()
         self.api_endpoints = data
-        if IDRAC_JSON.Actions in self.api_endpoints:
-            actions = self.api_endpoints[IDRAC_JSON.Actions]
+        if REDFISH_JSON.Actions in self.api_endpoints:
+            actions = self.api_endpoints[REDFISH_JSON.Actions]
             action_keys = actions.keys()
             self.action_targets = [actions[k]['target'] for k in action_keys]
 
@@ -757,10 +758,10 @@ class RedfishManagerBase(RedfishManager):
         unfiltered_actions = {}
         full_redfish_names = {}
 
-        if IDRAC_JSON.Actions not in json_data:
+        if REDFISH_JSON.Actions not in json_data:
             return unfiltered_actions, full_redfish_names
 
-        redfish_actions = json_data[IDRAC_JSON.Actions]
+        redfish_actions = json_data[REDFISH_JSON.Actions]
         for a in redfish_actions:
             _ca = redfish_actions[a]
             if a == "Oem" and isinstance(_ca, dict):
@@ -789,16 +790,16 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         action_dict = {}
-        if IDRAC_JSON.Members not in json_data:
-            if IDRAC_JSON.Actions in json_data:
+        if REDFISH_JSON.Members not in json_data:
+            if REDFISH_JSON.Actions in json_data:
                 return cls.discover_redfish_actions(cls, json_data)
             else:
                 return action_dict
 
-        member_data = json_data[IDRAC_JSON.Members]
+        member_data = json_data[REDFISH_JSON.Members]
         for m in member_data:
             if isinstance(m, dict):
-                if IDRAC_JSON.Actions in m.keys():
+                if REDFISH_JSON.Actions in m.keys():
                     action = cls.discover_redfish_actions(cls, m)
                     action_dict.update(action)
 
@@ -1014,7 +1015,7 @@ class RedfishManagerBase(RedfishManager):
             loop=None,
             expected: Optional[int] = 204,
             ignore_error_code: Optional[int] = 0
-    ) -> Tuple[requests.models.Response, IdracApiRespond]:
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
         """Make async patch api request until completion , it issues post with x-auth
         authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
@@ -1040,7 +1041,7 @@ class RedfishManagerBase(RedfishManager):
             loop=None,
             expected: Optional[int] = 204,
             ignore_error_code: Optional[int] = 0
-    ) -> Tuple[requests.models.Response, IdracApiRespond]:
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
         """Make async patch api request until completion , it issues post with x-auth
         authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
@@ -1066,7 +1067,7 @@ class RedfishManagerBase(RedfishManager):
             loop=None,
             expected: Optional[int] = 204,
             ignore_error_code: Optional[int] = 0
-    ) -> Tuple[requests.models.Response, IdracApiRespond]:
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
         """Make async post api request until completion , it issues post with x-auth
         authentication header or redfish_ctl. Caller can use this in asyncio routine.
 
@@ -1183,7 +1184,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default success handler,  Check for status code.
         In case of critical error raise exception. If exception expected
         i.e. operation canceled.
@@ -1194,7 +1195,7 @@ class RedfishManagerBase(RedfishManager):
         :param response: requests.models.Response: responses
         :param ignore_error_code: error code to ignore.
         :param expected:  Option status code that we caller consider success.
-        :return: IdracApiRespond if httm method request succeed
+        :return: RedfishApiRespond if httm method request succeed
         :raise RedfishException if HTTP method failed.
         """
         # if location in the header , job created
@@ -1202,7 +1203,7 @@ class RedfishManagerBase(RedfishManager):
 
         if response.headers is not None \
                 and RedfishJsonSpec.Location in response.headers:
-            return IdracApiRespond.AcceptedTaskGenerated
+            return RedfishApiRespond.AcceptedTaskGenerated
 
         if response.status_code == expected:
             return self._http_code_mapping[response.status_code]
@@ -1223,7 +1224,7 @@ class RedfishManagerBase(RedfishManager):
                 raise RedfishForbidden("Authorization failed.")
             if response.status_code == 404:
                 raise RedfishForbidden(self._redfish_error)
-            return IdracApiRespond.Error
+            return RedfishApiRespond.Error
         elif response.status_code >= 500:
             raise RedfishException(
                 f"{self._redfish_error.message} HTTP Status code: "
@@ -1238,7 +1239,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 202,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default delete success handler,  Check for status code.
         and raise exception.  Default handler to check post
         request respond.
@@ -1257,7 +1258,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 200,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         return self.read_api_respond(
             response, expected=expected, ignore_error_code=ignore_error_code
         )
@@ -1266,7 +1267,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 200,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default delete success handler,  Check for status code.
         and raise exception.  Default handler to check post
         request respond.
@@ -1285,7 +1286,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default error handler, for post
         :param expected:
         :param response: response HTTP response.
@@ -1301,7 +1302,7 @@ class RedfishManagerBase(RedfishManager):
             self,
             response: requests.models.Response,
             expected: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default error handler, for post
         :param ignore_error_code:
         :param expected:
@@ -1316,7 +1317,7 @@ class RedfishManagerBase(RedfishManager):
     async def async_default_patch_success(
             self, response: requests.models.Response,
             expected: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> IdracApiRespond:
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
         """Default error handler for patch http method.
         :param expected:
         :param response: response HTTP response.
@@ -1343,10 +1344,10 @@ class RedfishManagerBase(RedfishManager):
             do_async: Optional[bool] = False,
             data_type: Optional[str] = "json",
             expected_status: Optional[int] = 200,
-            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, IdracApiRespond]:
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
         """A base http post/patch/delete method.
 
-        Return result as command result named tuples and IdracApiRespond
+        Return result as command result named tuples and RedfishApiRespond
         reflect API respond enum based on HTTP/HTTPS status replay
 
         :param method: http method POST/PATCH etc.
@@ -1358,7 +1359,7 @@ class RedfishManagerBase(RedfishManager):
         :param do_async: for asynced request.
         :param data_type: a data-type json/xml
         :param expected_status: expected status code depend on patch msg.
-        :return: Tuple of CommandResult, IdracApiRespond
+        :return: Tuple of CommandResult, RedfishApiRespond
         """
         headers = {}
         if data_type == "json":
@@ -1372,7 +1373,7 @@ class RedfishManagerBase(RedfishManager):
 
         err = None
         response = None
-        api_resp = IdracApiRespond.Error
+        api_resp = RedfishApiRespond.Error
         try:
             r = f"{self._default_method}{self.redfish_ip}{resource}"
             if not do_async:
@@ -1447,7 +1448,7 @@ class RedfishManagerBase(RedfishManager):
 
         # if task id available, we fetch task/job id from header
         # and include in return api
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = self.job_id_from_header(response)
             return CommandResult(
                 {"task_id": task_id}, None, None, None), api_resp
@@ -1464,13 +1465,13 @@ class RedfishManagerBase(RedfishManager):
                   do_async: Optional[bool] = False,
                   data_type: Optional[str] = "json",
                   expected_status: Optional[int] = 204,
-                  ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, IdracApiRespond]:
+                  ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
         """Base http post request for redfish remote api.
 
         Returns CommandResult and data field contain a data payload.
         If such data is present. In most case post doesn't return anything.
 
-        Method return a tuple CommandResult, IdracApiRespond
+        Method return a tuple CommandResult, RedfishApiRespond
         provide option if post accepted , ok status just ok or failed.
 
         Meanwhile, in case error CommandResult. Error
@@ -1482,7 +1483,7 @@ class RedfishManagerBase(RedfishManager):
         :param do_async: whether we do asyncio or not
         :param data_type: a default data type json or xml.
         :param expected_status: in case we expect http status that different from spec.
-        :return: Tuple[CommandResult, IdracApiRespond]
+        :return: Tuple[CommandResult, RedfishApiRespond]
         :raise: PostRequestFailed for all error that we can't handle.
                 i.e. error like api return are not exception.
         """
@@ -1499,13 +1500,13 @@ class RedfishManagerBase(RedfishManager):
             do_async: Optional[bool] = False,
             data_type: Optional[str] = "json",
             expected_status: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, IdracApiRespond]:
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
         """Base http post request for redfish remote api.
 
         Returns CommandResult and data field contain a data payload.
         If such data is present. In most case post doesn't return anything.
 
-        Method return a tuple CommandResult, IdracApiRespond
+        Method return a tuple CommandResult, RedfishApiRespond
         provide option if post accepted , ok status just ok or failed.
 
         Meanwhile, in case error CommandResult. Error
@@ -1517,7 +1518,7 @@ class RedfishManagerBase(RedfishManager):
         :param do_async: whether we do asyncio or not
         :param data_type: a default data type json or xml.
         :param expected_status: in case we expect http status that different from spec.
-        :return: Tuple[CommandResult, IdracApiRespond]
+        :return: Tuple[CommandResult, RedfishApiRespond]
         :raise: PostRequestFailed for all error that we can't handle.
                 i.e. error like api return are not exception.
         """
@@ -1534,13 +1535,13 @@ class RedfishManagerBase(RedfishManager):
             do_async: Optional[bool] = False,
             data_type: Optional[str] = "json",
             expected_status: Optional[int] = 204,
-            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, IdracApiRespond]:
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
         """Base http delete request for redfish remote api.
 
         Returns CommandResult and data field contain a data payload.
         If such data is present. In most case post doesn't return anything.
 
-        Method return a tuple CommandResult, IdracApiRespond
+        Method return a tuple CommandResult, RedfishApiRespond
         provide option if post accepted , ok status just ok or failed.
 
         Meanwhile, in case error CommandResult. Error
@@ -1552,7 +1553,7 @@ class RedfishManagerBase(RedfishManager):
         :param do_async: whether we do asyncio or not
         :param data_type: a default data type json or xml.
         :param expected_status: in case we expect http status that different from spec.
-        :return: Tuple[CommandResult, IdracApiRespond]
+        :return: Tuple[CommandResult, RedfishApiRespond]
         :raise: PostRequestFailed for all error that we can't handle.
                 i.e. error like api return are not exception.
         """
@@ -1831,7 +1832,7 @@ class RedfishManagerBase(RedfishManager):
             )
             return cmd_chassis
 
-        if isinstance(cmd_chassis.data, dict) and IDRAC_JSON.PowerState in cmd_chassis.data:
+        if isinstance(cmd_chassis.data, dict) and REDFISH_JSON.PowerState in cmd_chassis.data:
             pd_state = cmd_chassis.data[power_state_attr]
             if pd_state.lower() == 'on':
                 return self.sync_invoke(
@@ -1858,7 +1859,7 @@ class RedfishManagerBase(RedfishManager):
         :return: str: firmware.
         """
         api_return = self.base_query(self.idrac_members,
-                                     key=IDRAC_JSON.FirmwareVersion)
+                                     key=REDFISH_JSON.FirmwareVersion)
         return api_return.data
 
     def idrac_last_reset(self) -> datetime:
@@ -1867,7 +1868,7 @@ class RedfishManagerBase(RedfishManager):
         """
         idrac_reset_time = None
         api_return = self.base_query(self.idrac_members,
-                                     key=IDRAC_JSON.LastResetTime)
+                                     key=REDFISH_JSON.LastResetTime)
         try:
             idrac_reset_time = datetime.fromisoformat(api_return.data)
         except ValueError as ve:
@@ -1881,7 +1882,7 @@ class RedfishManagerBase(RedfishManager):
         """
         idrac_time = None
         api_return = self.base_query(self.idrac_members,
-                                     key=IDRAC_JSON.Datatime)
+                                     key=REDFISH_JSON.Datatime)
         try:
             idrac_time = datetime.fromisoformat(api_return.data)
         except ValueError as ve:
@@ -1901,7 +1902,7 @@ class RedfishManagerBase(RedfishManager):
         :return:  idrac time zone
         """
         api_resp = self.base_query(self.idrac_members,
-                                   key=IDRAC_JSON.DateTimeLocalOffset)
+                                   key=REDFISH_JSON.DateTimeLocalOffset)
         return api_resp.data
 
     @cached_property
@@ -1909,13 +1910,13 @@ class RedfishManagerBase(RedfishManager):
         """Shared method return idrac managed chassis list as json
         :return: str: manage chassis i.e. /redfish/v1/Chassis/System.Embedded.1
         """
-        api_resp = self.base_query(self.idrac_members, key=IDRAC_JSON.Links)
-        if api_resp.data is not None and IDRAC_JSON.ManageChassis in api_resp.data:
+        api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
+        if api_resp.data is not None and REDFISH_JSON.ManageChassis in api_resp.data:
             if isinstance(api_resp.data, dict):
-                manage_chassis = api_resp.data[IDRAC_JSON.ManageChassis]
+                manage_chassis = api_resp.data[REDFISH_JSON.ManageChassis]
                 self._manage_chassis_obs = manage_chassis
                 return self.value_from_json_list(
-                    manage_chassis, IDRAC_JSON.Data_id
+                    manage_chassis, REDFISH_JSON.Data_id
                 )
         else:
             self.logger.error("")
@@ -1926,7 +1927,7 @@ class RedfishManagerBase(RedfishManager):
         """Return manager count. typically it 1
         :return:
         """
-        cmd_result = self.base_query(f"{IDRAC_API.IDRAC_MANAGER}")
+        cmd_result = self.base_query(f"{REDFISH_API.IDRAC_MANAGER}")
         return cmd_result.data["Members@odata.count"]
 
     @cached_property
@@ -1935,7 +1936,7 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         cmd_result = self.base_query(
-            f"{IDRAC_API.IDRAC_MANAGER}", key=IDRAC_JSON.Members)
+            f"{REDFISH_API.IDRAC_MANAGER}", key=REDFISH_JSON.Members)
 
         # idrac ctl only manage one instance.
         member_list = cmd_result.data
@@ -1947,7 +1948,7 @@ class RedfishManagerBase(RedfishManager):
                 member_target = member[RedfishJson.Data_id]
                 cmd_result = self.base_query(
                     member_target,
-                    key=IDRAC_JSON.IDracFirmwareVersion
+                    key=REDFISH_JSON.IDracFirmwareVersion
                 )
                 return cmd_result.data
         else:
@@ -1961,8 +1962,8 @@ class RedfishManagerBase(RedfishManager):
         Upon first call , result cached all follow-up call will return cached result.
         :return:
         """
-        cmd_result = self.base_query(f"{IDRAC_API.IDRAC_MANAGER}", key=IDRAC_JSON.Members)
-        return self.value_from_json_list(cmd_result.data, IDRAC_JSON.Data_id)
+        cmd_result = self.base_query(f"{REDFISH_API.IDRAC_MANAGER}", key=REDFISH_JSON.Members)
+        return self.value_from_json_list(cmd_result.data, REDFISH_JSON.Data_id)
 
     @staticmethod
     def _member_ids(members) -> list:
@@ -1973,8 +1974,8 @@ class RedfishManagerBase(RedfishManager):
         """
         if not isinstance(members, list):
             return []
-        return [m[IDRAC_JSON.Data_id] for m in members
-                if isinstance(m, dict) and isinstance(m.get(IDRAC_JSON.Data_id), str)]
+        return [m[REDFISH_JSON.Data_id] for m in members
+                if isinstance(m, dict) and isinstance(m.get(REDFISH_JSON.Data_id), str)]
 
     def discover_computer_system_ids(self) -> list:
         """Return ALL ComputerSystem ids from ``/redfish/v1/Systems``.
@@ -1986,7 +1987,7 @@ class RedfishManagerBase(RedfishManager):
         GB300 exposes ``/redfish/v1/Systems/System_0`` (host) and
         ``/redfish/v1/Systems/HGX_Baseboard_0`` (NVIDIA GPU baseboard).
         """
-        cmd_result = self.base_query(RedfishApi.Systems, key=IDRAC_JSON.Members)
+        cmd_result = self.base_query(RedfishApi.Systems, key=REDFISH_JSON.Members)
         return self._member_ids(cmd_result.data)
 
     def discover_manager_ids(self) -> list:
@@ -1995,7 +1996,7 @@ class RedfishManagerBase(RedfishManager):
         Companion to :meth:`discover_computer_system_ids` for boxes with more
         than one BMC; ``idrac_members`` only yields a single (last) manager.
         """
-        cmd_result = self.base_query(RedfishApi.Managers, key=IDRAC_JSON.Members)
+        cmd_result = self.base_query(RedfishApi.Managers, key=REDFISH_JSON.Members)
         return self._member_ids(cmd_result.data)
 
     def _host_system(self, system_ids) -> str:
@@ -2033,13 +2034,13 @@ class RedfishManagerBase(RedfishManager):
         and hosts without a reachable Systems collection keep the original result.
         """
         resolved = ""
-        api_resp = self.base_query(self.idrac_members, key=IDRAC_JSON.Links)
-        if api_resp.data is not None and IDRAC_JSON.ManagerServers in api_resp.data:
+        api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
+        if api_resp.data is not None and REDFISH_JSON.ManagerServers in api_resp.data:
             if isinstance(api_resp.data, dict):
-                manage_servers = api_resp.data[IDRAC_JSON.ManagerServers]
+                manage_servers = api_resp.data[REDFISH_JSON.ManagerServers]
                 self._manage_servers_obs = manage_servers
                 resolved = self.value_from_json_list(
-                    manage_servers, IDRAC_JSON.Data_id
+                    manage_servers, REDFISH_JSON.Data_id
                 )
         else:
             self.logger.error("")
@@ -2059,10 +2060,10 @@ class RedfishManagerBase(RedfishManager):
         id cached all follow-up calls and will return cached result.
         :return:
         """
-        self.base_query(self.idrac_manage_servers, key=IDRAC_JSON.Id)
-        api_resp = self.base_query(self.idrac_manage_servers, key=IDRAC_JSON.Id)
+        self.base_query(self.idrac_manage_servers, key=REDFISH_JSON.Id)
+        api_resp = self.base_query(self.idrac_manage_servers, key=REDFISH_JSON.Id)
         if api_resp is None:
-            self.logger.critical(f"failed obtain {IDRAC_JSON.Id}")
+            self.logger.critical(f"failed obtain {REDFISH_JSON.Id}")
         return api_resp.data
 
     @staticmethod
@@ -2174,30 +2175,30 @@ class RedfishManagerBase(RedfishManager):
         """
         if reboot_type == ScheduleJobType.NoReboot:
             pd = {
-                IDRAC_JSON.RedfishSettingsApplyTime: {
-                    IDRAC_JSON.ApplyTime: JobApplyTypes.InMaintenance,
-                    IDRAC_JSON.MaintenanceWindowStartTime: start_time_isofmt,
-                    IDRAC_JSON.MaintenanceWindowDuration: duration_time
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: JobApplyTypes.InMaintenance,
+                    REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
+                    REDFISH_JSON.MaintenanceWindowDuration: duration_time
                 }
             }
         elif reboot_type == ScheduleJobType.AutoReboot:
             pd = {
-                IDRAC_JSON.RedfishSettingsApplyTime: {
-                    IDRAC_JSON.ApplyTime: JobApplyTypes.AtMaintenance,
-                    IDRAC_JSON.MaintenanceWindowStartTime: start_time_isofmt,
-                    IDRAC_JSON.MaintenanceWindowDuration: duration_time
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: JobApplyTypes.AtMaintenance,
+                    REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
+                    REDFISH_JSON.MaintenanceWindowDuration: duration_time
                 }
             }
         elif reboot_type == ScheduleJobType.OnReset:
             pd = {
-                IDRAC_JSON.RedfishSettingsApplyTime: {
-                    IDRAC_JSON.ApplyTime: JobApplyTypes.OnReset
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: JobApplyTypes.OnReset
                 }
             }
         elif reboot_type == ScheduleJobType.Immediate:
             pd = {
-                IDRAC_JSON.RedfishSettingsApplyTime: {
-                    IDRAC_JSON.ApplyTime: JobApplyTypes.Immediate
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: JobApplyTypes.Immediate
                 }
             }
         else:
@@ -2291,7 +2292,7 @@ class RedfishManagerBase(RedfishManager):
             raise ValueError("Unknown apply time")
 
     def api_success_msg(self,
-                        api_respond: IdracApiRespond,
+                        api_respond: RedfishApiRespond,
                         message_key: Optional[str] = "message",
                         message=None) -> Dict:
         """A default api success respond,
@@ -2327,10 +2328,10 @@ class RedfishManagerBase(RedfishManager):
         if cmd_result.error is not None:
             return PowerState.Unknown
 
-        if IDRAC_JSON.PowerState not in cmd_result.data:
-            raise UnexpectedResponse(f"{IDRAC_JSON.PowerState} not present in respond.")
+        if REDFISH_JSON.PowerState not in cmd_result.data:
+            raise UnexpectedResponse(f"{REDFISH_JSON.PowerState} not present in respond.")
 
-        power_state = cmd_result.data[IDRAC_JSON.PowerState]
+        power_state = cmd_result.data[REDFISH_JSON.PowerState]
         if 'On' in power_state:
             return PowerState.On
         if 'Off' in power_state:

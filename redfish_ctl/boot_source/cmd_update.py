@@ -12,7 +12,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -173,13 +173,13 @@ class BootSourceUpdate(RedfishManagerBase,
             do_async=do_async, expected_status=202
         )
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state
             cmd_result.data['task_id'] = task_id
-        elif api_resp in (IdracApiRespond.Success, IdracApiRespond.Ok):
+        elif api_resp in (RedfishApiRespond.Success, RedfishApiRespond.Ok):
             if do_commit:
                 self.logger.info("Commit changes and rebooting.")
                 # we commit with a reboot

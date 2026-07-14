@@ -301,7 +301,7 @@ def test_reconcile_confirm_applies_only_required_changes():
             {
                 "Manager": "BMC_0",
                 "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                "status": "IdracApiRespond.Ok",
+                "status": "RedfishApiRespond.Ok",
                 "error": None,
             }
         ],

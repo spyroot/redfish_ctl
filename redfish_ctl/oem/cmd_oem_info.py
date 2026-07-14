@@ -16,7 +16,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -60,7 +60,7 @@ class OemInfo(RedfishManagerBase,
                 roots.extend(finder() or [])
             except Exception:
                 continue
-        roots.extend(self._members(self._get(IDRAC_API.Chassis, do_async)))
+        roots.extend(self._members(self._get(REDFISH_API.Chassis, do_async)))
         return roots
 
     def execute(self,

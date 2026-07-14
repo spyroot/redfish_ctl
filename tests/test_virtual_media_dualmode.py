@@ -5,7 +5,7 @@ import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType, IdracApiRespond
+from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -307,5 +307,5 @@ def test_virtual_media_eject_skips_post_when_device_is_already_empty(
     )
 
     assert isinstance(result, CommandResult)
-    assert result.data == {"Status": IdracApiRespond.Ok}
+    assert result.data == {"Status": RedfishApiRespond.Ok}
     assert redfish_service.last_request.method == "GET"

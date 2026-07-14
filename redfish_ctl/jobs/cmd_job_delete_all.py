@@ -8,17 +8,17 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import RedfishApiRespond
 from ..redfish_shared import RedfishJson
 from ..cmd_utils import str2bool
-from ..redfish_manager_shared import IdracApiRespond, ResetType
+from ..redfish_manager_shared import RedfishApiRespond, ResetType
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..redfish_manager_shared import IDRAC_API
-from ..redfish_manager_shared import IdracApiRespond
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import RedfishApiRespond
 
 
 
@@ -78,7 +78,7 @@ class JobRmDellServices(RedfishManagerBase,
         cmd_result, api_resp = self.base_post(target_api, do_async=do_async,
                                               payload=payload,
                                               expected_status=200)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

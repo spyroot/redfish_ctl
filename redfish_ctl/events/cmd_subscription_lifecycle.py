@@ -4,7 +4,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -31,7 +31,7 @@ class _SubscriptionBase(RedfishManagerBase):
 
     def _subscription_collection_uri(self, do_async):
         service = self.base_query(
-            IDRAC_API.EventServiceQuery,
+            REDFISH_API.EventServiceQuery,
             do_async=do_async,
         ).data or {}
         subscriptions_uri = self._link(service, "Subscriptions")

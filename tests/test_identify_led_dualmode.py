@@ -103,7 +103,7 @@ def test_identify_led_confirm_patches_and_rereads_system_state(redfish_mock_fact
     assert patches[0].json() == {"LocationIndicatorActive": True}
     assert result.data["applied"] == {
         "target": "/redfish/v1/Systems/System_0",
-        "status": "IdracApiRespond.Ok",
+        "status": "RedfishApiRespond.Ok",
         "error": None,
     }
     assert result.data["observed"] is True

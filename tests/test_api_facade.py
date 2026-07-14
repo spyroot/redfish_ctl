@@ -411,7 +411,7 @@ def test_set_ntp_returns_typed_apply_result_when_confirmed():
             {
                 "Manager": "BMC_0",
                 "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                "status": "IdracApiRespond.Ok",
+                "status": "RedfishApiRespond.Ok",
                 "error": None,
             }
         ],
@@ -438,7 +438,7 @@ def test_set_ntp_returns_typed_apply_result_when_confirmed():
             NtpApplied(
                 manager="BMC_0",
                 target="/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                status="IdracApiRespond.Ok",
+                status="RedfishApiRespond.Ok",
                 error=None,
                 raw=payload["applied"][0],
             ),
