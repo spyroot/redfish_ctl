@@ -80,6 +80,7 @@ from .storage.cmd_convert_to_raid import *
 # chassis cmd
 from .chassis.cmd_chassis_query import *
 from .chassis.cmd_chasis_reset import *
+from .chassis.cmd_asset_tag_set import *
 from .sensors.cmd_sensors import *
 from .controls.cmd_controls import *
 from .thermal.cmd_thermal import *

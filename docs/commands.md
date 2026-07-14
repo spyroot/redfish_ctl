@@ -5,7 +5,7 @@ Author: Mus <spyroot@gmail.com>
 When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
 basic Redfish path before deeper inventory or any staged change.
 
-The table below follows the 122 command names imported by `redfish_ctl/__init__.py`. Run
+The table below follows the 123 command names imported by `redfish_ctl/__init__.py`. Run
 `redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
 backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
 
@@ -77,6 +77,7 @@ Safety labels:
 | `account-svc` | Read AccountService. | Read |
 | `accounts` | Read the account collection; `--usernames` prints only usernames. | Read |
 | `actions` | List Redfish actions exposed by the box and their risk levels. | Read |
+| `asset-tag-set` | Read or set a chassis or system AssetTag; dry-run by default and `--confirm` applies. | Guarded |
 | `attr` | Read manager attributes. | Read |
 | `attr-clear-pending` | Clear pending manager attribute values. | Write |
 | `attr-update` | Stage manager attribute changes. | Write |
