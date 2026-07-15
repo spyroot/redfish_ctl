@@ -231,9 +231,9 @@ class _Handler(BaseHTTPRequestHandler):
             result["api"] = entry.api.name
             result["elapsedMs"] = int((time.monotonic() - t0) * 1000)
             self._send(200, json.dumps(result).encode(), "application/json")
-        except Exception as exc:  # a transport/command failure -> 200 with error body
+        except Exception as exc:  # a transport/backend failure -> 502 Bad Gateway
             body = {"ok": False, "error": str(exc), "api": entry.api.name, "data": None}
-            self._send(200, json.dumps(body).encode(), "application/json")
+            self._send(502, json.dumps(body).encode(), "application/json")
 
 
 def make_manager_factory():

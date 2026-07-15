@@ -30,6 +30,12 @@ from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 from .cmd_network_adapters import NetworkAdapters
 
+# The package does ``from .network.cmd_nic_firmware import *``; keep that to the
+# command class so re-exported imports (CommandResult, RedfishManagerBase, enums)
+# do not leak into the top-level ``redfish_ctl`` namespace. ``network_class`` stays
+# importable directly (``from ...cmd_nic_firmware import network_class``).
+__all__ = ["NicFirmware"]
+
 # Tokens that mark a firmware component (or adapter model) as a network device.
 # Matched against alphanumeric tokens (not raw substrings) so a GUID/version that
 # merely contains "cx8"/"nic" as a fragment is not misclassified.

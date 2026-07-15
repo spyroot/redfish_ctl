@@ -10,6 +10,11 @@ exercises only the offline helpers.
 from __future__ import annotations
 
 import importlib.util
+import json
+import threading
+import urllib.error
+import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -352,3 +357,60 @@ def test_render_html_flags_drifting_component_across_fleet(app):
     html = app.render_html([node("a", "40.45.3048"), node("b", "40.44.0000")])
     assert "fw drift" in html  # the fleet disagrees on CX8_0
     assert "NIC FW Drift" in html  # the summary card
+
+
+# --------------------------------------------------------------------------- #
+# HTTP handler: routes + status codes (loopback server; k8s access stubbed out).
+# --------------------------------------------------------------------------- #
+
+
+@contextmanager
+def _serve_consumer(app):
+    """Run the consumer on an ephemeral loopback port (caller stubs _nodes)."""
+    httpd = app.ThreadingHTTPServer(("127.0.0.1", 0), app._Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def _req(url):
+    """Return (status, body-bytes), treating a 4xx/5xx as a normal response."""
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def test_http_routes_serve_status_and_metrics(app, monkeypatch):
+    """/, /api/nodes, /api/nodes/<name>, /metrics, /healthz serve 200; unknown/missing 404.
+
+    ``_nodes`` is stubbed so the handler never touches a Kubernetes API server.
+    """
+    nodes = [app.normalize_endpoint(
+        _endpoint("n1", "https://1", status={"powerState": "On", "health": "OK"})
+    )]
+    monkeypatch.setattr(app._Handler, "_nodes", lambda self: nodes)
+    with _serve_consumer(app) as base:
+        assert _req(base + "/healthz")[0] == 200
+        assert _req(base + "/")[0] == 200
+        code, body = _req(base + "/api/nodes")
+        assert code == 200 and json.loads(body)["summary"]["total"] == 1
+        assert _req(base + "/api/nodes/n1")[0] == 200
+        assert _req(base + "/api/nodes/missing")[0] == 404  # unknown node
+        assert _req(base + "/metrics")[0] == 200
+        assert _req(base + "/nope")[0] == 404  # unknown path
+
+
+def test_http_backend_error_is_503(app, monkeypatch):
+    """When the k8s-facing load fails, the handler returns 503, not a stack trace."""
+    def boom(self):
+        raise RuntimeError("cluster unreachable")
+    monkeypatch.setattr(app._Handler, "_nodes", boom)
+    with _serve_consumer(app) as base:
+        code, body = _req(base + "/api/nodes")
+        assert code == 503
+        assert json.loads(body)["error"] == "backend unavailable"

@@ -9,6 +9,10 @@ unit dispatch, the committed GB300 corpus for an end-to-end command run).
 from __future__ import annotations
 
 import json
+import threading
+import urllib.error
+import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -125,3 +129,79 @@ def test_invoke_nic_firmware_end_to_end_against_corpus():
     summary = out["data"]["summary"]
     assert summary["nic_count"] == 4
     assert "40.45.3048" in summary["distinct_versions"]
+
+
+# --------------------------------------------------------------------------- #
+# HTTP handler: route + status-code contract (loopback server, no live BMC).
+# --------------------------------------------------------------------------- #
+
+
+class _RaisingManager:
+    """sync_invoke raises — exercises the do_POST backend-failure (502) path."""
+
+    def sync_invoke(self, *_a, **_k):
+        raise RuntimeError("bmc unreachable")
+
+
+@contextmanager
+def _serve(manager):
+    """Run the explorer on an ephemeral loopback port with a fixed manager."""
+    handler = server._Handler
+    handler.manager = manager  # pre-set so the real factory is never called
+    handler.manager_factory = staticmethod(lambda: manager)
+    handler.target_label = "test-bmc:443"
+    httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        handler.manager = None
+
+
+def _req(url, *, data=None, method="GET"):
+    """Return (status, body-bytes), treating a 4xx/5xx as a normal response."""
+    req = urllib.request.Request(
+        url, data=data, method=method,
+        headers={"Content-Type": "application/json"} if data is not None else {},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def test_http_get_routes_status_codes():
+    """/healthz, /api/catalog, and / serve 200; an unknown path is 404."""
+    with _serve(_FakeManager(CommandResult({"adapters": []}, None, None, None))) as base:
+        assert _req(base + "/healthz")[0] == 200
+        assert _req(base + "/api/catalog")[0] == 200
+        code, body = _req(base + "/")
+        assert code == 200 and b"redfish_ctl explorer" in body
+        assert _req(base + "/nope")[0] == 404
+
+
+def test_http_post_invoke_success_and_input_errors():
+    """A valid command is 200/ok; bad JSON and an unlisted command are 400; wrong path 404."""
+    with _serve(_FakeManager(CommandResult({"adapters": []}, None, None, None))) as base:
+        code, body = _req(base + "/api/invoke", data=json.dumps({"command": "nic-firmware"}).encode(),
+                          method="POST")
+        assert code == 200 and json.loads(body)["ok"] is True
+        # A mutating command is not allow-listed -> 400, never dispatched.
+        assert _req(base + "/api/invoke", data=json.dumps({"command": "system_reset"}).encode(),
+                    method="POST")[0] == 400
+        # Malformed body -> 400.
+        assert _req(base + "/api/invoke", data=b"{not json", method="POST")[0] == 400
+        # Wrong POST path -> 404.
+        assert _req(base + "/other", data=b"{}", method="POST")[0] == 404
+
+
+def test_http_post_backend_failure_is_502():
+    """A transport/backend failure during invoke surfaces as 502, not a masked 200."""
+    with _serve(_RaisingManager()) as base:
+        code, body = _req(base + "/api/invoke", data=json.dumps({"command": "nic-firmware"}).encode(),
+                          method="POST")
+        assert code == 502
+        assert json.loads(body)["ok"] is False
