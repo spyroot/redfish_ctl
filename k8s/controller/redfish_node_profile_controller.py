@@ -15,6 +15,7 @@ try:  # pragma: no cover - exercised only in a deployed controller image.
 except ImportError:  # pragma: no cover - unit tests call the handler directly.
     kopf = None
 
+from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
 REDFISH_GROUP = "redfish.ctl.dev"
@@ -326,23 +327,19 @@ def load_secret_credentials(
     namespace: str | None,
     secret_ref: Mapping[str, Any] | None,
 ) -> dict[str, str]:
-    """Read credentials from the Secret named by spec.endpoint.secretRef when available."""
+    """Read credentials from the Secret named by spec.endpoint.secretRef when available.
+
+    Shares the process-wide client from :mod:`redfish_ctl.kube_client` with the
+    endpoint controller (both run in one kopf process), so the kube config is
+    loaded once for the whole process instead of on every handler thread.
+    """
     if not namespace or not secret_ref or not secret_ref.get("name"):
         return {}
-    try:  # pragma: no cover - requires a Kubernetes client in-cluster or locally.
-        from kubernetes import client, config
-    except ImportError:  # pragma: no cover - controller images carry this dependency.
+    try:
+        api = get_core_v1_api()
+    except Exception:  # pragma: no cover - kubernetes/config unavailable offline.
         return {}
 
-    try:  # pragma: no cover - not exercised by offline tests.
-        config.load_incluster_config()
-    except Exception:
-        try:
-            config.load_kube_config()
-        except Exception:
-            return {}
-
-    api = client.CoreV1Api()
     secret = api.read_namespaced_secret(str(secret_ref["name"]), namespace)
     data = secret.data or {}
     username_key = str(secret_ref.get("usernameKey") or "username")
