@@ -133,7 +133,18 @@ def build_identity_dimensions(
         bmc_octet_base: int = 20,
         server_octet_base: int = 40,
         server_subnet: Optional[str] = None) -> dict[str, str]:
-    """Return the fixed join dimensions required on every exported series."""
+    """Return the fixed join dimensions required on every exported series.
+
+    :param bmc_ip: BMC management IP; its final octet derives the slot/node.
+    :param vendor: hardware vendor label; lowercased into the ``vendor`` dimension.
+    :param host_prefix: prefix for the derived ``host.name`` (``<prefix>-slot<n>``).
+    :param bmc_octet_base: BMC last-octet offset subtracted to compute the slot number.
+    :param server_octet_base: host last-octet offset added to the slot for ``server.address``.
+    :param server_subnet: override for the first three octets of ``server.address``;
+        defaults to the BMC subnet.
+    :return: dict of ``host.name``, ``node``, ``server.address``, ``bmc.ip`` and
+        ``vendor`` dimensions.
+    """
     bmc = str(bmc_ip or "unknown")
     parts = bmc.split(".")
     if len(parts) == 4 and parts[-1].isdigit():
@@ -167,6 +178,9 @@ def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
     Accepts REDFISH_IP/USERNAME/PASSWORD/PORT and the legacy IDRAC_* names.
+
+    :param path: path to the credential env file to read.
+    :return: mapping of recognized credential keys to their unquoted values.
     """
     values = {}
     for raw_line in Path(path).read_text().splitlines():
@@ -181,7 +195,11 @@ def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
 
 
 def exporter_argv_uses_secret(argv: Iterable[str]) -> bool:
-    """True when the exporter invocation carries a password on argv."""
+    """True when the exporter invocation carries a password on argv.
+
+    :param argv: command-line arguments to inspect.
+    :return: True if an exporter invocation passes a password flag on argv, else False.
+    """
     args = list(argv)
     if "exporter" not in args:
         return False
@@ -192,7 +210,12 @@ def exporter_argv_uses_secret(argv: Iterable[str]) -> bool:
 
 
 def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
-    """Apply exporter credential-file values to an argparse namespace in place."""
+    """Apply exporter credential-file values to an argparse namespace in place.
+
+    :param args: argparse namespace updated in place with credential values.
+    :param path: explicit env-file path; falls back to the namespace attribute and
+        the REDFISH_/IDRAC_ exporter credential-file environment variables.
+    """
     file_path = path or getattr(args, "exporter_credential_file", None)
     file_path = (file_path
                  or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE")
@@ -229,7 +252,19 @@ def build_metric_samples(
         leak_detection_rows: Iterable[Mapping] = (),
         network_rows: Iterable[Mapping] = (),
         component_integrity_rows: Iterable[Mapping] = ()) -> list[MetricSample]:
-    """Build exporter samples from normalized Redfish command rows."""
+    """Build exporter samples from normalized Redfish command rows.
+
+    :param identity: fixed join dimensions applied to every sample.
+    :param environment_rows: Chassis EnvironmentMetrics rows (power/energy/fan).
+    :param sensor_rows: Redfish Sensor rows (thermal/fan/voltage/power).
+    :param nvlink_rows: nvlink-ports rows for per-link fabric metrics.
+    :param metric_report_rows: TelemetryService MetricReport rows.
+    :param thermal_rows: ThermalSubsystem temperature rows.
+    :param leak_detection_rows: LeakDetector rows.
+    :param network_rows: NIC/DPU network-adapter inventory rows.
+    :param component_integrity_rows: ComponentIntegrity rows.
+    :return: combined list of MetricSample objects from all row sources.
+    """
     samples: list[MetricSample] = []
     samples.extend(samples_from_environment_rows(environment_rows, identity))
     samples.extend(samples_from_sensor_rows(sensor_rows, identity))
@@ -246,7 +281,13 @@ def scrape_health_samples(
         identity: Mapping[str, str],
         ok: bool,
         duration_seconds: float) -> list[MetricSample]:
-    """Return per-scrape liveness and duration samples."""
+    """Return per-scrape liveness and duration samples.
+
+    :param identity: fixed join dimensions applied to the health samples.
+    :param ok: whether the scrape succeeded (1.0) or failed (0.0).
+    :param duration_seconds: scrape wall-clock duration, in seconds.
+    :return: list of the ``hw.scrape.ok`` and ``hw.scrape.duration_seconds`` samples.
+    """
     dims = _with_dims(identity, source="exporter")
     duration = _as_float(duration_seconds)
     return [
@@ -264,7 +305,13 @@ def jittered_interval(
         interval: float,
         jitter_fraction: float = POLL_JITTER_FRACTION,
         random_value: Optional[float] = None) -> float:
-    """Return ``interval`` offset by a bounded symmetric jitter fraction."""
+    """Return ``interval`` offset by a bounded symmetric jitter fraction.
+
+    :param interval: base interval in seconds; non-positive values fall back to 1.0.
+    :param jitter_fraction: symmetric jitter as a fraction of the interval; negatives clamp to 0.
+    :param random_value: optional draw in [0, 1] to use instead of ``random.random()``.
+    :return: the interval adjusted by the bounded jitter, in seconds.
+    """
     base = _as_float(interval)
     if base is None or base <= 0:
         base = 1.0
@@ -282,7 +329,12 @@ def jittered_interval(
 def samples_from_environment_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map Chassis EnvironmentMetrics rows into chassis/GPU power metrics."""
+    """Map Chassis EnvironmentMetrics rows into chassis/GPU power metrics.
+
+    :param rows: Chassis EnvironmentMetrics rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: power, energy and fan-speed samples derived from the rows.
+    """
     samples = []
     for row in rows:
         chassis = _environment_chassis(row)
@@ -308,7 +360,12 @@ def samples_from_environment_rows(
 def samples_from_sensor_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map Redfish Sensor rows into chassis thermal/fan/voltage/GPU power metrics."""
+    """Map Redfish Sensor rows into chassis thermal/fan/voltage/GPU power metrics.
+
+    :param rows: Redfish Sensor rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: thermal, fan, voltage and power samples derived from the rows.
+    """
     samples = []
     for row in rows:
         value = _as_float(row.get("Reading"))
@@ -334,7 +391,12 @@ def samples_from_sensor_rows(
 def samples_from_nvlink_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map nvlink-ports rows into per-link fabric metrics."""
+    """Map nvlink-ports rows into per-link fabric metrics.
+
+    :param rows: nvlink-ports rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: per-link fabric samples (link state, speed, byte counters, BER).
+    """
     samples = []
     for row in rows:
         dims = _fabric_dims(identity, row.get("System"), row.get("GPU"), row.get("Port"), "nvlink")
@@ -360,6 +422,10 @@ def samples_from_metric_report_rows(
     every other property (GPU FP16/FP32 activity, thermal, power, memory, …) is
     emitted under a generic ``hw.gb300.*`` name so the FULL telemetry surface
     reaches OTel/Prometheus, not just the fabric subset.
+
+    :param rows: TelemetryService MetricReport rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: one MetricSample per convertible MetricReport row.
     """
     samples = []
     for row in rows:
@@ -397,6 +463,14 @@ def _gpu_metric_report_sample(
         prop_info: Mapping[str, str],
         row: Mapping,
         identity: Mapping[str, str]) -> Optional[MetricSample]:
+    """Build a GPU-specific MetricSample from a MetricReport row, if applicable.
+
+    :param prop_info: parsed MetricProperty fields (property, source, gpu, index, …).
+    :param row: the raw MetricReport row.
+    :param identity: fixed join dimensions applied to the sample.
+    :return: a GPU temperature/clock/utilization/throttle/memory sample, or None
+        when the row is not a recognized GPU metric.
+    """
     prop_name = str(prop_info.get("property") or "")
     gpu = _gpu_from_metric_info(prop_info)
     if not gpu:
@@ -494,6 +568,14 @@ def _gpu_metric_dims(
         prop_info: Mapping[str, str],
         row: Mapping,
         gpu: str) -> dict[str, str]:
+    """Build the GPU metric-report dimensions for one sample.
+
+    :param identity: fixed join dimensions applied to the sample.
+    :param prop_info: parsed MetricProperty fields providing system/chassis/memory context.
+    :param row: the raw MetricReport row (supplies the report name).
+    :param gpu: the resolved GPU identifier.
+    :return: dimension mapping for the GPU sample.
+    """
     dims = _with_dims(identity, source="metric-report", gpu=gpu)
     for key in ("system", "chassis", "memory"):
         if prop_info.get(key):
@@ -506,7 +588,12 @@ def _gpu_metric_dims(
 def samples_from_thermal_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map ThermalSubsystem temperature readings into per-zone metrics."""
+    """Map ThermalSubsystem temperature readings into per-zone metrics.
+
+    :param rows: ThermalSubsystem temperature rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: per-zone ``hw.temperature`` samples derived from the rows.
+    """
     samples = []
     for row in rows:
         reading = (row.get("ReadingCelsius")
@@ -529,7 +616,12 @@ def samples_from_thermal_rows(
 def samples_from_leak_detection_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map LeakDetector rows into per-detector leak-state gauges."""
+    """Map LeakDetector rows into per-detector leak-state gauges.
+
+    :param rows: LeakDetector rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: per-detector ``hw.leak.state`` samples derived from the rows.
+    """
     samples = []
     for row in rows:
         value = _leak_state_value(row.get("DetectorState"))
@@ -557,7 +649,12 @@ def samples_from_leak_detection_rows(
 def samples_from_network_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Expose NIC/DPU inventory health as lightweight fabric presence gauges."""
+    """Expose NIC/DPU inventory health as lightweight fabric presence gauges.
+
+    :param rows: network-adapter inventory rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: ``hw.fabric.adapter_present`` presence samples for each adapter.
+    """
     samples = []
     for row in rows:
         adapter = str(row.get("Id") or "adapter")
@@ -572,7 +669,12 @@ def samples_from_network_rows(
 def samples_from_component_integrity_rows(
         rows: Iterable[Mapping],
         identity: Mapping[str, str]) -> list[MetricSample]:
-    """Expose ComponentIntegrity enabled state for attested fabric components."""
+    """Expose ComponentIntegrity enabled state for attested fabric components.
+
+    :param rows: ComponentIntegrity rows to map.
+    :param identity: fixed join dimensions applied to every sample.
+    :return: ``hw.component_integrity.enabled`` samples for each component.
+    """
     samples = []
     for row in rows:
         component = str(row.get("Id") or "component")
@@ -585,7 +687,11 @@ def samples_from_component_integrity_rows(
 
 
 def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
-    """Render samples in Prometheus/OpenMetrics text exposition form."""
+    """Render samples in Prometheus/OpenMetrics text exposition form.
+
+    :param samples: metric samples to render.
+    :return: Prometheus/OpenMetrics text exposition of the samples.
+    """
     lines = []
     seen_types = set()
     for sample in samples:
@@ -601,7 +707,11 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
 
 
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint gauge envelope."""
+    """Wrap samples in the SignalFx /v2/datapoint gauge envelope.
+
+    :param samples: metric samples to wrap.
+    :return: SignalFx ``/v2/datapoint`` body with a ``gauge`` list.
+    """
     return {
         "gauge": [
             {
@@ -621,6 +731,10 @@ def _require_datapoint_url(ingest_url: str) -> str:
     host such as ``https://ingest.us1.observability.splunkcloud.com`` accepts the
     request context but silently drops every datapoint. Require the full
     ``…/v2/datapoint`` endpoint so misconfiguration fails loudly instead.
+
+    :param ingest_url: the SignalFx ingest URL to validate.
+    :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
+    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
     """
     if SIGNALFX_DATAPOINT_PATH not in (ingest_url or ""):
         raise ValueError(
@@ -633,7 +747,12 @@ def _require_datapoint_url(ingest_url: str) -> str:
 
 
 def resolve_signalfx_token(token_env: Optional[str] = None) -> str:
-    """Return the SignalFx ingest token from ``token_env`` (default SPLUNK_ACCESS_TOKEN)."""
+    """Return the SignalFx ingest token from ``token_env`` (default SPLUNK_ACCESS_TOKEN).
+
+    :param token_env: env var name to read the token from; defaults to ``SPLUNK_ACCESS_TOKEN``.
+    :return: the ingest token value.
+    :raises ValueError: if the environment variable is unset or empty.
+    """
     name = token_env or "SPLUNK_ACCESS_TOKEN"
     token = os.environ.get(name, "")
     if not token:
@@ -646,6 +765,10 @@ def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
 
     Falls back to the ``SPLUNK_INGEST_URL`` environment variable and requires the
     full ``…/v2/datapoint`` endpoint (see ``_require_datapoint_url``).
+
+    :param ingest_url: explicit ingest URL; falls back to ``SPLUNK_INGEST_URL``.
+    :return: a validated full ``…/v2/datapoint`` ingest URL.
+    :raises ValueError: if no URL is set or it is not a full datapoint endpoint.
     """
     url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
     if not url:
@@ -659,6 +782,13 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
     ``ingest_url`` must be the full SignalFx datapoint endpoint (``…/v2/datapoint``);
     it is POSTed verbatim, so a bare host silently drops every datapoint
     (see ``_require_datapoint_url``).
+
+    :param body: SignalFx datapoint payload to POST.
+    :param token: SignalFx ingest token for the ``X-SF-Token`` header.
+    :param ingest_url: full SignalFx datapoint endpoint (``…/v2/datapoint``).
+    :param timeout: request timeout in seconds.
+    :return: the HTTP status code of the POST response.
+    :raises ValueError: if ``ingest_url`` is not a full datapoint endpoint.
     """
     _require_datapoint_url(ingest_url)
     data = json.dumps(body).encode()
@@ -676,10 +806,16 @@ def serve_prometheus(
         scrape: Callable[[], str],
         bind: str = "0.0.0.0",
         port: int = 9109) -> None:
-    """Serve ``/metrics`` by calling ``scrape`` for each request."""
+    """Serve ``/metrics`` by calling ``scrape`` for each request.
+
+    :param scrape: callable returning the Prometheus text body for each request.
+    :param bind: address to bind the HTTP server to.
+    :param port: TCP port to serve ``/metrics`` on.
+    """
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802 - http.server API
+            """Serve ``/metrics`` with the scrape body, or 404/500 on error."""
             if self.path != "/metrics":
                 self.send_response(404)
                 self.end_headers()
@@ -700,6 +836,10 @@ def serve_prometheus(
                 self.wfile.write(payload)
 
         def log_message(self, format, *args):  # noqa: A002 - http.server API
+            """Silence the default per-request stderr logging.
+
+            :param format: log format string (ignored).
+            """
             return
 
     HTTPServer((bind, port), Handler).serve_forever()
@@ -711,7 +851,14 @@ def run_signalfx_loop(
         ingest_url: str,
         interval: float,
         timeout: float = 20.0) -> None:
-    """Push SignalFx datapoints forever at ``interval`` seconds."""
+    """Push SignalFx datapoints forever at ``interval`` seconds.
+
+    :param scrape_samples: callable returning the samples to push each cycle.
+    :param token: SignalFx ingest token.
+    :param ingest_url: full SignalFx datapoint endpoint.
+    :param interval: base seconds between pushes (jittered per cycle).
+    :param timeout: per-push request timeout in seconds.
+    """
     while True:
         start = time.monotonic()
         push_signalfx(to_signalfx_body(scrape_samples()), token, ingest_url, timeout=timeout)
@@ -720,12 +867,22 @@ def run_signalfx_loop(
 
 
 def _reading(field):
+    """Return the ``Reading`` of a mapping field, or the field itself.
+
+    :param field: a Redfish reading value or ``{"Reading": …}`` mapping.
+    :return: the scalar reading value.
+    """
     if isinstance(field, Mapping):
         return field.get("Reading")
     return field
 
 
 def _fan_readings(row: Mapping) -> list[tuple[str, float]]:
+    """Extract (name, RPM) pairs from a row's ``FanSpeedsPercent`` list.
+
+    :param row: an EnvironmentMetrics row that may carry fan-speed entries.
+    :return: list of (fan name, RPM) tuples with a numeric SpeedRPM.
+    """
     readings = []
     for fan in row.get("FanSpeedsPercent") or []:
         if not isinstance(fan, Mapping):
@@ -739,6 +896,11 @@ def _fan_readings(row: Mapping) -> list[tuple[str, float]]:
 
 
 def _as_float(value) -> Optional[float]:
+    """Coerce a Redfish value to a finite float, or None.
+
+    :param value: the value to convert (bool, number, or string).
+    :return: the float value, or None when it is missing or non-finite.
+    """
     if isinstance(value, bool):
         return 1.0 if value else 0.0
     if value is None:
@@ -756,6 +918,11 @@ def _as_float(value) -> Optional[float]:
 
 
 def _duration_seconds(value) -> Optional[float]:
+    """Convert a numeric value or ISO-8601 duration to seconds.
+
+    :param value: a number or ISO-8601 duration string (e.g. ``PT5M``).
+    :return: total seconds, or None when it cannot be parsed.
+    """
     parsed = _as_float(value)
     if parsed is not None:
         return parsed
@@ -778,6 +945,11 @@ def _duration_seconds(value) -> Optional[float]:
 
 
 def _leak_state_value(value) -> Optional[float]:
+    """Map a leak-detector state string to a gauge value.
+
+    :param value: the ``DetectorState`` string.
+    :return: 0.0 for a clear state, 1.0 for a leak, or None when empty.
+    """
     if value in (None, ""):
         return None
     state = re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
@@ -798,12 +970,26 @@ def _sample(metric: str,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None) -> MetricSample:
+    """Construct a MetricSample with stringified dimension values.
+
+    :param metric: metric name.
+    :param value: numeric sample value.
+    :param dims: dimension mapping.
+    :param unit: optional unit annotation.
+    :param timestamp: optional sample timestamp.
+    :return: the assembled MetricSample.
+    """
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
                         unit=unit, timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
+    """Build a dimension dict from identity plus non-empty extras.
+
+    :param identity: fixed join dimensions to seed the result.
+    :return: dimension mapping with the required dims plus any non-empty extras.
+    """
     dims = {key: str(identity.get(key, "unknown")) for key in REQUIRED_DIMENSIONS}
     for key, value in extra.items():
         if value not in (None, ""):
@@ -812,6 +998,11 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
 
 
 def _environment_chassis(row: Mapping) -> str:
+    """Resolve the chassis identifier for an EnvironmentMetrics row.
+
+    :param row: the EnvironmentMetrics row.
+    :return: the parent chassis id, falling back to Chassis/Id or ``unknown``.
+    """
     parent_type = row.get("ParentType")
     parent_id = row.get("ParentId")
     if parent_type == "Chassis" and parent_id:
@@ -822,6 +1013,13 @@ def _environment_chassis(row: Mapping) -> str:
 def _environment_dims(identity: Mapping[str, str],
                       row: Mapping,
                       chassis: str) -> dict[str, str]:
+    """Build environment-source dimensions for an EnvironmentMetrics row.
+
+    :param identity: fixed join dimensions to seed the result.
+    :param row: the EnvironmentMetrics row supplying parent type/id.
+    :param chassis: the resolved chassis identifier.
+    :return: dimension mapping including resource/processor/memory context.
+    """
     dims = _with_dims(identity, source="environment", chassis=chassis)
     parent_type = row.get("ParentType")
     parent_id = row.get("ParentId")
@@ -838,6 +1036,12 @@ def _environment_dims(identity: Mapping[str, str],
 
 
 def _environment_gpu(row: Mapping, chassis: str) -> Optional[str]:
+    """Resolve the GPU identifier owning an EnvironmentMetrics row, if any.
+
+    :param row: the EnvironmentMetrics row.
+    :param chassis: the resolved chassis identifier.
+    :return: the ``GPU_<n>`` identifier, or None when the row is not GPU-scoped.
+    """
     parent_type = row.get("ParentType")
     parent_id = str(row.get("ParentId") or "")
     if parent_type == "Processor" and parent_id.startswith("GPU_"):
@@ -854,6 +1058,15 @@ def _fabric_dims(identity: Mapping[str, str],
                  gpu,
                  port,
                  fabric: str) -> dict[str, str]:
+    """Build fabric-source dimensions for a link/port sample.
+
+    :param identity: fixed join dimensions to seed the result.
+    :param system: system identifier, if known.
+    :param gpu: GPU identifier, if known.
+    :param port: port identifier, if known.
+    :param fabric: fabric type label (e.g. ``nvlink`` or ``ib``).
+    :return: dimension mapping for the fabric sample.
+    """
     dims = _with_dims(identity, source="fabric", fabric=fabric)
     for key, value in (("system", system), ("gpu", gpu), ("port", port)):
         if value:
@@ -862,6 +1075,11 @@ def _fabric_dims(identity: Mapping[str, str],
 
 
 def _gpu_from_chassis(chassis: str) -> Optional[str]:
+    """Extract the GPU identifier embedded in a chassis name.
+
+    :param chassis: the chassis identifier.
+    :return: the ``GPU_<n>`` identifier, or None when none is present.
+    """
     parts = chassis.split("HGX_")
     if len(parts) == 2 and parts[1].startswith("GPU_"):
         return parts[1]
@@ -869,6 +1087,11 @@ def _gpu_from_chassis(chassis: str) -> Optional[str]:
 
 
 def _gpu_from_metric_info(info: Mapping[str, str]) -> Optional[str]:
+    """Resolve a GPU identifier from parsed MetricProperty fields.
+
+    :param info: parsed MetricProperty fields (gpu, memory, chassis, sensor, …).
+    :return: the ``GPU_<n>`` identifier, or None when none can be resolved.
+    """
     gpu = str(info.get("gpu") or "")
     if gpu.startswith("GPU_"):
         return gpu
@@ -885,11 +1108,21 @@ def _gpu_from_metric_info(info: Mapping[str, str]) -> Optional[str]:
 
 
 def _gpu_dim(chassis: str) -> dict[str, str]:
+    """Build a ``gpu`` dimension dict from a chassis name.
+
+    :param chassis: the chassis identifier.
+    :return: ``{"gpu": <id>}`` when a GPU is present, else an empty dict.
+    """
     gpu = _gpu_from_chassis(chassis)
     return {"gpu": gpu} if gpu else {}
 
 
 def _parse_metric_property(prop: str) -> dict[str, str]:
+    """Parse a Redfish MetricProperty URI into its addressing fields.
+
+    :param prop: the MetricProperty path (with optional ``#`` fragment).
+    :return: dict with the property name and any system/gpu/port/chassis/index/source context.
+    """
     path, _, fragment = prop.partition("#")
     parts = [part for part in path.strip("/").split("/") if part]
     frag = [p for p in fragment.strip("/").split("/") if p] if fragment else []
@@ -923,6 +1156,11 @@ def _parse_metric_property(prop: str) -> dict[str, str]:
 
 
 def _unit_for_metric(metric: str) -> Optional[str]:
+    """Infer a unit annotation from a metric name suffix.
+
+    :param metric: the metric name.
+    :return: ``By`` for byte metrics, ``Gbps`` for speed metrics, else None.
+    """
     if metric.endswith("_bytes"):
         return "By"
     if metric.endswith("_gbps") or metric.endswith("port_speed"):
@@ -934,6 +1172,9 @@ def _generic_metric_name(prop: str) -> str:
     """Vendor-neutral metric name for any MetricReport property not in the
     curated fabric map, so the full telemetry surface is exported rather than
     just fabric counters. e.g. ``FP16ActivityPercent`` -> ``hw.gb300.fp16_activity_percent``.
+
+    :param prop: the MetricReport property name.
+    :return: the vendor-neutral ``hw.gb300.*`` metric name.
     """
     snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", prop)
     snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
@@ -941,18 +1182,38 @@ def _generic_metric_name(prop: str) -> str:
 
 
 def _is_gpu_temperature(prop: str) -> bool:
+    """Whether a property name denotes a GPU temperature reading.
+
+    :param prop: the property name to test.
+    :return: True if the name refers to a temperature.
+    """
     lowered = prop.lower()
     return "temp" in lowered or "temperature" in lowered
 
 
 def _dim_value(value) -> str:
+    """Sanitize a value into a safe, bounded dimension string.
+
+    :param value: the raw dimension value.
+    :return: the cleaned value (invalid chars replaced), capped at 256 chars.
+    """
     cleaned = DIM_VALUE_OK.sub("_", str(value)).strip("_")
     return (cleaned or "unknown")[:256]
 
 
 def _escape_label_value(value) -> str:
+    """Escape a value for a Prometheus label (backslash, newline, quote).
+
+    :param value: the raw label value.
+    :return: the escaped label string.
+    """
     return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
 def _format_value(value: float) -> str:
+    """Format a float as a Prometheus sample value.
+
+    :param value: the numeric sample value.
+    :return: an integer string when whole, else the float repr.
+    """
     return str(int(value)) if float(value).is_integer() else repr(float(value))
