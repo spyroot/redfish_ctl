@@ -1,4 +1,4 @@
-"""iDRAC update compute settings
+"""Update compute system settings.
 
     redfish_ctl compute-update
 
@@ -23,7 +23,7 @@ class UpdateCompute(RedfishManagerBase,
                     name='update',
                     metaclass=Singleton):
     """
-    Update idrac compute
+    Update compute system settings
     """
 
     def __init__(self, *args, **kwargs):
