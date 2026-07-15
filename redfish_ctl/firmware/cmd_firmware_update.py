@@ -33,12 +33,16 @@ class FirmwareUpdate(RedfishManagerBase,
     """Flash firmware via a discovered UpdateService update endpoint."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the firmware-update command."""
         super(FirmwareUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``firmware-update`` subcommand and its safety flags."""
+        """Register the ``firmware-update`` subcommand and its safety flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--image_uri', required=False, dest='image_uri', type=str, default=None,
@@ -58,7 +62,12 @@ class FirmwareUpdate(RedfishManagerBase,
         return cmd_parser, "firmware-update", "command flash firmware via UpdateService (guarded)"
 
     def _update_service_uri(self, do_async):
-        """Resolve the UpdateService URI from the service root, with a fallback."""
+        """Resolve the UpdateService URI from the service root, with a fallback.
+
+        :param do_async: query the service root asynchronously.
+        :return: the UpdateService ``@odata.id``, or the default
+            ``{Version}/UpdateService`` when the root exposes no link.
+        """
         try:
             root = self.base_query(RedfishApi.Version, do_async=do_async).data or {}
         except Exception:
@@ -69,7 +78,11 @@ class FirmwareUpdate(RedfishManagerBase,
         return f"{RedfishApi.Version}/UpdateService"
 
     def _read_update_service(self, do_async):
-        """Return ``(uri, resource, error)`` for UpdateService discovery."""
+        """Return ``(uri, resource, error)`` for UpdateService discovery.
+
+        :param do_async: read the UpdateService asynchronously.
+        :return: tuple of (UpdateService URI, resource dict, error string or None).
+        """
         uri = self._update_service_uri(do_async)
         try:
             resource = self.base_query(uri, do_async=do_async).data or {}
@@ -78,7 +91,17 @@ class FirmwareUpdate(RedfishManagerBase,
         return uri, resource, None
 
     def _action_result(self, target, payload, actions, do_async, dry_run, confirm):
-        """Post the SimpleUpdate action with the same fail-safe response shape."""
+        """Post the SimpleUpdate action with the same fail-safe response shape.
+
+        :param target: the SimpleUpdate action target URI to POST to.
+        :param payload: the request body (ImageURI and optional TransferProtocol).
+        :param actions: discovered action metadata carried on the result.
+        :param do_async: POST the action asynchronously.
+        :param dry_run: when True, preview only and POST nothing.
+        :param confirm: required to run a destructive action; when False the
+            action is forced to a dry-run preview.
+        :return: CommandResult with a dry-run preview or the POST outcome.
+        """
         from ..actions.action_policy import Destructiveness, classify
 
         full = "#UpdateService.SimpleUpdate"
@@ -110,7 +133,12 @@ class FirmwareUpdate(RedfishManagerBase,
 
     @staticmethod
     def _push_target(update_service):
-        """Prefer MultipartHttpPushUri, then HttpPushUri, when present."""
+        """Prefer MultipartHttpPushUri, then HttpPushUri, when present.
+
+        :param update_service: the UpdateService resource dict to inspect.
+        :return: tuple of (push method name, push URI), or (None, None) when
+            neither push URI is present.
+        """
         for method in ("MultipartHttpPushUri", "HttpPushUri"):
             target = (update_service or {}).get(method)
             if isinstance(target, str) and target:
@@ -118,7 +146,14 @@ class FirmwareUpdate(RedfishManagerBase,
         return None, None
 
     def _post_image_file(self, target, method, image_path):
-        """Upload a local image file to the discovered push URI."""
+        """Upload a local image file to the discovered push URI.
+
+        :param target: the push URI path to upload to.
+        :param method: the push method (``MultipartHttpPushUri`` or
+            ``HttpPushUri``) selecting the upload encoding.
+        :param image_path: ``Path`` to the local firmware image to upload.
+        :return: the ``requests.Response`` from the upload POST.
+        """
         headers = {}
         auth = None
         if self.x_auth is not None:
@@ -153,7 +188,16 @@ class FirmwareUpdate(RedfishManagerBase,
             )
 
     def _push_result(self, target, method, image_file, dry_run, confirm):
-        """Preview or execute a push-URI firmware upload."""
+        """Preview or execute a push-URI firmware upload.
+
+        :param target: the push URI path to upload to.
+        :param method: the push method name being used.
+        :param image_file: path to the local firmware image file.
+        :param dry_run: when True, preview only and upload nothing.
+        :param confirm: when False, force a dry-run preview.
+        :return: CommandResult with a dry-run preview, the upload outcome, or an
+            error when the file is missing or the upload fails.
+        """
         data = {
             "method": method,
             "target": target,
@@ -205,6 +249,21 @@ class FirmwareUpdate(RedfishManagerBase,
 
         Returns a dry-run preview unless ``--confirm``; the destructiveness guard
         keeps firmware writes as previews by default.
+
+        :param image_uri: firmware image URI placed in the ImageURI payload for
+            SimpleUpdate.
+        :param image_file: local firmware image uploaded when the service exposes
+            a push URI instead of SimpleUpdate.
+        :param transfer_protocol: optional TransferProtocol added to the payload.
+        :param confirm: actually flash; without it the command stays a dry-run.
+        :param dry_run: force a dry-run preview even when confirm is set.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: run the UpdateService discovery and update request
+            asynchronously (subscribes to an event loop).
+        :return: CommandResult with a dry-run preview or the update outcome, or an
+            error when UpdateService is unreadable or exposes no update mechanism.
         """
         payload = {}
         if image_uri:
