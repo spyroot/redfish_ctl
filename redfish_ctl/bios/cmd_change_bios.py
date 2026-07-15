@@ -282,11 +282,11 @@ class BiosChangeSettings(RedfishManagerBase,
         :param attr_value:  attribute value or list of values
         :param attr_name: attribute name or list of values
         :param do_async: note async will subscribe to an event loop.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param from_spec: read bios changes from a spec file
         :param commit_pending:  this command will first commit all pending changes before do new change.
         :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :param start_time:
         :param start_date:
         :return: CommandResult and if filename provide will save to a file.

@@ -58,7 +58,7 @@ class VirtualMediaEject(RedfishManagerBase,
         :param do_strict: will raise exception if media already ejected.
                           mainly if caller need have special handler.
         :param device_id: virtual media device id. (1 or 2)
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: will not block and return result as future.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult

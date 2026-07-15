@@ -108,7 +108,7 @@ class BootOneShot(RedfishManagerBase,
         :param do_check:
         :param do_async: note async will subscribe to an event loop.
         :param verbose:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """

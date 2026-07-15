@@ -378,11 +378,11 @@ class SubscriptionCreate(_SubscriptionBase,
                 **kwargs) -> CommandResult:
         """Preview (dry-run) or create an EventDestination subscription.
 
-        :param filename: optional path to save the result payload to.
-        :param data_type: output serialization format (``json`` or ``yaml``).
-        :param verbose: emit extra diagnostics when True.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: issue the create over the async Redfish path when True.
-        :param do_expanded: request an expanded ($expand) response where supported.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
         :param destination: subscriber URL events are delivered to (required to create).
         :param protocol: the event protocol (default ``Redfish``).
         :param event_format_type: the delivered payload format, or None to omit.
@@ -460,11 +460,11 @@ class SubscriptionDelete(_SubscriptionBase,
                 **kwargs) -> CommandResult:
         """Preview (dry-run) or delete an EventDestination subscription.
 
-        :param filename: optional path to save the result payload to.
-        :param data_type: output serialization format (``json`` or ``yaml``).
-        :param verbose: emit extra diagnostics when True.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: issue the delete over the async Redfish path when True.
-        :param do_expanded: request an expanded ($expand) response where supported.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
         :param subscription: the subscription id or member URI to remove (required).
         :param confirm: actually delete; without it the command only previews.
         :return: a CommandResult with the delete outcome, or the dry-run preview.

@@ -170,11 +170,11 @@ class JobList(RedfishManagerBase,
         :param reboot_completed: retrieve completed jobs
         :param filter_scheduled: retrieve scheduled jobs
         :param filter_completed:  retrieve completed
-        :param do_async: make async request.
-        :param verbose: enable verbose
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param filename: accepted for CLI compatibility; not used by this command.
         :param data_type: json or xml
-        :param do_expanded: returns expanded result for API call
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
         :param job_type: filter on job_type
         :param job_ids: filter by job id only.
         :return: CommandResult and if filename provide will save to a file.

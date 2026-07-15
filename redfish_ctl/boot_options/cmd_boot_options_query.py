@@ -45,10 +45,10 @@ class BootOptionsQuery(RedfishManagerBase,
         """Query information for boot options.
 
         :param do_async: note async will subscribe to an event loop.
-        :param do_expanded: will issue expanded request.
-        :param verbose: enable verbose output.
-        :param data_type: json or xml
-         :param filename: if filename indicate call will save a bios setting to a file.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+         :param filename: if filename indicate call will save the response to this file.
         :return: CommandResult and if filename provide will save to a file.
         """
         target_api = f"{self.idrac_manage_servers}/BootOptions"

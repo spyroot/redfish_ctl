@@ -86,9 +86,9 @@ class BootOptionsList(RedfishManagerBase,
         "/redfish/v1/Systems/System.Embedded.1/BootOptions/Optical.vFlash.ISOIMG-1"
         ]
 
-        :param do_async:
-        :param verbose:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param filename: accepted for CLI compatibility; not used by this command.
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """

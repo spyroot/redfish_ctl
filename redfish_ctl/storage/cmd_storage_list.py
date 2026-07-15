@@ -49,9 +49,9 @@ class StorageListView(RedfishManagerBase,
         """Queries for storage controller list.
         :param do_expanded:
         :param do_async: will not block and return result as future.
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:  json, xml etc.
-        :param verbose: enables verbose output
+        :param filename: if filename indicate call will save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse
         """

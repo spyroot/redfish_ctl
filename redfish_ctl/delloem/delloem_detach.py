@@ -43,8 +43,8 @@ class DellOemDetach(
                 **kwargs) -> CommandResult:
         """Executes dell oem detach cmd
         :param do_async: note async will subscribe to an event loop.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult
         """
         cmd_result = self.sync_invoke(

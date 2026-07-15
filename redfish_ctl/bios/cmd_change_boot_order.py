@@ -124,7 +124,7 @@ class ChangeBootOrder(
         :param boot_order:
         :param filename:
         :param do_async:
-        :param data_type:
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :param kwargs:
         :return: return cmd result
         :raise FailedDiscoverAction

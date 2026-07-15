@@ -145,7 +145,7 @@ class VirtualMediaInsert(RedfishManagerBase,
         :param remote_username:  username for remote authentication
         :param remote_password:  password for remote authentication
         :param uri_path: URI path to image file.
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: will not block and return result as future.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult

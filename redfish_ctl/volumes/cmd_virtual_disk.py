@@ -72,10 +72,10 @@ class VirtualDiskQuery(
                 **kwargs) -> CommandResult:
         """Queries volumes from given controlled from iDRAC.
         :param device_id: a storage controller id, NonRAID.Slot.6-1
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_deep: do deep recursive fetch
-        :param do_async: will not block and return result as future.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse

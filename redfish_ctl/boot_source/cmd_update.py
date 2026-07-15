@@ -136,9 +136,9 @@ class BootSourceUpdate(RedfishManagerBase,
         :param do_reboot: will reboot a host.
         :param data_filter: filter applied to find specific device.
         :param do_async: note async will subscribe to an event loop.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: accepted for CLI compatibility; not used by this command.
         :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         target_api = f"{self.idrac_manage_servers}/Oem/Dell/DellBootSources/Settings"

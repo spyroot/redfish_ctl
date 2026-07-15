@@ -95,9 +95,9 @@ class StorageView(RedfishManagerBase,
         :param data_filter:
         :param do_expanded:
         :param controller: if empty cmd will return list of controllers.
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: will not block and return result as future.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse

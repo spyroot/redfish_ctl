@@ -61,9 +61,9 @@ class RaidServiceQuery(RedfishManagerBase,
         of Command Result. The discovered named tuple store action
         and respected rest APIs.
 
-        :param do_async:
-        :param verbose:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type:
         :return: return raid service
         """

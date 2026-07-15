@@ -79,7 +79,7 @@ class EnableBootOptions(RedfishManagerBase,
         :param do_async: will do async call
         :param verbose: enables verbose output.
         :param data_type: json or xml
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :return: CommandResult and if filename provide will save to a file.
         """
         if verbose:

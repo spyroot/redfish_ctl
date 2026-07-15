@@ -45,8 +45,8 @@ class DellOemDisconnect(RedfishManagerBase,
         """Executes dell oem disconnect, detach network iso.
 
         :param do_async:note async will subscribe to an event loop.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         cmd_result = self.sync_invoke(ApiRequestType.DellOemActions, "dell_oem_actions")
