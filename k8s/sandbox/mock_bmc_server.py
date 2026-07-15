@@ -22,6 +22,7 @@ DEFAULT_PORT = 8080
 DEFAULT_CORPUS_DIR = Path(
     os.environ.get("MOCK_BMC_CORPUS_DIR", "/corpus/gb300")
 )
+REST_API_STATUS_MAP_JSON = "rest_api_map.status.json"
 
 
 class MockBMCServer(ThreadingHTTPServer):
@@ -40,14 +41,20 @@ def _build_fixture_index(corpus_dir: Path) -> dict[str, Path]:
 
 
 def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
-    """Load the optional ``rest_api_map.npy`` URL/status/error mapping.
+    """Load the optional Redfish URL/status/error mapping.
 
-    :param corpus_dir: directory that may contain ``rest_api_map.npy``.
+    :param corpus_dir: directory that may contain a status JSON sidecar or
+        legacy ``rest_api_map.npy``.
     :return: the decoded map, or an empty dict when the file is absent.
-    :raises ValueError: if NumPy is missing, the file fails to load, or it
-        does not decode to an object.
+    :raises ValueError: if the map fails to load or does not decode to an
+        object.
     """
-    map_path = Path(corpus_dir) / "rest_api_map.npy"
+    corpus_path = Path(corpus_dir)
+    sidecar_path = corpus_path / REST_API_STATUS_MAP_JSON
+    if sidecar_path.exists():
+        return _load_rest_api_map_json(sidecar_path)
+
+    map_path = corpus_path / "rest_api_map.npy"
     if not map_path.exists():
         return {}
     try:
@@ -62,6 +69,25 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
         raise ValueError(f"failed to load Redfish API map: {map_path}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"Redfish API map must contain an object: {map_path}")
+    _validate_rest_api_map(data, map_path)
+    return data
+
+
+def _load_rest_api_map_json(map_path: Path) -> dict[str, Any]:
+    """Load a JSON Redfish API status/error map sidecar.
+
+    :param map_path: sidecar file path to read and validate.
+    :return: decoded and validated Redfish API map data.
+    """
+    try:
+        data = json.loads(map_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"failed to load Redfish API map: {map_path}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"Redfish API map must contain an object: {map_path}")
+    for key in ("http_status_mapping", "error_file_mapping"):
+        if key not in data:
+            raise ValueError(f"{key} is required in Redfish API map: {map_path}")
     _validate_rest_api_map(data, map_path)
     return data
 
