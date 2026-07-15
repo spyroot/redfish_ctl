@@ -24,18 +24,26 @@ class Sensors(RedfishManagerBase,
     """Read every Chassis sensor reading (temperature, power, fan, voltage…)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the sensors command."""
         super(Sensors, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``sensors`` subcommand (read-only, no flags needed)."""
+        """Register the ``sensors`` subcommand (read-only, no flags needed).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return cmd_parser, "sensors", "command read all chassis sensor readings"
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (or any value; non-dicts yield []).
+        :return: list of member ``@odata.id`` strings.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -53,6 +61,15 @@ class Sensors(RedfishManagerBase,
         Tolerant of a chassis without a Sensors link or an unreachable
         collection (skips it). An ``$expand``'d Sensors member already carries
         its Reading; otherwise each member is fetched individually.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the underlying queries on the async event loop when True.
+        :param do_expanded: force an expanded ($expand) Sensors query and skip the
+            per-member fallback.
+        :return: CommandResult whose data is a list of sensor rows
+            {Chassis, Name, Reading, ReadingUnits, ReadingType, Health}.
         """
         readings = []
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
