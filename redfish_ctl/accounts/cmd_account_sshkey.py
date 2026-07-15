@@ -33,7 +33,13 @@ MAX_SSH_KEY_BYTES = 1366
 
 
 def validate_ssh_key(key: str) -> Optional[str]:
-    """Return an error string if ``key`` is not an iLO-acceptable SSH pubkey, else None."""
+    """Return an error string if ``key`` is not an iLO-acceptable SSH pubkey, else None.
+
+    :param key: candidate OpenSSH public key string (e.g. ``ssh-rsa AAAA...``).
+    :return: a human-readable error message when the key is empty, not an
+        OpenSSH public key, a DSA key, or over the iLO size limit; None when
+        the key passes every check.
+    """
     key = (key or "").strip()
     if not key:
         return "empty SSH key"
@@ -55,11 +61,13 @@ class AccountImportSSHKey(_AccountBase,
     """PATCH an account's Oem.Hpe.SSHKeys to authorize (or clear) an SSH key."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the account-import-sshkey command."""
         super(AccountImportSSHKey, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the ``account-import-sshkey`` subcommand and its flags."""
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None)
@@ -76,6 +84,21 @@ class AccountImportSSHKey(_AccountBase,
 
     def execute(self, acct_user=None, acct_id=None, ssh_key=None, ssh_key_file=None,
                 ssh_remove=False, acct_confirm=False, **kwargs) -> CommandResult:
+        """Authorize or clear an account's SSH public key (HPE OEM, guarded).
+
+        :param acct_user: UserName of the target account (or use acct_id).
+        :param acct_id: account Id of the target instead of matching by username.
+        :param ssh_key: the SSH public key string to authorize.
+        :param ssh_key_file: path to a ``.pub`` file to read the key from when
+            ``ssh_key`` is not given.
+        :param ssh_remove: when True, clear the account's authorized keys
+            instead of importing one.
+        :param acct_confirm: when False (default) return a dry-run preview;
+            when True PATCH ``Oem.Hpe.SSHKeys`` on the account.
+        :return: CommandResult with the dry-run preview or write result; an
+            error when no target/key is given, the key is invalid, the account
+            is not found, or the account is not an HPE (Oem.Hpe) account.
+        """
         if not acct_user and not acct_id:
             return CommandResult(None, None, None, "provide --username or --id")
 

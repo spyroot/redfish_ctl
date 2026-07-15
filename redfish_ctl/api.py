@@ -115,6 +115,45 @@ class GpuMetricsStatus:
 
 
 @dataclass(frozen=True)
+class NetworkAdapterInfo:
+    """A physical NIC/DPU card from Chassis/*/NetworkAdapters."""
+
+    chassis: str | None
+    id: str | None
+    model: str | None
+    manufacturer: str | None
+    device_class: str | None
+    part_number: str | None
+    serial_number: str | None
+    health: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NicFirmwareInfo:
+    """A network-adapter firmware component from UpdateService/FirmwareInventory."""
+
+    id: str | None
+    name: str | None
+    version: str | None
+    updateable: bool | None
+    manufacturer: str | None
+    device_class: str | None
+    uri: str | None
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class NetworkFirmwareStatus:
+    """Typed NIC/DPU adapter + firmware report from the nic-firmware command."""
+
+    summary: Mapping[str, Any]
+    adapters: tuple[NetworkAdapterInfo, ...]
+    firmware: tuple[NicFirmwareInfo, ...]
+    raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
 class NtpTarget:
     """A ManagerNetworkProtocol resource that can receive an NTP PATCH."""
 
@@ -378,6 +417,49 @@ def get_gpu_metrics(manager: SyncInvoker) -> GpuMetricsStatus:
     return GpuMetricsStatus(
         summary=_mapping(data.get("summary")),
         gpus=gpu_rows,
+        raw=data,
+    )
+
+
+def get_network_firmware(manager: SyncInvoker) -> NetworkFirmwareStatus:
+    """Return typed NIC/DPU adapter + firmware report through the nic-firmware command.
+
+    Read-only. Surfaces every network adapter (ConnectX NICs, BlueField DPUs) and
+    the firmware version of each network component, plus a summary whose
+    ``distinct_versions`` is the fleet firmware-drift signal.
+    """
+    data = _mapping(_invoke(manager, ApiRequestType.NicFirmware, "nic-firmware"))
+    adapters = tuple(
+        NetworkAdapterInfo(
+            chassis=row.get("Chassis"),
+            id=row.get("Id"),
+            model=row.get("Model"),
+            manufacturer=row.get("Manufacturer"),
+            device_class=row.get("DeviceClass"),
+            part_number=row.get("PartNumber"),
+            serial_number=row.get("SerialNumber"),
+            health=row.get("Health"),
+            raw=row,
+        )
+        for row in _rows(data.get("adapters"))
+    )
+    firmware = tuple(
+        NicFirmwareInfo(
+            id=row.get("Id"),
+            name=row.get("Name"),
+            version=row.get("Version"),
+            updateable=row.get("Updateable"),
+            manufacturer=row.get("Manufacturer"),
+            device_class=row.get("DeviceClass"),
+            uri=row.get("Uri"),
+            raw=row,
+        )
+        for row in _rows(data.get("firmware"))
+    )
+    return NetworkFirmwareStatus(
+        summary=_mapping(data.get("summary")),
+        adapters=adapters,
+        firmware=firmware,
         raw=data,
     )
 

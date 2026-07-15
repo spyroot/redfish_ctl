@@ -1,5 +1,6 @@
 """Dual-mode tests for EventDestination subscription lifecycle commands."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -7,15 +8,21 @@ import textwrap
 from pathlib import Path
 
 import pytest
+import requests
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.events.cmd_subscription_lifecycle import (
+    SubscriptionCreate,
+    SubscriptionDelete,
+)
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
-from redfish_ctl.redfish_manager import CommandResult
 
 SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"
 SUBSCRIPTION_ONE_PATH = f"{SUBSCRIPTIONS_PATH}/1"
 DESTINATION = "https://listener.example.com/redfish/events"
+CREATED_SUBSCRIPTION_PATH = f"{SUBSCRIPTIONS_PATH}/created"
 
 
 def _request_type(name):
@@ -44,6 +51,52 @@ def _seed_subscription(service):
         "Destination": DESTINATION,
         "Protocol": "Redfish",
     }
+
+
+def _error_payload(status_code):
+    return {
+        "error": {
+            "code": f"Base.1.12.Status{status_code}",
+            "message": f"subscription mutation failed with {status_code}",
+        }
+    }
+
+
+def _response(status_code, body="{}", headers=None):
+    response = requests.Response()
+    response.status_code = status_code
+    response._content = body.encode("utf-8")
+    for key, value in (headers or {}).items():
+        response.headers[key] = value
+    return response
+
+
+def _replace_post_response(service, status_code, headers=None):
+    requests_mock = pytest.importorskip("requests_mock")
+
+    def post_cb(request, context):
+        service.requests.append(request)
+        context.status_code = status_code
+        for key, value in (headers or {}).items():
+            context.headers[key] = value
+        if status_code >= 400:
+            return json.dumps(_error_payload(status_code))
+        return "{}"
+
+    service.mocker.post(requests_mock.ANY, text=post_cb)
+
+
+def _replace_delete_response(service, status_code):
+    requests_mock = pytest.importorskip("requests_mock")
+
+    def delete_cb(request, context):
+        service.requests.append(request)
+        context.status_code = status_code
+        if status_code >= 400:
+            return json.dumps(_error_payload(status_code))
+        return ""
+
+    service.mocker.delete(requests_mock.ANY, text=delete_cb)
 
 
 def test_subscription_create_dry_run_builds_payload_without_post(
@@ -109,6 +162,124 @@ def test_subscription_create_confirm_posts_event_destination_payload(
         "RegistryPrefixes": ["Base", "TaskEvent"],
         "ResourceTypes": ["Task"],
     }
+
+
+def test_subscription_create_confirm_returns_created_location(
+    redfish_mock_factory,
+):
+    """subscription-create reports the 201 Location of the new EventDestination."""
+    manager, service = redfish_mock_factory("supermicro")
+    _replace_post_response(
+        service,
+        201,
+        headers={"Location": CREATED_SUBSCRIPTION_PATH},
+    )
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionCreate"),
+        "subscription-create",
+        destination=DESTINATION,
+        confirm=True,
+    )
+
+    posts = [request for request in service.requests if request.method == "POST"]
+    assert result.error is None
+    assert result.data["action"] == "create"
+    assert result.data["target"] == SUBSCRIPTIONS_PATH
+    assert result.data["status"] == "RedfishApiRespond.Created"
+    assert result.data["status_code"] == 201
+    assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
+    assert len(posts) == 1
+    assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
+
+
+def test_subscription_create_confirm_async_returns_created_location(
+    redfish_mock_factory,
+):
+    """subscription-create --async preserves the EventDestination Location."""
+    manager, service = redfish_mock_factory("supermicro")
+    _replace_post_response(
+        service,
+        201,
+        headers={"Location": CREATED_SUBSCRIPTION_PATH},
+    )
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionCreate"),
+        "subscription-create",
+        destination=DESTINATION,
+        confirm=True,
+        do_async=True,
+    )
+
+    posts = [request for request in service.requests if request.method == "POST"]
+    assert result.error is None
+    assert result.data["action"] == "create"
+    assert result.data["target"] == SUBSCRIPTIONS_PATH
+    assert result.data["status"] == "RedfishApiRespond.Created"
+    assert result.data["status_code"] == 201
+    assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
+    assert len(posts) == 1
+    assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
+
+
+def test_subscription_create_async_accepts_direct_response_from_transport(
+    redfish_mock_factory,
+    monkeypatch,
+):
+    """subscription-create --async handles transports that return a response."""
+    manager, _service = redfish_mock_factory("supermicro")
+
+    async def post_response(self, loop, req, payload, hdr):
+        return _response(
+            201,
+            headers={"Location": CREATED_SUBSCRIPTION_PATH},
+        )
+
+    monkeypatch.setattr(
+        SubscriptionCreate,
+        "api_async_post_call",
+        post_response,
+    )
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionCreate"),
+        "subscription-create",
+        destination=DESTINATION,
+        confirm=True,
+        do_async=True,
+    )
+
+    assert result.error is None
+    assert result.data["status"] == "RedfishApiRespond.Created"
+    assert result.data["status_code"] == 201
+    assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
+
+
+@pytest.mark.parametrize("status_code", [400, 404, 409])
+def test_subscription_create_confirm_reports_http_error_without_success(
+    redfish_mock_factory,
+    status_code,
+):
+    """subscription-create surfaces 4xx Redfish errors as command errors."""
+    manager, service = redfish_mock_factory("supermicro")
+    _replace_post_response(service, status_code)
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionCreate"),
+        "subscription-create",
+        destination=DESTINATION,
+        confirm=True,
+    )
+
+    posts = [request for request in service.requests if request.method == "POST"]
+    assert len(posts) == 1
+    assert result.error
+    assert result.data["action"] == "create"
+    assert result.data["target"] == SUBSCRIPTIONS_PATH
+    assert result.data["status"] == "RedfishApiRespond.Error"
+    assert result.data["status_code"] == status_code
+    assert result.data["location"] is None
 
 
 def test_subscription_create_splits_comma_separated_filters(
@@ -185,6 +356,92 @@ def test_subscription_delete_confirm_deletes_resolved_member(
     assert result.data["status"] == "RedfishApiRespond.Ok"
     assert len(deletes) == 1
     assert deletes[0].path.lower() == SUBSCRIPTION_ONE_PATH.lower()
+
+
+def test_subscription_delete_confirm_async_reports_http_error_without_success(
+    redfish_mock_factory,
+):
+    """subscription-delete --async surfaces Redfish errors as command errors."""
+    manager, service = redfish_mock_factory("supermicro")
+    _seed_subscription(service)
+    _replace_delete_response(service, 409)
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionDelete"),
+        "subscription-delete",
+        subscription=SUBSCRIPTION_ONE_PATH,
+        confirm=True,
+        do_async=True,
+    )
+
+    deletes = [request for request in service.requests if request.method == "DELETE"]
+    assert len(deletes) == 1
+    assert deletes[0].path.lower() == SUBSCRIPTION_ONE_PATH.lower()
+    assert result.error
+    assert result.data["action"] == "delete"
+    assert result.data["target"] == SUBSCRIPTION_ONE_PATH
+    assert result.data["status"] == "RedfishApiRespond.Error"
+    assert result.data["status_code"] == 409
+
+
+def test_subscription_delete_async_accepts_direct_response_from_transport(
+    redfish_mock_factory,
+    monkeypatch,
+):
+    """subscription-delete --async handles transports that return a response."""
+    manager, service = redfish_mock_factory("supermicro")
+    _seed_subscription(service)
+
+    async def delete_response(self, loop, req, payload, hdr):
+        return _response(
+            409,
+            body=json.dumps(_error_payload(409)),
+        )
+
+    monkeypatch.setattr(
+        SubscriptionDelete,
+        "api_async_delete_call",
+        delete_response,
+    )
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionDelete"),
+        "subscription-delete",
+        subscription=SUBSCRIPTION_ONE_PATH,
+        confirm=True,
+        do_async=True,
+    )
+
+    assert result.error
+    assert result.data["status"] == "RedfishApiRespond.Error"
+    assert result.data["status_code"] == 409
+
+
+@pytest.mark.parametrize("status_code", [400, 404, 409])
+def test_subscription_delete_confirm_reports_http_error_without_success(
+    redfish_mock_factory,
+    status_code,
+):
+    """subscription-delete surfaces 4xx Redfish errors as command errors."""
+    manager, service = redfish_mock_factory("supermicro")
+    _seed_subscription(service)
+    _replace_delete_response(service, status_code)
+
+    result = manager.sync_invoke(
+        _request_type("SubscriptionDelete"),
+        "subscription-delete",
+        subscription=SUBSCRIPTION_ONE_PATH,
+        confirm=True,
+    )
+
+    deletes = [request for request in service.requests if request.method == "DELETE"]
+    assert len(deletes) == 1
+    assert deletes[0].path.lower() == SUBSCRIPTION_ONE_PATH.lower()
+    assert result.error
+    assert result.data["action"] == "delete"
+    assert result.data["target"] == SUBSCRIPTION_ONE_PATH
+    assert result.data["status"] == "RedfishApiRespond.Error"
+    assert result.data["status_code"] == status_code
 
 
 def test_subscription_delete_rejects_collection_uri_without_delete(

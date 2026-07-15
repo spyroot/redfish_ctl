@@ -1,0 +1,53 @@
+# Defense-in-depth egress/ingress restriction for the redfish_ctl explorer.
+#
+# The explorer is a higher-trust tier than the fleet-status consumer: it holds a
+# BMC Secret (mock-bmc-credentials, referenced by k8s/explorer/deployment.yaml) and
+# connects to that one BMC directly. This NetworkPolicy records that boundary — the
+# explorer should only reach DNS and its target BMC, and only serve HTTP in-cluster.
+#
+# The BMC endpoint IP varies per deployment, so this sandbox manifest allows the
+# common BMC ports (443/80) rather than pinning a CIDR; on a real cluster set the
+# egress `to:` below to the target node's BMC IP/CIDR to make the block hard.
+#
+# NOTE: enforcement requires a NetworkPolicy-capable CNI (Calico, Cilium, ...).
+# kind's default kindnet does NOT enforce NetworkPolicy, so in the local sandbox
+# this manifest documents intent; on a real cluster it is enforced. Operator access
+# is via `kubectl port-forward`, which is gated by RBAC and bypasses NetworkPolicy,
+# so restricting ingress to the HTTP port does not block the documented workflow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redfish-ctl-explorer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-ctl-explorer
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redfish-ctl-explorer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Serve the explorer UI/API to in-cluster clients on the HTTP port only.
+    - ports:
+        - protocol: TCP
+          port: 8299
+  egress:
+    # DNS resolution.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Target BMC (Redfish over HTTPS, or HTTP for the in-cluster mock). The BMC
+    # address varies per deployment, so this sandbox manifest allows 443/80 egress
+    # rather than pinning a CIDR; on a real cluster tighten `to:` to the BMC IP/CIDR.
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

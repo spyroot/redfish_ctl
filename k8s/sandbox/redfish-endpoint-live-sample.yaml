@@ -1,0 +1,37 @@
+# Sample: point the read-only controller at a REAL BMC (not the in-cluster mock).
+#
+# The controller polls this endpoint read-only (system + sensors + thermal +
+# NIC/DPU firmware) and writes the result to .status; it never issues a write to
+# the BMC. A full poll of a large chassis (e.g. a GB300 with dozens of chassis
+# and hundreds of sensors) can take a minute or more — the endpoint shows as
+# Pending until the first walk finishes, then flips to a populated status.
+#
+# 1) Create the credential Secret (never commit real credentials). Replace the
+#    literals; the address below uses the RFC 5737 documentation range:
+#
+#      kubectl -n redfish-sandbox create secret generic bmc-credentials \
+#        --from-literal=username=root \
+#        --from-literal=password='<bmc-password>'
+#
+# 2) Set spec.address to the BMC. Use https://<host> for a TLS BMC (self-signed
+#    is fine with insecure: true), or http://<host> with port 80 for a plain
+#    endpoint. The controller pod must be able to route to that address — in a
+#    kind-on-Docker setup a pod inherits the Docker VM's routes, so a BMC that a
+#    `docker run curl` can reach is reachable from the controller too.
+#
+# 3) kubectl apply -f this file, then watch:  kubectl -n redfish-sandbox get rfe
+apiVersion: redfish.ctl.dev/v1alpha1
+kind: RedfishEndpoint
+metadata:
+  name: lab-bmc-01
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/component: redfish-sandbox
+    redfish.ctl.dev/target: live-lab-bmc
+spec:
+  address: https://203.0.113.10
+  port: 443
+  insecure: true
+  pollInterval: 30s
+  secretRef:
+    name: bmc-credentials

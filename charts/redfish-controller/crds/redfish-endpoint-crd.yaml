@@ -25,6 +25,9 @@ spec:
         - name: HEALTH
           type: string
           jsonPath: .status.health
+        - name: NIC-FW
+          type: integer
+          jsonPath: .status.networkFirmware.firmwareCount
         - name: POLLED
           type: date
           jsonPath: .status.lastPolled
@@ -97,6 +100,83 @@ spec:
                     maxCelsius:
                       type: number
                       nullable: true
+                networkFirmware:
+                  type: object
+                  description: >-
+                    NIC/DPU network-adapter firmware inventory, populated from
+                    the BMC's NetworkAdapters and UpdateService/FirmwareInventory.
+                  properties:
+                    adapterCount:
+                      type: integer
+                      minimum: 0
+                    nicCount:
+                      type: integer
+                      minimum: 0
+                    dpuCount:
+                      type: integer
+                      minimum: 0
+                    firmwareCount:
+                      type: integer
+                      minimum: 0
+                    updateableCount:
+                      type: integer
+                      minimum: 0
+                    distinctVersions:
+                      type: array
+                      items:
+                        type: string
+                    components:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            nullable: true
+                          deviceClass:
+                            type: string
+                            nullable: true
+                          version:
+                            type: string
+                            nullable: true
+                          updateable:
+                            type: boolean
+                            nullable: true
                 lastPolled:
                   type: string
                   format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                      - reason
+                      - lastTransitionTime
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                consecutiveFailures:
+                  type: integer
+                  minimum: 0
+                lastError:
+                  type: string
+                  nullable: true
+                nextPollAfter:
+                  type: string
+                  format: date-time
+                  nullable: true

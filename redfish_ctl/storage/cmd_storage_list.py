@@ -23,6 +23,7 @@ class StorageListView(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the storage_list command."""
         super(StorageListView, self).__init__(*args, **kwargs)
 
     @staticmethod

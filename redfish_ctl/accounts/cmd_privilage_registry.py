@@ -18,6 +18,7 @@ class QueryPrivilegeRegistry(RedfishManagerBase,
     """A command query iDRAC resource based on a resource path.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the query_privilege_registry command."""
         super(QueryPrivilegeRegistry, self).__init__(*args, **kwargs)
         # maps from cli choice to a key in respond
 

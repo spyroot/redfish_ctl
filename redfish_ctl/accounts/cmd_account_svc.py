@@ -20,6 +20,7 @@ class QueryAccountService(RedfishManagerBase,
     """A command query iDRAC account services based on a resource path.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the command and its CLI-filter-to-response-key map."""
         super(QueryAccountService, self).__init__(*args, **kwargs)
         # maps from cli choice to a key in respond
         self._json_filter_dict = {

@@ -49,6 +49,17 @@ rack7-node3   On      OK       2026-07-11T02:10:41Z
 A node that loses power or cooling shows up here without anyone SSH-ing
 anywhere — the read path is the fleet's heartbeat.
 
+`spec.pollInterval` sets each endpoint's cadence. The controller's kopf timer
+fires at a base cadence — 30s by default, retunable per deployment via the
+`REDFISH_CONTROLLER_POLL_INTERVAL` env var (the Helm chart renders it from
+`controller.pollInterval`) — and each endpoint polls no more often than that
+base; a larger `pollInterval` slows an individual endpoint down. When a BMC is unreachable the poll does not fail the
+object: the controller records an `EndpointReachable=False` condition plus a
+`lastError` and backs off (`nextPollAfter`) with exponential growth, while the
+last good `powerState`/`health`/`temperature` and `lastPolled` are preserved.
+Editing the spec (e.g. fixing a bad `address`) re-polls immediately rather than
+waiting out the interval or backoff.
+
 ## Scenario: stream telemetry to the collector
 
 For dashboards and alerting, status snapshots are not enough — run one

@@ -1,0 +1,48 @@
+# Defense-in-depth egress restriction for the fleet-status consumer.
+#
+# The consumer only needs to reach the Kubernetes API server (to read
+# RedfishEndpoint status) and DNS. It must never open a connection to a BMC.
+# RBAC already denies it Secret/BMC-credential access; this NetworkPolicy records
+# that boundary. On real clusters, set `to:` below to the API-server endpoint/CIDR
+# to make the egress block hard for BMC addresses.
+#
+# NOTE: enforcement requires a NetworkPolicy-capable CNI (Calico, Cilium, ...).
+# kind's default kindnet does NOT enforce NetworkPolicy, so in the local sandbox
+# this manifest documents intent; on a real cluster it is enforced.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redfish-fleet-consumer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-fleet-consumer
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redfish-fleet-consumer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow dashboard/API/metrics traffic to the HTTP port from anywhere in-cluster.
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS resolution.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API server (default HTTPS). The apiserver endpoint IP varies by
+    # cluster, so this local sandbox manifest allows 443/6443 egress rather than
+    # pinning a CIDR; on a real cluster tighten `to:` to the apiserver endpoint/CIDR.
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
