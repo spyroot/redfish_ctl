@@ -1,4 +1,10 @@
-"""Read Redfish LeakDetection and LeakDetector resources."""
+"""Read Redfish LeakDetection and LeakDetector resources.
+
+    redfish_ctl leak-detectors
+
+Walks every Chassis ThermalSubsystem LeakDetection subsystem and reports
+its detector state plus any linked leak policies.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -15,18 +21,27 @@ class LeakDetectors(RedfishManagerBase,
     """Read chassis leak detection state and linked leak policies."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the leak-detectors command."""
         super(LeakDetectors, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``leak-detectors`` subcommand."""
+        """Register the read-only ``leak-detectors`` subcommand.
+
+        :return: a tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read chassis LeakDetection detector state"
         return cmd_parser, "leak-detectors", help_text
 
     @staticmethod
     def _members(data):
+        """Collect the ``@odata.id`` links from a Redfish collection payload.
+
+        :param data: a decoded Redfish collection resource.
+        :return: the member URIs, or an empty list when ``data`` is not a dict.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -38,6 +53,12 @@ class LeakDetectors(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Extract the ``@odata.id`` of a linked resource stored under ``key``.
+
+        :param data: the resource dict that holds the link.
+        :param key: the property name whose ``@odata.id`` is wanted.
+        :return: the linked URI string, or None when absent.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -45,6 +66,12 @@ class LeakDetectors(RedfishManagerBase,
 
     @staticmethod
     def _nested_link(data, *keys):
+        """Follow a chain of nested keys to a linked resource ``@odata.id``.
+
+        :param data: the top-level resource dict.
+        :param keys: successive property names to descend through.
+        :return: the linked URI string, or None when any level is missing.
+        """
         value = data
         for key in keys:
             if not isinstance(value, dict):
@@ -56,20 +83,46 @@ class LeakDetectors(RedfishManagerBase,
 
     @staticmethod
     def _status(data):
+        """Return the ``Status`` sub-object of a resource.
+
+        :param data: a decoded Redfish resource.
+        :return: the ``Status`` dict, or an empty dict when missing.
+        """
         status = data.get("Status") if isinstance(data, dict) else None
         return status if isinstance(status, dict) else {}
 
     @staticmethod
     def _chassis_id(chassis_uri):
+        """Derive the chassis identifier from a chassis URI.
+
+        :param chassis_uri: a Chassis resource URI.
+        :return: the trailing path segment (the chassis id).
+        """
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI and return its payload, swallowing any error.
+
+        :param uri: the Redfish resource URI to fetch.
+        :param do_async: when True, run the query on an asyncio event loop.
+        :return: the decoded payload dict, or an empty dict on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _read_detectors(self, chassis_id, detectors_uri, do_async=False):
+        """Read a LeakDetectors collection into per-detector summary rows.
+
+        :param chassis_id: the owning chassis identifier.
+        :param detectors_uri: the LeakDetectors collection URI.
+        :param do_async: when True, run the queries on an asyncio event loop.
+        :return: a (collection, rows) tuple — ``collection`` is a summary dict
+            of the LeakDetectors resource (chassis id and members) and ``rows``
+            the per-detector summary list; ``collection`` is None only in the
+            defensive case where the fetch does not yield a dict.
+        """
         data = self._query_optional(detectors_uri, do_async=do_async)
         if not isinstance(data, dict):
             return None, []
@@ -110,6 +163,14 @@ class LeakDetectors(RedfishManagerBase,
 
     @staticmethod
     def _is_leak_policy(policy):
+        """Heuristically decide whether a policy targets leak detection.
+
+        Matches on ``leak`` appearing in the policy id, name, or ``@odata.type``,
+        or in any policy condition ``Property``.
+
+        :param policy: a decoded policy resource.
+        :return: True when the policy looks leak-related, else False.
+        """
         if not isinstance(policy, dict):
             return False
         values = [
@@ -132,6 +193,13 @@ class LeakDetectors(RedfishManagerBase,
         return False
 
     def _read_policies(self, chassis_id, policies_uri, do_async=False):
+        """Read a policy collection and keep the leak-related policies.
+
+        :param chassis_id: the owning chassis identifier.
+        :param policies_uri: the policy collection URI.
+        :param do_async: when True, run the queries on an asyncio event loop.
+        :return: a list of leak-policy summary rows (empty when none match).
+        """
         data = self._query_optional(policies_uri, do_async=do_async)
         if not isinstance(data, dict):
             return []
@@ -165,6 +233,12 @@ class LeakDetectors(RedfishManagerBase,
 
     @staticmethod
     def _summary(chassis_count, data):
+        """Tally chassis, subsystem, detector, and policy counts for the result.
+
+        :param chassis_count: number of chassis inspected.
+        :param data: the accumulated result dict being summarized.
+        :return: a summary dict of counts, including detector state tallies.
+        """
         states = [
             row.get("DetectorState")
             for row in data["detectors"]
@@ -197,6 +271,18 @@ class LeakDetectors(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Aggregate every chassis LeakDetection subsystem and leak policies.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, run the Redfish queries on an asyncio event
+            loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this
+            command.
+        :return: a CommandResult wrapping the leak-detection summary,
+            subsystems, detector collections, detectors, and policies.
+        """
         data = {
             "summary": {},
             "subsystems": [],

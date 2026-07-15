@@ -1,4 +1,10 @@
-"""Read Redfish Chassis ThermalSubsystem resources."""
+"""Read Redfish Chassis ThermalSubsystem resources.
+
+    redfish_ctl thermal
+
+Walks every Chassis ThermalSubsystem and reports its status, thermal
+metrics (temperature readings), and fan inventory.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -15,17 +21,26 @@ class Thermal(RedfishManagerBase,
     """Read chassis thermal subsystems, thermal metrics, and fan links."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the thermal command."""
         super(Thermal, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``thermal`` subcommand."""
+        """Register the read-only ``thermal`` subcommand.
+
+        :return: a tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return cmd_parser, "thermal", "command read chassis thermal subsystem data"
 
     @staticmethod
     def _members(data):
+        """Collect the ``@odata.id`` links from a Redfish collection payload.
+
+        :param data: a decoded Redfish collection resource.
+        :return: the member URIs, or an empty list when ``data`` is not a dict.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -37,6 +52,12 @@ class Thermal(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Extract the ``@odata.id`` of a linked resource stored under ``key``.
+
+        :param data: the resource dict that holds the link.
+        :param key: the property name whose ``@odata.id`` is wanted.
+        :return: the linked URI string, or None when absent.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -44,20 +65,46 @@ class Thermal(RedfishManagerBase,
 
     @staticmethod
     def _chassis_id(chassis_uri):
+        """Derive the chassis identifier from a chassis URI.
+
+        :param chassis_uri: a Chassis resource URI.
+        :return: the trailing path segment (the chassis id).
+        """
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _status(data):
+        """Return the ``Status`` sub-object of a resource.
+
+        :param data: a decoded Redfish resource.
+        :return: the ``Status`` dict, or an empty dict when missing.
+        """
         status = data.get("Status") if isinstance(data, dict) else None
         return status if isinstance(status, dict) else {}
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI and return its payload, swallowing any error.
+
+        :param uri: the Redfish resource URI to fetch.
+        :param do_async: when True, run the query on an asyncio event loop.
+        :return: the decoded payload dict, or an empty dict on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _read_fans(self, chassis_id, fans_uri, do_async=False):
+        """Read a Fans collection and expand each fan into a summary row.
+
+        :param chassis_id: the owning chassis identifier.
+        :param fans_uri: the Fans collection URI.
+        :param do_async: when True, run the queries on an asyncio event loop.
+        :return: a (collection, rows) tuple — ``collection`` is a summary dict
+            of the Fans resource (chassis id and members) and ``rows`` the
+            per-fan summary list; ``collection`` is None only in the defensive
+            case where the fetch does not yield a dict.
+        """
         data = self._query_optional(fans_uri, do_async=do_async)
         if not isinstance(data, dict):
             return None, []
@@ -93,6 +140,12 @@ class Thermal(RedfishManagerBase,
 
     @staticmethod
     def _temperature_rows(chassis_id, metrics):
+        """Flatten ThermalMetrics temperature readings into per-sensor rows.
+
+        :param chassis_id: the owning chassis identifier.
+        :param metrics: a decoded ThermalMetrics resource.
+        :return: a list of temperature-reading rows (empty when none present).
+        """
         readings = metrics.get("TemperatureReadingsCelsius") or []
         if not isinstance(readings, list):
             return []
@@ -116,6 +169,18 @@ class Thermal(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Aggregate every chassis ThermalSubsystem, its metrics, and fans.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, run the Redfish queries on an asyncio event
+            loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this
+            command.
+        :return: a CommandResult wrapping the collected thermal summary,
+            subsystems, thermal metrics, temperature readings, and fans.
+        """
         data = {
             "summary": {},
             "subsystems": [],
