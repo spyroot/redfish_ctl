@@ -15,6 +15,7 @@ import json
 def from_json_spec(from_spec: str):
     """read json from a file
     :param from_spec: a path to a file with json spec.
+    :return: the parsed JSON payload.
     """
     with open(from_spec) as user_file:
         file_contents = user_file.read()
@@ -23,10 +24,11 @@ def from_json_spec(from_spec: str):
 
 
 def _find_ids(obj, key, result):
-    """Recursively search all keys
-    :param obj:
-    :param key:
-    :return:
+    """Recursively collect values stored under ``key`` into ``result``.
+
+    :param obj: dict, list, or scalar value to search.
+    :param key: key whose values are collected.
+    :param result: accumulator list that matching values are appended to.
     """
     if obj is None:
         return
@@ -55,6 +57,14 @@ def find_ids(obj, key):
 
 
 def str2bool(v):
+    """Convert a string (or bool) to a boolean.
+
+    :param v: value to interpret; a bool passes through, while a string such as
+        ``yes``/``true``/``t``/``y``/``1`` maps to True and
+        ``no``/``false``/``f``/``n``/``0`` maps to False.
+    :return: the parsed boolean value.
+    :raise argparse.ArgumentTypeError: if the string is not a recognized boolean.
+    """
     if isinstance(v, bool):
         return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
