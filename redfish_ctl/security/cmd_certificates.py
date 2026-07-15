@@ -1,4 +1,12 @@
-"""Read Redfish certificate inventory without returning certificate bodies."""
+"""Read Redfish certificate inventory without returning certificate bodies.
+
+    redfish_ctl certificates
+
+Walks CertificateService and its CertificateLocations, plus each system and
+manager Certificates collection, returning collection and per-certificate
+metadata rows (issuer, subject, validity, key usage) but never the certificate
+body itself.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -16,17 +24,27 @@ class Certificates(RedfishManagerBase,
     """Read CertificateService and linked certificate collection metadata."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the certificates command."""
         super(Certificates, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only certificates subcommand."""
+        """Register the read-only certificates subcommand.
+
+        :param cls: command class supplying the shared base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return cmd_parser, "certificates", "command read Redfish certificate inventory"
 
     @staticmethod
     def _members(data):
+        """Return the ``@odata.id`` strings from a Redfish collection, tolerantly.
+
+        :param data: Redfish collection body (or any value).
+        :return: list of member ``@odata.id`` strings; empty list if not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -38,11 +56,23 @@ class Certificates(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` of a single ``{key: {@odata.id}}`` link, or None.
+
+        :param data: resource body holding the link (or any value).
+        :param key: name of the link property to read.
+        :return: the linked ``@odata.id`` string, or None when absent.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     @staticmethod
     def _links(data, key):
+        """Return the ``@odata.id`` strings for a single link or a list of links.
+
+        :param data: resource body holding the link property (or any value).
+        :param key: name of the link property to read.
+        :return: list of linked ``@odata.id`` strings; empty list when absent.
+        """
         value = (data or {}).get(key)
         if isinstance(value, dict):
             uri = value.get("@odata.id")
@@ -58,6 +88,11 @@ class Certificates(RedfishManagerBase,
 
     @staticmethod
     def _key_usage(data):
+        """Return the certificate ``KeyUsage`` values as a list, tolerantly.
+
+        :param data: certificate body (or any value).
+        :return: the KeyUsage values as a list; empty list when absent.
+        """
         usage = (data or {}).get("KeyUsage")
         if isinstance(usage, list):
             return usage
@@ -67,9 +102,20 @@ class Certificates(RedfishManagerBase,
 
     @staticmethod
     def _resource_id(uri):
+        """Return the trailing id segment of a Redfish resource URI.
+
+        :param uri: Redfish resource path.
+        :return: the last path segment of the URI.
+        """
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     def _get(self, uri, do_async):
+        """GET a resource body, returning ``{}`` on empty URI or any failure.
+
+        :param uri: Redfish resource path to fetch; a falsy URI skips the query.
+        :param do_async: when set, the query subscribes to an event loop for async execution.
+        :return: the resource body as a dict, or ``{}`` when empty or on failure.
+        """
         if not uri:
             return {}
         try:
@@ -79,15 +125,29 @@ class Certificates(RedfishManagerBase,
         return data if isinstance(data, dict) else {}
 
     def _discover(self, discover):
+        """Call a discovery callable, returning ``[]`` on any failure.
+
+        :param discover: zero-argument callable that returns resource URIs.
+        :return: the discovered URIs, or an empty list on failure.
+        """
         try:
             return discover() or []
         except Exception:
             return []
 
     def _certificate_locations(self, locations):
+        """Walk a CertificateLocations body for certificate collection URIs.
+
+        :param locations: CertificateLocations body to walk.
+        :return: list of URIs ending in ``/Certificates`` found in the tree.
+        """
         found = []
 
         def visit(value):
+            """Recursively collect ``/Certificates`` URIs into ``found``.
+
+            :param value: a node (dict, list, or scalar) from the locations tree.
+            """
             if isinstance(value, dict):
                 uri = value.get("@odata.id")
                 if isinstance(uri, str) and uri.rstrip("/").endswith("/Certificates"):
@@ -102,6 +162,13 @@ class Certificates(RedfishManagerBase,
         return found
 
     def _certificate_row(self, cert, cert_uri, collection_uri):
+        """Build a metadata row for a certificate (never its body).
+
+        :param cert: certificate resource body.
+        :param cert_uri: URI of the certificate resource.
+        :param collection_uri: URI of the collection the certificate belongs to.
+        :return: a metadata row dict (id, issuer, subject, validity, key usage, links).
+        """
         links = cert.get("Links") if isinstance(cert.get("Links"), dict) else {}
         return {
             "Id": cert.get("Id") or self._resource_id(cert_uri),
@@ -120,6 +187,13 @@ class Certificates(RedfishManagerBase,
 
     @staticmethod
     def _summary(certificate_service, collections, certificates):
+        """Build a summary of service presence and collection/certificate counts.
+
+        :param certificate_service: the certificate service row, or None when absent.
+        :param collections: the collected certificate collection rows.
+        :param certificates: the collected certificate metadata rows.
+        :return: a summary dict with service presence and counts.
+        """
         return {
             "certificate_service": certificate_service is not None,
             "collections": len(collections),
@@ -133,7 +207,15 @@ class Certificates(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read certificate service and linked certificate collections."""
+        """Read certificate service and linked certificate collections.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when set, each Redfish query subscribes to an event loop for async execution.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the summary, certificate service, collections, and certificate rows.
+        """
         certificate_service = None
         certificate_collections = []
         certificates = []
@@ -141,6 +223,11 @@ class Certificates(RedfishManagerBase,
         seen_collections = set()
 
         def add_collection(uri, source):
+            """Record a not-yet-seen certificate collection URI with its source label.
+
+            :param uri: certificate collection URI to enqueue.
+            :param source: human-readable origin label for the collection.
+            """
             if uri and uri not in seen_collections:
                 seen_collections.add(uri)
                 collection_links.append((uri, source))

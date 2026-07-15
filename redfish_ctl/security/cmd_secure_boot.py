@@ -27,26 +27,40 @@ class SecureBoot(RedfishManagerBase,
     """Read SecureBoot state and key databases for every system."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the secure-boot command."""
         super(SecureBoot, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``secure-boot`` subcommand (read-only)."""
+        """Register the ``secure-boot`` subcommand (read-only).
+
+        :param cls: command class supplying the shared base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read SecureBoot state and key databases (PK/KEK/db/dbx)"
         return cmd_parser, "secure-boot", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: Redfish collection body (or any value).
+        :return: list of member ``@odata.id`` strings; empty list if not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure."""
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: Redfish resource path to fetch.
+        :param do_async: when set, the query subscribes to an event loop for async execution.
+        :return: the resource body as a dict, or ``{}`` on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -54,12 +68,22 @@ class SecureBoot(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None."""
+        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None.
+
+        :param data: resource body holding the link (or any value).
+        :param key: name of the link property to read.
+        :return: the linked ``@odata.id`` string, or None when absent.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     def _cert_count(self, db, do_async):
-        """Number of certificates in a SecureBootDatabase, tolerantly."""
+        """Number of certificates in a SecureBootDatabase, tolerantly.
+
+        :param db: SecureBootDatabase body.
+        :param do_async: when set, the certificate query subscribes to an event loop for async execution.
+        :return: certificate count, or None when the database has no Certificates link.
+        """
         coll_uri = self._link(db, "Certificates")
         if not coll_uri:
             return None
@@ -72,7 +96,15 @@ class SecureBoot(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read SecureBoot state + databases for every discovered system."""
+        """Read SecureBoot state + databases for every discovered system.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when set, each Redfish query subscribes to an event loop for async execution.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping one SecureBoot state row per system/database.
+        """
         rows = []
         try:
             system_ids = self.discover_computer_system_ids() or []
