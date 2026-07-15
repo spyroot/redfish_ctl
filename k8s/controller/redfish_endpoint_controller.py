@@ -87,10 +87,21 @@ MANAGER_FACTORY: ManagerFactory = RedfishManagerBase
 
 
 def _utc_now() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime.
+
+    :return: current time in UTC.
+    """
     return datetime.now(timezone.utc)
 
 
 def _rfc3339(value: datetime) -> str:
+    """Format a datetime as an RFC 3339 UTC string with a ``Z`` suffix.
+
+    Naive values are assumed to be UTC.
+
+    :param value: datetime to format.
+    :return: RFC 3339 timestamp string (seconds precision, ``Z`` zone).
+    """
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     value = value.astimezone(timezone.utc).replace(microsecond=0)
@@ -98,6 +109,13 @@ def _rfc3339(value: datetime) -> str:
 
 
 def _number(value: int | float | str | None) -> float | None:
+    """Coerce a numeric-like value to ``float``, or ``None`` if it cannot.
+
+    Booleans and unparsable strings return ``None`` rather than a number.
+
+    :param value: value to coerce (int, float, numeric string, or ``None``).
+    :return: the value as a float, or ``None`` when not numeric.
+    """
     if value is None:
         return None
     if isinstance(value, bool):
@@ -111,6 +129,11 @@ def _number(value: int | float | str | None) -> float | None:
 
 
 def _temperature_summary(thermal: ThermalStatus) -> dict[str, int | float | None]:
+    """Summarize thermal readings into a count and the hottest temperature.
+
+    :param thermal: thermal read result whose ``temperatures`` are inspected.
+    :return: dict with ``count`` of valid readings and ``maxCelsius`` (or ``None``).
+    """
     values = [
         reading
         for row in thermal.temperatures
@@ -123,6 +146,11 @@ def _temperature_summary(thermal: ThermalStatus) -> dict[str, int | float | None
 
 
 def _health_from_sensors(sensors: tuple[SensorReading, ...]) -> str | None:
+    """Return the worst health across sensors, or ``None`` if none report health.
+
+    :param sensors: sensor readings to reduce.
+    :return: the most severe health string (Critical > Warning > OK), or ``None``.
+    """
     rank = {
         "OK": 0,
         "Warning": 1,
@@ -141,6 +169,10 @@ def _network_firmware_summary(
 
     ``distinctVersions`` is the fleet drift signal: one version across the fleet
     means every node's NICs run the same firmware; more than one flags drift.
+
+    :param network_firmware: typed NIC/DPU firmware read result.
+    :return: the ``status.networkFirmware`` block (counts, distinct versions,
+        and a capped list of components).
     """
     summary = network_firmware.summary
     components = [
@@ -172,7 +204,16 @@ def build_status(
     network_firmware: NetworkFirmwareStatus | None = None,
     polled_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Return the RedfishEndpoint status object from typed read results."""
+    """Return the RedfishEndpoint status object from typed read results.
+
+    :param system: typed system read result (power state, health).
+    :param sensors: sensor readings, used as a health fallback.
+    :param thermal: thermal read result for the temperature summary.
+    :param network_firmware: optional NIC/DPU firmware; adds the
+        ``networkFirmware`` block when present.
+    :param polled_at: timestamp recorded as ``lastPolled``; defaults to now.
+    :return: the ``.status`` object for the RedfishEndpoint CR.
+    """
     status: dict[str, Any] = {
         "powerState": system.power_state,
         "health": system.health or _health_from_sensors(sensors),
@@ -193,6 +234,10 @@ def parse_interval_seconds(text: Any, default: float) -> float:
 
     Returns ``default`` for missing, malformed, or non-positive values, so a bad
     CR field degrades to the base cadence rather than breaking the poll loop.
+
+    :param text: interval value (a duration string, number, or ``None``).
+    :param default: seconds to return when ``text`` is missing or invalid.
+    :return: the parsed interval in seconds, or ``default``.
     """
     if text is None:
         return default
@@ -221,6 +266,8 @@ def base_interval_seconds() -> float:
     the controller container, so an operator can retune the deployment without
     editing code. Per-CR ``spec.pollInterval`` still governs each endpoint on
     top of this floor.
+
+    :return: the base timer cadence in seconds.
     """
     return parse_interval_seconds(
         os.environ.get(POLL_INTERVAL_ENV),
@@ -229,6 +276,11 @@ def base_interval_seconds() -> float:
 
 
 def _parse_rfc3339(text: Any) -> datetime | None:
+    """Parse an RFC 3339 timestamp into a UTC-aware datetime.
+
+    :param text: timestamp string to parse; non-strings yield ``None``.
+    :return: the parsed timezone-aware datetime, or ``None`` when unparsable.
+    """
     if not isinstance(text, str) or not text:
         return None
     try:
@@ -256,6 +308,11 @@ def poll_due(
       faster than the deployment's timer is bounded by it.)
 
     A CR with no prior successful poll is always due.
+
+    :param spec: the CR spec, read for ``pollInterval``.
+    :param status: the CR ``.status``, read for ``nextPollAfter``/``lastPolled``.
+    :param now: current time used for the due/backoff comparison.
+    :return: ``True`` when the BMC should be polled this fire, else ``False``.
     """
     next_after = _parse_rfc3339(status.get("nextPollAfter"))
     if next_after is not None and now < next_after:
@@ -273,6 +330,11 @@ def backoff_seconds(failures: int, base: float, cap: float = MAX_BACKOFF_SECONDS
 
     ``failures`` is 1 for the first failure. Delay doubles each failure from the
     base cadence up to ``cap``.
+
+    :param failures: count of consecutive failures (1 for the first).
+    :param base: base delay in seconds that doubles per failure.
+    :param cap: maximum delay in seconds.
+    :return: the backoff delay in seconds, capped at ``cap``.
     """
     if failures < 1:
         return base
@@ -288,6 +350,15 @@ def _condition(
     message: str,
     changed_at: datetime,
 ) -> dict[str, str]:
+    """Build a Kubernetes-style status condition entry.
+
+    :param condition_type: the condition ``type`` value.
+    :param status: whether the condition holds, rendered as ``"True"``/``"False"``.
+    :param reason: machine-readable reason code.
+    :param message: human-readable detail; omitted when empty.
+    :param changed_at: transition time recorded as ``lastTransitionTime``.
+    :return: the condition dict.
+    """
     condition = {
         "type": condition_type,
         "status": "True" if status else "False",
@@ -300,7 +371,11 @@ def _condition(
 
 
 def _classify_poll_error(exc: BaseException) -> tuple[str, str]:
-    """Map a BMC read failure to a (reason, message) for the status condition."""
+    """Map a BMC read failure to a (reason, message) for the status condition.
+
+    :param exc: the exception raised while reading the BMC.
+    :return: tuple of (reason code, message) for the status condition.
+    """
     message = str(exc) or exc.__class__.__name__
     if isinstance(exc, (RedfishUnauthorized, RedfishForbidden, AuthenticationFailed)):
         return "AuthenticationFailed", message
@@ -331,6 +406,12 @@ def build_error_status(
     the failure and a backoff. ``lastPolled`` stays at the last *successful*
     poll, and the failure is explained by the condition + ``lastError`` rather
     than freezing silently.
+
+    :param prev_status: the current ``.status``, read for ``consecutiveFailures``.
+    :param exc: the exception raised during the failed poll.
+    :param now: current time, used for the condition and backoff deadline.
+    :param base_interval: base cadence the exponential backoff builds on.
+    :return: a partial ``.status`` merge patch recording the failure and backoff.
     """
     failures = _int(prev_status.get("consecutiveFailures")) + 1
     reason, message = _classify_poll_error(exc)
@@ -356,7 +437,12 @@ def build_success_status(
     *,
     now: datetime,
 ) -> dict[str, Any]:
-    """Merge the core readings with a healthy condition and cleared failure fields."""
+    """Merge the core readings with a healthy condition and cleared failure fields.
+
+    :param readings: the status readings from a successful poll.
+    :param now: current time recorded on the reachable condition.
+    :return: the full ``.status`` object for a successful poll.
+    """
     status = dict(readings)
     status["conditions"] = [
         _condition(
@@ -375,6 +461,11 @@ def build_success_status(
 
 
 def _int(value: Any) -> int:
+    """Coerce a value to ``int``, returning ``0`` when it cannot be parsed.
+
+    :param value: value to coerce.
+    :return: the value as an int, or ``0`` on failure.
+    """
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -382,6 +473,11 @@ def _int(value: Any) -> int:
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
+    """Return ``value`` if it is a mapping, else an empty mapping.
+
+    :param value: candidate mapping.
+    :return: the mapping, or an empty dict when ``value`` is not one.
+    """
     return value if isinstance(value, Mapping) else {}
 
 
@@ -391,6 +487,8 @@ def _close_manager(manager: Any) -> None:
     ``RedfishManagerBase`` lazily caches a keep-alive ``requests.Session`` (with
     its urllib3 connection pool) in ``_session_cache``. The controller builds one
     manager per poll, so at fleet scale unclosed sessions would leak sockets/FDs.
+
+    :param manager: the per-poll manager whose cached session is closed.
     """
     session = getattr(manager, "_session_cache", None)
     if session is None:
@@ -402,6 +500,14 @@ def _close_manager(manager: Any) -> None:
 
 
 def _manager_address(spec: Mapping[str, Any]) -> tuple[str, bool]:
+    """Resolve the BMC host and HTTP flag from ``spec.address``.
+
+    Accepts either a bare host/IP (with ``spec.port``) or an ``http(s)://`` URL.
+
+    :param spec: the CR spec, read for ``address``, ``port``, and ``insecure``.
+    :return: tuple of (host address, whether to use plain HTTP).
+    :raises ValueError: when ``spec.address`` is empty.
+    """
     raw_address = str(spec.get("address") or "").strip()
     if not raw_address:
         raise ValueError("RedfishEndpoint spec.address is required")
@@ -420,6 +526,14 @@ def _make_manager(
     credentials: Mapping[str, str],
     manager_factory: ManagerFactory,
 ) -> Any:
+    """Build a Redfish manager for the endpoint from spec and credentials.
+
+    :param spec: the CR spec, read for address, port, and ``insecure``.
+    :param credentials: username/password mapping for BMC auth.
+    :param manager_factory: callable that constructs the manager (indirected
+        for tests).
+    :return: the constructed manager instance.
+    """
     address, is_http = _manager_address(spec)
     return manager_factory(
         idrac_ip=address,
@@ -440,6 +554,9 @@ def _safe_network_firmware(manager: Any) -> NetworkFirmwareStatus | None:
     The failure is logged (not silent) so a persistent NIC-firmware read problem
     is diagnosable; on failure the prior status.networkFirmware is left in place
     by the merge patch rather than being cleared.
+
+    :param manager: the BMC manager to read NIC/DPU firmware from.
+    :return: the network firmware read result, or ``None`` when unavailable.
     """
     try:
         return get_network_firmware(manager)
@@ -459,6 +576,12 @@ def poll_endpoint(
 
     Always closes the per-poll manager's pooled session, even on error, so a
     fleet of endpoints does not leak sockets one failed/slow poll at a time.
+
+    :param spec: the CR spec identifying and configuring the endpoint.
+    :param credentials: username/password mapping for BMC auth.
+    :param manager_factory: callable that constructs the manager.
+    :param polled_at: timestamp recorded as ``lastPolled``; defaults to now.
+    :return: the ``.status`` object built from the read results.
     """
     manager = _make_manager(spec, credentials or {}, manager_factory)
     try:
@@ -478,6 +601,12 @@ def poll_endpoint(
 
 
 def _decode_secret_value(data: Mapping[str, str], key: str) -> str | None:
+    """Decode a base64 Secret field, or ``None`` when the key is absent/empty.
+
+    :param data: the Secret ``data`` mapping (base64-encoded values).
+    :param key: the field name to decode.
+    :return: the decoded UTF-8 value, or ``None`` when missing.
+    """
     encoded = data.get(key)
     if not encoded:
         return None
@@ -495,6 +624,10 @@ def load_secret_credentials(
     threads. Falls back to empty credentials whenever a client is unavailable
     (kubernetes not installed, or no in-cluster/local config), matching the
     offline behaviour the test suite relies on.
+
+    :param namespace: namespace of the CR (and its Secret); empty skips the read.
+    :param secret_ref: ``spec.secretRef`` naming the Secret and its keys.
+    :return: mapping with ``username``/``password`` when found, else empty.
     """
     if not namespace or not secret_ref or not secret_ref.get("name"):
         return {}
@@ -544,6 +677,17 @@ def poll_redfish_endpoint(
     failure is caught, recorded on ``.status`` with an exponential backoff, and
     retried next cycle instead of raising forever; the last successful readings
     are preserved (merge-patch).
+
+    :param spec: the CR spec identifying and configuring the endpoint.
+    :param body: the full CR body; used to read ``.status`` when ``status`` is
+        not passed.
+    :param namespace: namespace of the CR, for the Secret read and logging.
+    :param name: name of the CR, for logging.
+    :param logger: kopf logger; poll outcomes are logged when provided.
+    :param patch: kopf patch object the new ``.status`` is written into.
+    :param status: the current ``.status`` passed by kopf; falls back to
+        ``body`` when ``None``.
+    :param force: when ``True``, poll immediately and bypass the cadence gate.
     """
     current_status = status if status is not None else _mapping(body).get("status")
     current_status = _mapping(current_status)
@@ -583,7 +727,10 @@ def poll_redfish_endpoint(
 
 
 def poll_on_change(**kwargs: Any) -> None:  # pragma: no cover - runtime kopf wiring.
-    """Create/update entrypoint: poll immediately, bypassing the cadence gate."""
+    """Create/update entrypoint: poll immediately, bypassing the cadence gate.
+
+    :return: ``None`` (delegates to :func:`poll_redfish_endpoint`).
+    """
     return poll_redfish_endpoint(force=True, **kwargs)
 
 
