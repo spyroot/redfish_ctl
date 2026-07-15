@@ -528,19 +528,42 @@ class _EndpointCache:
 
     def __init__(self, ttl_seconds: float = 3.0) -> None:
         self._ttl = ttl_seconds
-        self._lock = threading.Lock()
+        self._cond = threading.Condition()
         self._at = 0.0
         self._value: list[dict[str, Any]] = []
+        self._loading = False
+
+    def _is_fresh(self) -> bool:
+        # Callers hold ``self._cond``. ``_at == 0`` means never loaded.
+        return bool(self._at) and (time.monotonic() - self._at) <= self._ttl
 
     def get(self, loader) -> list[dict[str, Any]]:
-        now = time.monotonic()
-        with self._lock:
-            if now - self._at <= self._ttl and self._at:
+        with self._cond:
+            if self._is_fresh():
                 return self._value
-        fresh = loader()
-        with self._lock:
+            # Single-flight: the first caller past a stale TTL performs the load;
+            # concurrent callers wait on the condition and reuse its result, so a
+            # burst of dashboard clients triggers at most one k8s API refill per
+            # TTL instead of a thundering herd of parallel list calls.
+            while self._loading:
+                self._cond.wait()
+                if self._is_fresh():
+                    return self._value
+            self._loading = True
+        try:
+            fresh = loader()
+        except BaseException:
+            # Release the in-flight flag so a failed load doesn't wedge the cache;
+            # the next waiter retries.
+            with self._cond:
+                self._loading = False
+                self._cond.notify_all()
+            raise
+        with self._cond:
             self._value = fresh
             self._at = time.monotonic()
+            self._loading = False
+            self._cond.notify_all()
         return fresh
 
 
@@ -624,6 +647,19 @@ class _Handler(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
 
+class FleetServer(ThreadingHTTPServer):
+    """Threaded consumer server with a generous socket listen backlog.
+
+    The stdlib default (``request_queue_size = 5``) drops connections at the OS
+    accept queue when a crowd of dashboard clients connects at once. 128 lets the
+    burst queue instead of being reset (the short-TTL cache then serves them all
+    from one load).
+    """
+
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def run_server(
     host: str = "0.0.0.0",
     port: int = 8080,
@@ -631,7 +667,7 @@ def run_server(
 ) -> None:  # pragma: no cover - process entry point
     """Serve the dashboard/API/metrics with a thread-per-request server."""
     _Handler.namespace = namespace or os.environ.get("WATCH_NAMESPACE", "redfish-sandbox")
-    server = ThreadingHTTPServer((host, port), _Handler)
+    server = FleetServer((host, port), _Handler)
     print(
         f"redfish-fleet-consumer serving on {host}:{port} "
         f"(namespace={_Handler.namespace})",
