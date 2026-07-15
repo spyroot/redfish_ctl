@@ -1,6 +1,6 @@
-"""iDRAC system command
+"""System view command.
 
-Command provides the option to retrieve system view from iDRAC and serialize
+Command provides the option to retrieve system view from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest of commands
 caller can save to a file and consume asynchronously or synchronously.

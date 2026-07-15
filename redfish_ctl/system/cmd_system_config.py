@@ -1,6 +1,6 @@
-"""iDRAC export system config command.
+"""Export system configuration command.
 
-Command provides the option to retrieve firmware setting from iDRAC and serialize
+Command provides the option to retrieve firmware setting from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -65,7 +65,7 @@ class ExportSystemConfig(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 **kwargs
                 ) -> CommandResult:
-        """Exports system configuration from idrac
+        """Exports system configuration from a Redfish endpoint
 
         Default, Clone, Replace
         Default, IncludeReadOnly, IncludePasswordHashValues
