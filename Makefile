@@ -22,7 +22,9 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check k8s-sandbox k8s-consumer k8s-explorer clean
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate k8s-sandbox k8s-consumer k8s-explorer clean
+
+DOCSTRING_BASE ?= origin/main
 
 help: ## Show available developer targets.
 	@awk 'BEGIN { \
@@ -65,6 +67,9 @@ docker-image: ## Build the production CLI image locally.
 
 docs-voice-check: ## Reject first-person wording in public docs.
 	! grep -rnE '\b(I|me|my|mine|myself)\b' README.md docs/
+
+docstring-gate: ## Fail if a new/changed method lacks docs (args + return). Override BASE=<ref>.
+	$(PYTHON) tools/docstring_gate.py --base $(DOCSTRING_BASE)
 
 k8s-sandbox: ## Run the local Kubernetes read-path sandbox when present.
 	./k8s/sandbox/run-sandbox.sh

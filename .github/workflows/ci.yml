@@ -12,6 +12,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Cancel a PR's in-progress run when a newer commit is pushed, so a burst of
+  # commits does not stack full pipelines. Pushes to main always run to
+  # completion (every landed commit is tested).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -39,3 +46,11 @@ jobs:
         # The tree carries pre-existing ruff debt, so lint is reported but does
         # not fail the build. New code should still be clean.
         run: ruff check redfish_ctl || true
+      - name: Docstring hard gate (new/changed methods must document args + return)
+        # Diff-aware and BLOCKING: only functions this PR adds or changes must
+        # carry a docstring with :param: per arg and :return: (see TEAM_GUIDE.md).
+        # Pre-existing gaps are backfilled separately, not gated here.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}"
+          python tools/docstring_gate.py --base FETCH_HEAD
