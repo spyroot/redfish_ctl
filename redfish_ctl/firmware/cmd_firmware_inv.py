@@ -1,6 +1,6 @@
-"""iDRAC firmware inventory command
+"""Firmware inventory command.
 
-Command provides the option to retrieve firmware setting from iDRAC and serialize
+Command provides the option to retrieve firmware setting from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -27,7 +27,7 @@ class FirmwareInventoryQuery(RedfishManagerBase,
                              name='firmware_inv_query',
                              metaclass=Singleton):
     """
-    Command implementation to get current firmware version from iDRAC.
+    Command implementation to get current firmware version from a Redfish endpoint.
     """
 
     def __init__(self, *args, **kwargs):
@@ -61,7 +61,7 @@ class FirmwareInventoryQuery(RedfishManagerBase,
                 do_deep: Optional[bool] = False,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False, **kwargs) -> CommandResult:
-        """Query firmware from idrac
+        """Query firmware from a Redfish endpoint
         :param do_deep: will return verbose output for each pci device.
         :param do_async: accepted for CLI compatibility; not used by this command.
         :param verbose: accepted for CLI compatibility; not used by this command.
