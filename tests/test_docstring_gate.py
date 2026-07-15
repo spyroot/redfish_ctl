@@ -79,6 +79,13 @@ def test_bare_return_none_not_treated_as_value(gate):
     assert gate.check_function(node) == []
 
 
+def test_nested_function_return_is_ignored(gate):
+    """A return inside a nested function must not force :return: on the outer one."""
+    node = _fn('def outer(a):\n    """Do.\n\n    :param a: x.\n    """\n'
+               '    def inner():\n        return 5\n    inner()\n')
+    assert gate.check_function(node) == []
+
+
 def test_command_module_requires_usage_example(gate, tmp_path):
     """A cmd_*.py with a command class but no 'redfish_ctl <cmd>' example is flagged."""
     d = tmp_path / "redfish_ctl" / "x"

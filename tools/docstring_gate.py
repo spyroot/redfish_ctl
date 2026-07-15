@@ -94,12 +94,18 @@ def _returns_value(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     :param node: the function AST node.
     :return: True if a ``return <value>`` (not bare/None) appears in its body.
     """
-    for child in ast.walk(node):
-        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child is not node:
+    # Traverse manually from the body so a nested function/lambda is skipped
+    # entirely (its returns belong to it). ``ast.walk`` cannot do this: it keeps
+    # descending into a nested FunctionDef even after we skip that node.
+    stack: list[ast.AST] = list(node.body)
+    while stack:
+        child = stack.pop()
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
             continue
         if isinstance(child, ast.Return) and child.value is not None:
             if not (isinstance(child.value, ast.Constant) and child.value.value is None):
                 return True
+        stack.extend(ast.iter_child_nodes(child))
     return False
 
 

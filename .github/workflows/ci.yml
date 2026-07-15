@@ -12,6 +12,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Cancel a PR's in-progress run when a newer commit is pushed, so a burst of
+  # commits does not stack full pipelines. Pushes to main always run to
+  # completion (every landed commit is tested).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest

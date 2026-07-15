@@ -36,6 +36,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Only one kind-e2e per ref: cancel a PR's superseded run so repeated pushes
+  # do not queue multiple 20-minute cluster spin-ups. Main runs to completion.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   kind-e2e:
     runs-on: ubuntu-latest
