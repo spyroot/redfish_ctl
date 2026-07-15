@@ -1,4 +1,9 @@
-"""Read a small fleet inventory through existing redfish_ctl commands."""
+"""Read a small fleet inventory through existing redfish_ctl commands.
+
+Example::
+
+    redfish_ctl fleet --inventory nodes.yaml --concurrency 8
+"""
 
 from __future__ import annotations
 
@@ -32,6 +37,14 @@ class FleetNode:
 
 
 def _env_value(raw: Mapping[str, Any], field: str, env_field: str, default: str) -> str:
+    """Resolve a config value from the row, a named env var, or a default.
+
+    :param raw: inventory row mapping for one node.
+    :param field: key holding a literal value in ``raw``.
+    :param env_field: key in ``raw`` naming the environment variable to read.
+    :param default: value returned when neither source supplies one.
+    :return: the literal value, the environment value, or the default.
+    """
     value = raw.get(field)
     if value is not None:
         return str(value)
@@ -42,6 +55,12 @@ def _env_value(raw: Mapping[str, Any], field: str, env_field: str, default: str)
 
 
 def _as_bool(value: Any, default: bool) -> bool:
+    """Coerce a YAML value to a boolean.
+
+    :param value: value to interpret; None yields the default.
+    :param default: value returned when ``value`` is None.
+    :return: the boolean interpretation of ``value``.
+    """
     if value is None:
         return default
     if isinstance(value, bool):
@@ -52,12 +71,23 @@ def _as_bool(value: Any, default: bool) -> bool:
 
 
 def _as_int(value: Any, default: int) -> int:
+    """Coerce a YAML value to an int, or the default when unset.
+
+    :param value: value to convert; None yields the default.
+    :param default: value returned when ``value`` is None.
+    :return: the integer value.
+    """
     if value is None:
         return default
     return int(value)
 
 
 def _as_float(value: Any) -> float | None:
+    """Coerce a numeric or numeric-string value to float.
+
+    :param value: value to convert; bools and non-numeric strings are rejected.
+    :return: the float value, or None when it cannot be converted.
+    """
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
@@ -71,6 +101,12 @@ def _as_float(value: Any) -> float | None:
 
 
 def _inventory_nodes(data: Any) -> list[Mapping[str, Any]]:
+    """Extract the node rows from parsed inventory data.
+
+    :param data: parsed YAML, either a list of rows or a mapping with a
+        ``nodes`` list.
+    :return: the mapping rows; non-mapping entries are dropped.
+    """
     if isinstance(data, list):
         rows = data
     elif isinstance(data, Mapping):
@@ -81,7 +117,12 @@ def _inventory_nodes(data: Any) -> list[Mapping[str, Any]]:
 
 
 def load_inventory(path: str | Path) -> tuple[FleetNode, ...]:
-    """Load a YAML fleet inventory into connection entries."""
+    """Load a YAML fleet inventory into connection entries.
+
+    :param path: path to the YAML inventory file.
+    :return: tuple of :class:`FleetNode` connection entries.
+    :raises ValueError: if a node row has no address/host/ip.
+    """
     inventory_path = Path(path)
     with inventory_path.open() as handle:
         data = yaml.safe_load(handle) or {}
@@ -107,6 +148,12 @@ def load_inventory(path: str | Path) -> tuple[FleetNode, ...]:
 
 
 def _temperature_summary(readings: tuple[Any, ...]) -> dict[str, int | float | None]:
+    """Summarize a node's thermal readings.
+
+    :param readings: thermal temperature readings for one node.
+    :return: mapping with the reading ``count`` and the ``max_celsius`` value
+        (None when no numeric reading is present).
+    """
     values = [
         value
         for value in (_as_float(reading.reading_celsius) for reading in readings)
@@ -120,6 +167,11 @@ def _temperature_summary(readings: tuple[Any, ...]) -> dict[str, int | float | N
 
 
 def _node_manager(node: FleetNode) -> RedfishManagerBase:
+    """Build a Redfish manager from a node's connection details.
+
+    :param node: the fleet node to connect to.
+    :return: a :class:`RedfishManagerBase` bound to the node.
+    """
     return RedfishManagerBase(
         idrac_ip=node.address,
         idrac_username=node.username,
@@ -131,6 +183,13 @@ def _node_manager(node: FleetNode) -> RedfishManagerBase:
 
 
 def _error_row(node: FleetNode, exc: BaseException) -> dict[str, Any]:
+    """Build a failure summary row for a node that could not be read.
+
+    :param node: the fleet node that failed.
+    :param exc: the exception raised while reading it.
+    :return: a node summary marked ``ok`` False, with zeroed metrics and the
+        error string.
+    """
     return {
         "name": node.name,
         "address": node.address,
@@ -145,7 +204,12 @@ def _error_row(node: FleetNode, exc: BaseException) -> dict[str, Any]:
 
 
 def read_node(node: FleetNode) -> dict[str, Any]:
-    """Read one node through the typed facade and return a public summary."""
+    """Read one node through the typed facade and return a public summary.
+
+    :param node: the fleet node to read.
+    :return: a node summary with power/health/sensor/temperature fields, or a
+        failure row when a Redfish, OS, or value error occurs.
+    """
     try:
         manager = _node_manager(node)
         system = get_system(manager)
@@ -167,7 +231,14 @@ def read_node(node: FleetNode) -> dict[str, Any]:
 
 
 def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]:
-    """Fan out read-only status calls across inventory nodes."""
+    """Fan out read-only status calls across inventory nodes.
+
+    :param nodes: fleet nodes to read.
+    :param concurrency: maximum concurrent BMC reads; clamped to at least 1 and
+        at most the node count.
+    :return: mapping with a ``summary`` (total/ok/failed) and per-node ``nodes``
+        rows in inventory order.
+    """
     if not nodes:
         return {"summary": {"total": 0, "ok": 0, "failed": 0}, "nodes": []}
 
@@ -204,12 +275,16 @@ class FleetInventory(RedfishManagerBase,
     """Read a YAML fleet inventory and summarize node health."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the fleet command."""
         super(FleetInventory, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only fleet subcommand."""
+        """Register the read-only fleet subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = argparse.ArgumentParser(add_help=False)
         cmd_parser.add_argument(
             "--inventory",
@@ -228,6 +303,11 @@ class FleetInventory(RedfishManagerBase,
                 inventory: str,
                 concurrency: int = 8,
                 **kwargs) -> CommandResult:
-        """Execute read-only fan-out over the configured inventory."""
+        """Execute read-only fan-out over the configured inventory.
+
+        :param inventory: path to the YAML inventory file.
+        :param concurrency: maximum concurrent BMC reads.
+        :return: a :class:`CommandResult` whose data holds the fleet summary.
+        """
         nodes = load_inventory(inventory)
         return CommandResult(read_fleet(nodes, concurrency), None, None, None)
