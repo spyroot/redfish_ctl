@@ -1,4 +1,4 @@
-"""iDRAC query bios registry
+"""Change BIOS settings command.
 
 Command provides capability to change bios settings
 from JSON spec or via command line via --attr_name and comma separate list

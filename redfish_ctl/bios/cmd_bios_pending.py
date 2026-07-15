@@ -1,4 +1,4 @@
-"""iDRAC query BIOS pending values.
+"""Query BIOS pending values.
 
 Command provides a raw query of the BIOS attributes that are staged as
 pending (not yet applied).

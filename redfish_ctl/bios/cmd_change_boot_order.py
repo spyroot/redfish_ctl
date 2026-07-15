@@ -1,4 +1,4 @@
-"""iDRAC change boot order and boot options.
+"""Change BIOS boot order and boot options.
 It requires server reboot.
 
     redfish_ctl change-boot-order --from_spec specs/change_boot_order_spec.json
