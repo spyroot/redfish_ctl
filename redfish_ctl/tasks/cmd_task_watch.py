@@ -1,9 +1,13 @@
-"""iDRAC export system config command.
+"""iDRAC task watch command.
 
 Command provides the option to retrieve firmware setting from iDRAC and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
+
+Example::
+
+    redfish_ctl task-watch --task_id JID_744718373591
 
 Author Mus spyroot@gmail.com
 """
@@ -35,14 +39,15 @@ class GetTask(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the task-watch command."""
         super(GetTask, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command arguments.
-        :param cls:
-        :return:
+        """Register the task-watch subcommand and its arguments.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = argparse.ArgumentParser(add_help=False)
         cmd_parser.add_argument('--async', action='store_true',
@@ -68,13 +73,16 @@ class GetTask(
                 do_async: Optional[bool] = False,
                 **kwargs
                 ) -> CommandResult:
-        """watch current task.
-        :param job_id:
-        :param do_async:
-        :param data_type:
-        :param verbose:
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :return:
+        """Fetch the current state of a task by its job id.
+
+        :param job_id: task/job id to fetch (e.g. JID_744718373591).
+        :param data_type: accepted for CLI compatibility; only echoed in verbose
+            logging, not used by this command.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param verbose: enables verbose logging of the received arguments.
+        :param do_async: accepted for CLI compatibility; only echoed in verbose
+            logging, not used by this command.
+        :return: CommandResult wrapping the fetched task payload.
         """
 
         if verbose:

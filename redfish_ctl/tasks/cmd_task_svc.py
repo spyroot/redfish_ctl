@@ -2,6 +2,10 @@
 
 Command provides the option to retrieve task services.
 
+Example::
+
+    redfish_ctl task-svc
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -20,14 +24,15 @@ class Manager(RedfishManagerBase,
     caller can save to a file or output to a file or pass downstream.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the task-svc command."""
         super(Manager, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Registers command args
-        :param cls:
-        :return:
+        """Register the task-svc subcommand and its arguments.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_arg = cls.base_parser()
         help_text = "command fetch task services"
@@ -39,14 +44,15 @@ class Manager(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Queries task servers services from iDRAC.
-        :param do_async:
-        :param verbose:
-        :param do_deep:
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:
-        :return:
-        :raise: AuthenticationFailed, UnexpectedResponse
+        """Query the Redfish TaskService and discover its actions.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: json or xml; json adds the JSON content-type header.
+        :param do_deep: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the TaskService payload and discovered actions.
+        :raises AuthenticationFailed, UnexpectedResponse: on request failure.
         """
         headers = {}
         if data_type == "json":

@@ -2,6 +2,9 @@
 
 Command provides query tasks service and obtains list of task.
 
+Example::
+
+    redfish_ctl task-get
 
 Author Mus spyroot@gmail.com
 """
@@ -30,14 +33,15 @@ class TasksGet(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the task-get command."""
         super(TasksGet, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command and all optional flags.
-        :param cls:
-        :return:
+        """Register the task-get subcommand and its arguments.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('-t' '--task_id', required=True, dest="task_id", type=str,
@@ -54,15 +58,15 @@ class TasksGet(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = True,
                 **kwargs) -> CommandResult:
-        """Executes tasks fetch
+        """Fetch a single task by its id from the Redfish TaskService.
 
-        :param task_id:
+        :param task_id: task id to fetch (appended to the Tasks resource path).
+        :param filename: if set, save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
-        :param do_expanded:  will do expand query
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
-        :return: CommandResult and if filename provide will save to a file.
+        :param do_expanded: issue an expanded ($expand) Redfish query.
+        :return: CommandResult wrapping the task query result.
         """
         target_api = f"/redfish/v1/TaskService/Tasks/{task_id}"
         cmd_result = self.base_query(target_api,
