@@ -391,12 +391,19 @@ class MutationRules(_OverlayStore):
     ) -> dict[str, Any] | None:
         path = _normalize_request_path(request_path)
         corpus_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
+        candidates = [
+            rule
+            for rule in self.rules
+            if isinstance(rule, dict)
+            and self._rule_request_matches(rule, method, path, body)
+        ]
+        corpus_cache = self._load_precondition_corpus(candidates, corpus_lookup)
+        cached_lookup = self._cached_corpus_lookup(corpus_cache)
         with self._lock:
             matched = [
                 rule
-                for rule in self.rules
-                if isinstance(rule, dict)
-                and self._rule_matches(rule, method, path, body, corpus_lookup)
+                for rule in candidates
+                if self._rule_preconditions_hold(rule, cached_lookup)
             ]
             if not matched:
                 return None
@@ -412,6 +419,36 @@ class MutationRules(_OverlayStore):
                 self._applied.append(str(rule.get("name") or "unnamed"))
             response = matched[0].get("response") or {}
             return response if isinstance(response, dict) else {"status": 204}
+
+    @staticmethod
+    def _precondition_paths(rules: list[dict[str, Any]]) -> set[str]:
+        paths: set[str] = set()
+        for rule in rules:
+            for condition in rule.get("when") or []:
+                if not isinstance(condition, dict):
+                    continue
+                resource_path = condition.get("path")
+                if isinstance(resource_path, str):
+                    paths.add(_normalize_request_path(resource_path))
+        return paths
+
+    def _load_precondition_corpus(
+        self,
+        rules: list[dict[str, Any]],
+        corpus_lookup: Any,
+    ) -> dict[str, Any]:
+        return {
+            path: copy.deepcopy(corpus_lookup(path) or {})
+            for path in self._precondition_paths(rules)
+        }
+
+    @staticmethod
+    def _cached_corpus_lookup(corpus_cache: dict[str, Any]) -> Any:
+        def lookup(resource_path: str) -> Any:
+            path = _normalize_request_path(resource_path)
+            return copy.deepcopy(corpus_cache.get(path, {}))
+
+        return lookup
 
     def _roll_failure(self, matched: list[dict[str, Any]]) -> dict[str, Any] | None:
         for rule in matched:
@@ -438,13 +475,12 @@ class MutationRules(_OverlayStore):
             _deep_update(base, overlay)
         return base
 
-    def _rule_matches(
+    def _rule_request_matches(
         self,
         rule: dict[str, Any],
         method: str,
         path: str,
         body: Any,
-        corpus_lookup: Any,
     ) -> bool:
         if str(rule.get("method", "")).upper() != method.upper():
             return False
@@ -460,6 +496,13 @@ class MutationRules(_OverlayStore):
             return False
         if "body_contains" in rule and not _body_contains(body, rule["body_contains"]):
             return False
+        return True
+
+    def _rule_preconditions_hold(
+        self,
+        rule: dict[str, Any],
+        corpus_lookup: Any,
+    ) -> bool:
         for condition in rule.get("when") or []:
             if not isinstance(condition, dict):
                 return False

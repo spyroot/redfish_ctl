@@ -207,3 +207,39 @@ def test_mutation_rules_serialize_concurrent_writes_with_reads(tmp_path: Path) -
         "disable-boot-override": 16,
     }
     assert replay["failed"] == []
+
+
+def test_mutation_rules_load_corpus_state_outside_engine_lock() -> None:
+    """Precondition corpus reads should not run while the mutation lock is held."""
+    module = _load_server_module()
+    engine = module.MutationRules(
+        {
+            "vendor": "lock-scope-test",
+            "rules": [
+                {
+                    "name": "reset-when-powered-on",
+                    "method": "POST",
+                    "path": RESET,
+                    "when": [
+                        {
+                            "path": SYSTEM,
+                            "field": "PowerState",
+                            "equals": "On",
+                        }
+                    ],
+                    "response": {"status": 204},
+                }
+            ],
+        }
+    )
+    lock_available_during_lookup = []
+
+    def corpus_lookup(path: str) -> dict[str, Any]:
+        acquired = engine._lock.acquire(blocking=False)
+        lock_available_during_lookup.append(acquired)
+        if acquired:
+            engine._lock.release()
+        return {"PowerState": "On"} if path == SYSTEM else {}
+
+    assert engine.match_write("POST", RESET, {}, corpus_lookup) == {"status": 204}
+    assert lock_available_during_lookup == [True]
