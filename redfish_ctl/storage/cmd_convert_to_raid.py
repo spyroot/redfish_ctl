@@ -30,6 +30,7 @@ class ConvertToRaid(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the convert-to-raid command."""
         super(ConvertToRaid, self).__init__(*args, **kwargs)
 
     @staticmethod
