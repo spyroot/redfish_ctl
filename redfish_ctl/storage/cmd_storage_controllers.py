@@ -1,7 +1,7 @@
-"""iDRAC storage controller query
+"""Storage controller query command.
 
 Command provides the option to retrieve storage controller information
-from iDRAC and serialize back as caller as JSON, YAML, or XML. In addition,
+from a Redfish endpoint and serialize back as caller as JSON, YAML, or XML. In addition,
 it automatically registered to the command line ctl tool. Similarly to
 the rest command caller can save to a file and consume asynchronously
 or synchronously.
@@ -13,10 +13,10 @@ On return will hold list of controller in CommandResult.data
  'AHCI.Slot.4-1',
  'AHCI.Embedded.2-1']
 
-python redfish_ctl.py storage
+redfish_ctl storage-controllers
 
 Example: filter by controller type
-redfish_ctl.py --json storage --filter AHCI
+redfish_ctl --json storage-controllers --filter AHCI
 
 [
     "AHCI.Embedded.1-1",
@@ -80,7 +80,7 @@ class StorageQuery(RedfishManagerBase, scm_type=ApiRequestType.StorageQuery,
                 do_async: Optional[bool] = False,
                 id_filter: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Query storage controller from idrac.
+        """Query storage controllers from a Redfish endpoint.
 
          Example of members
          "Members": [

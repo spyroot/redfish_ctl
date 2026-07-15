@@ -52,7 +52,7 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/manager/cmd_manager_reset.py:92 execute base_post",
     "redfish_ctl/manager/cmd_manager_time.py:108 execute base_patch",
     "redfish_ctl/storage/cmd_convert_none_raid.py:114 execute base_post",
-    "redfish_ctl/storage/cmd_convert_to_raid.py:117 execute base_post",
+    "redfish_ctl/storage/cmd_convert_to_raid.py:116 execute base_post",
     "redfish_ctl/system/cmd_system_config.py:116 execute base_post",
     "redfish_ctl/system/cmd_system_import.py:151 execute base_post",
     "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:122 execute base_post",

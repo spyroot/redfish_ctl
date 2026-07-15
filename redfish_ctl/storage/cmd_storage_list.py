@@ -1,9 +1,9 @@
-"""iDRAC storage list view
+"""Storage controller list command.
 
 Command provides the option to retrieve list of storage controllers.
 
 Example expanded
-python redfish_ctl.py storage-list -e
+redfish_ctl storage-list -e
 
 Author Mus spyroot@gmail.com
 """
@@ -19,7 +19,7 @@ class StorageListView(RedfishManagerBase,
                       scm_type=ApiRequestType.StorageListQuery,
                       name='storage_list',
                       metaclass=Singleton):
-    """iDRACs REST API fetch storage list information.
+    """Fetch the storage controller list over the Redfish API.
     """
 
     def __init__(self, *args, **kwargs):

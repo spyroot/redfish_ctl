@@ -1,4 +1,10 @@
-"""iDRAC
+"""Storage drive inventory command.
+
+Fetch the physical drives behind a storage controller from a Redfish
+endpoint and report each drive's RAID state.
+
+redfish_ctl storage-drives -c AHCI.Embedded.2-1
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -14,7 +20,7 @@ class DrivesQuery(RedfishManagerBase,
                   scm_type=ApiRequestType.Drives,
                   name='drives_query',
                   metaclass=Singleton):
-    """iDRACs REST API fetch storage information.
+    """Fetch storage drive information over the Redfish API.
     """
 
     def __init__(self, *args, **kwargs):

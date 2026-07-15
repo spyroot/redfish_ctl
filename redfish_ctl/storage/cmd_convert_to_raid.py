@@ -1,13 +1,13 @@
-"""iDRAC
+"""Convert non-RAID physical disks to RAID.
 
-The ConvertToNonRAID() method is used to convert a physical disks in
-RAID state of "Ready" to a Non-RAID state.
+The method is used to convert physical disks in a Non-RAID state to a
+RAID-capable state.
 
 After the method is successfully executed, the
 DCIM_PhysicalDiskView.RAIDStatus property of that physical
 disk should reflect the new state.
 
-python redfish_ctl.py storage-convert-noraid -c AHCI.Embedded.2-1
+redfish_ctl storage-convert-raid -c AHCI.Embedded.2-1
 
 Author Mus spyroot@gmail.com
 """
@@ -25,8 +25,7 @@ class ConvertToRaid(
     scm_type=ApiRequestType.ConvertToRaid,
     name='convert_none_raid',
     metaclass=Singleton):
-    """iDRACs REST API convert none raid disk to raid
-    for a target controller.
+    """Convert non-RAID disks to RAID for a target controller via the Dell RAID service.
     """
 
     def __init__(self, *args, **kwargs):
