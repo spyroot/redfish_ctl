@@ -22,6 +22,11 @@ from ..redfish_manager_shared import (
 
 
 def _as_list(values) -> list[str]:
+    """Normalize a value, list, or comma-string into trimmed non-empty strings.
+
+    :param values: a string, an iterable of strings, or None.
+    :return: a flat list of stripped, non-empty items (empty list when None).
+    """
     if values is None:
         return []
     raw_values = [values] if isinstance(values, str) else list(values)
@@ -39,6 +44,12 @@ class _SubscriptionBase(RedfishManagerBase):
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` of the linked resource under ``key``.
+
+        :param data: the resource dict holding the link.
+        :param key: the property name of the link to resolve.
+        :return: the linked ``@odata.id``, or None when the link is absent.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
@@ -272,11 +283,15 @@ class SubscriptionCreate(_SubscriptionBase,
     """Create an EventDestination subscription after dry-run preview."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the subscription-create command."""
         super(SubscriptionCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
     def register_subcommand(cls):
-        """Register the guarded subscription-create subcommand."""
+        """Register the guarded subscription-create subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--destination", required=True, dest="destination", metavar="URI",
@@ -420,7 +435,10 @@ class SubscriptionDelete(_SubscriptionBase,
 
     @staticmethod
     def register_subcommand(cls):
-        """Register the guarded subscription-delete subcommand."""
+        """Register the guarded subscription-delete subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--subscription", required=True, dest="subscription", metavar="ID_OR_URI",
