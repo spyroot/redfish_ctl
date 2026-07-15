@@ -29,10 +29,21 @@ ReconcileFunc = Callable[..., Any]
 
 
 def _utc_now() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime.
+
+    :return: current time in UTC.
+    """
     return datetime.now(timezone.utc)
 
 
 def _rfc3339(value: datetime) -> str:
+    """Format a datetime as an RFC 3339 UTC string with a ``Z`` suffix.
+
+    Naive values are assumed to be UTC.
+
+    :param value: datetime to format.
+    :return: RFC 3339 timestamp string (seconds precision, ``Z`` zone).
+    """
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     value = value.astimezone(timezone.utc).replace(microsecond=0)
@@ -40,6 +51,11 @@ def _rfc3339(value: datetime) -> str:
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
+    """Return ``value`` if it is a mapping, else an empty mapping.
+
+    :param value: candidate mapping.
+    :return: the mapping, or an empty dict when ``value`` is not one.
+    """
     return value if isinstance(value, Mapping) else {}
 
 
@@ -51,6 +67,16 @@ def _condition(
     message: str = "",
     changed_at: datetime,
 ) -> dict[str, str]:
+    """Build a Kubernetes-style status condition entry.
+
+    :param condition_type: the condition ``type`` value.
+    :param status: tri-state condition value rendered as
+        ``"True"``/``"False"``/``"Unknown"`` (``None`` means unknown).
+    :param reason: machine-readable reason code.
+    :param message: human-readable detail; omitted when empty.
+    :param changed_at: transition time recorded as ``lastTransitionTime``.
+    :return: the condition dict.
+    """
     if status is True:
         status_text = "True"
     elif status is False:
@@ -69,12 +95,23 @@ def _condition(
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
+    """Return a shallow ``dict`` copy of a mapping, else an empty dict.
+
+    :param value: candidate mapping.
+    :return: a dict copy of ``value``, or an empty dict when not a mapping.
+    """
     if isinstance(value, Mapping):
         return dict(value)
     return {}
 
 
 def _planned_step(step: Any) -> dict[str, Any]:
+    """Shape a planned reconcile step into its CR status representation.
+
+    :param step: a planned step object (kind/required/description/preview).
+    :return: dict with the step's ``kind``, ``required``, ``description``, and
+        ``preview``.
+    """
     return {
         "kind": str(getattr(step, "kind", "")),
         "required": bool(getattr(step, "required", False)),
@@ -84,6 +121,11 @@ def _planned_step(step: Any) -> dict[str, Any]:
 
 
 def _applied_change(change: Any) -> dict[str, Any]:
+    """Shape an applied reconcile change into its CR status representation.
+
+    :param change: an applied change object (kind/changed/result).
+    :return: dict with the change's ``kind``, ``changed``, and ``result``.
+    """
     return {
         "kind": str(getattr(change, "kind", "")),
         "changed": bool(getattr(change, "changed", False)),
@@ -92,6 +134,15 @@ def _applied_change(change: Any) -> dict[str, Any]:
 
 
 def plan_hash(planned_steps: list[dict[str, Any]]) -> str | None:
+    """Hash the required steps of a plan for approval matching.
+
+    Only ``required`` steps are hashed, so an unchanged plan yields a stable
+    digest an operator can approve.
+
+    :param planned_steps: the planned steps from a dry-run reconcile.
+    :return: a SHA-256 hex digest of the required steps, or ``None`` when none
+        are required.
+    """
     required_steps = [step for step in planned_steps if step.get("required")]
     if not required_steps:
         return None
@@ -110,6 +161,15 @@ def _approval_reason(
     approved_plan_hash: str | None,
     consumed_plan_hash: str | None,
 ) -> str:
+    """Classify why a plan is or is not approved, as a condition reason code.
+
+    :param approved: whether the current plan is approved to apply.
+    :param current_plan_hash: hash of the current plan's required steps.
+    :param approved_plan_hash: plan hash the spec approves, if any.
+    :param consumed_plan_hash: plan hash already applied, if any.
+    :return: a reason code (``Approved``/``ApprovalConsumed``/
+        ``ApprovalHashMismatch``/``ApprovalRequired``).
+    """
     if approved:
         return "Approved"
     if current_plan_hash and consumed_plan_hash == current_plan_hash:
@@ -128,7 +188,18 @@ def build_status(
     consumed_plan_hash: str | None = None,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Return the RedfishNodeProfile status object from a reconcile result."""
+    """Return the RedfishNodeProfile status object from a reconcile result.
+
+    :param result: the reconcile result (its ``steps``/``applied``/``dry_run``).
+    :param approved: whether the plan was approved and applied.
+    :param approved_plan_hash: plan hash the spec approves, if any.
+    :param plan_hash_value: precomputed plan hash; recomputed from steps when
+        omitted.
+    :param consumed_plan_hash: plan hash already applied, if any.
+    :param reconciled_at: timestamp recorded as ``lastReconciled``; defaults to
+        now.
+    :return: the ``.status`` object for the RedfishNodeProfile CR.
+    """
     observed_at = reconciled_at or _utc_now()
     steps = tuple(getattr(result, "steps", ()))
     applied = tuple(getattr(result, "applied", ()))
@@ -190,7 +261,13 @@ def build_error_status(
     *,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Return status for controller failures that occur before reconcile runs."""
+    """Return status for controller failures that occur before reconcile runs.
+
+    :param message: the failure detail recorded on the condition.
+    :param reconciled_at: timestamp recorded as ``lastReconciled``; defaults to
+        now.
+    :return: a ``.status`` object marking reconcile unavailable.
+    """
     observed_at = reconciled_at or _utc_now()
     return {
         "dryRun": True,
@@ -211,6 +288,12 @@ def build_error_status(
 
 
 def _endpoint_spec(spec: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return the required ``spec.endpoint`` mapping.
+
+    :param spec: the CR spec.
+    :return: the ``endpoint`` mapping.
+    :raises ValueError: when ``spec.endpoint`` is missing or empty.
+    """
     endpoint = _mapping(spec.get("endpoint"))
     if not endpoint:
         raise ValueError("RedfishNodeProfile spec.endpoint is required")
@@ -218,6 +301,14 @@ def _endpoint_spec(spec: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _manager_address(endpoint: Mapping[str, Any]) -> tuple[str, int, bool]:
+    """Resolve the BMC host, port, and HTTP flag from the endpoint spec.
+
+    Accepts either a bare host/IP (with ``port``) or an ``http(s)://`` URL.
+
+    :param endpoint: the ``spec.endpoint`` mapping (address/port).
+    :return: tuple of (host, port, whether to use plain HTTP).
+    :raises ValueError: when the address is empty or a URL lacks a host.
+    """
     raw_address = str(endpoint.get("address") or "").strip()
     if not raw_address:
         raise ValueError("RedfishNodeProfile spec.endpoint.address is required")
@@ -238,6 +329,13 @@ def _make_manager(
     credentials: Mapping[str, str],
     manager_factory: ManagerFactory,
 ) -> Any:
+    """Build a Redfish manager for the endpoint from spec and credentials.
+
+    :param endpoint: the ``spec.endpoint`` mapping (address/port/insecure).
+    :param credentials: username/password mapping for BMC auth.
+    :param manager_factory: callable that constructs the manager.
+    :return: the constructed manager instance.
+    """
     address, port, is_http = _manager_address(endpoint)
     return manager_factory(
         idrac_ip=address,
@@ -251,6 +349,11 @@ def _make_manager(
 
 
 def _load_reconcile_func() -> ReconcileFunc:
+    """Import and return the reconcile function, lazily.
+
+    :return: the ``redfish_ctl.reconcile.reconcile`` callable.
+    :raises RuntimeError: when ``redfish_ctl.reconcile`` cannot be imported.
+    """
     try:
         from redfish_ctl.reconcile import reconcile
     except ImportError as exc:  # pragma: no cover - depends on merge order.
@@ -267,7 +370,22 @@ def reconcile_profile(
     reconcile_func: ReconcileFunc | None = None,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Plan or apply the desired state from a RedfishNodeProfile spec."""
+    """Plan or apply the desired state from a RedfishNodeProfile spec.
+
+    Runs a dry-run plan first; applies only when the spec's approved plan hash
+    matches the current plan and has not already been consumed.
+
+    :param spec: the CR spec (endpoint, desired state, approval hash).
+    :param credentials: username/password mapping for BMC auth.
+    :param current_status: the current ``.status``, read for
+        ``consumedPlanHash``.
+    :param manager_factory: callable that constructs the manager.
+    :param reconcile_func: reconcile callable; loaded lazily when omitted.
+    :param reconciled_at: timestamp recorded as ``lastReconciled``; defaults to
+        now.
+    :return: the ``.status`` object (dry-run plan, or applied result when
+        approved).
+    """
     endpoint = _endpoint_spec(spec)
     desired_state = _mapping(spec.get("desiredState"))
     manager = _make_manager(endpoint, credentials or {}, manager_factory)
@@ -317,6 +435,12 @@ def reconcile_profile(
 
 
 def _decode_secret_value(data: Mapping[str, str], key: str) -> str | None:
+    """Decode a base64 Secret field, or ``None`` when the key is absent/empty.
+
+    :param data: the Secret ``data`` mapping (base64-encoded values).
+    :param key: the field name to decode.
+    :return: the decoded UTF-8 value, or ``None`` when missing.
+    """
     encoded = data.get(key)
     if not encoded:
         return None
@@ -332,6 +456,10 @@ def load_secret_credentials(
     Shares the process-wide client from :mod:`redfish_ctl.kube_client` with the
     endpoint controller (both run in one kopf process), so the kube config is
     loaded once for the whole process instead of on every handler thread.
+
+    :param namespace: namespace of the CR (and its Secret); empty skips the read.
+    :param secret_ref: ``spec.endpoint.secretRef`` naming the Secret and keys.
+    :return: mapping with ``username``/``password`` when found, else empty.
     """
     if not namespace or not secret_ref or not secret_ref.get("name"):
         return {}
@@ -370,6 +498,13 @@ def reconcile_redfish_node_profile(
     ``status.reconcile_redfish_node_profile``, a field the structural CRD
     schema rejects, which surfaces a "merge-patching finished with
     inconsistencies" warning on every reconcile.
+
+    :param spec: the CR spec (endpoint, desired state, approval hash).
+    :param body: the full CR body; used to read the current ``.status``.
+    :param namespace: namespace of the CR, for the Secret read and logging.
+    :param name: name of the CR, for logging.
+    :param logger: kopf logger; the reconcile is logged when provided.
+    :param patch: kopf patch object the new ``.status`` is written into.
     """
     endpoint = _mapping(spec.get("endpoint"))
     credentials = load_secret_credentials(namespace, endpoint.get("secretRef"))
