@@ -5,6 +5,11 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
 
+Example::
+
+    redfish_ctl firmware_inventory
+    redfish_ctl firmware_inventory --filename fw.json
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -26,14 +31,15 @@ class FirmwareInventoryQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the firmware_inventory command."""
         super(FirmwareInventoryQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command.
-        :param cls:
-        :return:
+        """Register the firmware_inventory subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_arg = argparse.ArgumentParser(add_help=False)
         cmd_arg.add_argument('--async', action='store_true', required=False, dest="do_async",

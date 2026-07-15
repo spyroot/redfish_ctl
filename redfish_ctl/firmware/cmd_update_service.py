@@ -1,4 +1,10 @@
-"""Read Redfish UpdateService capabilities and advertised actions."""
+"""Read Redfish UpdateService capabilities and advertised actions.
+
+Example::
+
+    redfish_ctl update_service
+    redfish_ctl update_service -f update_service.json
+"""
 from abc import abstractmethod
 from typing import Optional
 
@@ -16,27 +22,50 @@ class UpdateServiceQuery(RedfishManagerBase,
     """Read the service, inventory links, push URIs, and action targets."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the update_service command."""
         super(UpdateServiceQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only update_service subcommand."""
+        """Register the read-only update_service subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read UpdateService capabilities and actions"
         return cmd_parser, "update_service", help_text
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` for a link entry, or None.
+
+        :param data: the resource dict to read the link from.
+        :param key: the link property name.
+        :return: the referenced ``@odata.id`` string, or None when absent or not
+            a link object.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     @staticmethod
     def _action_name(full_name):
+        """Shorten a fully qualified action name to its trailing segment.
+
+        :param full_name: the fully qualified action name (e.g.
+            ``#UpdateService.SimpleUpdate``).
+        :return: the action name after the final dot.
+        """
         return full_name.lstrip("#").split(".")[-1]
 
     @classmethod
     def _collect_actions(cls, node):
+        """Recursively collect Redfish action entries from an Actions node.
+
+        :param node: an Actions mapping (or nested dict) to walk.
+        :return: a list of action rows with Name, FullName, Target, ActionInfo,
+            and Parameters.
+        """
         rows = []
         if not isinstance(node, dict):
             return rows
@@ -62,6 +91,12 @@ class UpdateServiceQuery(RedfishManagerBase,
         return rows
 
     def _update_service_uri(self, do_async):
+        """Resolve the UpdateService URI from the service root, with a fallback.
+
+        :param do_async: query the service root asynchronously.
+        :return: the UpdateService ``@odata.id``, or
+            ``REDFISH_API.UpdateServiceQuery`` when the root exposes no link.
+        """
         try:
             root = self.base_query(RedfishApi.Version, do_async=do_async).data or {}
         except Exception:
@@ -77,7 +112,15 @@ class UpdateServiceQuery(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read UpdateService without invoking any update action."""
+        """Read UpdateService without invoking any update action.
+
+        :param filename: if set, save the summarized response to this file.
+        :param data_type: json or xml; serialization format passed to the query.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: read UpdateService asynchronously.
+        :return: CommandResult with the summarized UpdateService (metadata,
+            inventory links, push URIs, and sorted action targets).
+        """
         service_uri = self._update_service_uri(do_async)
         result = self.base_query(service_uri, do_async=do_async, data_type=data_type)
         service = result.data or {}
