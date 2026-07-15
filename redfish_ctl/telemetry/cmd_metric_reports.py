@@ -32,12 +32,16 @@ class MetricReports(RedfishManagerBase,
     """Read every Redfish TelemetryService MetricReport (platform + accelerator OOB metrics)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the metric-reports command."""
         super(MetricReports, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``metric-reports`` subcommand and its one optional filter."""
+        """Register the ``metric-reports`` subcommand and its one optional filter.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--report', required=False, dest="report", default=None, type=str,
@@ -47,7 +51,11 @@ class MetricReports(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: parsed Redfish collection resource, or any value.
+        :return: list of member @odata.id strings; empty when data is not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -67,6 +75,15 @@ class MetricReports(RedfishManagerBase,
         non-dict sample (each is skipped). ``report`` narrows to reports whose id
         contains that substring (case-insensitive) — e.g. ``ProcessorMetrics`` to
         scope to GPU/CPU processor telemetry on an HGX baseboard.
+
+        :param report: if set, keep only reports whose id contains this substring
+            (case-insensitive); None returns every report.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: when True, issue an expanded ($expand) query for the collection.
+        :return: CommandResult wrapping the flattened metric-value rows.
         """
         rows = []
         reports_uri = f"{RedfishApi.Version}/TelemetryService/MetricReports"

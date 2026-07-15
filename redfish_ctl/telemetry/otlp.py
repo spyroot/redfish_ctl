@@ -40,7 +40,11 @@ _MISSING_SDK_MSG = (
 
 
 def is_monotonic_counter(metric_name: str) -> bool:
-    """True when ``metric_name`` is a cumulative counter that should be an OTLP Sum."""
+    """True when ``metric_name`` is a cumulative counter that should be an OTLP Sum.
+
+    :param metric_name: the metric name to classify.
+    :return: True for a monotonic cumulative counter, False for a gauge.
+    """
     if metric_name in _COUNTER_EXACT:
         return True
     return any(metric_name.endswith(sfx) for sfx in _COUNTER_SUFFIXES)
@@ -53,6 +57,11 @@ def resolve_otlp_config(endpoint: Optional[str] = None,
 
     Metric-signal-specific vars win over the generic ones, matching the OTel spec
     so redfish_ctl behaves like every other OTLP producer in the pipeline.
+
+    :param endpoint: explicit OTLP endpoint; falls back to OTEL_* env when None.
+    :param protocol: explicit OTLP transport; falls back to OTEL_* env, else ``grpc``.
+    :param headers: explicit OTLP headers; falls back to OTEL_* env when None.
+    :return: tuple of (endpoint, protocol, headers) after resolution.
     """
     endpoint = (endpoint
                 or os.environ.get("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
@@ -68,7 +77,12 @@ def resolve_otlp_config(endpoint: Optional[str] = None,
 
 
 def _resource_attrs(samples, service_name: str) -> dict:
-    """Pull the shared identity dims off the samples for the OTel Resource."""
+    """Pull the shared identity dims off the samples for the OTel Resource.
+
+    :param samples: iterable of MetricSample objects to read identity dims from.
+    :param service_name: value for the ``service.name`` resource attribute.
+    :return: dict of OTel resource attributes.
+    """
     attrs = {"service.name": service_name}
     for sample in samples:
         for key in RESOURCE_DIM_KEYS:
@@ -79,7 +93,15 @@ def _resource_attrs(samples, service_name: str) -> dict:
 
 def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ctl",
                               timestamp_ns: Optional[int] = None):
-    """Build an OTLP ``MetricsData`` from exporter ``MetricSample``s (lazy SDK import)."""
+    """Build an OTLP ``MetricsData`` from exporter ``MetricSample``s (lazy SDK import).
+
+    :param samples: iterable of exporter MetricSample objects.
+    :param service_name: value for the ``service.name`` resource attribute.
+    :param timestamp_ns: unix nanosecond timestamp for every datapoint; ``time.time_ns()``
+        when None.
+    :return: an OTLP ``MetricsData`` grouping the samples into Sum/Gauge metrics.
+    :raises RuntimeError: when the OpenTelemetry SDK is not installed.
+    """
     try:
         from opentelemetry.sdk.metrics.export import (
             AggregationTemporality,
@@ -133,7 +155,14 @@ def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ct
 
 
 def _build_exporter(endpoint: Optional[str], protocol: str, headers: Optional[str]):
-    """Construct the grpc or http OTLP metric exporter (lazy import)."""
+    """Construct the grpc or http OTLP metric exporter (lazy import).
+
+    :param endpoint: OTLP endpoint passed to the exporter; omitted when None.
+    :param protocol: transport selector; ``http*`` picks the HTTP exporter, else grpc.
+    :param headers: OTLP headers passed to the exporter; omitted when None.
+    :return: a configured OTLPMetricExporter instance.
+    :raises RuntimeError: when the OpenTelemetry SDK/exporter is not installed.
+    """
     kwargs: dict = {}
     if endpoint:
         kwargs["endpoint"] = endpoint
@@ -156,7 +185,15 @@ def _build_exporter(endpoint: Optional[str], protocol: str, headers: Optional[st
 def push_otlp(samples: Iterable, service_name: str = "redfish_ctl",
               endpoint: Optional[str] = None, protocol: Optional[str] = None,
               headers: Optional[str] = None):
-    """Build OTLP metrics from samples and export them once. Returns the export result."""
+    """Build OTLP metrics from samples and export them once. Returns the export result.
+
+    :param samples: iterable of exporter MetricSample objects to export.
+    :param service_name: value for the ``service.name`` resource attribute.
+    :param endpoint: OTLP endpoint; resolved from OTEL_* env when None.
+    :param protocol: OTLP transport; resolved from OTEL_* env, else ``grpc``.
+    :param headers: OTLP headers; resolved from OTEL_* env when None.
+    :return: the exporter's ``MetricExportResult`` from the single export call.
+    """
     endpoint, protocol, headers = resolve_otlp_config(endpoint, protocol, headers)
     metrics_data = metrics_data_from_samples(samples, service_name)
     exporter = _build_exporter(endpoint, protocol, headers)
@@ -170,7 +207,16 @@ def run_otlp_loop(scrape_samples: Callable[[], Iterable], interval: float,
                   service_name: str = "redfish_ctl", endpoint: Optional[str] = None,
                   protocol: Optional[str] = None, headers: Optional[str] = None,
                   sleep: Callable[[float], None] = time.sleep) -> None:  # pragma: no cover
-    """Scrape and push OTLP on a fixed interval until interrupted."""
+    """Scrape and push OTLP on a fixed interval until interrupted.
+
+    :param scrape_samples: callable returning a fresh iterable of MetricSample per scrape.
+    :param interval: seconds between scrapes; clamped to a minimum of 1 second.
+    :param service_name: value for the ``service.name`` resource attribute.
+    :param endpoint: OTLP endpoint; resolved from OTEL_* env when None.
+    :param protocol: OTLP transport; resolved from OTEL_* env, else ``grpc``.
+    :param headers: OTLP headers; resolved from OTEL_* env when None.
+    :param sleep: sleep function between scrapes (injectable for testing).
+    """
     endpoint, protocol, headers = resolve_otlp_config(endpoint, protocol, headers)
     exporter = _build_exporter(endpoint, protocol, headers)
     try:

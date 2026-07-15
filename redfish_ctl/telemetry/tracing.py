@@ -33,7 +33,10 @@ BMC_PEER_SERVICE = "bmc"
 
 
 def enable_tracing(tracer: Any) -> None:
-    """Turn tracing on with a ready OpenTelemetry tracer (or off with None)."""
+    """Turn tracing on with a ready OpenTelemetry tracer (or off with None).
+
+    :param tracer: an OpenTelemetry tracer to install, or None to disable tracing.
+    """
     global _TRACER
     _TRACER = tracer
 
@@ -49,6 +52,10 @@ def setup_otlp(service_name: str = "redfish-ctl") -> None:
     Requires the OpenTelemetry SDK + OTLP exporter (the ``[otlp]`` extra);
     raises a clear error otherwise. ``service.name`` becomes the APM service
     map node.
+
+    :param service_name: value for the ``service.name`` resource attribute (the APM
+        service-map node name).
+    :raises RuntimeError: when the OpenTelemetry SDK or an OTLP exporter is not installed.
     """
     try:
         from opentelemetry.sdk.resources import Resource
@@ -85,13 +92,19 @@ def disable_tracing() -> None:
 
 
 def is_enabled() -> bool:
-    """True when a tracer is installed."""
+    """True when a tracer is installed.
+
+    :return: True when tracing is on, False when every helper no-ops.
+    """
     return _TRACER is not None
 
 
 @contextlib.contextmanager
 def operation_span(name: str) -> Iterator[Any]:
-    """Root/parent span for one command operation. No-op when tracing is off."""
+    """Root/parent span for one command operation. No-op when tracing is off.
+
+    :param name: span name, typically the command being executed.
+    """
     if _TRACER is None:
         yield None
         return
@@ -106,6 +119,9 @@ def client_span(url: str, method: str) -> Iterator[Any]:
     """CLIENT span for one BMC HTTP call. No-op when tracing is off.
 
     The BMC becomes an inferred downstream service via ``peer.service``.
+
+    :param url: BMC request URL; its hostname becomes ``server.address``.
+    :param method: HTTP method for the call (``http.request.method``).
     """
     if _TRACER is None:
         yield None
@@ -124,7 +140,11 @@ def client_span(url: str, method: str) -> Iterator[Any]:
 
 
 def record_response(span: Any, status_code: Optional[int]) -> None:
-    """Attach the HTTP status to a CLIENT span; mark ERROR on a 4xx/5xx."""
+    """Attach the HTTP status to a CLIENT span; mark ERROR on a 4xx/5xx.
+
+    :param span: the CLIENT span to annotate, or None to no-op.
+    :param status_code: HTTP response status code, or None to no-op.
+    """
     if span is None or status_code is None:
         return
     from opentelemetry.trace import Status, StatusCode
@@ -136,7 +156,11 @@ def record_response(span: Any, status_code: Optional[int]) -> None:
 
 
 def record_exception(span: Any, exc: BaseException) -> None:
-    """Mark a span failed from a transport exception (timeout, connect error)."""
+    """Mark a span failed from a transport exception (timeout, connect error).
+
+    :param span: the span to annotate, or None to no-op.
+    :param exc: the transport exception to record on the span.
+    """
     if span is None:
         return
     from opentelemetry.trace import Status, StatusCode
@@ -147,7 +171,11 @@ def record_exception(span: Any, exc: BaseException) -> None:
 
 
 def record_result(span: Any, result: Any) -> None:
-    """Mark an operation span failed when its CommandResult carries an error."""
+    """Mark an operation span failed when its CommandResult carries an error.
+
+    :param span: the operation span to annotate, or None to no-op.
+    :param result: a CommandResult whose ``error`` attribute, when set, marks the span failed.
+    """
     if span is None:
         return
     error = getattr(result, "error", None)

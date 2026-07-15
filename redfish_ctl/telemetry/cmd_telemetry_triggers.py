@@ -25,19 +25,27 @@ class TelemetryTriggers(RedfishManagerBase,
     """Read every TelemetryService Trigger (metric alert threshold)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the telemetry-triggers command."""
         super(TelemetryTriggers, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``telemetry-triggers`` subcommand (read-only)."""
+        """Register the ``telemetry-triggers`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read TelemetryService triggers (metric alert thresholds)"
         return cmd_parser, "telemetry-triggers", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: parsed Redfish collection resource, or any value.
+        :return: list of member @odata.id strings; empty when data is not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -50,7 +58,15 @@ class TelemetryTriggers(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk the Triggers collection and summarize each trigger."""
+        """Walk the Triggers collection and summarize each trigger.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: when True, issue an expanded ($expand) query for the collection.
+        :return: CommandResult wrapping the list of trigger summary rows.
+        """
         rows = []
         triggers_uri = f"{RedfishApi.Version}/TelemetryService/Triggers"
         try:
