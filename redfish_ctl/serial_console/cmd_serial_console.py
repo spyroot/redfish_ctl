@@ -45,12 +45,16 @@ class SerialConsoleConfig(RedfishManagerBase,
     """Report or enable host BIOS serial redirection together with BMC SOL."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the serial-console command."""
         super(SerialConsoleConfig, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``serial-console`` subcommand."""
+        """Register the ``serial-console`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--enable', action='store_true', dest='enable', default=False,
@@ -68,7 +72,12 @@ class SerialConsoleConfig(RedfishManagerBase,
         return cmd_parser, "serial-console", help_text
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure (read is best-effort)."""
+        """GET a resource body, returning {} on any failure (read is best-effort).
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: issue the query on the async event loop when True.
+        :return: the parsed response body, or {} when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -81,6 +90,10 @@ class SerialConsoleConfig(RedfishManagerBase,
         Prefers an explicit override, then a known attribute name, then any
         attribute that looks like a serial-console knob. Returns ``None`` when the
         BIOS exposes nothing recognizable.
+
+        :param bios_attrs: the system's BIOS ``Attributes`` mapping.
+        :param override_attr: explicit attribute name to use, or None to auto-detect.
+        :return: the resolved BIOS attribute name, or None when none is recognizable.
         """
         if override_attr:
             return override_attr
@@ -104,7 +117,27 @@ class SerialConsoleConfig(RedfishManagerBase,
                 bios_attr: Optional[str] = None,
                 bios_value: Optional[str] = None,
                 **kwargs) -> CommandResult:
-        """Report serial-console/SOL state; with ``enable`` set both (guarded)."""
+        """Report serial-console/SOL state; with ``enable`` set both (guarded).
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the underlying queries and PATCHes on the async
+            event loop when True.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param enable: enable BIOS serial redirection and the BMC SOL service;
+            when False only the current state is reported.
+        :param confirm: actually apply the changes; without it ``enable`` only
+            previews the resolved targets and payloads (dry-run).
+        :param bios_attr: serial BIOS attribute to set; auto-discovered when omitted.
+        :param bios_value: value that enables redirection; defaults to the known
+            value for the resolved attribute.
+        :return: CommandResult whose data is the current status (report mode), a
+            dry-run preview (``enable`` without ``confirm``), or the applied result
+            (``enable`` with ``confirm``).
+        :raises InvalidArgument: when no serial BIOS attribute can be resolved, or
+            no enable value is known for it and ``--bios_value`` is not given.
+        """
         system_uri = self.idrac_manage_servers
         bios = self._get(f"{system_uri}/Bios", do_async)
         bios_attrs = bios.get("Attributes", {}) if isinstance(bios, dict) else {}

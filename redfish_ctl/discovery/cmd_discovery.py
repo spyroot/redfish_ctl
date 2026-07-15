@@ -2,6 +2,9 @@
 
 Command discover all idrac / redfish resources.
 
+    redfish_ctl discovery
+    redfish_ctl discovery --network 192.168.254.0/24
+
 Author Mus spyroot@gmail.com
 """
 import json

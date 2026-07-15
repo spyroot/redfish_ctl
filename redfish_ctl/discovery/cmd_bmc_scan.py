@@ -31,12 +31,16 @@ class BmcScan(RedfishManagerBase,
     """Scan a CIDR for hosts exposing a Redfish ServiceRoot."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the bmc-scan command."""
         super(BmcScan, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``bmc-scan`` subcommand and its scan flags."""
+        """Register the ``bmc-scan`` subcommand and its scan flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--subnet', required=False, dest='subnet', type=str, default=None,
@@ -63,7 +67,21 @@ class BmcScan(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Expand the CIDR and probe each host concurrently for a Redfish BMC."""
+        """Expand the CIDR and probe each host concurrently for a Redfish BMC.
+
+        :param subnet: network segment to scan as a CIDR (e.g. 10.43.3.0/24);
+            required — a missing value returns an error result.
+        :param scan_port: HTTPS port to probe on each host.
+        :param scan_timeout: per-host probe timeout in seconds.
+        :param scan_workers: number of concurrent probes.
+        :param filename: if set, save the discovered BMC list to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data is the list of discovered BMCs, or an
+            error message when --subnet is missing or invalid.
+        """
         if not subnet:
             return CommandResult(
                 [], None, None,

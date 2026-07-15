@@ -29,12 +29,16 @@ class Logs(RedfishManagerBase,
     """Read log-service entries from every system and manager."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the logs command."""
         super(Logs, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``logs`` subcommand."""
+        """Register the ``logs`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--limit', required=False, dest='limit', type=int, default=50,
@@ -43,14 +47,23 @@ class Logs(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (or any value; non-dicts yield []).
+        :return: list of member ``@odata.id`` strings.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure."""
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: issue the query on the async event loop when True.
+        :return: the parsed response body, or {} when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -58,7 +71,12 @@ class Logs(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None."""
+        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None.
+
+        :param data: the resource body holding the link (may be None).
+        :param key: the property name whose ``@odata.id`` to extract.
+        :return: the link target URI, or None when absent or malformed.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
@@ -67,6 +85,8 @@ class Logs(RedfishManagerBase,
 
         Log services hang off different roots per vendor — Systems/Managers on
         iLO, Chassis on the GB300 — so all three are walked.
+
+        :return: list of root resource URIs to inspect for log services.
         """
         roots = []
         for finder in (self.discover_computer_system_ids, self.discover_manager_ids):
@@ -88,7 +108,17 @@ class Logs(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk LogServices on every system/manager and collect capped entries."""
+        """Walk LogServices on every system/manager and collect capped entries.
+
+        :param limit: max entries collected per log service.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the underlying queries on the async event loop when True.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data is a list of flattened log-entry rows
+            {Source, Service, Id, Severity, Created, Message}.
+        """
         rows = []
         for root_uri in self._roots():
             rdata = self._get(root_uri, do_async)
