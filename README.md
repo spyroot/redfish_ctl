@@ -70,9 +70,9 @@ redfish_ctl --help             # every subcommand
 
 Reads are safe. Commands that change hardware are labeled **Guarded** or **Write** in the
 [command reference](docs/commands.md#registered-commands): Guarded commands require an explicit
-intent flag such as `--confirm`, while Write commands may mutate immediately. Preview with
-`--show` or `--dry_run` when the command supports it, then see [Mutating Commands](#mutating-commands)
-below before applying anything.
+intent flag such as `--confirm`; Write commands can mutate immediately and require explicit target
+approval before live use. Preview with `--show` or `--dry_run` when the command supports it, then
+see [Mutating Commands](#mutating-commands) below before applying anything.
 
 > **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
 > and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
@@ -233,8 +233,8 @@ opt-in emulator canary in `examples/hpe_ilo_canary.sh`. See [Vendors](docs/vendo
 ## Mutating Commands
 
 Some commands change real hardware: power, BIOS, boot order, storage conversion, virtual media,
-firmware update, and manager reset. Read current state first, preview when the command has
-`--show` or `--dry_run`, then verify after the job or task completes.
+firmware update, and BMC manager reboot (`manager-reboot`). Read current state first, preview when
+the command has `--show` or `--dry_run`, then verify after the job or task completes.
 
 ```bash
 redfish_ctl system-reset --reset_type GracefulRestart --dry_run

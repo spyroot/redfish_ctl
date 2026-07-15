@@ -25,14 +25,27 @@ DEFAULT_ROLE = "ReadOnly"
 
 
 def build_create_payload(username: str, password: str, role: str) -> dict:
-    """Build the POST body that creates a ManagerAccount."""
+    """Build the POST body that creates a ManagerAccount.
+
+    :param username: UserName for the new account.
+    :param password: cleartext password for the new account.
+    :param role: Redfish RoleId to assign; falls back to ``DEFAULT_ROLE``
+        (``ReadOnly``) when falsy (e.g. empty string or None).
+    :return: dict payload with UserName/Password/RoleId keys.
+    """
     return {"UserName": username, "Password": password, "RoleId": role or DEFAULT_ROLE}
 
 
 def build_update_payload(password: Optional[str],
                          role: Optional[str],
                          enabled: Optional[bool]) -> dict:
-    """Build a PATCH body from only the fields the caller actually set."""
+    """Build a PATCH body from only the fields the caller actually set.
+
+    :param password: new password, or None to leave it unchanged.
+    :param role: new Redfish RoleId, or None to leave it unchanged.
+    :param enabled: new Enabled state, or None to leave it unchanged.
+    :return: dict with only the keys that were supplied (may be empty).
+    """
     payload: dict = {}
     if password is not None:
         payload["Password"] = password
@@ -44,7 +57,11 @@ def build_update_payload(password: Optional[str],
 
 
 def _mask(payload: dict) -> dict:
-    """Return a copy of a payload with the Password value masked for display."""
+    """Return a copy of a payload with the Password value masked for display.
+
+    :param payload: request body that may contain a ``Password`` key.
+    :return: shallow copy with the ``Password`` value replaced by ``***``.
+    """
     return {k: ("***" if k == "Password" else v) for k, v in payload.items()}
 
 
@@ -60,6 +77,11 @@ class _AccountBase(RedfishManagerBase):
         collection is fetched WITHOUT ``$expand`` because some services (HPE iLO 5)
         reject an expanded Accounts query with HTTP 400; each member is fetched
         individually instead.
+
+        :param username: UserName to match, or None to match by id only.
+        :param account_id: account Id to match, or None to match by username only.
+        :return: tuple ``(uri, data)`` for the matched account, or
+            ``(None, {})`` when no member matches.
         """
         coll = (self.base_query(REDFISH_API.Accounts).data or {})
         for m in coll.get("Members", []):
@@ -79,11 +101,13 @@ class AccountCreate(_AccountBase,
     """Create a new Redfish account (dry-run unless --confirm)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the account-create command."""
         super(AccountCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the ``account-create`` subcommand and its flags."""
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=True, type=str, dest='acct_user',
                                 help="new account UserName")
@@ -98,6 +122,16 @@ class AccountCreate(_AccountBase,
 
     def execute(self, acct_user=None, acct_password=None, acct_role=DEFAULT_ROLE,
                 acct_confirm=False, **kwargs) -> CommandResult:
+        """Create a Redfish account (dry-run unless confirmed).
+
+        :param acct_user: UserName for the new account.
+        :param acct_password: password for the new account (never logged).
+        :param acct_role: Redfish RoleId to assign (default ``ReadOnly``).
+        :param acct_confirm: when False (default) return the masked payload
+            without writing; when True POST it to the Accounts collection.
+        :return: CommandResult describing the dry-run preview or the create
+            result (status and any error).
+        """
         payload = build_create_payload(acct_user, acct_password, acct_role)
         if not acct_confirm:
             return CommandResult(
@@ -116,11 +150,13 @@ class AccountUpdate(_AccountBase,
     """Update a Redfish account's password/role/enabled (dry-run unless --confirm)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the account-update command."""
         super(AccountUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the ``account-update`` subcommand and its flags."""
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None,
@@ -135,6 +171,19 @@ class AccountUpdate(_AccountBase,
 
     def execute(self, acct_user=None, acct_id=None, acct_role=None, acct_password=None,
                 acct_enabled=None, acct_confirm=False, **kwargs) -> CommandResult:
+        """Update a Redfish account's password, role, or enabled state.
+
+        :param acct_user: UserName of the account to update (or use acct_id).
+        :param acct_id: account Id to update instead of matching by username.
+        :param acct_role: new Redfish RoleId, or None to leave unchanged.
+        :param acct_password: new password, or None to leave unchanged.
+        :param acct_enabled: ``true``/``false`` string to enable or disable the
+            account, or None to leave unchanged.
+        :param acct_confirm: when False (default) return a masked dry-run
+            preview; when True PATCH the account resource.
+        :return: CommandResult with the dry-run preview or the update result;
+            an error when no target/field is given or the account is not found.
+        """
         if not acct_user and not acct_id:
             return CommandResult(None, None, None, "provide --username or --id")
         enabled = None
@@ -163,11 +212,13 @@ class AccountDelete(_AccountBase,
     """Delete a Redfish account (refuses without --confirm; never self-deletes)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the account-delete command."""
         super(AccountDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the ``account-delete`` subcommand and its flags."""
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None)
@@ -177,6 +228,16 @@ class AccountDelete(_AccountBase,
         return cmd_parser, "account-delete", "delete a Redfish account (guarded, irreversible)"
 
     def execute(self, acct_user=None, acct_id=None, acct_confirm=False, **kwargs) -> CommandResult:
+        """Delete a Redfish account (guarded, never self-deletes).
+
+        :param acct_user: UserName of the account to delete (or use acct_id).
+        :param acct_id: account Id to delete instead of matching by username.
+        :param acct_confirm: when False (default) return a dry-run preview;
+            when True DELETE the account resource (irreversible).
+        :return: CommandResult with the dry-run preview or delete result; an
+            error when no target is given, the account is not found, or the
+            target is the logged-in account (self-delete guard).
+        """
         if not acct_user and not acct_id:
             return CommandResult(None, None, None, "provide --username or --id")
         uri, data = self._resolve_account(acct_user, acct_id)

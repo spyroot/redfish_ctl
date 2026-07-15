@@ -10,7 +10,7 @@ Safety labels:
 
 - **Read**: reads BMC state only.
 - **Guarded**: previews by default or requires an explicit apply flag such as `--confirm`.
-- **Write**: stages or applies BMC or host state.
+- **Write**: can stage or apply BMC or host state; do not run live without explicit target approval.
 
 Platform/vendor labels:
 

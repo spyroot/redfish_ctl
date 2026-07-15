@@ -18,6 +18,7 @@ class DrivesQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the drives_query command."""
         super(DrivesQuery, self).__init__(*args, **kwargs)
 
     @staticmethod

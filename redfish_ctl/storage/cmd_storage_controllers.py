@@ -45,6 +45,7 @@ class StorageQuery(RedfishManagerBase, scm_type=ApiRequestType.StorageQuery,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the storage_query command."""
         super(StorageQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
