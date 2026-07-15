@@ -29,12 +29,16 @@ class EventSubmitTest(RedfishManagerBase,
     """Submit a test event via EventService.SubmitTestEvent."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the event-submit-test command."""
         super(EventSubmitTest, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``event-submit-test`` subcommand."""
+        """Register the ``event-submit-test`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--message_id', required=False, dest='message_id', type=str,
@@ -49,7 +53,11 @@ class EventSubmitTest(RedfishManagerBase,
         return cmd_parser, "event-submit-test", "command submit a Redfish test event"
 
     def _event_service_uri(self, do_async):
-        """Resolve the EventService URI from the service root, with a standard fallback."""
+        """Resolve the EventService URI from the service root, with a standard fallback.
+
+        :param do_async: issue the service-root query over the async Redfish path when True.
+        :return: the EventService ``@odata.id``, or the standard fallback URI.
+        """
         try:
             root = self.base_query(RedfishApi.Version, do_async=do_async).data or {}
         except Exception:
@@ -72,6 +80,15 @@ class EventSubmitTest(RedfishManagerBase,
 
         REVERSIBLE per the action policy, so it executes by default; ``--dry_run``
         still shows the resolved target + payload without POSTing.
+
+        :param message_id: the MessageId placed in the test-event payload.
+        :param event_type: optional EventType added to the payload when set.
+        :param dry_run: resolve the target and show the payload without POSTing.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: resolve and POST over the async Redfish path when True.
+        :return: a CommandResult with the SubmitTestEvent outcome, or the dry-run preview.
         """
         payload = {"MessageId": message_id}
         if event_type:
