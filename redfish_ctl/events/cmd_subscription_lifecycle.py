@@ -1,4 +1,8 @@
-"""Create and delete Redfish EventDestination subscriptions."""
+"""Create and delete Redfish EventDestination subscriptions.
+
+    redfish_ctl subscription-create --destination https://listener/events --protocol Redfish --confirm
+    redfish_ctl subscription-delete --subscription <id-or-uri> --confirm
+"""
 
 import asyncio
 import inspect
