@@ -3,7 +3,7 @@
 Command provides the option to eject  virtual disk from iDRAC.
 
 Example:
-    python redfish_ctl.py eject_virtual_media --device_id 1
+    redfish_ctl eject_vm --device_id 1
 
 Will eject virtual device id 1
 
@@ -28,6 +28,7 @@ class VirtualMediaEject(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the eject_vm command."""
         super(VirtualMediaEject, self).__init__(*args, **kwargs)
 
     @staticmethod

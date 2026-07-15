@@ -1,4 +1,8 @@
 """iDRAC fetch dell lc rs status
+
+Example:
+    redfish_ctl service-api-rs-status
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -17,6 +21,7 @@ class GetRemoteRssAPIStatus(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the service-api-rs-status command."""
         super(GetRemoteRssAPIStatus, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -36,8 +41,8 @@ class GetRemoteRssAPIStatus(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Execute remote service rs api status.
-        :param verbose: enables verbose output
-        :param do_async: will not block and return result as future.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: accepted for CLI compatibility; not used by this command.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse

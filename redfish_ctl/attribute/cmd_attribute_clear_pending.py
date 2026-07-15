@@ -1,5 +1,7 @@
 """iDRAC clear pending values.
 
+    redfish_ctl attr-clear-pending
+
 Command provides the option to clear all the pending attributes values.
 
 Author Mus spyroot@gmail.com
@@ -27,14 +29,15 @@ class AttributeClearPending(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the attr-clear-pending command."""
         super(AttributeClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command
-        :param cls:
-        :return:
+        """Register the ``attr-clear-pending`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = argparse.ArgumentParser(add_help=False)
 
@@ -52,10 +55,17 @@ class AttributeClearPending(
                 **kwargs
                 ) -> CommandResult:
         """Execute clear pending command.
-        :param do_async:
-        :param data_type:
-        :param kwargs:
-        :return:
+
+        Discovers the ``#DellManager.ClearPending`` action from a deep
+        attribute query and POSTs it.
+
+        :param do_async: if set, submit the clear-pending action asynchronously.
+        :param data_type: response content type, json or xml.
+        :return: CommandResult from the ClearPending POST, augmented with
+            task_state and task_id when the BMC generates a task; the attribute
+            query result is returned unchanged when that lookup errors.
+        :raises FailedDiscoverAction: when the ClearPending action target cannot
+            be discovered.
         """
         headers = {}
         if data_type == "json":

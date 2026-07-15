@@ -1,5 +1,9 @@
 """iDRAC deletes all jobs
 
+Example::
+
+    redfish_ctl job-rm-all
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -31,6 +35,7 @@ class JobRmDellServices(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the job-rm-all command."""
         super(JobRmDellServices, self).__init__(*args, **kwargs)
 
     @staticmethod

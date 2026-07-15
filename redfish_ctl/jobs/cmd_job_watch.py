@@ -1,7 +1,11 @@
-"""iDRAC delete job from iDRAC action
+"""iDRAC watch a job progress
 
 Command provides the option to delete a
 job from iDRAC.
+
+Example::
+
+    redfish_ctl job-watch --job_id JID_744718373591
 
 Author Mus spyroot@gmail.com
 """
@@ -22,6 +26,7 @@ class JobWatch(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the job-watch command."""
         super(JobWatch, self).__init__(*args, **kwargs)
 
     @staticmethod

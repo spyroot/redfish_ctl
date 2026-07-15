@@ -40,6 +40,7 @@ class VirtualMediaGet(RedfishManagerBase,
     result to a file or output stdout or pass downstream to jq etc. tools.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the get_vm command."""
         super(VirtualMediaGet, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -77,7 +78,7 @@ class VirtualMediaGet(RedfishManagerBase,
         """Execute command and fetch virtual media status
 
         :param device_id: filter based on device
-        :param filter_key filter based on key.
+        :param filter_key: filter based on key.
         :param verbose: enables verbose output
         :param do_async: will not block and return result as future.
         :param filename: if filename indicate call will save a bios setting to a file.
@@ -130,7 +131,13 @@ class VirtualMediaGet(RedfishManagerBase,
         return CommandResult(data, None, None, None)
 
     def _hydrate_member_links(self, members, do_async: Optional[bool] = False):
-        """Fetch linked VirtualMedia members when the service did not expand them."""
+        """Fetch linked VirtualMedia members when the service did not expand them.
+
+        :param members: the Members value from the collection; returned unchanged
+            when it is not a list.
+        :param do_async: fetch each linked member via an asynchronous query.
+        :return: the members with any unexpanded links resolved to their detail dicts.
+        """
         if not isinstance(members, list):
             return members
         hydrated = []

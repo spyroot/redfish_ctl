@@ -5,7 +5,7 @@ selects the first boot device, then optionally reboots. Distinct from the
 general ``system-import`` command, which imports the SCP file supplied by
 ``--config`` verbatim.
 
-python redfish_ctl.py system-onetime-boot --config system.json
+    redfish_ctl system-onetime-boot --config system.json
 
 Author Mus spyroot@gmail.com
 """
@@ -30,6 +30,7 @@ class ImportOneTimeBoot(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the system-onetime-boot command."""
         super(ImportOneTimeBoot, self).__init__(*args, **kwargs)
 
     @staticmethod

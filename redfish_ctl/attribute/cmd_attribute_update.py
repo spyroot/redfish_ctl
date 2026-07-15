@@ -1,4 +1,6 @@
-"""iDRAC attribute command
+"""iDRAC attribute update command
+
+    redfish_ctl attr-update --from_spec attribute.json
 
 Command provides the option to retrieve the iDRAC attribute and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
@@ -31,14 +33,15 @@ class AttributesUpdate(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the attr-update command."""
         super(AttributesUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Registers command args
-        :param cls:
-        :return:
+        """Register the ``attr-update`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_arg = argparse.ArgumentParser(add_help=False)
 
@@ -64,13 +67,17 @@ class AttributesUpdate(
                 do_async: Optional[bool] = False,
                 from_spec: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Update idrac attributes
-        :param from_spec: a spec file container a key value pair for attribute
-        :param do_async: if we do asyncio
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:
-        :param verbose: verbose debug output
-        :return:
+        """Update idrac attributes.
+
+        :param from_spec: path to a json spec file holding the attribute
+            key/value pairs to apply.
+        :param do_async: if set, submit the update asynchronously.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: response content type, json or xml.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult from the attribute PATCH, augmented with
+            task_state and task_id when the BMC generates a task.
+        :raises InvalidArgumentFormat: when from_spec is empty.
         :raise: AuthenticationFailed, UnexpectedResponse
         """
         headers = {}

@@ -1,5 +1,7 @@
 """iDRAC attribute command
 
+    redfish_ctl attr --filter ServerPwrMon.1.PeakCurrentTime
+
 Command provides the option to retrieve the iDRAC attribute and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
@@ -31,14 +33,15 @@ class AttributesQuery(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the attr command."""
         super(AttributesQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Registers command args
-        :param cls:
-        :return:
+        """Register the ``attr`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_arg = argparse.ArgumentParser(add_help=False)
 
@@ -80,14 +83,17 @@ class AttributesQuery(
                 attr_filter: Optional[str] = "",
                 **kwargs) -> CommandResult:
         """Queries attributes from iDRAC.
-        :param attr_filter: filter on specific attribute.
-        :param attr_only:
-        :param do_async:
-        :param verbose:
-        :param do_deep:
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:
-        :return:
+
+        :param attr_filter: filter the attributes to those matching this name.
+        :param attr_only: return only the Attributes section of the resource.
+        :param do_async: if set, issue the query asynchronously.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_deep: perform a deep walk, issuing an expanded query and a
+            separate REST call for each linked attribute resource.
+        :param filename: if set, save the response to this file.
+        :param data_type: response content type, json or xml.
+        :return: CommandResult with the (optionally filtered) attribute data;
+            deep-walk resources are placed in its extra field when do_deep is set.
         :raise: AuthenticationFailed, UnexpectedResponse
         """
         headers = {}

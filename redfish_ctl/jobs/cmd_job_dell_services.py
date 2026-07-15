@@ -3,6 +3,10 @@
 The DellJobService resource provides some actions to support
 Job management functionality.  Query and discovery.
 
+Example::
+
+    redfish_ctl jobs-dell-service
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -21,6 +25,7 @@ class JobDellServices(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the jobs-dell-service command."""
         super(JobDellServices, self).__init__(*args, **kwargs)
 
     @staticmethod
