@@ -29,19 +29,27 @@ class NetworkAdapters(RedfishManagerBase,
     """Read every NetworkAdapter (NIC/DPU) across all chassis."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the network-adapters command."""
         super(NetworkAdapters, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``network-adapters`` subcommand (read-only)."""
+        """Register the ``network-adapters`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read all chassis NetworkAdapters (NICs and DPUs)"
         return cmd_parser, "network-adapters", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (expects a ``Members`` list).
+        :return: list of member ``@odata.id`` strings ([] if data is not a dict).
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -53,6 +61,9 @@ class NetworkAdapters(RedfishManagerBase,
 
         BlueField is a DPU/SmartNIC; ConnectX is a NIC. Unknown models fall
         through to NIC, which is the safe default for an Ethernet adapter.
+
+        :param model: the adapter model string (may be None).
+        :return: "DPU" for a BlueField model, otherwise "NIC".
         """
         m = (model or "").lower()
         if "bluefield" in m or "bf3" in m or "bf2" in m:
@@ -72,6 +83,13 @@ class NetworkAdapters(RedfishManagerBase,
 
         Tolerant of a chassis with no NetworkAdapters link or an unreachable
         collection (skips it).
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: issue an expanded ($expand) query on the adapters collection.
+        :return: CommandResult holding a list of per-adapter rows.
         """
         rows = []
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)

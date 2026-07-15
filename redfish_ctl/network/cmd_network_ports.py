@@ -28,26 +28,39 @@ class NetworkPorts(RedfishManagerBase,
     """Read every NetworkAdapter Port's link state across all chassis."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the network-ports command."""
         super(NetworkPorts, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``network-ports`` subcommand (read-only)."""
+        """Register the ``network-ports`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read NetworkAdapter port link state (up/speed) per chassis"
         return cmd_parser, "network-ports", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (expects a ``Members`` list).
+        :return: list of member ``@odata.id`` strings ([] if data is not a dict).
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure."""
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: the Redfish resource path to GET.
+        :param do_async: note async will subscribe to an event loop.
+        :return: the resource body dict, or {} on any query error.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -55,7 +68,12 @@ class NetworkPorts(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None."""
+        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None.
+
+        :param data: a Redfish resource body that may hold the link.
+        :param key: the property name whose ``{@odata.id}`` link to extract.
+        :return: the linked ``@odata.id`` string, or None if absent/malformed.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
@@ -66,7 +84,15 @@ class NetworkPorts(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk every chassis adapter's Ports and collect per-port link state."""
+        """Walk every chassis adapter's Ports and collect per-port link state.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult holding a list of per-port link-state rows.
+        """
         rows = []
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):

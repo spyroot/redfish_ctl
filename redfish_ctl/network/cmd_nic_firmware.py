@@ -53,6 +53,9 @@ def network_class(text: Optional[str]) -> Optional[str]:
     BlueField is a DPU/SmartNIC; ConnectX/Mellanox is a NIC; a bare ``nic`` token is
     the weak last signal. Matching is on whole alphanumeric tokens, so BMC/GPU/PCIe
     firmware and GUIDs (which may contain a fragment like ``cx8``) return None.
+
+    :param text: a firmware id or name to classify (may be None).
+    :return: "DPU", "NIC", or None when the text is not a network device.
     """
     tokens = set(_TOKEN_RE.findall((text or "").lower()))
     if tokens & _DPU_TOKENS:
@@ -69,26 +72,38 @@ class NicFirmware(RedfishManagerBase,
     """Read every NIC/DPU adapter and its firmware version across all chassis."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the nic-firmware command."""
         super(NicFirmware, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``nic-firmware`` subcommand (read-only)."""
+        """Register the ``nic-firmware`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read NIC/DPU network-adapter firmware (out-of-band)"
         return cmd_parser, "nic-firmware", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (expects a ``Members`` list).
+        :return: list of member ``@odata.id`` strings ([] if data is not a dict).
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _adapters(self, do_async):
-        """Physical NIC/DPU cards from ``Chassis/*/NetworkAdapters/*``."""
+        """Physical NIC/DPU cards from ``Chassis/*/NetworkAdapters/*``.
+
+        :param do_async: note async will subscribe to an event loop.
+        :return: list of adapter dicts (empty if the Chassis walk is unavailable).
+        """
         rows = []
         try:
             chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
@@ -134,6 +149,9 @@ class NicFirmware(RedfishManagerBase,
         links (identified by id/name token) to read each ``Version``. When the BMC
         honours ``$expand`` and returns members inline with a Version, that value is
         used without a second GET.
+
+        :param do_async: note async will subscribe to an event loop.
+        :return: list of network-relevant firmware component dicts (empty if unavailable).
         """
         rows = []
         fw_root = f"{RedfishApi.Version}/UpdateService/FirmwareInventory"
@@ -182,7 +200,15 @@ class NicFirmware(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Return the joined NIC/DPU adapter + firmware report (read-only)."""
+        """Return the joined NIC/DPU adapter + firmware report (read-only).
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult holding {"adapters", "firmware", "summary"}.
+        """
         adapters = self._adapters(do_async)
         firmware = self._nic_firmware(do_async)
         versions = sorted({f["Version"] for f in firmware if f.get("Version")})
