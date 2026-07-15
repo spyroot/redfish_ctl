@@ -63,6 +63,11 @@ ACTION_POLICY = {
     "#Control.ResetToDefaults": Destructiveness.DESTRUCTIVE,
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
+    # ClearLog erases log entries (unrecoverable), but it neither disrupts the
+    # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
+    # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
+    # secure-erase / RoT-key / factory-reset class actions).
+    "#LogService.ClearLog": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
