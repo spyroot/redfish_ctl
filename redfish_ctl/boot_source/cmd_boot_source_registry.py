@@ -2,6 +2,9 @@
 
 And the registry defines a representation of Boot Sources instances
 
+Example.
+redfish_ctl boot-source-registry
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -24,6 +27,7 @@ class QueryBootSourceRegistry(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-source-registry command."""
         super(QueryBootSourceRegistry, self).__init__(*args, **kwargs)
 
     @staticmethod

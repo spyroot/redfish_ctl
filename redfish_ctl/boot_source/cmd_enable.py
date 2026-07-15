@@ -37,6 +37,7 @@ class EnableBootOptions(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-source-enable command."""
         super(EnableBootOptions, self).__init__(*args, **kwargs)
 
     @staticmethod

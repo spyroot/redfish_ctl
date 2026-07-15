@@ -8,6 +8,8 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
 caller can save to a file and consume asynchronously or synchronously.
 
+Example.
+redfish_ctl boot-one-shot --device Cd
 
 Author Mus spyroot@gmail.com
 """
@@ -30,6 +32,7 @@ class BootOneShot(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-one-shot command."""
         super(BootOneShot, self).__init__(*args, **kwargs)
 
     @staticmethod

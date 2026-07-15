@@ -1,7 +1,10 @@
-"""iDRAC query chassis services
+"""iDRAC update boot sources.
 
 Command provides option to query boot source for
 pending values.
+
+Example.
+redfish_ctl boot-source-update on-reset --from_spec new_boot.json
 
 Author Mus spyroot@gmail.com
 """
@@ -24,6 +27,7 @@ class BootSourceUpdate(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-source-update command."""
         super(BootSourceUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod

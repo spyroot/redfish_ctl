@@ -29,6 +29,7 @@ class BootSource(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-source command."""
         super(BootSource, self).__init__(*args, **kwargs)
 
     @staticmethod

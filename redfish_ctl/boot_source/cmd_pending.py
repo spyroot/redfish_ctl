@@ -1,7 +1,10 @@
-"""iDRAC query chassis services
+"""iDRAC query boot source pending values.
 
 Command provides option to query boot source for
 pending values.
+
+Example.
+redfish_ctl boot-pending
 
 Author Mus spyroot@gmail.com
 """
@@ -27,6 +30,7 @@ class BootSourcePending(RedfishManagerBase,
     """A command query dell OEM for boot source pending changes.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-pending command."""
         super(BootSourcePending, self).__init__(*args, **kwargs)
 
     @staticmethod
