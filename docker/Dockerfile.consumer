@@ -1,0 +1,37 @@
+# Fleet-status consumer image for the local Kubernetes sandbox.
+#
+# A tiny read-only web app that renders RedfishEndpoint .status (written by the
+# controller) as a dashboard, JSON API, and Prometheus metrics. It depends only
+# on the Kubernetes client — it does NOT install redfish_ctl and never talks to
+# a BMC.
+#
+# Build:
+#   docker build -f docker/Dockerfile.consumer -t redfish-ctl-consumer:local .
+FROM python:3.12-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Match the deployment's runAsUser/runAsGroup so the non-root uid exists.
+RUN groupadd --system --gid 10001 redfish \
+    && useradd \
+        --system \
+        --uid 10001 \
+        --gid redfish \
+        --home-dir /home/redfish \
+        --create-home \
+        redfish
+
+WORKDIR /app
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install --no-cache-dir "kubernetes>=29" \
+    && python -m pip check
+
+COPY k8s/consumer/fleet_status_app.py ./fleet_status_app.py
+
+USER redfish
+
+EXPOSE 8080
+ENTRYPOINT ["python", "-u", "/app/fleet_status_app.py"]

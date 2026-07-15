@@ -22,7 +22,7 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check k8s-sandbox clean
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check k8s-sandbox k8s-consumer k8s-explorer clean
 
 help: ## Show available developer targets.
 	@awk 'BEGIN { \
@@ -68,6 +68,12 @@ docs-voice-check: ## Reject first-person wording in public docs.
 
 k8s-sandbox: ## Run the local Kubernetes read-path sandbox when present.
 	./k8s/sandbox/run-sandbox.sh
+
+k8s-consumer: ## Build and deploy the fleet-status consumer into the sandbox.
+	./k8s/consumer/deploy.sh
+
+k8s-explorer: ## Build and deploy the redfish_ctl web explorer (set REDFISH_IP/SECRET).
+	./k8s/explorer/deploy.sh
 
 clean: ## Remove local build, test, and type-check artifacts.
 	rm -rf build dist *.egg-info .coverage htmlcov .pytest_cache .ruff_cache .mypy_cache

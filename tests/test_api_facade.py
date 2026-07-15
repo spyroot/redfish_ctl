@@ -29,15 +29,16 @@ from redfish_ctl.api import (
     bios_profile_list,
     bios_profile_show,
     get_gpu_metrics,
+    get_network_firmware,
     get_sensors,
     get_system,
     get_thermal,
     reboot,
     set_ntp,
 )
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
-from redfish_ctl.redfish_manager import CommandResult
 
 GB300_CORPUS = corpus_dir(
     Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
@@ -779,6 +780,7 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
     sensors = get_sensors(manager)
     thermal = get_thermal(manager)
     gpu_metrics = get_gpu_metrics(manager)
+    network_firmware = get_network_firmware(manager)
     ntp = set_ntp(manager, ["0.pool.ntp.org"])
     reset_preview = reboot(manager)
     profile_diff = bios_profile_diff(manager, "gb300-power-capped")
@@ -806,6 +808,20 @@ def test_facade_wrappers_read_gb300_corpus_through_command_registry(
         and row.model == "NVIDIA GB300"
         and row.temperatures_celsius["HGX_GPU_0_TEMP_0"] == 32.9375
         for row in gpu_metrics.gpus
+    )
+    # NIC/DPU firmware inventory: 4 ConnectX-8 NICs + 1 BlueField-3 DPU, with the
+    # ConnectX firmware pinned at a single version across the card set.
+    assert network_firmware.summary["adapter_count"] == 5
+    assert network_firmware.summary["nic_count"] == 4
+    assert network_firmware.summary["dpu_count"] == 1
+    assert "40.45.3048" in network_firmware.summary["distinct_versions"]
+    assert any(
+        adapter.model == "ConnectX-8 800GE 2P NIC" and adapter.device_class == "NIC"
+        for adapter in network_firmware.adapters
+    )
+    assert any(
+        fw.id == "CX8_0" and fw.version == "40.45.3048" and fw.updateable is True
+        for fw in network_firmware.firmware
     )
     assert ntp.dry_run is True
     assert ntp.servers == ("0.pool.ntp.org",)

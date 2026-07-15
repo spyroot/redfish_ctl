@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, MutableMapping
 from urllib.parse import urlsplit
@@ -14,14 +15,22 @@ except ImportError:  # pragma: no cover - unit tests call the handler directly.
     kopf = None
 
 from redfish_ctl.api import (
+    NetworkFirmwareStatus,
     SensorReading,
     SystemStatus,
     ThermalStatus,
+    get_network_firmware,
     get_sensors,
     get_system,
     get_thermal,
 )
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
+
+_LOGGER = logging.getLogger(__name__)
+
+# Cap the number of firmware components written to status to keep the CR small;
+# a NIC/DPU set is a handful, but guard against a pathological host.
+_MAX_FIRMWARE_COMPONENTS = 64
 
 REDFISH_GROUP = "redfish.ctl.dev"
 REDFISH_VERSION = "v1alpha1"
@@ -80,20 +89,54 @@ def _health_from_sensors(sensors: tuple[SensorReading, ...]) -> str | None:
     return max(health_values, key=lambda value: rank.get(value, -1))
 
 
+def _network_firmware_summary(
+    network_firmware: NetworkFirmwareStatus,
+) -> dict[str, Any]:
+    """Shape a NetworkFirmwareStatus into the CR status.networkFirmware block.
+
+    ``distinctVersions`` is the fleet drift signal: one version across the fleet
+    means every node's NICs run the same firmware; more than one flags drift.
+    """
+    summary = network_firmware.summary
+    components = [
+        {
+            "id": fw.id,
+            "deviceClass": fw.device_class,
+            "version": fw.version,
+            "updateable": bool(fw.updateable) if fw.updateable is not None else None,
+        }
+        for fw in network_firmware.firmware[:_MAX_FIRMWARE_COMPONENTS]
+    ]
+    distinct = [str(v) for v in summary.get("distinct_versions", []) if v is not None]
+    return {
+        "adapterCount": int(summary.get("adapter_count", 0) or 0),
+        "nicCount": int(summary.get("nic_count", 0) or 0),
+        "dpuCount": int(summary.get("dpu_count", 0) or 0),
+        "firmwareCount": int(summary.get("firmware_count", 0) or 0),
+        "updateableCount": int(summary.get("updateable_count", 0) or 0),
+        "distinctVersions": distinct,
+        "components": components,
+    }
+
+
 def build_status(
     system: SystemStatus,
     sensors: tuple[SensorReading, ...],
     thermal: ThermalStatus,
     *,
+    network_firmware: NetworkFirmwareStatus | None = None,
     polled_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Return the RedfishEndpoint status object from typed read results."""
-    return {
+    status: dict[str, Any] = {
         "powerState": system.power_state,
         "health": system.health or _health_from_sensors(sensors),
         "temperature": _temperature_summary(thermal),
         "lastPolled": _rfc3339(polled_at or _utc_now()),
     }
+    if network_firmware is not None:
+        status["networkFirmware"] = _network_firmware_summary(network_firmware)
+    return status
 
 
 def _manager_address(spec: Mapping[str, Any]) -> tuple[str, bool]:
@@ -127,6 +170,22 @@ def _make_manager(
     )
 
 
+def _safe_network_firmware(manager: Any) -> NetworkFirmwareStatus | None:
+    """Read NIC/DPU firmware, tolerating a BMC that exposes no network firmware.
+
+    A host without NetworkAdapters or FirmwareInventory (or one that errors on
+    that walk) must not fail the whole poll — power/health/thermal still land.
+    The failure is logged (not silent) so a persistent NIC-firmware read problem
+    is diagnosable; on failure the prior status.networkFirmware is left in place
+    by the merge patch rather than being cleared.
+    """
+    try:
+        return get_network_firmware(manager)
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully, but leave a trace
+        _LOGGER.warning("network-firmware read failed, leaving prior value: %s", exc)
+        return None
+
+
 def poll_endpoint(
     spec: Mapping[str, Any],
     *,
@@ -139,7 +198,14 @@ def poll_endpoint(
     system = get_system(manager)
     sensors = get_sensors(manager)
     thermal = get_thermal(manager)
-    return build_status(system, sensors, thermal, polled_at=polled_at)
+    network_firmware = _safe_network_firmware(manager)
+    return build_status(
+        system,
+        sensors,
+        thermal,
+        network_firmware=network_firmware,
+        polled_at=polled_at,
+    )
 
 
 def _decode_secret_value(data: Mapping[str, str], key: str) -> str | None:

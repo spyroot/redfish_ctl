@@ -1,0 +1,101 @@
+# redfish_ctl web explorer — a tree of the tool's read-only commands, invoked
+# live against one BMC. It talks to the BMC directly (needs credentials), so it
+# is a higher trust tier than the read-only fleet-status consumer and is scoped
+# to a single target endpoint.
+#
+# The target BMC address is set here; credentials come from a Secret (the same
+# shape the controller uses). Point spec REDFISH_IP at the node to explore.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redfish-ctl-explorer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-ctl-explorer
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redfish-ctl-explorer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redfish-ctl-explorer
+        app.kubernetes.io/component: redfish-sandbox
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: explorer
+          image: redfish-ctl-explorer:local
+          imagePullPolicy: IfNotPresent
+          env:
+            # Target BMC to explore. Overwritten at deploy time for a real node.
+            - name: REDFISH_IP
+              value: "mock-bmc.redfish-sandbox.svc.cluster.local"
+            - name: REDFISH_PORT
+              value: "80"
+            - name: REDFISH_SCHEME
+              value: "http"
+            - name: REDFISH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mock-bmc-credentials
+                  key: username
+            - name: REDFISH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mock-bmc-credentials
+                  key: password
+          ports:
+            - name: http
+              containerPort: 8299
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redfish-ctl-explorer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-ctl-explorer
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redfish-ctl-explorer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
