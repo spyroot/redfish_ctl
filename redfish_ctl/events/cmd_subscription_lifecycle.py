@@ -1,11 +1,20 @@
 """Create and delete Redfish EventDestination subscriptions."""
 
+import asyncio
+import inspect
+import json
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import (
+    REDFISH_API,
+    ApiRequestType,
+    HTTPMethod,
+    RedfishApiRespond,
+    Singleton,
+)
 
 
 def _as_list(values) -> list[str]:
@@ -29,7 +38,18 @@ class _SubscriptionBase(RedfishManagerBase):
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
+    @staticmethod
+    def _ensure_event_loop():
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+
     def _subscription_collection_uri(self, do_async):
+        if do_async:
+            self._ensure_event_loop()
         service = self.base_query(
             REDFISH_API.EventServiceQuery,
             do_async=do_async,
@@ -40,6 +60,8 @@ class _SubscriptionBase(RedfishManagerBase):
         return subscriptions_uri
 
     def _subscription_members(self, subscriptions_uri, do_async):
+        if do_async:
+            self._ensure_event_loop()
         collection = self.base_query(subscriptions_uri, do_async=do_async).data or {}
         members = collection.get("Members")
         if not isinstance(members, list):
@@ -70,6 +92,107 @@ class _SubscriptionBase(RedfishManagerBase):
             if member_uri.rsplit("/", 1)[-1] == value or member_uri == value:
                 return member_uri
         raise InvalidArgument(f"subscription {value!r} was not found")
+
+    @staticmethod
+    def _location(response):
+        if response is None or response.headers is None:
+            return None
+        return response.headers.get("Location")
+
+    def _response_status(self, response, expected_status):
+        mapped_status = self._http_code_mapping.get(response.status_code)
+        if response.status_code == expected_status:
+            return mapped_status or RedfishApiRespond.Success
+        if 200 <= response.status_code < 300:
+            return mapped_status or RedfishApiRespond.Ok
+        return RedfishApiRespond.Error
+
+    def _error_text(self, response):
+        try:
+            return str(self.parse_error(response))
+        except Exception as exc:
+            return str(exc)
+
+    @staticmethod
+    async def _await_async_response(response_or_future):
+        response = await response_or_future
+        if inspect.isawaitable(response):
+            return await response
+        return response
+
+    def _send_subscription_request(self, method, request, body, headers, do_async):
+        if not do_async:
+            if method == HTTPMethod.POST:
+                return self.api_post_call(request, json.dumps(body), headers)
+            if method == HTTPMethod.DELETE:
+                return self.api_delete_call(request, headers)
+        loop = self._ensure_event_loop()
+        if method == HTTPMethod.POST:
+            return loop.run_until_complete(
+                self._await_async_response(
+                    self.api_async_post_call(
+                        loop,
+                        request,
+                        json.dumps(body),
+                        headers,
+                    )
+                )
+            )
+        if method == HTTPMethod.DELETE:
+            return loop.run_until_complete(
+                self._await_async_response(
+                    self.api_async_delete_call(loop, request, "", headers)
+                )
+            )
+        raise InvalidArgument(f"unsupported subscription method {method}")
+
+    def _subscription_mutation(
+        self,
+        method,
+        target,
+        action,
+        payload=None,
+        expected_status=204,
+        do_async=False,
+    ):
+        body = payload or {}
+        headers = {}
+        headers.update(self.json_content_type)
+        request = f"{self._default_method}{self.redfish_ip}{target}"
+        response = None
+        try:
+            response = self._send_subscription_request(
+                method,
+                request,
+                body,
+                headers,
+                do_async,
+            )
+        except Exception as exc:
+            error = str(exc)
+            data = {
+                "action": action,
+                "target": target,
+                "status": str(RedfishApiRespond.Error),
+                "status_code": None,
+                "error": error,
+            }
+            if method == HTTPMethod.POST:
+                data["location"] = None
+            return CommandResult(data, None, None, error), RedfishApiRespond.Error
+
+        status = self._response_status(response, expected_status)
+        error = None if status != RedfishApiRespond.Error else self._error_text(response)
+        data = {
+            "action": action,
+            "target": target,
+            "status": str(status),
+            "status_code": response.status_code,
+            "error": error,
+        }
+        if method == HTTPMethod.POST:
+            data["location"] = self._location(response)
+        return CommandResult(data, None, None, error), status
 
 
 class SubscriptionCreate(_SubscriptionBase,
@@ -176,20 +299,15 @@ class SubscriptionCreate(_SubscriptionBase,
                 "note": "preview only; re-run with --confirm to create subscription",
             }, None, None, None)
 
-        result, status = self.base_post(
+        result, _ = self._subscription_mutation(
+            HTTPMethod.POST,
             target,
+            "create",
             payload=payload,
-            do_async=do_async,
             expected_status=201,
+            do_async=do_async,
         )
-        data = {
-            "action": "create",
-            "target": target,
-            "status": str(status),
-            "location": None,
-            "error": result.error,
-        }
-        return CommandResult(data, None, None, result.error)
+        return result
 
 
 class SubscriptionDelete(_SubscriptionBase,
@@ -238,15 +356,11 @@ class SubscriptionDelete(_SubscriptionBase,
                 "note": "preview only; re-run with --confirm to delete subscription",
             }, None, None, None)
 
-        result, status = self.base_delete(
+        result, _ = self._subscription_mutation(
+            HTTPMethod.DELETE,
             target,
-            do_async=do_async,
+            "delete",
             expected_status=204,
+            do_async=do_async,
         )
-        data = {
-            "action": "delete",
-            "target": target,
-            "status": str(status),
-            "error": result.error,
-        }
-        return CommandResult(data, None, None, result.error)
+        return result
