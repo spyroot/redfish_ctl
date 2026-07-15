@@ -1,4 +1,4 @@
-"""iDRAC import system config from json file.
+"""Import system configuration from a JSON file.
 
 Command provides the option to import configuration.
 

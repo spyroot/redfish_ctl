@@ -1,4 +1,4 @@
-"""iDRAC set a one-time boot device via a system-configuration import.
+"""Set a one-time boot device via a system-configuration import.
 
 Sends an ImportSystemConfiguration request whose buffer enables BootOnce and
 selects the first boot device, then optionally reboots. Distinct from the
