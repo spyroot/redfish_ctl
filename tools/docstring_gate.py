@@ -10,6 +10,10 @@ a backfill of the whole tree first. For each in-scope function it requires:
     ``**kwargs`` are exempt), and
   * a ``:return:``/``:returns:`` line when the body returns a real value.
 
+A changed command module (a ``cmd_*.py`` under ``redfish_ctl/`` that defines a
+class) must additionally carry a ``redfish_ctl <cmd>`` usage example in its module
+docstring, so what the command invokes stays obvious and greppable.
+
 The style is the codebase's reStructuredText convention (see
 ``redfish_ctl/redfish_manager_base.py``). Run ``--all`` to report the whole-tree
 backlog instead of the diff.
@@ -128,6 +132,31 @@ def check_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     return problems
 
 
+_USAGE_RE = re.compile(r"\bredfish_ctl\s+[\w-]+")
+
+
+def command_module_problem(path: Path) -> str | None:
+    """Require a command module's docstring to carry a ``redfish_ctl <cmd>`` example.
+
+    A command module (a ``cmd_*.py`` under ``redfish_ctl/`` that defines a class) is
+    what a user reaches for by CLI name, so its module docstring must show at least
+    one invocation example — the account/bios command style — to keep "what it
+    invokes" obvious and greppable. Non-command ``cmd_*`` helpers (no class) and
+    non-command modules are exempt.
+
+    :param path: the module path to check.
+    :return: a problem string, or None when the module is exempt or compliant.
+    """
+    if not (path.name.startswith("cmd_") and "redfish_ctl" in path.parts):
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    if not any(isinstance(node, ast.ClassDef) for node in tree.body):
+        return None
+    if not _USAGE_RE.search(ast.get_docstring(tree) or ""):
+        return "command module docstring has no 'redfish_ctl <cmd>' usage example"
+    return None
+
+
 def scan(path: Path, scope: set[int] | None) -> list[tuple[int, str, list[str]]]:
     """Check functions in ``path`` (all, or only those overlapping ``scope``).
 
@@ -164,6 +193,10 @@ def main() -> int:
     if args.all:
         targets = [p for r in args.roots for p in Path(r).rglob("*.py") if "tests" not in p.parts]
         for path in sorted(targets):
+            mp = command_module_problem(path)
+            if mp:
+                print(f"{path}:1 <module> — {mp}")
+                violations += 1
             for ln, name, probs in scan(path, None):
                 print(f"{path}:{ln} {name}() — {'; '.join(probs)}")
                 violations += 1
@@ -173,6 +206,10 @@ def main() -> int:
             print("docstring-gate: no changed Python files to check.")
             return 0
         for path in files:
+            mp = command_module_problem(path)
+            if mp:
+                print(f"{path}:1 <module> — {mp}")
+                violations += 1
             for ln, name, probs in scan(path, added_lines(args.base, path)):
                 print(f"{path}:{ln} {name}() — {'; '.join(probs)}")
                 violations += 1

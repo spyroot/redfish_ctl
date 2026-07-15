@@ -77,3 +77,23 @@ def test_bare_return_none_not_treated_as_value(gate):
     """`return` / `return None` are not a value-return, so no :return: is required."""
     node = _fn('def f(a):\n    """Do.\n\n    :param a: first.\n    """\n    if a:\n        return\n    return None\n')
     assert gate.check_function(node) == []
+
+
+def test_command_module_requires_usage_example(gate, tmp_path):
+    """A cmd_*.py with a command class but no 'redfish_ctl <cmd>' example is flagged."""
+    d = tmp_path / "redfish_ctl" / "x"
+    d.mkdir(parents=True)
+    f = d / "cmd_foo.py"
+    f.write_text('"""Do a thing."""\nclass Foo:\n    pass\n')
+    assert gate.command_module_problem(f) is not None
+    f.write_text('"""Do a thing.\n\n    redfish_ctl foo --bar\n"""\nclass Foo:\n    pass\n')
+    assert gate.command_module_problem(f) is None
+
+
+def test_command_module_helper_without_class_is_exempt(gate, tmp_path):
+    """A cmd_-named module with no command class (a helper) is exempt from the rule."""
+    d = tmp_path / "redfish_ctl"
+    d.mkdir(parents=True)
+    f = d / "cmd_helpers.py"
+    f.write_text('"""Helpers."""\ndef g():\n    """Do it."""\n    return 1\n')
+    assert gate.command_module_problem(f) is None
