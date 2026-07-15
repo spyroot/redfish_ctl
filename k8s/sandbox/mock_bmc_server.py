@@ -390,41 +390,27 @@ class MutationRules(_OverlayStore):
         corpus_state: Any = None,
     ) -> dict[str, Any] | None:
         path = _normalize_request_path(request_path)
-        base_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
-        # Pre-read corpus state for the precondition paths of every rule that
-        # matches on method/path/body, BEFORE taking the engine lock. The corpus
-        # is immutable and independent of engine state, so this file read + JSON
-        # parse must not run under the lock — doing so serializes all concurrent
-        # writers (and overlay readers) on disk I/O. Shape-matching is pure, so
-        # the same rules match again under the lock and the cache covers every
-        # path the precondition evaluation will request.
-        corpus_cache: dict[str, Any] = {}
-        for rule in self.rules:
-            if not isinstance(rule, dict) or not self._shape_matches(
-                rule, method, path, body
-            ):
-                continue
-            for condition in rule.get("when") or []:
-                if not isinstance(condition, dict):
-                    continue
-                cond_path = condition.get("path")
-                if isinstance(cond_path, str):
-                    key = _normalize_request_path(cond_path)
-                    if key not in corpus_cache:
-                        corpus_cache[key] = base_lookup(key)
-
-        def corpus_lookup(resource_path: str) -> Any:
-            key = _normalize_request_path(resource_path)
-            if key not in corpus_cache:  # unreachable given pure shape-matching
-                corpus_cache[key] = base_lookup(key)
-            return corpus_cache[key]
-
+        corpus_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
+        # Shape-match rules (method/path/body) OUTSIDE the lock, then pre-read the
+        # corpus state their preconditions need. The corpus is immutable and
+        # independent of engine state, so this file read + JSON parse must NOT run
+        # under self._lock — doing so serializes every concurrent writer (and
+        # overlay reader) on disk I/O. Under the lock we evaluate only these
+        # candidates' preconditions against the pre-read snapshot: minimal work,
+        # zero I/O.
+        candidates = [
+            rule
+            for rule in self.rules
+            if isinstance(rule, dict)
+            and self._rule_request_matches(rule, method, path, body)
+        ]
+        corpus_cache = self._load_precondition_corpus(candidates, corpus_lookup)
+        cached_lookup = self._cached_corpus_lookup(corpus_cache)
         with self._lock:
             matched = [
                 rule
-                for rule in self.rules
-                if isinstance(rule, dict)
-                and self._rule_matches(rule, method, path, body, corpus_lookup)
+                for rule in candidates
+                if self._rule_preconditions_hold(rule, cached_lookup)
             ]
             if not matched:
                 return None
@@ -440,6 +426,49 @@ class MutationRules(_OverlayStore):
                 self._applied.append(str(rule.get("name") or "unnamed"))
             response = matched[0].get("response") or {}
             return response if isinstance(response, dict) else {"status": 204}
+
+    @staticmethod
+    def _precondition_paths(rules: list[dict[str, Any]]) -> set[str]:
+        """Normalized resource paths every candidate rule's preconditions read."""
+        paths: set[str] = set()
+        for rule in rules:
+            for condition in rule.get("when") or []:
+                if not isinstance(condition, dict):
+                    continue
+                resource_path = condition.get("path")
+                if isinstance(resource_path, str):
+                    paths.add(_normalize_request_path(resource_path))
+        return paths
+
+    def _load_precondition_corpus(
+        self,
+        rules: list[dict[str, Any]],
+        corpus_lookup: Any,
+    ) -> dict[str, Any]:
+        """Pre-read (outside the lock) the corpus snapshot the candidates need.
+
+        Deep-copied at store time so the snapshot is a private copy immune to any
+        later mutation of what ``corpus_lookup`` returned — at no lock-time cost.
+        """
+        return {
+            path: copy.deepcopy(corpus_lookup(path) or {})
+            for path in self._precondition_paths(rules)
+        }
+
+    @staticmethod
+    def _cached_corpus_lookup(corpus_cache: dict[str, Any]) -> Any:
+        """Serve pre-read corpus state under the lock without touching disk.
+
+        No deep copy here: the only consumer, ``_effective_state``, already
+        deep-copies before mutating, so a second copy would be dead work under the
+        lock. A miss returns ``{}`` (impossible in practice — the cache covers
+        every literal ``when`` path) so the locked section stays strictly I/O-free.
+        """
+
+        def lookup(resource_path: str) -> Any:
+            return corpus_cache.get(_normalize_request_path(resource_path), {})
+
+        return lookup
 
     def _roll_failure(self, matched: list[dict[str, Any]]) -> dict[str, Any] | None:
         for rule in matched:
@@ -466,8 +495,8 @@ class MutationRules(_OverlayStore):
             _deep_update(base, overlay)
         return base
 
-    @staticmethod
-    def _shape_matches(
+    def _rule_request_matches(
+        self,
         rule: dict[str, Any],
         method: str,
         path: str,
@@ -475,10 +504,9 @@ class MutationRules(_OverlayStore):
     ) -> bool:
         """Match a rule on method/path/body only — no ``when`` / corpus lookup.
 
-        Pure and lock-free: it depends only on the immutable rule and the
-        request, never on overlays or corpus files. ``match_write`` uses it to
-        decide which rules' preconditions to pre-read corpus state for before
-        acquiring the engine lock.
+        Pure and lock-free: depends only on the immutable rule and the request,
+        never on overlays or corpus files, so candidate selection and the corpus
+        pre-read run before ``self._lock``.
         """
         if str(rule.get("method", "")).upper() != method.upper():
             return False
@@ -496,16 +524,8 @@ class MutationRules(_OverlayStore):
             return False
         return True
 
-    def _rule_matches(
-        self,
-        rule: dict[str, Any],
-        method: str,
-        path: str,
-        body: Any,
-        corpus_lookup: Any,
-    ) -> bool:
-        if not self._shape_matches(rule, method, path, body):
-            return False
+    def _rule_preconditions_hold(self, rule: dict[str, Any], corpus_lookup: Any) -> bool:
+        """Whether every ``when`` precondition holds against the pre-read state."""
         for condition in rule.get("when") or []:
             if not isinstance(condition, dict):
                 return False
