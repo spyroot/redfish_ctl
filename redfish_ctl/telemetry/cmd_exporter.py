@@ -34,12 +34,16 @@ class Exporter(RedfishManagerBase,
     """Read BMC telemetry and expose Prometheus or SignalFx metric output."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the exporter command."""
         super(Exporter, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``exporter`` subcommand."""
+        """Register the ``exporter`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser(is_file_save=False)
         cmd_parser.add_argument(
             "--listen", default="0.0.0.0", type=str,
@@ -91,14 +95,23 @@ class Exporter(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
-        """Return @odata.id strings from a Redfish collection."""
+        """Return @odata.id strings from a Redfish collection.
+
+        :param data: parsed Redfish collection resource, or any value.
+        :return: list of member @odata.id strings; empty when data is not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _invoke_rows(self, api_type: ApiRequestType, name: str, **kwargs) -> list:
-        """Invoke another read-only command and tolerate absent resources."""
+        """Invoke another read-only command and tolerate absent resources.
+
+        :param api_type: ApiRequestType of the command to invoke.
+        :param name: registered name of the command to invoke.
+        :return: the command's list payload, or an empty list on error or non-list data.
+        """
         try:
             result = self.sync_invoke(api_type, name, **kwargs)
         except Exception:
@@ -106,7 +119,12 @@ class Exporter(RedfishManagerBase,
         return result.data if isinstance(result.data, list) else []
 
     def _invoke_dict(self, api_type: ApiRequestType, name: str, **kwargs) -> dict:
-        """Invoke another read-only command that returns an object payload."""
+        """Invoke another read-only command that returns an object payload.
+
+        :param api_type: ApiRequestType of the command to invoke.
+        :param name: registered name of the command to invoke.
+        :return: the command's dict payload, or an empty dict on error or non-dict data.
+        """
         try:
             result = self.sync_invoke(api_type, name, **kwargs)
         except Exception:
@@ -114,7 +132,11 @@ class Exporter(RedfishManagerBase,
         return result.data if isinstance(result.data, dict) else {}
 
     def _leak_detection_rows(self, do_async: bool = False) -> list[dict]:
-        """Return LeakDetector rows from the read-only leak-detectors command."""
+        """Return LeakDetector rows from the read-only leak-detectors command.
+
+        :param do_async: when True, issue the underlying query asynchronously.
+        :return: list of leak-detector rows; empty when none are exposed.
+        """
         data = self._invoke_dict(
             ApiRequestType.LeakDetectors,
             "leak-detectors",
@@ -124,7 +146,11 @@ class Exporter(RedfishManagerBase,
         return detectors if isinstance(detectors, list) else []
 
     def _environment_rows(self, do_async: bool = False) -> list[dict]:
-        """Walk Chassis EnvironmentMetrics links and return their payloads."""
+        """Walk Chassis EnvironmentMetrics links and return their payloads.
+
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :return: list of EnvironmentMetrics payloads, one per chassis that exposes them.
+        """
         rows = []
         try:
             chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async).data or {}
@@ -148,7 +174,12 @@ class Exporter(RedfishManagerBase,
         return rows
 
     def _thermal_rows(self, do_async: bool = False, do_expanded: bool = False) -> list[dict]:
-        """Return temperature readings from the read-only thermal command."""
+        """Return temperature readings from the read-only thermal command.
+
+        :param do_async: when True, issue the underlying query asynchronously.
+        :param do_expanded: when True, issue an expanded ($expand) query.
+        :return: list of temperature-reading rows; empty when none are exposed.
+        """
         try:
             result = self.sync_invoke(
                 ApiRequestType.Thermal, "thermal",
@@ -162,7 +193,14 @@ class Exporter(RedfishManagerBase,
         return [row for row in rows if isinstance(row, dict)]
 
     def _environment_command_rows(self, do_async: bool = False) -> list[dict]:
-        """Return normalized rows from the environment-metrics command."""
+        """Return normalized rows from the environment-metrics command.
+
+        Falls back to walking Chassis EnvironmentMetrics links directly when the
+        command is unavailable or returns an unexpected payload.
+
+        :param do_async: when True, issue the underlying queries asynchronously.
+        :return: list of environment-metric rows; empty when none are exposed.
+        """
         try:
             result = self.sync_invoke(
                 ApiRequestType.EnvironmentMetrics,
@@ -179,7 +217,11 @@ class Exporter(RedfishManagerBase,
         return self._environment_rows(do_async=do_async)
 
     def _vendor_label(self, vendor: Optional[str]) -> str:
-        """Return a stable lower-case vendor label."""
+        """Return a stable lower-case vendor label.
+
+        :param vendor: explicit vendor override; when falsy the vendor is auto-detected.
+        :return: the vendor label, or ``"unknown"`` when neither is available.
+        """
         if vendor:
             return vendor
         try:
@@ -193,7 +235,15 @@ class Exporter(RedfishManagerBase,
                         vendor: Optional[str] = None,
                         do_async: bool = False,
                         do_expanded: bool = False) -> list:
-        """Scrape all supported read-only telemetry paths and build samples."""
+        """Scrape all supported read-only telemetry paths and build samples.
+
+        :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
+            configured BMC address.
+        :param vendor: vendor dimension override; auto-detected when None.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: when True, issue expanded ($expand) queries.
+        :return: list of MetricSample objects, including the scrape-health samples.
+        """
         started_at = exporter.time.monotonic()
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
@@ -249,7 +299,32 @@ class Exporter(RedfishManagerBase,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
-        """Scrape once, serve Prometheus, or push SignalFx/OTLP datapoints."""
+        """Scrape once, serve Prometheus, or push SignalFx/OTLP datapoints.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish scrape queries asynchronously.
+        :param do_expanded: when True, issue expanded ($expand) scrape queries.
+        :param listen: address for the Prometheus /metrics listener.
+        :param port: port for the Prometheus /metrics listener.
+        :param interval: scrape interval in seconds for the long-running push/serve loops.
+        :param once: scrape a single time and return the rendered output instead of serving.
+        :param exporter_output: output format — ``prometheus``, ``signalfx``, or ``otlp``.
+        :param label_bmc_ip: BMC IP used only for metric dimensions when it differs from the
+            configured address.
+        :param vendor: vendor dimension override; auto-detected when None.
+        :param push_signalfx: when True, push SignalFx datapoints instead of serving Prometheus.
+        :param signalfx_ingest_url: SignalFx ingest URL; resolved from the environment when None.
+        :param signalfx_token_env: environment variable holding the SignalFx ingest token.
+        :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
+            OTEL_* env when None.
+        :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
+            OTEL_* env when None.
+        :return: on ``once``, a CommandResult wrapping the rendered/pushed output and a
+            sample-count summary; a CommandResult with empty payload when serving or looping
+            forever.
+        """
         if exporter_output == "otlp":
             from . import otlp
             if once:
@@ -261,6 +336,10 @@ class Exporter(RedfishManagerBase,
                     {"sample_count": len(samples), "export_result": str(result)}, None)
 
             def scrape_samples():
+                """Scrape one round of telemetry samples for the OTLP loop.
+
+                :return: list of MetricSample objects for the current scrape.
+                """
                 return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
 
             otlp.run_otlp_loop(
@@ -294,12 +373,20 @@ class Exporter(RedfishManagerBase,
             ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
 
             def scrape_samples():
+                """Scrape one round of telemetry samples for the SignalFx loop.
+
+                :return: list of MetricSample objects for the current scrape.
+                """
                 return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
 
             run_signalfx_loop(scrape_samples, token, ingest_url, float(interval or 30.0))
             return CommandResult(None, None, None, None)
 
         def scrape_text():
+            """Scrape samples and render them as Prometheus exposition text.
+
+            :return: the rendered Prometheus /metrics text for the current scrape.
+            """
             samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
             return render_prometheus_text(samples)
 

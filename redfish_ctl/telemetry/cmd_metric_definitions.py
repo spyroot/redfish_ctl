@@ -30,19 +30,27 @@ class MetricDefinitions(RedfishManagerBase,
     """Read every TelemetryService MetricReportDefinition (the report schemas)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the metric-definitions command."""
         super(MetricDefinitions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``metric-definitions`` subcommand (read-only)."""
+        """Register the ``metric-definitions`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read TelemetryService metric report definitions"
         return cmd_parser, "metric-definitions", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: parsed Redfish collection resource, or any value.
+        :return: list of member @odata.id strings; empty when data is not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -60,6 +68,13 @@ class MetricDefinitions(RedfishManagerBase,
         Tolerant of a host without TelemetryService or the definitions link
         (returns an empty list). ``MetricProperties`` is the list of metric URIs
         the report publishes; its length is the report's metric count.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: when True, issue an expanded ($expand) query for the collection.
+        :return: CommandResult wrapping the list of metric-definition summary rows.
         """
         rows = []
         defs_uri = f"{RedfishApi.Version}/TelemetryService/MetricReportDefinitions"
