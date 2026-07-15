@@ -5,6 +5,8 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
 
+    redfish_ctl pci PCIeDevices
+
 Author Mus spyroot@gmail.com
 """
 import asyncio
@@ -29,6 +31,7 @@ class PciDeviceQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the pci command."""
         super(PciDeviceQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -119,14 +122,29 @@ class PciDeviceQuery(RedfishManagerBase,
         Walks /redfish/v1/Chassis -> each chassis PCIeDevices collection -> each
         device (and, for PCIeFunctions, that device's PCIeFunctions collection).
         Skips a chassis or leaf that is missing/unreachable rather than failing.
+
+        :param pci_type: PCIeDevices or PCIeFunctions; PCIeFunctions descends one
+            level further into each device's functions collection.
+        :param do_async: forwarded to base_query so the walk can run async.
+        :return: list of PCIe device or function bodies (empty if none found).
         """
         def get(uri):
+            """Fetch the resource body at ``uri``, or {} on any error.
+
+            :param uri: Redfish resource path to GET.
+            :return: the resource body dict, or an empty dict on failure.
+            """
             try:
                 return self.base_query(uri, do_async=do_async).data or {}
             except Exception:
                 return {}
 
         def members(data):
+            """Return the ``@odata.id`` strings from a collection body.
+
+            :param data: a Redfish collection body (dict carrying ``Members``).
+            :return: list of member ``@odata.id`` strings.
+            """
             return [m["@odata.id"] for m in (data.get("Members") or [])
                     if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 

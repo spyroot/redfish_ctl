@@ -30,19 +30,27 @@ class QueryComponentIntegrity(RedfishManagerBase,
     """Read every ComponentIntegrity (SPDM/attestation) relationship."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the component-integrity command."""
         super(QueryComponentIntegrity, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``component-integrity`` subcommand (read-only)."""
+        """Register the ``component-integrity`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read ComponentIntegrity (SPDM attestation) state"
         return cmd_parser, "component-integrity", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (dict carrying ``Members``).
+        :return: list of member ``@odata.id`` strings (empty if none/malformed).
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
@@ -54,6 +62,9 @@ class QueryComponentIntegrity(RedfishManagerBase,
 
         Layout: SPDM.IdentityAuthentication.ResponderAuthentication
         .ComponentCertificate.@odata.id. Any level may be absent.
+
+        :param spdm: the leaf's ``SPDM`` sub-dict (or any non-dict).
+        :return: the certificate ``@odata.id`` string, or None when absent.
         """
         if not isinstance(spdm, dict):
             return None
@@ -73,6 +84,14 @@ class QueryComponentIntegrity(RedfishManagerBase,
 
         Tolerant of a host without the collection (returns an empty list) or a
         leaf missing the SPDM/cert sub-structure (CertificateURI is None).
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: issue an expanded ($expand) Redfish query.
+        :return: CommandResult whose data is a list of per-leaf integrity rows
+            (empty when the host exposes no ComponentIntegrity collection).
         """
         rows = []
         coll_uri = f"{RedfishApi.Version}/ComponentIntegrity"

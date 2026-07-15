@@ -32,26 +32,40 @@ class NvLinkPorts(RedfishManagerBase,
     """Read every GPU NVLink port and its traffic/error metrics."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the nvlink-ports command."""
         super(NvLinkPorts, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``nvlink-ports`` subcommand (read-only)."""
+        """Register the ``nvlink-ports`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read GPU NVLink ports and per-port metrics"
         return cmd_parser, "nvlink-ports", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body (dict carrying ``Members``).
+        :return: list of member ``@odata.id`` strings (empty if none/malformed).
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _link(self, data, key, do_async):
-        """Follow a single ``{key: {@odata.id}}`` link, returning its body or {}."""
+        """Follow a single ``{key: {@odata.id}}`` link, returning its body or {}.
+
+        :param data: the parent resource body holding the link.
+        :param key: the property name whose ``@odata.id`` link to follow.
+        :param do_async: forwarded to base_query so the fetch can run async.
+        :return: the linked resource body dict, or {} if absent/unreachable.
+        """
         link = (data or {}).get(key)
         uri = link.get("@odata.id") if isinstance(link, dict) else None
         if not uri:
@@ -73,6 +87,14 @@ class NvLinkPorts(RedfishManagerBase,
         On a multi-system host (e.g. a host System plus an HGX baseboard System)
         the GPUs live under whichever System exposes them; both are walked. A
         port whose Metrics leaf is absent still yields a row with None counters.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data is a list of per-port NVLink rows
+            (empty when no Systems or GPU ports are exposed).
         """
         rows = []
         try:

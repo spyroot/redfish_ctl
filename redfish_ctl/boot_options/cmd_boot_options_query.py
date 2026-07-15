@@ -1,5 +1,7 @@
 """iDRAC query for a boot options
 
+    redfish_ctl boot-options
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -19,6 +21,7 @@ class BootOptionsQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-options command."""
         super(BootOptionsQuery, self).__init__(*args, **kwargs)
 
     @staticmethod

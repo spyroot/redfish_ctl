@@ -11,6 +11,8 @@ idrac9_3.36_redfishapiguide/dellbootsources?guid=guid-4803ff0e-76ad-42c5-a971-82
 
 python redfish_ctl.py --json boot_source
 
+    redfish_ctl boot-sources
+
 cmd return list of boot devices.
 
     "/redfish/v1/Systems/System.Embedded.1/BootOptions/HardDisk.List.1-1",
@@ -41,6 +43,7 @@ class BootOptionsList(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-sources command."""
         super(BootOptionsList, self).__init__(*args, **kwargs)
 
     @staticmethod
