@@ -61,6 +61,9 @@ def _env(*names, default=""):
     Used to read the going-forward ``REDFISH_*`` endpoint/credential variables while
     still honoring the legacy ``IDRAC_*`` names during the rename: pass the REDFISH_
     name first, the IDRAC_ name second, so REDFISH_ wins when both are set.
+
+    :param default: value returned when none of the listed variables is set.
+    :return: the first non-empty environment variable value, or ``default``.
     """
     for name in names:
         value = os.environ.get(name)
@@ -112,6 +115,9 @@ FLEET_COMMANDS = {"fleet"}
 
 def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
     """Printer error and if terminal support color print red or green etc.
+
+    :param msg: the message to print.
+    :param tcolor: terminal color escape applied when the terminal supports color.
     """
     current_term = os.getenv("TERM")
     if current_term is not None and current_term in TermList:
@@ -123,11 +129,17 @@ def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
 
 def console_error_printer(msg):
     """Printer error and if terminal support color print red or green etc.
+
+    :param msg: the error message to print.
     """
     color_printer(msg, tcolor=TermColors.WARNING)
 
 
 def formatter(prog):
+    """Construct an argparse help formatter for the given program name.
+
+    :param prog: the program name passed to the help formatter.
+    """
     argparse.HelpFormatter(prog, max_help_position=100, width=200)
 
 
@@ -145,6 +157,11 @@ __version__ = IdracDetails.version
 
 
 def log_verbose(cmd_args, err):
+    """Warn about a parse failure only when verbose output is enabled.
+
+    :param cmd_args: parsed CLI arguments; ``verbose`` gates the warning.
+    :param err: the exception whose message is included in the warning.
+    """
     if cmd_args.verbose:
         err_msg = str(err)
         warnings.warn(f"Failed parse server respond. {err_msg}")
@@ -226,7 +243,12 @@ def json_printer(json_data,
 
 
 def process_respond(cmd_args, command_result):
-    """
+    """Assemble the printable payload from a command result.
+
+    :param cmd_args: parsed CLI arguments controlling which sections are emitted.
+    :param command_result: the CommandResult returned by the invoked command.
+    :return: ``command_result.data`` when ``--data_only`` is set, otherwise a dict
+        with the data, extra, and discovered-action sections that pass the output filters.
     """
     query_request = {}
     if cmd_args.data_only:
@@ -274,6 +296,9 @@ def is_network_scan(args) -> bool:
     no credentials, so they must bypass the single-host IDRAC_IP/credential gate
     and the startup ``check_api_version()`` / vendor probe (which would connect
     to a host that scan mode does not have).
+
+    :param args: parsed CLI arguments.
+    :return: True when the command is a credential-less network-segment scan.
     """
     sub = getattr(args, "subcommand", None)
     if sub == "bmc-scan":
@@ -284,7 +309,11 @@ def is_network_scan(args) -> bool:
 
 
 def is_local_command(args) -> bool:
-    """True when the command reads only local repository data."""
+    """True when the command reads only local repository data.
+
+    :param args: parsed CLI arguments.
+    :return: True when the command reads only local data and needs no BMC connection.
+    """
     subcommand = getattr(args, "subcommand", None)
     if subcommand == "bios-profile":
         return getattr(args, "action", "list") in {"list", "show"}
@@ -292,7 +321,11 @@ def is_local_command(args) -> bool:
 
 
 def _redfish_query_from_args(args: argparse.Namespace) -> RedfishQuery:
-    """Build the global Redfish query object from top-level CLI flags."""
+    """Build the global Redfish query object from top-level CLI flags.
+
+    :param args: parsed CLI arguments carrying the top-level query_* flags.
+    :return: a :class:`RedfishQuery` built from those flags.
+    """
     return RedfishQuery(
         select=getattr(args, "query_select", None),
         filter=getattr(args, "query_filter", None),
@@ -304,7 +337,12 @@ def _redfish_query_from_args(args: argparse.Namespace) -> RedfishQuery:
 
 
 def _query_flag_is_active(query: RedfishQuery, attr: str) -> bool:
-    """Return whether a RedfishQuery field should be vendor-gated."""
+    """Return whether a RedfishQuery field should be vendor-gated.
+
+    :param query: the :class:`RedfishQuery` to inspect.
+    :param attr: the query field name to test.
+    :return: True when the field is set (``top`` counts as active when not None).
+    """
     value = getattr(query, attr)
     if attr == "top":
         return value is not None
@@ -314,7 +352,12 @@ def _query_flag_is_active(query: RedfishQuery, attr: str) -> bool:
 def _validate_redfish_query_for_vendor(
         query: RedfishQuery,
         caps: VendorCapabilities) -> None:
-    """Raise when the target vendor profile does not support query flags."""
+    """Raise when the target vendor profile does not support query flags.
+
+    :param query: the :class:`RedfishQuery` to validate.
+    :param caps: the target vendor's :class:`VendorCapabilities`.
+    :raises InvalidArgument: when the vendor lacks support for a requested query flag.
+    """
     unsupported = [
         name for name, attr, enabled_attr in _QUERY_CAPABILITY_FLAGS
         if _query_flag_is_active(query, attr) and not getattr(caps, enabled_attr)
@@ -331,12 +374,19 @@ def _validate_redfish_query_for_vendor(
 
 
 def is_fleet_command(args) -> bool:
-    """True when the command manages its own per-node connections."""
+    """True when the command manages its own per-node connections.
+
+    :param args: parsed CLI arguments.
+    :return: True when the command manages its own per-node connections.
+    """
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
-    """Main entry point
+    """Main entry point.
+
+    :param cmd_args: parsed CLI arguments for the selected command.
+    :param command_name_to_cmd: mapping of command name to its (type, name) tuple.
     """
     # BMCs ship self-signed certs, so verification is opt-in via --verify-ssl.
     # We skip verification by default; --insecure stays as an explicit "skip".
@@ -457,6 +507,9 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
 
 def create_cmd_tree(arg_parser, debug=False) -> Dict:
     """Create command tree structure.
+
+    :param arg_parser: the root argument parser to attach subcommand parsers to.
+    :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
     redfish_api = RedfishManagerBase()

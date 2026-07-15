@@ -23,7 +23,11 @@ class DesiredState:
 
     @classmethod
     def from_mapping(cls, spec: Mapping[str, Any]) -> "DesiredState":
-        """Build desired state from a CRD-style or JSON-style mapping."""
+        """Build desired state from a CRD-style or JSON-style mapping.
+
+        :param spec: CRD-style or JSON-style mapping of the desired node state.
+        :return: a :class:`DesiredState` built from ``spec``.
+        """
         ntp = _mapping(spec.get("ntp"))
         boot = _mapping(spec.get("boot"))
         reboot_spec = spec.get("reboot")
@@ -84,7 +88,15 @@ def reconcile(
     wait_for_reboot: bool = False,
     async_call: bool = False,
 ) -> ReconcileResult:
-    """Plan desired state and apply only when explicitly confirmed."""
+    """Plan desired state and apply only when explicitly confirmed.
+
+    :param manager: synchronous invoker used to run the underlying commands.
+    :param desired: target state as a :class:`DesiredState` or a mapping.
+    :param confirm: when False, only build the plan; when True, apply required steps.
+    :param wait_for_reboot: wait for the host reset to finish (only when confirmed).
+    :param async_call: issue the host reset as an asynchronous invocation.
+    :return: a :class:`ReconcileResult` with the planned steps and applied changes.
+    """
     state = (
         DesiredState.from_mapping(desired)
         if isinstance(desired, Mapping)
@@ -124,6 +136,14 @@ def _reconcile_bios_profile(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
+    """Plan and optionally apply the desired BIOS profile.
+
+    :param manager: synchronous invoker used to run the bios-profile command.
+    :param state: desired state carrying the target BIOS profile name.
+    :param confirm: when True, apply the profile if the diff shows a change is required.
+    :param steps: plan list the computed step is appended to.
+    :param applied: results list an applied change is appended to.
+    """
     profile_name = state.bios_profile
     diff = _invoke_mapping(
         manager,
@@ -167,6 +187,14 @@ def _reconcile_ntp(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
+    """Plan and optionally apply the desired Manager NTP servers.
+
+    :param manager: synchronous invoker used to read and set NTP configuration.
+    :param state: desired state carrying the NTP servers and optional manager id.
+    :param confirm: when True, apply the NTP change through the guarded ntp-set command.
+    :param steps: plan list the computed step is appended to.
+    :param applied: results list an applied change is appended to.
+    """
     current = _invoke_rows(
         manager,
         ApiRequestType.ManagerNetworkProtocol,
@@ -221,6 +249,14 @@ def _reconcile_boot(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
+    """Plan and optionally apply the desired one-time boot override.
+
+    :param manager: synchronous invoker used to read and set the boot override.
+    :param state: desired state carrying the boot device, mode, and UEFI target.
+    :param confirm: when True, apply the boot override if a change is required.
+    :param steps: plan list the computed step is appended to.
+    :param applied: results list an applied change is appended to.
+    """
     current = _invoke_mapping(
         manager,
         ApiRequestType.CurrentBoot,
@@ -265,6 +301,16 @@ def _reconcile_reboot(
     steps: list[ReconcileStep],
     applied: list[AppliedChange],
 ) -> None:
+    """Plan and optionally apply the desired host reset.
+
+    :param manager: synchronous invoker used to run the reboot command.
+    :param state: desired state carrying the reset type.
+    :param confirm: when True, execute the reset; otherwise plan it as a dry run.
+    :param wait_for_reboot: wait for the reset to finish (only when confirmed).
+    :param async_call: issue the reset as an asynchronous invocation.
+    :param steps: plan list the computed step is appended to.
+    :param applied: results list an applied change is appended to.
+    """
     result = _invoke_mapping(
         manager,
         ApiRequestType.ComputerSystemReset,
@@ -294,6 +340,13 @@ def _invoke_mapping(
     name: str,
     **kwargs: Any,
 ) -> Mapping[str, Any]:
+    """Invoke a command and coerce its payload to a mapping.
+
+    :param manager: synchronous invoker used to run the command.
+    :param api_call: the :class:`ApiRequestType` to invoke.
+    :param name: the registered command name to invoke.
+    :return: the response payload as a mapping, or an empty mapping.
+    """
     return _mapping(_invoke_data(manager, api_call, name, **kwargs))
 
 
@@ -303,6 +356,13 @@ def _invoke_rows(
     name: str,
     **kwargs: Any,
 ) -> tuple[Mapping[str, Any], ...]:
+    """Invoke a command and coerce its payload to a tuple of mapping rows.
+
+    :param manager: synchronous invoker used to run the command.
+    :param api_call: the :class:`ApiRequestType` to invoke.
+    :param name: the registered command name to invoke.
+    :return: the response rows as mappings; empty when the payload is not a list.
+    """
     return _mapping_rows(_invoke_data(manager, api_call, name, **kwargs))
 
 
@@ -312,6 +372,14 @@ def _invoke_data(
     name: str,
     **kwargs: Any,
 ) -> Any:
+    """Invoke a command and return its data, raising on a command error.
+
+    :param manager: synchronous invoker used to run the command.
+    :param api_call: the :class:`ApiRequestType` to invoke.
+    :param name: the registered command name to invoke.
+    :return: the command result data.
+    :raises RedfishApiError: when the command returns an error.
+    """
     result = manager.sync_invoke(api_call, name, **kwargs)
     if result.error:
         raise RedfishApiError(str(result.error))
@@ -319,16 +387,31 @@ def _invoke_data(
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
+    """Return ``value`` when it is a mapping, else an empty mapping.
+
+    :param value: value to coerce.
+    :return: ``value`` if it is a mapping, otherwise an empty dict.
+    """
     return value if isinstance(value, Mapping) else {}
 
 
 def _mapping_rows(value: Any) -> tuple[Mapping[str, Any], ...]:
+    """Return the mapping rows from a list or tuple value.
+
+    :param value: value to coerce.
+    :return: a tuple of the mapping items; empty when ``value`` is not a list or tuple.
+    """
     if not isinstance(value, (list, tuple)):
         return ()
     return tuple(row for row in value if isinstance(row, Mapping))
 
 
 def _first(mapping: Mapping[str, Any], *keys: str) -> Any:
+    """Return the value of the first key present in ``mapping``.
+
+    :param mapping: mapping to look keys up in.
+    :return: the value of the first matching key, or None when none is present.
+    """
     for key in keys:
         if key in mapping:
             return mapping[key]
@@ -336,6 +419,11 @@ def _first(mapping: Mapping[str, Any], *keys: str) -> Any:
 
 
 def _optional_str(value: Any) -> str | None:
+    """Coerce ``value`` to a stripped string, or None when empty.
+
+    :param value: value to coerce.
+    :return: the stripped string, or None when the value is None or blank.
+    """
     if value is None:
         return None
     text = str(value).strip()
@@ -343,6 +431,11 @@ def _optional_str(value: Any) -> str | None:
 
 
 def _str_tuple(value: Any) -> tuple[str, ...]:
+    """Coerce ``value`` to a tuple of non-empty strings.
+
+    :param value: a comma-separated string or an iterable of values.
+    :return: a tuple of stripped, non-empty strings; empty when ``value`` is None.
+    """
     if value is None:
         return ()
     if isinstance(value, str):
@@ -360,6 +453,12 @@ def _ntp_already_matches(
     rows: tuple[Mapping[str, Any], ...],
     state: DesiredState,
 ) -> bool:
+    """Return whether current NTP rows already satisfy the desired state.
+
+    :param rows: current ManagerNetworkProtocol rows.
+    :param state: desired state carrying the NTP servers and optional manager id.
+    :return: True when a comparable row matches the desired servers with NTP enabled.
+    """
     desired_servers = tuple(state.ntp_servers)
     comparable_rows = []
     for row in rows:
@@ -380,6 +479,11 @@ def _ntp_already_matches(
 
 
 def _ntp_row_is_capable(ntp: Mapping[str, Any]) -> bool:
+    """Return whether an NTP row exposes usable NTP fields.
+
+    :param ntp: the NTP sub-mapping of a ManagerNetworkProtocol row.
+    :return: True when the row reports ProtocolEnabled or any NTPServers.
+    """
     return ntp.get("ProtocolEnabled") is not None or bool(ntp.get("NTPServers"))
 
 
@@ -387,6 +491,12 @@ def _boot_already_matches(
     current: Mapping[str, Any],
     state: DesiredState,
 ) -> bool:
+    """Return whether the current boot override already matches the desired state.
+
+    :param current: current boot override fields from the ComputerSystem.
+    :param state: desired state carrying the boot device, mode, and UEFI target.
+    :return: True when the enabled state, target, mode, and UEFI target all match.
+    """
     desired_device = state.boot_device
     desired_enabled = "Disabled" if desired_device == "None" else "Once"
     if current.get("BootSourceOverrideEnabled") != desired_enabled:
@@ -407,6 +517,13 @@ def _boot_already_matches(
 
 
 def _reset_type(reboot_spec: Any, reboot: Mapping[str, Any]) -> str | None:
+    """Resolve the reset type from a reboot spec.
+
+    :param reboot_spec: the raw ``reboot`` spec value (string, bool, or mapping).
+    :param reboot: the reboot spec coerced to a mapping.
+    :return: the reset type string, or None when no reset is requested.
+    :raises ValueError: when a truthy bare reboot or a non-string resetType is given.
+    """
     if isinstance(reboot_spec, str):
         return _optional_str(reboot_spec)
     if isinstance(reboot_spec, bool):

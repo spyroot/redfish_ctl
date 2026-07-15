@@ -203,6 +203,11 @@ class RedfishActionEncoder(JSONEncoder):
     """
 
     def default(self, obj):
+        """Serialize an object by returning its ``__dict__``.
+
+        :param obj: the object being serialized.
+        :return: the object's ``__dict__`` for JSON encoding.
+        """
         return obj.__dict__
 
 
@@ -215,6 +220,10 @@ class RedfishAction:
                  target: Optional[str] = "",
                  full_redfish_name: Optional[str] = ""):
         """Action discovered from json respond.
+
+        :param action_name: short Redfish action name.
+        :param target: the action target URI to invoke.
+        :param full_redfish_name: fully qualified Redfish action name.
         """
         super().__init__()
         self.action_name = action_name
@@ -223,6 +232,7 @@ class RedfishAction:
         self.args = None
 
     def __iter__(self):
+        """Yield the action's (key, value) pairs for dict conversion."""
         yield from {
             "action_name": self.action_name,
             "full_redfish_name": self.full_redfish_name,
@@ -242,15 +252,31 @@ class RedfishAction:
         self.args[arg_name] = allowable_value
 
     def toJSON(self):
+        """Return the action serialized as a sorted, indented JSON string.
+
+        :return: the action as a sorted, indented JSON string.
+        """
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
     def __repr__(self):
+        """Return the action's string representation.
+
+        :return: the JSON string form of the action.
+        """
         return self.__str__()
 
     def __str__(self):
+        """Return the action as a compact JSON string.
+
+        :return: the action encoded as a JSON string.
+        """
         return json.dumps(dict(self), ensure_ascii=False)
 
     def to_json(self):
+        """Return the action as a compact JSON string.
+
+        :return: the action encoded as a JSON string.
+        """
         return json.dumps(dict(self), ensure_ascii=False)
 
 
@@ -272,6 +298,13 @@ class Singleton(type):
 
     @staticmethod
     def _connection_key(cls, args, kwargs):
+        """Build the cache key fingerprinting a class and its BMC connection.
+
+        :param cls: the command class being instantiated.
+        :param args: positional constructor arguments.
+        :param kwargs: keyword constructor arguments carrying the connection fields.
+        :return: a tuple key; the password contributes only as a SHA-256 digest.
+        """
         password = str(kwargs.get("idrac_password", "") or "")
         return (
             cls,
@@ -286,6 +319,10 @@ class Singleton(type):
         )
 
     def __call__(cls, *args, **kwargs):
+        """Return the cached instance for this class+connection, building one once.
+
+        :return: the singleton instance for the (class, connection) key.
+        """
         key = Singleton._connection_key(cls, args, kwargs)
         inst = cls._instances.get(key)
         if inst is None:
@@ -435,9 +472,20 @@ class RestMethodMapping:
         self._api_call = {}
 
     def add_api(self, a: Rest, method: HTTPMethod):
+        """Map a REST resource to its supported HTTP method.
+
+        :param a: the REST resource key.
+        :param method: the HTTP method supported for the resource.
+        """
         self._api_call[a] = method
 
     def method(self, a):
+        """Return the HTTP method mapped to a REST resource.
+
+        :param a: the REST resource key to look up.
+        :return: the HTTP method registered for the resource.
+        :raises KeyError: when the resource has no registered method.
+        """
         return self._api_call[a]
 
 
@@ -678,6 +726,10 @@ class DellBootSource:
 
     @property
     def Id(self) -> str:
+        """The unique identifier of the boot device.
+
+        :return: the boot device id.
+        """
         return self._id
 
     @property
@@ -753,8 +805,16 @@ class TestNetworkShareReq:
 
     @property
     def success(self):
+        """The HTTP status code treated as success for this request.
+
+        :return: the success status code (200).
+        """
         return self._success
 
     @property
     def method(self):
+        """The HTTP method used for this request.
+
+        :return: the HTTP method (POST).
+        """
         return self._method
