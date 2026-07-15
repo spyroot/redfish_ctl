@@ -11,6 +11,8 @@ In result command also store all discovered action.
 For example.
 {'AssignSpare': '/redfish/v1/Systems/System.Embedded.1/Oem/Dell/DellRaidService/Actions/DellRaidService.AssignSpare'}
 
+    redfish_ctl raid
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -32,6 +34,7 @@ class RaidServiceQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the raid command."""
         super(RaidServiceQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
