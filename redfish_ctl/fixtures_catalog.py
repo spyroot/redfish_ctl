@@ -30,6 +30,13 @@ class FixtureSet:
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> "FixtureSet":
+        """Build a :class:`FixtureSet` from a manifest mapping.
+
+        :param data: one fixture-set entry from the catalog manifest.
+        :return: the validated fixture set.
+        :raises CatalogError: if required fields are missing, the status is
+            invalid, a pending set lacks a reason, or ``oem_types`` is not a list.
+        """
         required = ("key", "vendor", "generation", "path", "status")
         missing = [field for field in required if not data.get(field)]
         if missing:
@@ -59,10 +66,22 @@ class FixtureSet:
         )
 
     def resolve_path(self, repo_root: Path | None = None) -> Path:
+        """Resolve this set's path to an absolute filesystem path.
+
+        :param repo_root: repository root to resolve against; defaults to the
+            package's repository root.
+        :return: the absolute path to the fixture-set directory.
+        """
         base = repo_root or REPO_ROOT
         return (base / self.path).resolve()
 
     def json_file_count(self, repo_root: Path | None = None) -> int:
+        """Count the JSON files under this set's resolved path.
+
+        :param repo_root: repository root to resolve against; defaults to the
+            package's repository root.
+        :return: number of ``*.json`` files found, or 0 when the path is absent.
+        """
         root = self.resolve_path(repo_root)
         if not root.exists():
             return 0
@@ -70,10 +89,18 @@ class FixtureSet:
 
     @property
     def is_active(self) -> bool:
+        """Whether this fixture set is marked active.
+
+        :return: True when the status is ``active``.
+        """
         return self.status == "active"
 
     @property
     def is_pending(self) -> bool:
+        """Whether this fixture set is marked pending.
+
+        :return: True when the status is ``pending``.
+        """
         return self.status == "pending"
 
 
@@ -85,6 +112,14 @@ class FixtureCatalog:
 
     @classmethod
     def from_manifest(cls, manifest_path: Path = DEFAULT_MANIFEST) -> "FixtureCatalog":
+        """Load and validate a fixture catalog from a manifest file.
+
+        :param manifest_path: path to the catalog manifest JSON.
+        :return: the parsed catalog.
+        :raises CatalogError: if the manifest cannot be read, is not valid JSON,
+            has an unexpected schema version, lacks a ``sets`` list, or contains
+            a duplicate fixture-set key.
+        """
         try:
             raw = json.loads(manifest_path.read_text(encoding="utf-8"))
         except OSError as exc:
@@ -112,20 +147,44 @@ class FixtureCatalog:
         )
 
     def require(self, key: str) -> FixtureSet:
+        """Return the fixture set with the given key.
+
+        :param key: fixture-set key to look up.
+        :return: the matching fixture set.
+        :raises CatalogError: if no set has that key.
+        """
         for fixture_set in self.sets:
             if fixture_set.key == key:
                 return fixture_set
         raise CatalogError(f"unknown fixture set: {key}")
 
     def active_sets(self) -> tuple[FixtureSet, ...]:
+        """Return all active fixture sets.
+
+        :return: the fixture sets whose status is ``active``.
+        """
         return tuple(fixture_set for fixture_set in self.sets if fixture_set.is_active)
 
     def pending_sets(self) -> tuple[FixtureSet, ...]:
+        """Return all pending fixture sets.
+
+        :return: the fixture sets whose status is ``pending``.
+        """
         return tuple(fixture_set for fixture_set in self.sets if fixture_set.is_pending)
 
     def by_vendor(self, vendor: str) -> tuple[FixtureSet, ...]:
+        """Return the fixture sets for one vendor.
+
+        :param vendor: vendor name to match.
+        :return: the fixture sets whose vendor equals ``vendor``.
+        """
         return tuple(fixture_set for fixture_set in self.sets if fixture_set.vendor == vendor)
 
 
 def load_catalog(manifest_path: Path = DEFAULT_MANIFEST) -> FixtureCatalog:
+    """Load the fixture catalog from a manifest file.
+
+    :param manifest_path: path to the catalog manifest JSON.
+    :return: the parsed catalog.
+    """
     return FixtureCatalog.from_manifest(manifest_path)

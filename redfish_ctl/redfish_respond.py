@@ -73,10 +73,12 @@ class RedfishRespondMessage:
         """
         Redfish specs defines a verbose output.  THis generic respond msg.
 
+        :param http_status_code: HTTP status code the server returned.
         :param code: a string
         :param message: Displays a human-readable error message that corresponds
                         to the message in the message registry.
         :param message_extended: list of redfish that describe one or more error messages.
+        :param exception_msg: raw error text kept when JSON decoding of the error failed.
         """
         self._code = code
         self._message = message
@@ -91,7 +93,10 @@ class RedfishRespondMessage:
 
     @property
     def code(self) -> str:
-        """code from error message from redfish error"""
+        """code from error message from redfish error
+
+        :return: the error code string.
+        """
         return self._code
 
     @property
@@ -118,10 +123,18 @@ class RedfishRespondMessage:
 
     @message.setter
     def message(self, value: str) -> None:
+        """Set the top-level human-readable message.
+
+        :param value: the message text.
+        """
         self._message = value
 
     @staticmethod
     def new_msg():
+        """Return a fresh empty :class:`RedfishMessage`.
+
+        :return: a new, empty message object.
+        """
         return RedfishMessage()
 
     @staticmethod
@@ -210,5 +223,9 @@ class RedfishRespondMessage:
             self._message_extended.append(msg)
 
     def __repr__(self) -> str:
+        """Render the extended-info messages as newline-joined text.
+
+        :return: each extended message on its own line, terminated by a newline.
+        """
         msgs = [m.message for m in self._message_extended]
         return "\n".join(msgs) + "\n"
