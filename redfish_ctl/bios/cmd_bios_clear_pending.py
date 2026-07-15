@@ -1,4 +1,4 @@
-"""iDRAC command clear bios pending values.
+"""Clear pending BIOS values command.
 
 Command provides the option to clear all the BIOS
 pending values.
@@ -22,7 +22,7 @@ class BiosClearPending(RedfishManagerBase,
                        metaclass=Singleton):
     """
     This cmd action is used to clear all BIOS pending
-    values currently in iDRAC.
+    values currently staged on the Redfish endpoint.
     """
 
     def __init__(self, *args, **kwargs):

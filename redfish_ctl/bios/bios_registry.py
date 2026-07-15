@@ -1,4 +1,4 @@
-"""iDRAC query bios registry
+"""BIOS attribute registry query command.
 
 Command provides raw query bios registry.
 redfish_ctl bios-registry --attr_name SystemServiceTag,OldSetupPassword

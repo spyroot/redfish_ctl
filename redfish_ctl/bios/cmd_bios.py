@@ -1,6 +1,6 @@
-"""iDRAC bios command
+"""BIOS query command.
 
-Command provides the option to retrieve BIOS setting from iDRAC  and serialize
+Command provides the option to retrieve BIOS setting from a Redfish endpoint  and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -122,7 +122,7 @@ class BiosQuery(RedfishManagerBase,
                 attr_filter: Optional[str] = "",
                 attr_filter_file: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Query bios settings from iDRAC.
+        """Query BIOS settings from a Redfish endpoint.
 
         It supports filtering via coma separate list bios attributes
         or caller can pass a json file
