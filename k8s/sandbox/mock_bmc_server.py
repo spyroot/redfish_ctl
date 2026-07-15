@@ -390,7 +390,35 @@ class MutationRules(_OverlayStore):
         corpus_state: Any = None,
     ) -> dict[str, Any] | None:
         path = _normalize_request_path(request_path)
-        corpus_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
+        base_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
+        # Pre-read corpus state for the precondition paths of every rule that
+        # matches on method/path/body, BEFORE taking the engine lock. The corpus
+        # is immutable and independent of engine state, so this file read + JSON
+        # parse must not run under the lock — doing so serializes all concurrent
+        # writers (and overlay readers) on disk I/O. Shape-matching is pure, so
+        # the same rules match again under the lock and the cache covers every
+        # path the precondition evaluation will request.
+        corpus_cache: dict[str, Any] = {}
+        for rule in self.rules:
+            if not isinstance(rule, dict) or not self._shape_matches(
+                rule, method, path, body
+            ):
+                continue
+            for condition in rule.get("when") or []:
+                if not isinstance(condition, dict):
+                    continue
+                cond_path = condition.get("path")
+                if isinstance(cond_path, str):
+                    key = _normalize_request_path(cond_path)
+                    if key not in corpus_cache:
+                        corpus_cache[key] = base_lookup(key)
+
+        def corpus_lookup(resource_path: str) -> Any:
+            key = _normalize_request_path(resource_path)
+            if key not in corpus_cache:  # unreachable given pure shape-matching
+                corpus_cache[key] = base_lookup(key)
+            return corpus_cache[key]
+
         with self._lock:
             matched = [
                 rule
@@ -438,14 +466,20 @@ class MutationRules(_OverlayStore):
             _deep_update(base, overlay)
         return base
 
-    def _rule_matches(
-        self,
+    @staticmethod
+    def _shape_matches(
         rule: dict[str, Any],
         method: str,
         path: str,
         body: Any,
-        corpus_lookup: Any,
     ) -> bool:
+        """Match a rule on method/path/body only — no ``when`` / corpus lookup.
+
+        Pure and lock-free: it depends only on the immutable rule and the
+        request, never on overlays or corpus files. ``match_write`` uses it to
+        decide which rules' preconditions to pre-read corpus state for before
+        acquiring the engine lock.
+        """
         if str(rule.get("method", "")).upper() != method.upper():
             return False
         rule_path = _normalize_request_path(str(rule.get("path", "")))
@@ -459,6 +493,18 @@ class MutationRules(_OverlayStore):
         if "body" in rule and body != rule["body"]:
             return False
         if "body_contains" in rule and not _body_contains(body, rule["body_contains"]):
+            return False
+        return True
+
+    def _rule_matches(
+        self,
+        rule: dict[str, Any],
+        method: str,
+        path: str,
+        body: Any,
+        corpus_lookup: Any,
+    ) -> bool:
+        if not self._shape_matches(rule, method, path, body):
             return False
         for condition in rule.get("when") or []:
             if not isinstance(condition, dict):
