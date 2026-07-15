@@ -1,8 +1,8 @@
 """Dual-mode-style mock tests for vendor-neutral action commands."""
 import json
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def _post_requests(service):
@@ -113,6 +113,11 @@ def test_action_list_returns_supermicro_action_inventory_without_posts(
     assert result.data
     assert "#ComputerSystem.Reset" in full_types
     assert "#EventService.SubmitTestEvent" in full_types
+    assert "#CertificateService.GenerateCSR" in full_types
+    assert {
+        row["FullType"]: row["Level"]
+        for row in result.data
+    }["#CertificateService.GenerateCSR"] == "reversible"
     assert all(row["Target"] for row in result.data)
     assert all(row["Level"] for row in result.data)
     assert _post_requests(service) == []
