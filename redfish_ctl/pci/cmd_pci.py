@@ -1,6 +1,6 @@
-"""iDRAC pci device query command
+"""PCI device query command.
 
-Command provides the option to retrieve firmware setting from iDRAC and serialize
+Command provides the option to retrieve firmware setting from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -56,7 +56,7 @@ class PciDeviceQuery(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 pci_type: Optional[str] = "PCIeDevices",
                 **kwargs) -> CommandResult:
-        """Query pci device or function from idrac.
+        """Query PCI device or function from a Redfish endpoint.
         :param verbose:
         :param do_async:
         :param filename: if filename indicate call will save the response to this file.
