@@ -46,11 +46,17 @@ jobs:
         # The tree carries pre-existing ruff debt, so lint is reported but does
         # not fail the build. New code should still be clean.
         run: ruff check redfish_ctl || true
-      - name: Docstring hard gate (new/changed methods must document args + return)
-        # Diff-aware and BLOCKING: only functions this PR adds or changes must
-        # carry a docstring with :param: per arg and :return: (see TEAM_GUIDE.md).
-        # Pre-existing gaps are backfilled separately, not gated here.
+      - name: Docstring hard gate (diff-aware — new/changed methods)
+        # Diff-aware and BLOCKING: shows a targeted failure for the functions
+        # this PR adds or changes (each needs a docstring with :param: per arg
+        # and :return:; see TEAM_GUIDE.md). Kept for friendly per-PR messages.
         if: github.event_name == 'pull_request'
         run: |
           git fetch --no-tags --depth=200 origin "${{ github.base_ref }}"
           python tools/docstring_gate.py --base FETCH_HEAD
+      - name: Docstring hard gate (whole tree — no method anywhere may lack docs)
+        # BLOCKING on every push and PR. The whole-tree backlog (redfish_ctl and
+        # k8s) was backfilled to zero, so this keeps the entire package
+        # permanently documented: any regression — a new undocumented method OR a
+        # docstring deleted from an existing one — fails CI, not just the diff.
+        run: python tools/docstring_gate.py --all
