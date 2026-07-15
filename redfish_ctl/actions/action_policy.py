@@ -85,6 +85,10 @@ def classify(full_action_type):
 
     An empty/None name or any action not in ACTION_POLICY falls back to
     DEFAULT_LEVEL (DESTRUCTIVE) so the safe path is the default.
+
+    :param full_action_type: full ``#Type.Action`` name to look up.
+    :return: the Destructiveness level, or DEFAULT_LEVEL (DESTRUCTIVE) when the
+        name is empty or absent from ACTION_POLICY.
     """
     if not full_action_type:
         return DEFAULT_LEVEL
