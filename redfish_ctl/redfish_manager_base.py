@@ -9,7 +9,7 @@ each sub-command is registered automatically.
 During the module phase, each sub-command is discovered and loaded,
 allowing anyone to extend and add their own set of subcommands easily.
 
-- The interaction with iDRAC done via REST API.
+- The interaction with the BMC is done via the REST API.
 - Each command must provide option invoke command synchronously
   or asynchronously
 
@@ -75,7 +75,7 @@ module_logger = logging.getLogger('redfish_ctl.redfish_manager_base')
 
 class RedfishManagerBase(RedfishManager):
     """
-    RedfishManagerBase Class, interact with iDRAC via REST API interface
+    RedfishManagerBase Class, interact with a Redfish endpoint via REST API interface
     """
 
     _registry = {t: {} for t in ApiRequestType}
@@ -90,16 +90,16 @@ class RedfishManagerBase(RedfishManager):
                  is_http: Optional[bool] = False,
                  is_debug: Optional[bool] = False,
                  log_level=logging.NOTSET):
-        """Default constructor for idrac requires credentials.
-           By default, iDRAC Manager uses json to serialize a data to callee
+        """Default constructor requires credentials.
+           By default, the manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param idrac_ip: idrac mgmt IP address
-        :param idrac_username: idrac username default is root
-        :param idrac_password: idrac password.
-        :param idrac_port: idrac TCP port (default 443); accepts an int or str.
+        :param idrac_ip: BMC management IP address
+        :param idrac_username: BMC username default is root
+        :param idrac_password: BMC password.
+        :param idrac_port: BMC TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
-            skipped. iDRAC/BMC controllers present self-signed certificates, so
+            skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
         :param x_auth: X-Authentication header.
         :param is_http: use plain HTTP instead of HTTPS for requests when True.
@@ -138,7 +138,7 @@ class RedfishManagerBase(RedfishManager):
         }
 
         # a mapping from http status code to result of request.
-        # idrac not consistent with return code, so it not very clear
+        # the BMC is not consistent with the return code, so it is not very clear
         # case when 200 is ok and 201 is something else. So it API per API
         # Thus default success has extra field, so we can always
         # pass what we expect for particular cmd.
@@ -212,7 +212,7 @@ class RedfishManagerBase(RedfishManager):
 
     @property
     def idrac_ip(self) -> str:
-        """iDRAC/BMC host address (delegates to :attr:`redfish_ip`).
+        """BMC host address (delegates to :attr:`redfish_ip`).
 
         :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
         """
@@ -220,7 +220,7 @@ class RedfishManagerBase(RedfishManager):
 
     @property
     def username(self) -> str:
-        """iDRAC/BMC account username.
+        """BMC account username.
 
         :return: the configured username.
         """
@@ -228,7 +228,7 @@ class RedfishManagerBase(RedfishManager):
 
     @property
     def password(self) -> str:
-        """iDRAC/BMC account password.
+        """BMC account password.
 
         :return: the configured password.
         """
@@ -540,9 +540,9 @@ class RedfishManagerBase(RedfishManager):
                    wait_for: Optional[int] = 0,
                    wait_for_state: Optional[TaskState] = TaskState.Unknown) -> TaskState:
 
-        """Synchronous fetch a job from iDRAC and wait for job completion.
+        """Synchronous fetch a job from the BMC and wait for job completion.
 
-        A job in idrac is the Task and contains information about a task
+        A job on the BMC is the Task and contains information about a task
         that the Redfish Task Service schedules or executes.
 
         Tasks represent operations that we want to wait.
@@ -769,7 +769,7 @@ class RedfishManagerBase(RedfishManager):
 
     @staticmethod
     def _get_actions(cls, json_data):
-        """Parse json iDRAC Manager for all supported action
+        """Parse json from the manager for all supported action
         and action method arg.
         :param cls:
         :param json_data:
@@ -884,7 +884,7 @@ class RedfishManagerBase(RedfishManager):
         return self.base_query(r, select_target="SecurityCertificate.*")
 
     def select_network_adapters(self) -> CommandResult:
-        """Return idrac nics
+        """Return the BMC NICs
         :return:
         """
         r = f"{self.idrac_members}/Attributes"
@@ -912,7 +912,7 @@ class RedfishManagerBase(RedfishManager):
         return self.base_query(r, select_target="Attributes/SystemModelName")
 
     def select_server_info(self) -> CommandResult:
-        """Return idrac cert
+        """Return the BMC certificate
         :return:
         """
         r = f"{self.idrac_manage_servers}/Attributes"
@@ -1901,7 +1901,7 @@ class RedfishManagerBase(RedfishManager):
 
     @cached_property
     def idrac_firmware(self) -> str:
-        """Shared method return idrac firmware
+        """Shared method return the BMC firmware
         :return: str: firmware.
         """
         api_return = self.base_query(self.idrac_members,
@@ -1909,7 +1909,7 @@ class RedfishManagerBase(RedfishManager):
         return api_return.data
 
     def idrac_last_reset(self) -> datetime:
-        """Shared method returns idrac last reset time as datatime
+        """Shared method returns the BMC last reset time as datatime
         :return: datetime
         """
         idrac_reset_time = None
@@ -1922,7 +1922,7 @@ class RedfishManagerBase(RedfishManager):
         return idrac_reset_time
 
     def idrac_current_time(self) -> datetime:
-        """Shared method return idrac current time, if idrac
+        """Shared method return the BMC current time, if the BMC
         return none ISO format
         :return: datetime
         """
@@ -1938,14 +1938,14 @@ class RedfishManagerBase(RedfishManager):
     @staticmethod
     def local_time_iso():
         """return local time in iso format
-        :return: idrac local time
+        :return: the BMC local time
         """
         current_date = datetime.now()
         return current_date.isoformat()
 
     def idrac_time_offset(self):
         """
-        :return:  idrac time zone
+        :return:  the BMC time zone
         """
         api_resp = self.base_query(self.idrac_members,
                                    key=REDFISH_JSON.DateTimeLocalOffset)
@@ -1953,7 +1953,7 @@ class RedfishManagerBase(RedfishManager):
 
     @cached_property
     def idrac_manage_chassis(self) -> str:
-        """Shared method return idrac managed chassis list as json
+        """Shared method return the BMC managed chassis list as json
         :return: str: manage chassis i.e. /redfish/v1/Chassis/System.Embedded.1
         """
         api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
@@ -1978,13 +1978,13 @@ class RedfishManagerBase(RedfishManager):
 
     @cached_property
     def idrac_manager_version(self) -> str:
-        """Remote idrac version.
+        """Remote BMC version.
         :return:
         """
         cmd_result = self.base_query(
             f"{REDFISH_API.IDRAC_MANAGER}", key=REDFISH_JSON.Members)
 
-        # idrac ctl only manage one instance.
+        # the tool only manages one instance.
         member_list = cmd_result.data
         if len(member_list) > 1:
             logging.warning("idrac manage more than one entity")
@@ -2002,7 +2002,7 @@ class RedfishManagerBase(RedfishManager):
 
     @cached_property
     def idrac_members(self) -> str:
-        """Shared method return idrac manage members servers list as json
+        """Shared method return the BMC managed member servers list as json
         /redfish/v1/Managers/iDRAC.Embedded.1
 
         Upon first call , result cached all follow-up call will return cached result.
@@ -2114,7 +2114,7 @@ class RedfishManagerBase(RedfishManager):
 
     @cached_property
     def idrac_id(self):
-        """Shared method return idrac id, i.e. System.Embedded.1
+        """Shared method return the manager id, i.e. System.Embedded.1
         id cached all follow-up calls and will return cached result.
         :return:
         """

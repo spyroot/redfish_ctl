@@ -1,10 +1,10 @@
 """Main entry for redfish_ctl
 
-The main routine for redfish_ctl , ctl tool leverages iDRAC Manager class.
-to interact with Dell IDRAC.
+The main routine for redfish_ctl; the tool leverages the RedfishManagerBase class.
+to interact with a Redfish BMC.
 
 Each command registered dynamically and dispatch to respected execute method
-by invoking request from IDRAC Manager.
+by invoking requests through the manager.
 
 Author Mus spyroot@gmail.com
 """
@@ -401,7 +401,7 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         from .telemetry import tracing
         tracing.setup_otlp("redfish-ctl")
 
-    # idrac manager main interface main uses to interact with IDRAC.
+    # the manager is the main interface main uses to interact with the BMC.
     redfish_api = RedfishManagerBase(idrac_ip=cmd_args.idrac_ip,
                                idrac_username=cmd_args.idrac_username,
                                idrac_password=cmd_args.idrac_password,

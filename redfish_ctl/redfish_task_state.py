@@ -1,5 +1,5 @@
 """Redfish Task state and task status
-Based on Redfish spec and correlated with IDRAC API.
+Based on the Redfish spec and correlated with the BMC task API.
 
 Author Mus spyroot@gmail.com
 """
