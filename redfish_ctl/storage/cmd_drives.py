@@ -1,4 +1,7 @@
 """iDRAC
+
+    redfish_ctl storage-drives
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod

@@ -107,7 +107,10 @@ class AccountCreate(_AccountBase,
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``account-create`` subcommand and its flags."""
+        """Register the ``account-create`` subcommand and its flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=True, type=str, dest='acct_user',
                                 help="new account UserName")
@@ -156,7 +159,10 @@ class AccountUpdate(_AccountBase,
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``account-update`` subcommand and its flags."""
+        """Register the ``account-update`` subcommand and its flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None,
@@ -218,7 +224,10 @@ class AccountDelete(_AccountBase,
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``account-delete`` subcommand and its flags."""
+        """Register the ``account-delete`` subcommand and its flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None)

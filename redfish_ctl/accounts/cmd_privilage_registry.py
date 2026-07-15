@@ -1,6 +1,9 @@
 """iDRAC query privilege registry
 
 Command query privilege registry.
+
+    redfish_ctl privilege-registry
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod

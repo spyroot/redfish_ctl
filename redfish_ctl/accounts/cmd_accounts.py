@@ -2,6 +2,8 @@
 
 Command query account.
 
+    redfish_ctl accounts
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod

@@ -3,6 +3,8 @@
 Command provides capability query
 particular account.
 
+    redfish_ctl account --account <id>
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod

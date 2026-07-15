@@ -15,6 +15,8 @@ On return will hold list of controller in CommandResult.data
 
 python redfish_ctl.py storage
 
+    redfish_ctl storage-controllers
+
 Example: filter by controller type
 redfish_ctl.py --json storage --filter AHCI
 

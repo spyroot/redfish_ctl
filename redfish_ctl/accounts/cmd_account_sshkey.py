@@ -67,7 +67,10 @@ class AccountImportSSHKey(_AccountBase,
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``account-import-sshkey`` subcommand and its flags."""
+        """Register the ``account-import-sshkey`` subcommand and its flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument('--username', required=False, type=str, dest='acct_user', default=None)
         cmd_parser.add_argument('--id', required=False, type=str, dest='acct_id', default=None)

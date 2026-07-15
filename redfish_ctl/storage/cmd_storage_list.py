@@ -5,6 +5,8 @@ Command provides the option to retrieve list of storage controllers.
 Example expanded
 python redfish_ctl.py storage-list -e
 
+    redfish_ctl storage-list -e
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
