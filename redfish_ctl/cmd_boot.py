@@ -1,9 +1,9 @@
-"""iDRAC boot query command
+"""Boot query command.
 
     redfish_ctl boot
     redfish_ctl boot --deep --filename boot.json
 
-Command provides the option to retrieve boot source from iDRAC and serialize
+Command provides the option to retrieve boot source from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
 caller can save to a file and consume asynchronously or synchronously.
@@ -65,7 +65,7 @@ class BootQuery(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Query boot source from idrac
+        """Query boot source from a Redfish endpoint
         :param do_async: will use asyncio
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_deep:

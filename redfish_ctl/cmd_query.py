@@ -1,4 +1,4 @@
-"""iDRAC query command
+"""Redfish query command.
 
     redfish_ctl query --resource /redfish/v1/Managers
     redfish_ctl query --resource /redfish/v1/Systems --expanded
@@ -22,7 +22,7 @@ class QueryIDRAC(
     scm_type=ApiRequestType.QueryIdrac,
     name='query_idrac',
     metaclass=Singleton):
-    """A command query iDRAC resource based on a resource path.
+    """Query a Redfish endpoint resource by resource path.
     """
 
     def __init__(self, *args, **kwargs):
