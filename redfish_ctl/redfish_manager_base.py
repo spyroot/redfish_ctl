@@ -97,10 +97,14 @@ class RedfishManagerBase(RedfishManager):
         :param idrac_ip: idrac mgmt IP address
         :param idrac_username: idrac username default is root
         :param idrac_password: idrac password.
+        :param idrac_port: idrac TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. iDRAC/BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
         :param x_auth: X-Authentication header.
+        :param is_http: use plain HTTP instead of HTTPS for requests when True.
+        :param is_debug: when True, include exception tracebacks in error logs.
+        :param log_level: logging level applied to this manager's logger.
         """
         super().__init__(redfish_ip=idrac_ip,
                          redfish_username=idrac_username,
@@ -208,18 +212,34 @@ class RedfishManagerBase(RedfishManager):
 
     @property
     def idrac_ip(self) -> str:
+        """iDRAC/BMC host address (delegates to :attr:`redfish_ip`).
+
+        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
+        """
         return self.redfish_ip
 
     @property
     def username(self) -> str:
+        """iDRAC/BMC account username.
+
+        :return: the configured username.
+        """
         return self._username
 
     @property
     def password(self) -> str:
+        """iDRAC/BMC account password.
+
+        :return: the configured password.
+        """
         return self._password
 
     @property
     def x_auth(self) -> str:
+        """X-Auth token used in place of basic authentication.
+
+        :return: the X-Auth token, or None when basic auth is used.
+        """
         return self._x_auth
 
     def __init_subclass__(cls, scm_type=None, name=None, **kwargs):
@@ -837,7 +857,9 @@ class RedfishManagerBase(RedfishManager):
     @cached_property
     def version_api(self, data_type: Optional[str] = "json") -> bool:
         """Return true if IDRAC version 6.0 i.e. a new version.
-        :return:
+
+        :param data_type: content type to request; json or xml.
+        :return: True when the iDRAC firmware is 6.00.00.00 or newer, else False.
         """
         headers = {}
         if data_type == "json":
@@ -1259,6 +1281,14 @@ class RedfishManagerBase(RedfishManager):
             response: requests.models.Response,
             expected: Optional[int] = 200,
             ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default post success handler. Map the response status or raise on failure.
+
+        :param response: HTTP response.
+        :param expected: status code the caller considers success.
+        :param ignore_error_code: HTTP status code to treat as success.
+        :return: RedfishApiRespond mapped from the response status.
+        :raise RedfishException: if the response reports a failure status.
+        """
         return self.read_api_respond(
             response, expected=expected, ignore_error_code=ignore_error_code
         )
@@ -1570,6 +1600,10 @@ class RedfishManagerBase(RedfishManager):
         off a Manager. Check every Manager first, then the host System, returning
         the first that advertises a VirtualMedia link. Falls back to the Dell
         ``{system}/VirtualMedia`` subpath so existing Dell behavior is unchanged.
+
+        :param do_async: issue the underlying queries asynchronously when True.
+        :return: the VirtualMedia collection URI.
+        :raise ResourceNotFound: if no VirtualMedia collection can be resolved.
         """
         # Managers first for iLO/Supermicro/OpenBMC; keep the historical Dell
         # System.Embedded.1 preference when both System and Manager advertise it.
@@ -1615,6 +1649,9 @@ class RedfishManagerBase(RedfishManager):
 
         Unlike the short-name discovery map, this does NOT collapse two actions
         that share a short name, so an exact full-type lookup is unambiguous.
+
+        :param resource: the parsed Redfish resource whose ``Actions`` block is read.
+        :return: a dict mapping each action full type to its target URL.
         """
         out = {}
         actions = (resource or {}).get("Actions") or {}
@@ -1633,7 +1670,16 @@ class RedfishManagerBase(RedfishManager):
     def _validate_action_payload(full_action_type: str,
                                  action: Optional[RedfishAction],
                                  payload: dict) -> list[dict]:
-        """Validate action payload keys/enum values when action metadata is available."""
+        """Validate action payload keys/enum values when action metadata is available.
+
+        :param full_action_type: the fully-qualified action type used to look up
+            parameter metadata from the CSDL when the action has no inline args.
+        :param action: the discovered RedfishAction (its inline ``args`` win over
+            CSDL metadata), or None.
+        :param payload: the action payload whose keys and values are checked.
+        :return: a list of error dicts (one per offending parameter); empty when
+            no metadata is available or every value is allowed.
+        """
         inline_args = getattr(action, "args", None) or {}
         if inline_args:
             strict_names = False
@@ -1971,6 +2017,9 @@ class RedfishManagerBase(RedfishManager):
 
         Tolerates a non-list / malformed payload (returns ``[]``) and skips
         members without a string id, so a partial response never raises.
+
+        :param members: the ``Members`` list from a Redfish collection.
+        :return: the list of ``@odata.id`` strings (empty on a malformed payload).
         """
         if not isinstance(members, list):
             return []
@@ -1986,6 +2035,8 @@ class RedfishManagerBase(RedfishManager):
         Systems collection so callers can pick the right one: e.g. a Supermicro
         GB300 exposes ``/redfish/v1/Systems/System_0`` (host) and
         ``/redfish/v1/Systems/HGX_Baseboard_0`` (NVIDIA GPU baseboard).
+
+        :return: the list of ComputerSystem ``@odata.id`` paths.
         """
         cmd_result = self.base_query(RedfishApi.Systems, key=REDFISH_JSON.Members)
         return self._member_ids(cmd_result.data)
@@ -1995,6 +2046,8 @@ class RedfishManagerBase(RedfishManager):
 
         Companion to :meth:`discover_computer_system_ids` for boxes with more
         than one BMC; ``idrac_members`` only yields a single (last) manager.
+
+        :return: the list of Manager ``@odata.id`` paths.
         """
         cmd_result = self.base_query(RedfishApi.Managers, key=REDFISH_JSON.Members)
         return self._member_ids(cmd_result.data)
@@ -2005,6 +2058,9 @@ class RedfishManagerBase(RedfishManager):
         The host exposes a ``Bios``/``Boot`` link (where boot/bios/storage live);
         on a split-topology box the others are baseboards (e.g. the NVIDIA HGX
         baseboard carries GPUs but no Bios). Returns "" if undecidable.
+
+        :param system_ids: candidate ComputerSystem ids to probe.
+        :return: the id exposing a Bios/Boot link, or "" if none qualifies.
         """
         for sid in system_ids:
             try:
@@ -2032,6 +2088,8 @@ class RedfishManagerBase(RedfishManager):
         when /redfish/v1/Systems has more than one member we prefer the host
         system -- the one exposing a Bios/Boot link. Single-system hosts (Dell)
         and hosts without a reachable Systems collection keep the original result.
+
+        :return: the managed host ComputerSystem path (empty string if unresolved).
         """
         resolved = ""
         api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
@@ -2222,7 +2280,9 @@ class RedfishManagerBase(RedfishManager):
 
        :param start_date: start date for a job YYYY-MM-DD
        :param start_time: a start time for a job HH:MM:SS
-       :param is_json_string return python string or JSON string.
+       :param is_json_string: return a JSON string when True, else a plain string.
+       :return: the future timestamp in ISO 8601 format (JSON-encoded when
+           ``is_json_string`` is True).
        :raise: MissingMandatoryArguments if mandatory args missing.
        :raise: InvalidArgumentFormat if format of the input is invalid.
        """
@@ -2261,10 +2321,12 @@ class RedfishManagerBase(RedfishManager):
         """
         The settings apply time and operation apply time annotations
         enable an operation to be performed during a maintenance window
-        :param start_date a date as string
-        :param start_time a start time for a future job
-        :param default_duration a duration
-        :param apply time auto-boot, maintenance, on-reset
+        :param apply: apply-time selector: auto-boot, maintenance, or on-reset.
+        :param start_date: a date as string
+        :param start_time: a start time for a future job
+        :param default_duration: a duration
+        :return: the settings apply-time request payload built by
+            :meth:`schedule_job_request`.
         :raise InvalidArgumentFormat will raise in case we can't parse args
         :raise ValueError if unknown apply type
         """

@@ -64,10 +64,13 @@ class RedfishManager:
         :param redfish_ip: redfish IP or hostname
         :param redfish_username: redfish username default is root
         :param redfish_password: redfish password.
+        :param redfish_port: redfish TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMCs ship self-signed certificates, so verification is
             opt-in: pass ``insecure=False`` to verify the server certificate.
+        :param is_http: use plain HTTP instead of HTTPS for requests when True.
         :param x_auth: X-Authentication header.
+        :param is_debug: when True, include exception tracebacks in error logs.
         """
         self._redfish_ip = redfish_ip
         self._username = redfish_username
@@ -106,6 +109,10 @@ class RedfishManager:
 
     @property
     def redfish_ip(self) -> str:
+        """Redfish host, with the port appended when it is not the default 443.
+
+        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
+        """
         if ":" in self._redfish_ip:
             return self._redfish_ip
         else:
@@ -116,21 +123,42 @@ class RedfishManager:
 
     @property
     def username(self) -> str:
+        """Redfish account username.
+
+        :return: the configured username.
+        """
         return self._username
 
     @property
     def password(self) -> str:
+        """Redfish account password.
+
+        :return: the configured password.
+        """
         return self._password
 
     @property
     def x_auth(self) -> str:
+        """X-Auth token used in place of basic authentication.
+
+        :return: the X-Auth token, or None when basic auth is used.
+        """
         return self._x_auth
 
     def authentication_header(self):
+        """Build the authentication header (placeholder; no-op in the base class)."""
         pass
 
     @staticmethod
     def redfish_error_handlers(status_code):
+        """Raise the matching Redfish exception for a non-success HTTP status.
+
+        :param status_code: the HTTP status code returned by the BMC.
+        :raise AuthenticationFailed: on 401.
+        :raise RedfishForbidden: on 403.
+        :raise RedfishMethodNotAllowed: on 405.
+        :raise RedfishNotAcceptable: on 406 or 409.
+        """
         if status_code == 401:
             raise AuthenticationFailed(
                 "Authentication failed."
@@ -215,6 +243,8 @@ class RedfishManager:
         ``REDFISH_HTTP_POOL`` (pool size), ``REDFISH_HTTP_RETRIES``,
         ``REDFISH_HTTP_BACKOFF`` (legacy ``IDRAC_HTTP_*`` still honored).
         Inherited by RedfishManagerBase.
+
+        :return: the cached keep-alive ``requests.Session``.
         """
         session = getattr(self, "_session_cache", None)
         if session is None:
@@ -331,6 +361,8 @@ class RedfishManager:
         Version, vendor, and the Systems path all live in this one document;
         a BMC round trip costs hundreds of milliseconds, so the identity
         properties below share a single fetch instead of each paying their own.
+
+        :return: the ServiceRoot document as a dict, or None if the query failed.
         """
         api_resp = self.base_query("/redfish/v1/")
         return api_resp.data if api_resp is not None else None
@@ -367,8 +399,10 @@ class RedfishManager:
 
     @staticmethod
     def select(select_property: Optional[str] = "") -> str:
-        """Return true if IDRAC version 6.0 i.e. a new version.
-        :return:
+        """Return a ``$select`` query-string fragment for the given property.
+
+        :param select_property: the Redfish property name to select.
+        :return: a query fragment of the form ``?$select=<property>``.
         """
         return f"?$select={select_property}"
 
@@ -472,6 +506,13 @@ class RedfishManager:
 
     @staticmethod
     def _redfish_error_from_payload(status_code: int, payload) -> RedfishError:
+        """Build a RedfishError from an error payload and HTTP status code.
+
+        :param status_code: the HTTP status code of the error response.
+        :param payload: the parsed error body; a dict is mined for ``code``,
+            ``message`` and extended-info entries, otherwise it is stringified.
+        :return: the populated RedfishError.
+        """
         if not isinstance(payload, dict):
             message = "" if payload is None else str(payload)
             return RedfishError(status_code, message=message)
