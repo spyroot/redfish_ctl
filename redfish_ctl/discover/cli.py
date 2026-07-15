@@ -43,6 +43,10 @@ def _supports_rich(stream: TextIO) -> bool:
     Both conditions matter: ``rich`` styling is only worth using on an
     interactive terminal, and on a non-TTY (pipe/file/CI) we degrade to plain
     text so escape codes never pollute the output.
+
+    :param stream: output stream the table would be written to.
+    :return: ``True`` when ``stream`` is a TTY and ``rich`` imports, else
+        ``False``.
     """
     if not _stream_is_tty(stream):
         return False
@@ -54,7 +58,12 @@ def _supports_rich(stream: TextIO) -> bool:
 
 
 def _stream_is_tty(stream: TextIO) -> bool:
-    """Best-effort ``isatty`` check that tolerates odd stream objects."""
+    """Best-effort ``isatty`` check that tolerates odd stream objects.
+
+    :param stream: output stream to test for an ``isatty`` method.
+    :return: ``True`` only when ``stream.isatty()`` exists and returns truthy;
+        any missing method or error yields ``False``.
+    """
     isatty = getattr(stream, "isatty", None)
     if not callable(isatty):
         return False
@@ -65,7 +74,12 @@ def _stream_is_tty(stream: TextIO) -> bool:
 
 
 def _cell(record: Dict[str, Any], key: str) -> str:
-    """Stringify one record cell, rendering missing values as ``-``."""
+    """Stringify one record cell, rendering missing values as ``-``.
+
+    :param record: one discovered-service record dict.
+    :param key: record key to read the cell value from.
+    :return: the value as a string, or ``-`` when it is ``None``.
+    """
     value = record.get(key)
     return "-" if value is None else str(value)
 
@@ -77,6 +91,9 @@ def render_table(
 
     Uses ``rich`` when available on a TTY; otherwise writes a plain-text table.
     An empty result set prints a short notice rather than an empty frame.
+
+    :param services: discovered services to render.
+    :param stream: output stream; defaults to ``sys.stdout`` when ``None``.
     """
     out = stream if stream is not None else sys.stdout
     records = [svc.as_dict() for svc in services]
@@ -92,7 +109,11 @@ def render_table(
 
 
 def _render_rich(records: List[Dict[str, Any]], out: TextIO) -> None:
-    """Render with ``rich`` (only called when import + TTY checks passed)."""
+    """Render with ``rich`` (only called when import + TTY checks passed).
+
+    :param records: discovered-service record dicts to render as rows.
+    :param out: output stream the ``rich`` table is printed to.
+    """
     from rich.console import Console
     from rich.table import Table
 
@@ -106,7 +127,11 @@ def _render_rich(records: List[Dict[str, Any]], out: TextIO) -> None:
 
 
 def _render_plain(records: List[Dict[str, Any]], out: TextIO) -> None:
-    """Render a fixed-width plain-text table (no escape codes)."""
+    """Render a fixed-width plain-text table (no escape codes).
+
+    :param records: discovered-service record dicts to render as rows.
+    :param out: output stream the plain-text table is written to.
+    """
     headers = [header for header, _key in _COLUMNS]
     keys = [key for _header, key in _COLUMNS]
 
@@ -117,6 +142,11 @@ def _render_plain(records: List[Dict[str, Any]], out: TextIO) -> None:
     ]
 
     def _fmt(cells: Sequence[str]) -> str:
+        """Join cells into one row, left-padding each to its column width.
+
+        :param cells: cell strings for one row, in column order.
+        :return: the formatted, two-space-separated row line.
+        """
         return "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(cells))
 
     out.write(_fmt(headers) + "\n")
@@ -131,6 +161,8 @@ async def _default_get(_ip: str) -> Optional[Dict[str, Any]]:
     Real discovery needs an operator-supplied transport/auth policy. The default
     deliberately performs no network call and holds no credentials, so running
     the CLI without wiring a fetcher is safe and inert.
+
+    :param _ip: host address (ignored; the default fetcher probes nothing).
     """
     return None
 
@@ -161,6 +193,8 @@ def make_http_fetcher(
         because BMCs ship self-signed certs; pass ``True`` behind a trusted CA.
     :param timeout: per-request timeout in seconds (default ``2.0``), bounding how
         long a single probe can hang.
+    :return: an :data:`~redfish_ctl.discover.scanner.AsyncGet` callable that GETs
+        one host's ServiceRoot and returns the parsed dict or ``None``.
 
     No credentials are sent — discovery reads only the unauthenticated service
     root. Building the fetcher opens no socket; I/O happens solely when the
@@ -169,9 +203,20 @@ def make_http_fetcher(
     url_template = f"{scheme}://{{host}}:{port}{REDFISH_ROOT_PATH}"
 
     async def _get(ip: str) -> Optional[Dict[str, Any]]:
+        """Fetch one host's ServiceRoot off the event loop.
+
+        :param ip: host address to probe.
+        :return: the parsed ServiceRoot dict, or ``None`` on any transport error
+            or non-usable response.
+        """
         url = url_template.format(host=ip)
 
         def _blocking_get() -> Optional[Dict[str, Any]]:
+            """Perform the blocking GET and validate the response.
+
+            :return: the parsed JSON object, or ``None`` when the status is not
+                ``200`` or the body is not a JSON object.
+            """
             response = requests.get(url, verify=verify_tls, timeout=timeout)
             if response.status_code != 200:
                 return None
@@ -190,7 +235,13 @@ def make_http_fetcher(
 
 
 def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
-    """Parse ``redfish-discover`` arguments."""
+    """Parse ``redfish-discover`` arguments.
+
+    :param argv: argument vector to parse (defaults to ``sys.argv[1:]`` when
+        ``None``).
+    :return: the parsed :class:`argparse.Namespace` (``hosts`` and
+        ``concurrency``).
+    """
     parser = argparse.ArgumentParser(
         prog="redfish-discover",
         description=(

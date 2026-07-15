@@ -43,7 +43,11 @@ class DiscoveredService:
     redfish_version: Optional[str]
 
     def as_dict(self) -> Dict[str, Optional[str]]:
-        """Return the record as a plain dict (handy for rendering/serialization)."""
+        """Return the record as a plain dict (handy for rendering/serialization).
+
+        :return: dict with keys ``ip``, ``vendor``, ``product``, and
+            ``redfish_version``.
+        """
         return {
             "ip": self.ip,
             "vendor": self.vendor,
@@ -58,6 +62,12 @@ def _service_from_root(
 
     A falsy/non-mapping root means the host is not a usable Redfish service, so we
     return ``None`` and the caller drops it from the results.
+
+    :param ip: host address that produced this ServiceRoot.
+    :param service_root: parsed ``/redfish/v1/`` dict, or ``None`` when the host
+        did not answer with a usable Redfish document.
+    :return: a :class:`DiscoveredService` for a non-empty mapping root, else
+        ``None``.
     """
     if not isinstance(service_root, dict) or not service_root:
         return None
@@ -80,6 +90,12 @@ async def _probe_host(
     Any exception raised by the injected ``get`` (timeout, connection refused,
     bad TLS, non-JSON body) is swallowed so one unreachable host never fails the
     whole scan; that host is simply reported as not discovered (``None``).
+
+    :param ip: host address to probe.
+    :param get: async callable that fetches ``/redfish/v1/`` for one host.
+    :param semaphore: bounds the number of concurrent probes in flight.
+    :return: a :class:`DiscoveredService` when the host answers with a usable
+        ServiceRoot, else ``None``.
     """
     async with semaphore:
         try:
