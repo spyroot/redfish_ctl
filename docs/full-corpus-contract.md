@@ -77,6 +77,14 @@ stable IGC contract), plus two additive capture keys:
   captured non-2xx bodies. A URL is in **either** `url_file_mapping` or `error_file_mapping`,
   never both. Consumers that read only the two legacy keys are unaffected.
 
+## `rest_api_map.status.json` sidecar
+`rest_api_map.status.json`, written by `Discovery.save_url_file_mapping` next to
+`rest_api_map.npy`, contains the additive `http_status_mapping` and `error_file_mapping` keys in
+plain JSON. The mock BMC reads this sidecar first, so status/error replay does not require NumPy or
+pickle loading for new captures. If the sidecar exists but is malformed or missing either replay map,
+mock startup fails closed instead of falling back silently. Older corpora without the sidecar keep
+using the legacy `.npy` contract.
+
 ## Validation gate (fail closed)
 `pack_full_corpus.py` refuses to write unless: all JSON parse; the map loads and has the two
 required mappings; the ServiceRoot is present and mapped;

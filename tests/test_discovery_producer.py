@@ -5,9 +5,14 @@ igc project consumes via `np.load(..., allow_pickle=True).item()`. These tests
 pin the file name and the two top-level keys so a refactor cannot silently break
 that cross-repo contract. No iDRAC, no network.
 """
+import json
+
 import numpy as np
+import pytest
 
 from redfish_ctl.discovery.cmd_discovery import Discovery
+
+STATUS_SIDECAR = "rest_api_map.status.json"
 
 
 def _new_discovery(tmp_path):
@@ -37,6 +42,71 @@ def test_save_url_file_mapping_roundtrip(tmp_path):
     assert loaded["allowed_methods_mapping"] == disc._api_allowed_methods
     assert loaded["http_status_mapping"] == disc._http_status
     assert loaded["error_file_mapping"] == disc._error_file_mapping
+
+
+def test_save_url_file_mapping_writes_status_json_sidecar(tmp_path):
+    """Captured status and error maps are available without loading pickle data."""
+    disc = _new_discovery(tmp_path)
+    disc._http_status = {"/redfish/v1/A": 200, "/redfish/v1/Ghost": 404}
+    disc._error_file_mapping = {
+        "/redfish/v1/Ghost": "_redfish_v1_Ghost.error.json"
+    }
+
+    disc.save_url_file_mapping()
+
+    sidecar = tmp_path / STATUS_SIDECAR
+    assert sidecar.exists()
+    assert json.loads(sidecar.read_text(encoding="utf-8")) == {
+        "http_status_mapping": disc._http_status,
+        "error_file_mapping": disc._error_file_mapping,
+    }
+
+
+def test_save_url_file_mapping_sidecar_uses_json_native_values(tmp_path):
+    """The sidecar remains JSON-serializable if capture maps carry scalar types."""
+    disc = _new_discovery(tmp_path)
+    disc._http_status = {"/redfish/v1/Ghost": np.int64(404)}
+    disc._error_file_mapping = {
+        "/redfish/v1/Ghost": tmp_path / "_redfish_v1_Ghost.error.json"
+    }
+
+    disc.save_url_file_mapping()
+
+    sidecar = json.loads((tmp_path / STATUS_SIDECAR).read_text(encoding="utf-8"))
+    assert sidecar == {
+        "http_status_mapping": {"/redfish/v1/Ghost": 404},
+        "error_file_mapping": {
+            "/redfish/v1/Ghost": str(tmp_path / "_redfish_v1_Ghost.error.json")
+        },
+    }
+
+
+def test_save_url_file_mapping_sidecar_write_is_atomic(tmp_path, monkeypatch):
+    """A failed sidecar write must not corrupt the previous sidecar."""
+    disc = _new_discovery(tmp_path)
+    disc._http_status = {"/redfish/v1/Ghost": 404}
+    disc._error_file_mapping = {
+        "/redfish/v1/Ghost": "_redfish_v1_Ghost.error.json"
+    }
+    sidecar = tmp_path / STATUS_SIDECAR
+    sidecar.write_text(
+        json.dumps({"http_status_mapping": {}, "error_file_mapping": {}}),
+        encoding="utf-8",
+    )
+
+    def fail_after_partial_write(payload, file_obj, indent):  # noqa: ARG001
+        file_obj.write("{")
+        raise OSError("simulated write failure")
+
+    monkeypatch.setattr(json, "dump", fail_after_partial_write)
+
+    with pytest.raises(OSError, match="simulated write failure"):
+        disc.save_url_file_mapping()
+
+    assert json.loads(sidecar.read_text(encoding="utf-8")) == {
+        "http_status_mapping": {},
+        "error_file_mapping": {},
+    }
 
 
 def test_save_url_file_mapping_keys_are_stable_for_igc(tmp_path):

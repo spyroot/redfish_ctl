@@ -10,6 +10,7 @@ Author Mus spyroot@gmail.com
 import json
 import os
 import re
+import tempfile
 import time
 from abc import abstractmethod
 from pathlib import Path
@@ -17,9 +18,9 @@ from typing import Optional
 
 import requests
 
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 from ..redfish_shared import env_first
 
 # Upper bound on how deep recursive_discovery will walk below a top-level
@@ -27,6 +28,35 @@ from ..redfish_shared import env_first
 # purely to guarantee termination even if normalization/dedup ever misses a
 # cyclic back-reference.
 DEFAULT_DISCOVERY_MAX_DEPTH = 32
+REST_API_STATUS_MAP_JSON = "rest_api_map.status.json"
+
+
+def _write_json_atomic(path: str, payload: dict) -> None:
+    """Write JSON by replacing the target only after serialization succeeds.
+
+    :param path: target JSON file path to replace atomically.
+    :param payload: JSON-serializable object to write.
+    :return: None.
+    """
+    target_dir = os.path.dirname(path) or "."
+    tmp_name = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=target_dir,
+            delete=False,
+        ) as file:
+            tmp_name = file.name
+            json.dump(payload, file, indent=2)
+        os.replace(tmp_name, path)
+    except Exception:
+        if tmp_name:
+            try:
+                os.unlink(tmp_name)
+            except FileNotFoundError:
+                pass
+        raise
 
 # Matches an individual *member* of any LogService's Entries collection
 # (``/LogServices/<Sel|Journal|Lclog|...>/Entries/<entry-id>``), across vendors.
@@ -353,6 +383,20 @@ class Discovery(RedfishManagerBase,
         }
         filename = os.path.join(self.json_response_dir, filename)
         np.save(filename, mappings)
+        sidecar = {
+            "http_status_mapping": {
+                path: int(status) for path, status in self._http_status.items()
+            },
+            "error_file_mapping": {
+                path: str(filename)
+                for path, filename in self._error_file_mapping.items()
+            },
+        }
+        status_filename = os.path.join(
+            self.json_response_dir,
+            REST_API_STATUS_MAP_JSON,
+        )
+        _write_json_atomic(status_filename, sidecar)
 
     def execute(self,
                 filename: Optional[str] = None,

@@ -24,10 +24,11 @@ index for committed corpus tarballs and pull-all extraction commands.
 ## Path A — Full BMC crawl (whole tree → vendor corpus)
 
 `redfish_ctl` can capture its own test data. The `discovery` command does a deep crawl of a BMC and
-writes one JSON file per Redfish URI (plus `rest_api_map.npy`) under `~/.json_responses/<ip>/` —
-exactly the layout the committed corpora pack (the filtered `tests/supermicro_gb300_corpus.tar.gz`
-LFS tarball, or overlay sets like `tests/supermicro_x10_fixtures/`). To contribute coverage for a
-BMC this project has not seen:
+writes one JSON file per Redfish URI under `~/.json_responses/<ip>/`, plus `rest_api_map.npy` for
+the legacy URL/method map and `rest_api_map.status.json`, the JSON status/error sidecar written by
+`Discovery.save_url_file_mapping`. This is exactly the layout the committed corpora pack (the
+filtered `tests/supermicro_gb300_corpus.tar.gz` LFS tarball, or overlay sets like
+`tests/supermicro_x10_fixtures/`). To contribute coverage for a BMC this project has not seen:
 
 1. **Crawl an approved lab BMC** (read-only; never production, never someone else's hardware):
 

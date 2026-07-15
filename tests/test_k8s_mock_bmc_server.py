@@ -22,6 +22,7 @@ HELM_VALUES = REPO_ROOT / "charts" / "redfish-controller" / "values.yaml"
 SIMULATION_DOC = REPO_ROOT / "docs" / "simulation-and-replay.md"
 GRACEFUL_RESTART_TRACE = REPO_ROOT / "tests" / "write_traces" / "graceful_restart.yaml"
 SUPERMICRO_RULES = REPO_ROOT / "tests" / "mutation_rules" / "supermicro_gb300.yaml"
+STATUS_SIDECAR = "rest_api_map.status.json"
 GB300_CORPUS = corpus_dir(
     REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
@@ -108,6 +109,33 @@ def _write_status_map_corpus(tmp_path: Path) -> Path:
                 path: filename for path, (_status, filename, _body) in error_cases.items()
             },
         },
+    )
+    return corpus
+
+
+def _write_status_sidecar_corpus(tmp_path: Path) -> Path:
+    corpus = tmp_path / "status-sidecar-corpus"
+    corpus.mkdir()
+    error_path = "/redfish/v1/Missing"
+    error_file = "_redfish_v1_Missing.error.json"
+
+    (corpus / _fixture_name("/redfish/v1")).write_text(
+        json.dumps({"@odata.id": "/redfish/v1/"}),
+        encoding="utf-8",
+    )
+    (corpus / error_file).write_text(
+        json.dumps({"error": {"code": "Base.1.17.CapturedMissing"}}),
+        encoding="utf-8",
+    )
+    (corpus / STATUS_SIDECAR).write_text(
+        json.dumps(
+            {
+                "http_status_mapping": {error_path: 404},
+                "error_file_mapping": {error_path: error_file},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
     )
     return corpus
 
@@ -215,6 +243,21 @@ def test_mock_bmc_replays_captured_error_status_map(
     assert payload == {"error": {"code": code}}
 
 
+def test_mock_bmc_replays_captured_error_status_json_sidecar(
+    tmp_path: Path,
+) -> None:
+    """Captured errors replay from JSON sidecar without requiring rest_api_map.npy."""
+    module = _load_server_module()
+    corpus = _write_status_sidecar_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        observed_status, payload = _http(base, "/redfish/v1/Missing")
+
+    assert observed_status == 404
+    assert payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+
+
 def test_mock_bmc_serves_url_file_mapping_alias(tmp_path: Path) -> None:
     """URL mappings can serve fixtures whose names do not derive from the URL."""
     module = _load_server_module()
@@ -245,6 +288,29 @@ def test_rest_api_map_rejects_malformed_status_values(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="http_status_mapping"):
+        module.make_handler(corpus)
+
+
+def test_rest_api_map_rejects_incomplete_status_json_sidecar(tmp_path: Path) -> None:
+    """A sidecar must not shadow a usable legacy map without both replay maps."""
+    module = _load_server_module()
+    corpus = _write_status_sidecar_corpus(tmp_path)
+    (corpus / STATUS_SIDECAR).write_text(
+        json.dumps({"http_status_mapping": {"/redfish/v1/Missing": 404}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="error_file_mapping"):
+        module.make_handler(corpus)
+
+
+def test_rest_api_map_rejects_malformed_status_json_sidecar(tmp_path: Path) -> None:
+    """A malformed sidecar fails closed instead of falling back silently."""
+    module = _load_server_module()
+    corpus = _write_status_sidecar_corpus(tmp_path)
+    (corpus / STATUS_SIDECAR).write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="failed to load Redfish API map"):
         module.make_handler(corpus)
 
 
