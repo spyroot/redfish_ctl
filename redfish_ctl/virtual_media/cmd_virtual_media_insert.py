@@ -1,4 +1,4 @@
-"""iDRAC virtual media eject command
+"""Virtual media insert command.
 
 Command provides the option to insert virtual disk with ISO image.
 For example late we can set boot from virtual medial,
@@ -86,7 +86,7 @@ class VirtualMediaInsert(RedfishManagerBase,
                          scm_type=ApiRequestType.VirtualMediaInsert,
                          name='virtual_disk_insert',
                          metaclass=Singleton):
-    """iDRACs cmd insert virtual media
+    """Insert virtual media over the Redfish API.
     Virtual medial must be empty, otherwise command will throw exception.
     Called must first eject existing virtual media.
     """
