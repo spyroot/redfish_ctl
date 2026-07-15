@@ -1,7 +1,7 @@
-"""iDRAC storage controller query
+"""Storage controller query command.
 
 Command provides the option to retrieve storage controller information
-from iDRAC and serialize back as caller as JSON, YAML, or XML. In addition,
+from a Redfish endpoint and serialize back as caller as JSON, YAML, or XML. In addition,
 it automatically registered to the command line ctl tool. Similarly to
 the rest command caller can save to a file and consume asynchronously
 or synchronously.
@@ -83,7 +83,7 @@ class StorageQuery(RedfishManagerBase, scm_type=ApiRequestType.StorageQuery,
                 do_async: Optional[bool] = False,
                 id_filter: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Query storage controller from idrac.
+        """Query storage controllers from a Redfish endpoint.
 
          Example of members
          "Members": [

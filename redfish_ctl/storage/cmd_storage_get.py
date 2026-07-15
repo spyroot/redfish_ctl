@@ -1,7 +1,7 @@
-"""iDRAC storage cmd
+"""Storage controller detail command.
 
 Command provides the option to retrieve storage information for specific
-controller disk from iDRAC.
+controller disk from a Redfish endpoint.
 
 Example
 python redfish_ctl.py storage-get --storage_controller NonRAID.Slot.6-1
@@ -31,7 +31,7 @@ class StorageView(RedfishManagerBase,
                   scm_type=ApiRequestType.StorageViewQuery,
                   name='storage_get',
                   metaclass=Singleton):
-    """iDRACs REST API fetch storage information.
+    """Fetch storage information over the Redfish API.
     """
 
     def __init__(self, *args, **kwargs):

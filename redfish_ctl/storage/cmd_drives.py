@@ -1,4 +1,4 @@
-"""iDRAC
+"""Storage drive inventory command.
 
     redfish_ctl storage-drives
 
@@ -17,7 +17,7 @@ class DrivesQuery(RedfishManagerBase,
                   scm_type=ApiRequestType.Drives,
                   name='drives_query',
                   metaclass=Singleton):
-    """iDRACs REST API fetch storage information.
+    """Fetch storage drive information over the Redfish API.
     """
 
     def __init__(self, *args, **kwargs):
