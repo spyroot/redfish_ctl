@@ -1,8 +1,8 @@
-"""iDRAC attribute update command
+"""Attribute update command.
 
     redfish_ctl attr-update --from_spec attribute.json
 
-Command provides the option to retrieve the iDRAC attribute and serialize
+Command provides the option to retrieve the Redfish endpoint attribute and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -28,7 +28,7 @@ class AttributesUpdate(
     scm_type=ApiRequestType.AttributesUpdate,
     name='attribute_update',
     metaclass=Singleton):
-    """iDRAC Attribute Query Command, fetch attribute data, caller can save to a file
+    """Attribute update command, fetch attribute data, caller can save to a file
     or output to a file or pass downstream.
     """
 
@@ -67,7 +67,7 @@ class AttributesUpdate(
                 do_async: Optional[bool] = False,
                 from_spec: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Update idrac attributes.
+        """Update Redfish endpoint attributes.
 
         :param from_spec: path to a json spec file holding the attribute
             key/value pairs to apply.

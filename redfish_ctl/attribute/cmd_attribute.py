@@ -1,8 +1,8 @@
-"""iDRAC attribute command
+"""Attribute query command.
 
     redfish_ctl attr --filter ServerPwrMon.1.PeakCurrentTime
 
-Command provides the option to retrieve the iDRAC attribute and serialize
+Command provides the option to retrieve the Redfish endpoint attribute and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -28,7 +28,7 @@ class AttributesQuery(
     scm_type=ApiRequestType.AttributesQuery,
     name='attribute_inventory',
     metaclass=Singleton):
-    """iDRAC Attribute Query Command, fetch attribute data, caller can save to a file
+    """Attribute query command, fetch attribute data, caller can save to a file
     or output to a file or pass downstream.
     """
 
@@ -82,7 +82,7 @@ class AttributesQuery(
                 attr_only: Optional[bool] = False,
                 attr_filter: Optional[str] = "",
                 **kwargs) -> CommandResult:
-        """Queries attributes from iDRAC.
+        """Queries attributes from a Redfish endpoint.
 
         :param attr_filter: filter the attributes to those matching this name.
         :param attr_only: return only the Attributes section of the resource.

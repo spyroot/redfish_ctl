@@ -1,4 +1,4 @@
-"""iDRAC clear pending values.
+"""Clear pending attribute values.
 
     redfish_ctl attr-clear-pending
 
@@ -25,7 +25,7 @@ class AttributeClearPending(
     metaclass=Singleton):
     """
     This cmd action is used to clear all the pending
-    values currently in iDRAC.
+    values currently staged on the Redfish endpoint.
     """
 
     def __init__(self, *args, **kwargs):
