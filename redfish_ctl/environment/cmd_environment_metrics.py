@@ -1,4 +1,11 @@
-"""Read Redfish EnvironmentMetrics resources."""
+"""Read Redfish EnvironmentMetrics resources.
+
+    redfish_ctl environment-metrics
+
+Walks the chassis, processor, and memory collections and rolls up the
+power, energy, temperature, and power-limit readings exposed by each
+linked EnvironmentMetrics resource.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -16,18 +23,27 @@ class EnvironmentMetrics(RedfishManagerBase,
     """Read power, energy, and temperature rollups from EnvironmentMetrics."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the environment-metrics command."""
         super(EnvironmentMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``environment-metrics`` subcommand."""
+        """Register the read-only ``environment-metrics`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read EnvironmentMetrics rollups"
         return cmd_parser, "environment-metrics", help_text
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` links from a Redfish collection.
+
+        :param data: parsed collection payload holding a ``Members`` array.
+        :return: list of member URI strings, empty when data is not a collection.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -39,6 +55,12 @@ class EnvironmentMetrics(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Resolve a single ``@odata.id`` link stored under a key.
+
+        :param data: parsed Redfish resource payload.
+        :param key: property name holding a link object.
+        :return: the linked URI string, or None when absent.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -46,10 +68,21 @@ class EnvironmentMetrics(RedfishManagerBase,
 
     @staticmethod
     def _resource_id(uri):
+        """Return the trailing identifier segment of a Redfish URI.
+
+        :param uri: resource path such as ``/redfish/v1/Chassis/1``.
+        :return: the last path segment, for example ``1``.
+        """
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _reading(data, key):
+        """Read a metric's ``Reading`` value from a payload.
+
+        :param data: parsed EnvironmentMetrics payload.
+        :param key: metric property name such as ``PowerWatts``.
+        :return: the ``Reading`` value when the metric is an object, otherwise the raw value.
+        """
         metric = data.get(key) if isinstance(data, dict) else None
         if isinstance(metric, dict):
             return metric.get("Reading")
@@ -57,6 +90,11 @@ class EnvironmentMetrics(RedfishManagerBase,
 
     @staticmethod
     def _power_limit(data):
+        """Collect the ``PowerLimitWatts`` control fields from a payload.
+
+        :param data: parsed EnvironmentMetrics payload.
+        :return: dict of the power-limit control fields, or None when absent.
+        """
         metric = data.get("PowerLimitWatts") if isinstance(data, dict) else None
         if not isinstance(metric, dict):
             return None
@@ -70,6 +108,12 @@ class EnvironmentMetrics(RedfishManagerBase,
         }
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI and return its payload, swallowing any error.
+
+        :param uri: Redfish resource path to fetch.
+        :param do_async: when True, issue the query asynchronously.
+        :return: the parsed payload dict, or an empty dict on failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -82,6 +126,15 @@ class EnvironmentMetrics(RedfishManagerBase,
                        parent_uri,
                        metrics_uri,
                        do_async=False):
+        """Fetch one EnvironmentMetrics resource and append its flattened row.
+
+        :param rows: accumulator list receiving the flattened metric row.
+        :param seen: set of already-processed metrics URIs for de-duplication.
+        :param parent_type: resource type owning the metrics, such as ``Chassis``.
+        :param parent_uri: URI of the parent resource.
+        :param metrics_uri: URI of the EnvironmentMetrics resource to read.
+        :param do_async: when True, issue the query asynchronously.
+        """
         if not metrics_uri or metrics_uri in seen:
             return
         metrics = self._query_optional(metrics_uri, do_async=do_async)
@@ -103,6 +156,12 @@ class EnvironmentMetrics(RedfishManagerBase,
         })
 
     def _append_chassis_metrics(self, rows, seen, do_async=False):
+        """Append EnvironmentMetrics rows for every chassis.
+
+        :param rows: accumulator list receiving the metric rows.
+        :param seen: set of already-processed metrics URIs for de-duplication.
+        :param do_async: when True, issue queries asynchronously.
+        """
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):
             chassis_data = self._query_optional(chassis_uri, do_async=do_async)
@@ -122,6 +181,14 @@ class EnvironmentMetrics(RedfishManagerBase,
                                           collection_key,
                                           parent_type,
                                           do_async=False):
+        """Append EnvironmentMetrics rows for a per-system subresource collection.
+
+        :param rows: accumulator list receiving the metric rows.
+        :param seen: set of already-processed metrics URIs for de-duplication.
+        :param collection_key: system link key to walk, such as ``Processors`` or ``Memory``.
+        :param parent_type: resource type label recorded for each row.
+        :param do_async: when True, issue queries asynchronously.
+        """
         systems = self._query_optional(RedfishApi.Systems, do_async=do_async)
         for system_uri in self._members(systems):
             system = self._query_optional(system_uri, do_async=do_async)
@@ -143,6 +210,11 @@ class EnvironmentMetrics(RedfishManagerBase,
 
     @staticmethod
     def _summary(rows):
+        """Tally resource and reading counts across collected rows.
+
+        :param rows: list of flattened metric rows.
+        :return: dict of aggregate counts by parent type and reading kind.
+        """
         by_parent = {}
         for row in rows:
             parent_type = row["ParentType"]
@@ -171,7 +243,15 @@ class EnvironmentMetrics(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read EnvironmentMetrics linked from chassis, processors, and memory."""
+        """Read EnvironmentMetrics linked from chassis, processors, and memory.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the underlying queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data holds a summary and the per-resource metric rows.
+        """
         rows = []
         seen = set()
 
