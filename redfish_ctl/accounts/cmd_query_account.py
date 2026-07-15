@@ -1,4 +1,4 @@
-"""iDRAC query command
+"""Account query command.
 
 Command provides capability query
 particular account.
@@ -22,7 +22,7 @@ class QueryAccount(RedfishManagerBase,
                    scm_type=ApiRequestType.QueryAccount,
                    name='query_account',
                    metaclass=Singleton):
-    """A command query iDRAC resource based on a resource path.
+    """Query a Redfish endpoint resource by resource path.
     """
 
     def __init__(self, *args, **kwargs):

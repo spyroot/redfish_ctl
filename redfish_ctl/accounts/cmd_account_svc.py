@@ -1,4 +1,4 @@
-"""iDRAC query account services
+"""Query account services.
 
 Command query account services.
 
@@ -19,7 +19,7 @@ class QueryAccountService(RedfishManagerBase,
                           scm_type=ApiRequestType.QueryAccountService,
                           name='query_account_svc',
                           metaclass=Singleton):
-    """A command query iDRAC account services based on a resource path.
+    """Query a Redfish endpoint's account services by resource path.
     """
     def __init__(self, *args, **kwargs):
         """Initialize the command and its CLI-filter-to-response-key map."""

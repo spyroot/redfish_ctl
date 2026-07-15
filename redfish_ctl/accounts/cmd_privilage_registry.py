@@ -1,4 +1,4 @@
-"""iDRAC query privilege registry
+"""Query the privilege registry.
 
 Command query privilege registry.
 
@@ -18,7 +18,7 @@ class QueryPrivilegeRegistry(RedfishManagerBase,
                              scm_type=ApiRequestType.PrivilegeRegistry,
                              name='query_privilege_registry',
                              metaclass=Singleton):
-    """A command query iDRAC resource based on a resource path.
+    """Query a Redfish endpoint resource by resource path.
     """
     def __init__(self, *args, **kwargs):
         """Initialize the query_privilege_registry command."""
