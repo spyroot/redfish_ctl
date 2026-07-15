@@ -31,26 +31,40 @@ class ActionList(RedfishManagerBase,
     """Inventory every Redfish action target on the box and its risk level."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the actions command."""
         super(ActionList, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``actions`` subcommand (read-only)."""
+        """Register the ``actions`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command list every Redfish action this box exposes and its risk level"
         return cmd_parser, "actions", help_text
 
     @staticmethod
     def _members(data):
-        """Return the @odata.id strings from a Redfish collection, tolerantly."""
+        """Return the @odata.id strings from a Redfish collection, tolerantly.
+
+        :param data: a Redfish collection body.
+        :return: list of ``@odata.id`` strings from Members; empty list when
+            ``data`` is not a dict or has no string-keyed members.
+        """
         if not isinstance(data, dict):
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure."""
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: resource URI to GET.
+        :param do_async: run the query asynchronously (passed to base_query).
+        :return: the resource body dict, or {} on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -58,7 +72,12 @@ class ActionList(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None."""
+        """Return the @odata.id of a single ``{key: {@odata.id}}`` link, or None.
+
+        :param data: a Redfish resource body.
+        :param key: link property name to read.
+        :return: the ``@odata.id`` of the link, or None when absent or malformed.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
@@ -69,6 +88,10 @@ class ActionList(RedfishManagerBase,
         manager's VirtualMedia, each system's Bios, and the service-level
         singletons. Deep leaves (per-drive SecureErase) are out of scope for the
         first pass; everything here is link-discovered, never hardcoded ids.
+
+        :param do_async: run the underlying resource queries asynchronously.
+        :return: de-duplicated list of resource URIs whose Actions blocks are
+            inventoried, in discovery order.
         """
         root = self._get(RedfishApi.Version, do_async)
         uris = []
@@ -111,7 +134,15 @@ class ActionList(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk the tree and report each discovered action + its risk level."""
+        """Walk the tree and report each discovered action + its risk level.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: run the underlying resource queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the list of discovered action rows.
+        """
         rows = []
         for uri in self._resource_uris(do_async):
             data = self._get(uri, do_async)
