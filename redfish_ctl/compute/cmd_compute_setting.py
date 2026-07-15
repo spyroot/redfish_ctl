@@ -1,4 +1,4 @@
-"""iDRAC query compute settings
+"""Query compute system settings.
 
     redfish_ctl compute-query
 

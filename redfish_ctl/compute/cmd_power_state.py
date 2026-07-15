@@ -1,4 +1,4 @@
-"""iDRAC reset a power state for compute system command.
+"""Reset the power state for a compute system command.
 
     redfish_ctl reboot --reset_type GracefulRestart
 
