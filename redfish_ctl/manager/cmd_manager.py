@@ -1,6 +1,6 @@
-"""iDRAC manager command
+"""Manager view command.
 
-Command provides the option to retrieve iDRAC manager view.
+Command provides the option to retrieve the Redfish manager view.
 redfish_ctl manager
 
 Author Mus spyroot@gmail.com
@@ -17,7 +17,7 @@ class Manager(RedfishManagerBase,
               scm_type=ApiRequestType.ManagerQuery,
               name='manager_query',
               metaclass=Singleton):
-    """iDRAC Manager server Command, fetch manager service,
+    """Manager view command, fetch the manager service,
     caller can save to a file or output to a file or pass downstream.
     """
 
@@ -44,7 +44,7 @@ class Manager(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = True,
                 **kwargs) -> CommandResult:
-        """Queries manager services from iDRAC.
+        """Queries manager services from a Redfish endpoint.
         :param do_expanded:
         :param do_async:
         :param verbose: accepted for CLI compatibility; not used by this command.
