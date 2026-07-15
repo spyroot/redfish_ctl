@@ -70,6 +70,12 @@ class _SubscriptionBase(RedfishManagerBase):
         return subscriptions_uri
 
     def _subscription_members(self, subscriptions_uri, do_async):
+        """List the member URIs in the Subscriptions collection.
+
+        :param subscriptions_uri: the Subscriptions collection URI.
+        :param do_async: prime the async event loop when True.
+        :return: the ``@odata.id`` of each subscription member (possibly empty).
+        """
         if do_async:
             self._ensure_event_loop()
         collection = self.base_query(subscriptions_uri, do_async=do_async).data or {}
@@ -430,7 +436,17 @@ class SubscriptionDelete(_SubscriptionBase,
                 subscription: Optional[str] = None,
                 confirm: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Preview or delete an EventDestination subscription."""
+        """Preview (dry-run) or delete an EventDestination subscription.
+
+        :param filename: optional path to save the result payload to.
+        :param data_type: output serialization format (``json`` or ``yaml``).
+        :param verbose: emit extra diagnostics when True.
+        :param do_async: issue the delete over the async Redfish path when True.
+        :param do_expanded: request an expanded ($expand) response where supported.
+        :param subscription: the subscription id or member URI to remove (required).
+        :param confirm: actually delete; without it the command only previews.
+        :return: a CommandResult with the delete outcome, or the dry-run preview.
+        """
         subscriptions_uri = self._subscription_collection_uri(do_async)
         target = self._resolve_subscription_uri(
             subscription,
