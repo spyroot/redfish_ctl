@@ -1,4 +1,4 @@
-"""iDRAC query tasks services
+"""Query task services.
 
 Command provides  query tasks service and obtains list of task.
 

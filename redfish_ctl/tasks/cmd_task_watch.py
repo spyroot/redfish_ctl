@@ -1,6 +1,6 @@
-"""iDRAC task watch command.
+"""Task watch command.
 
-Command provides the option to retrieve firmware setting from iDRAC and serialize
+Command provides the option to retrieve firmware setting from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
