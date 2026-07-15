@@ -9,7 +9,7 @@ dry-run unless ``--confirm`` is given, or additionally needs an explicit
 Fail-safe by construction: an action not in the table is treated as DESTRUCTIVE,
 so a newly exposed (unclassified) action can never POST without an explicit
 confirm. This module is product-neutral — it names standard DMTF + NVIDIA OEM
-action types only and imports nothing from the iDRAC layer.
+action types only and imports nothing from the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
