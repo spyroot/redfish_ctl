@@ -1,6 +1,6 @@
-"""iDRAC virtual disk query command
+"""Virtual disk query command.
 
-Command provides the option to retrieve virtual disk from iDRAC
+Command provides the option to retrieve virtual disk from a Redfish endpoint
 and serialize back to caller as JSON, YAML, or XML. In addition, it automatically
 registered to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
@@ -33,7 +33,7 @@ class VirtualDiskQuery(
     scm_type=ApiRequestType.VirtualDiskQuery,
     name='virtual_disk_query',
     metaclass=Singleton):
-    """iDRACs REST API Virtual Disk Query Command, fetch virtual disk, caller can save
+    """Virtual disk query command, fetch virtual disk, caller can save
     result to a file or output stdout or pass downstream to jq etc. tools.
     """
 
@@ -70,7 +70,7 @@ class VirtualDiskQuery(
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Queries volumes from given controlled from iDRAC.
+        """Queries volumes from a given controller on a Redfish endpoint.
         :param device_id: a storage controller id, NonRAID.Slot.6-1
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_deep: do deep recursive fetch
