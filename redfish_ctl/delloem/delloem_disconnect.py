@@ -23,6 +23,7 @@ class DellOemDisconnect(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-disconnect command."""
         super(DellOemDisconnect, self).__init__(*args, **kwargs)
 
     @staticmethod

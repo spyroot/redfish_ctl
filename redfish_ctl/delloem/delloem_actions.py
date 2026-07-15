@@ -18,6 +18,7 @@ class DellOemActions(RedfishManagerBase,
     """A command query oem actions.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-actions command."""
         super(DellOemActions, self).__init__(*args, **kwargs)
 
     @staticmethod

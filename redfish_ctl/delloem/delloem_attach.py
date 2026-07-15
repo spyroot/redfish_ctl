@@ -29,6 +29,7 @@ class DellOemAttach(RedfishManagerBase, scm_type=ApiRequestType.OemAttach,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-attach command."""
         super(DellOemAttach, self).__init__(*args, **kwargs)
 
     @staticmethod

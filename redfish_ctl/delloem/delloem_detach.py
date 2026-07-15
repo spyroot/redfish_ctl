@@ -22,6 +22,7 @@ class DellOemDetach(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-detach command."""
         super(DellOemDetach, self).__init__(*args, **kwargs)
 
     @staticmethod
