@@ -1,4 +1,4 @@
-"""iDRAC enable boot options.
+"""Query the current boot configuration.
 
     redfish_ctl current_boot
     redfish_ctl current_boot --filename current_boot.json
@@ -6,7 +6,7 @@
 This cmd return Dell Boot Sources Configuration and the related
 resources.
 
-Command provides the option to retrieve boot source from iDRAC and serialize
+Command provides the option to retrieve boot source from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
 caller can save to a file and consume asynchronously or synchronously.

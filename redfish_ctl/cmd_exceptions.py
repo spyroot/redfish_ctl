@@ -40,7 +40,7 @@ class InvalidArgumentFormat(Exception):
 
 class FailedDiscoverAction(Exception):
     """Must raise if requested action failed to discover.
-    i.e. old IDRAC version for example.
+    i.e. an old BMC firmware version, for example.
     """
     pass
 
