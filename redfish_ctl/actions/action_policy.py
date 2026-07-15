@@ -63,6 +63,7 @@ ACTION_POLICY = {
     "#Control.ResetToDefaults": Destructiveness.DESTRUCTIVE,
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
+    "#LogService.ClearLog": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,

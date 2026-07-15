@@ -111,6 +111,7 @@ class ApiRequestType(Enum):
     SubscriptionDelete = auto()
     SystemReset = auto()
     Logs = auto()
+    LogClear = auto()
     EthernetInterfaces = auto()
     SecureBoot = auto()
     CertificatesQuery = auto()

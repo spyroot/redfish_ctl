@@ -107,6 +107,7 @@ from .events.cmd_event_submit_test import *
 from .events.cmd_subscription_lifecycle import *
 from .compute.cmd_system_reset import *
 from .logs.cmd_logs import *
+from .logs.cmd_log_clear import *
 from .network.cmd_ethernet_interfaces import *
 from .security.cmd_secure_boot import *
 from .security.cmd_certificates import *
