@@ -1,11 +1,9 @@
-"""iDRAC
+"""Convert RAID physical disks to non-RAID.
 
 The method is used to convert a physical disks in RAID state of "Ready"
 to a Non-RAID state. After the method is successfully executed, the
 DCIM_PhysicalDiskView.RAIDStatus property of that physical disk should
 reflect the new state.
-
-python redfish_ctl.py storage-convert-noraid -c AHCI.Embedded.2-1
 
     redfish_ctl storage-convert-noraid -c AHCI.Embedded.2-1
 
@@ -24,7 +22,7 @@ class ConvertNoneRaid(RedfishManagerBase,
                       scm_type=ApiRequestType.ConvertNoneRaid,
                       name='convert_none_raid',
                       metaclass=Singleton):
-    """iDRACs REST API fetch storage information.
+    """Convert RAID physical disks to non-RAID via the Dell RAID service.
     """
 
     def __init__(self, *args, **kwargs):
