@@ -40,6 +40,7 @@ class BiosChangeSettings(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Construct the bios-change command, forwarding credentials to the base manager."""
         super(BiosChangeSettings, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -140,12 +141,18 @@ class BiosChangeSettings(RedfishManagerBase,
 
     @property
     def ok(self):
-        """Accepted; a Task has been generated"""
+        """Accepted; a Task has been generated.
+
+        :return: HTTP 202 status code.
+        """
         return 202
 
     @property
     def accepted(self):
-        """Accepted; a Task has been generated"""
+        """Accepted; a Task has been generated.
+
+        :return: HTTP 202 status code.
+        """
         return 202
 
     @property
@@ -204,6 +211,9 @@ class BiosChangeSettings(RedfishManagerBase,
         others) names it via ``Bios.AttributeRegistry`` resolved under
         ``/redfish/v1/Registries/<name>`` whose ``Location[].Uri`` is the registry.
         Prefer the Dell subpath when it resolves; otherwise follow the standard chain.
+
+        :param do_async: note async will subscribe to an event loop.
+        :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
         """
         dell_uri = f"{self.idrac_manage_servers}{REDFISH_API.BiosRegistry}"
         try:
@@ -231,6 +241,9 @@ class BiosChangeSettings(RedfishManagerBase,
 
         Reads ``Bios.@Redfish.Settings.SettingsObject.@odata.id`` (which iLO emits
         lowercased), falling back to ``{system}/Bios/Settings`` for Dell.
+
+        :param do_async: note async will subscribe to an event loop.
+        :return: the BIOS SettingsObject URI, defaulting to the Dell Settings path.
         """
         try:
             bios = self.base_query(f"{self.idrac_manage_servers}/Bios",

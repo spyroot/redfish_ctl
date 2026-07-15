@@ -3,6 +3,8 @@
 Command provides the option to clear all the BIOS
 pending values.
 
+    redfish_ctl bios-clear-pending
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -24,6 +26,7 @@ class BiosClearPending(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Construct the clear-pending command, forwarding credentials to the base manager."""
         super(BiosClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod
