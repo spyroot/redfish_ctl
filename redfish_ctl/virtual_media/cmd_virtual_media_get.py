@@ -1,8 +1,8 @@
-"""iDRAC command return virtual media.
+"""Return virtual media.
 
 redfish_ctl get_vm
 
-Command provides the option to retrieve virtual media from iDRAC
+Command provides the option to retrieve virtual media from a Redfish endpoint
 and serialize back to caller as JSON, YAML, or XML.
 In addition, it automatically registered to the command line ctl tool.
 Similarly to the rest command caller can save to a file and
@@ -36,7 +36,7 @@ class VirtualMediaGet(RedfishManagerBase,
                       scm_type=ApiRequestType.VirtualMediaGet,
                       name='virtual_disk_query',
                       metaclass=Singleton):
-    """iDRACs REST API Virtual Disk Query Command, fetch virtual disk, caller can save
+    """Virtual media query command, fetch virtual media, caller can save
     result to a file or output stdout or pass downstream to jq etc. tools.
     """
     def __init__(self, *args, **kwargs):

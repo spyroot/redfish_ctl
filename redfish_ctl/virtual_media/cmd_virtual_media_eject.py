@@ -1,6 +1,6 @@
-"""iDRAC virtual media eject command
+"""Virtual media eject command.
 
-Command provides the option to eject  virtual disk from iDRAC.
+Command provides the option to eject  virtual disk from a Redfish endpoint.
 
 Example:
     redfish_ctl eject_vm --device_id 1
@@ -23,7 +23,7 @@ class VirtualMediaEject(RedfishManagerBase,
                         scm_type=ApiRequestType.VirtualMediaEject,
                         name='virtual_disk_eject',
                         metaclass=Singleton):
-    """iDRACs cmd ejects virtual media
+    """Eject virtual media over the Redfish API.
     Virtual medial must be inserted, otherwise command throw exception.
     """
 
