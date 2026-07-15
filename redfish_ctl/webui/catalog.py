@@ -30,6 +30,10 @@ class CommandEntry:
     heavy: bool = False
 
     def to_dict(self) -> dict[str, Any]:
+        """Return this entry as a JSON-serializable dict for the UI.
+
+        :return: mapping of label, api name, command, description, and heavy flag.
+        """
         return {
             "label": self.label,
             "api": self.api.name,
@@ -137,7 +141,10 @@ CATALOG: tuple[tuple[str, tuple[CommandEntry, ...]], ...] = (
 
 
 def catalog_json() -> list[dict[str, Any]]:
-    """Return the catalog as JSON-serializable domains for the UI."""
+    """Return the catalog as JSON-serializable domains for the UI.
+
+    :return: list of ``{"domain": str, "commands": list[dict]}`` entries.
+    """
     return [
         {"domain": domain, "commands": [entry.to_dict() for entry in entries]}
         for domain, entries in CATALOG
@@ -145,7 +152,11 @@ def catalog_json() -> list[dict[str, Any]]:
 
 
 def resolve(command: str) -> CommandEntry | None:
-    """Return the catalog entry for a command name, or None if not allow-listed."""
+    """Return the catalog entry for a command name, or None if not allow-listed.
+
+    :param command: catalog command name to look up.
+    :return: the matching CommandEntry, or None if the name is not allow-listed.
+    """
     for _domain, entries in CATALOG:
         for entry in entries:
             if entry.command == command:
