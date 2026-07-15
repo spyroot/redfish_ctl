@@ -60,7 +60,7 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:142 execute base_post",
     "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:104 execute base_post",
     "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:207 execute base_post",
-    "redfish_ctl/volumes/cmd_initilize.py:78 execute base_post",
+    "redfish_ctl/volumes/cmd_initilize.py:81 execute base_post",
 }
 
 
