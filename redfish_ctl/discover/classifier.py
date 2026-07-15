@@ -62,6 +62,10 @@ def _vendor_from_oem(service_root: Mapping[str, Any]) -> Optional[str]:
 
     The ``Oem`` value should be a mapping whose keys are vendor namespaces.
     A non-mapping ``Oem`` (malformed input) is ignored rather than raising.
+
+    :param service_root: parsed ServiceRoot mapping to read the ``Oem`` block from.
+    :return: a canonical vendor tag when an OEM namespace key is recognized, else
+        ``None``.
     """
     oem = service_root.get("Oem")
     if not isinstance(oem, Mapping):
@@ -80,6 +84,10 @@ def _vendor_from_odata_type(service_root: Mapping[str, Any]) -> Optional[str]:
 
     Example: ``#DellServiceRoot.v1_0_0.DellServiceRoot`` -> ``dell``. The leading
     ``#`` and any namespace path are stripped before matching the prefix.
+
+    :param service_root: parsed ServiceRoot mapping to read ``@odata.type`` from.
+    :return: a canonical vendor tag when the schema name starts with a known OEM
+        prefix, else ``None``.
     """
     odata_type = service_root.get("@odata.type")
     if not isinstance(odata_type, str):
@@ -94,7 +102,13 @@ def _vendor_from_odata_type(service_root: Mapping[str, Any]) -> Optional[str]:
 
 
 def _vendor_from_text(service_root: Mapping[str, Any]) -> Optional[str]:
-    """Return a vendor from ``Manufacturer``/``Vendor`` substrings, or ``None``."""
+    """Return a vendor from ``Manufacturer``/``Vendor`` substrings, or ``None``.
+
+    :param service_root: parsed ServiceRoot mapping to read ``Manufacturer`` and
+        ``Vendor`` free-text fields from.
+    :return: a canonical vendor tag when a known token is found in the combined
+        free text, else ``None``.
+    """
     parts = []
     for field in ("Manufacturer", "Vendor"):
         value = service_root.get(field)
