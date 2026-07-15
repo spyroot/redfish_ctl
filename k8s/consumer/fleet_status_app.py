@@ -528,19 +528,42 @@ class _EndpointCache:
 
     def __init__(self, ttl_seconds: float = 3.0) -> None:
         self._ttl = ttl_seconds
-        self._lock = threading.Lock()
+        self._cond = threading.Condition()
         self._at = 0.0
         self._value: list[dict[str, Any]] = []
+        self._loading = False
+
+    def _is_fresh(self) -> bool:
+        # Callers hold ``self._cond``. ``_at == 0`` means never loaded.
+        return bool(self._at) and (time.monotonic() - self._at) <= self._ttl
 
     def get(self, loader) -> list[dict[str, Any]]:
-        now = time.monotonic()
-        with self._lock:
-            if now - self._at <= self._ttl and self._at:
+        with self._cond:
+            if self._is_fresh():
                 return self._value
-        fresh = loader()
-        with self._lock:
+            # Single-flight: the first caller past a stale TTL performs the load;
+            # concurrent callers wait on the condition and reuse its result, so a
+            # burst of dashboard clients triggers at most one k8s API refill per
+            # TTL instead of a thundering herd of parallel list calls.
+            while self._loading:
+                self._cond.wait()
+                if self._is_fresh():
+                    return self._value
+            self._loading = True
+        try:
+            fresh = loader()
+        except BaseException:
+            # Release the in-flight flag so a failed load doesn't wedge the cache;
+            # the next waiter retries.
+            with self._cond:
+                self._loading = False
+                self._cond.notify_all()
+            raise
+        with self._cond:
             self._value = fresh
             self._at = time.monotonic()
+            self._loading = False
+            self._cond.notify_all()
         return fresh
 
 
