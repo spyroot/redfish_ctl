@@ -143,7 +143,7 @@ class ApiRequestType(Enum):
     AttributesUpdate = auto()
     AttributeClearPending = auto()
 
-    # idrac manager
+    # manager
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
     NtpSet = auto()
@@ -337,7 +337,7 @@ class Singleton(type):
 
 
 class BootSource(Enum):
-    """IDRAC Boot sources"""
+    """Boot sources."""
     Pxe = "Pxe"
     Floppy = "Floppy"
     CD = "CD"
@@ -369,11 +369,11 @@ class ResetType(Enum):
 
 
 class PowerState(Enum):
-    """ IDRAC chassis power state
+    """ Chassis power state
     """
     On = "On"
     Off = "Off"
-    # this not idrac respect in case of error
+    # this is not respected by the BMC in case of error
     Unknown = "Unknown"
 
 
@@ -521,7 +521,7 @@ class IdracJobSvcActions(Enum):
 
 
 class IdracResetActions(Enum):
-    """IDRAC Reset actions."""
+    """Reset actions."""
     ComputerSystemReset = "ComputerSystem.Reset"
     ChassisReset = "Chassis.Reset"
     ManagerReset = "Manager.Reset"
@@ -529,7 +529,7 @@ class IdracResetActions(Enum):
 
 class REDFISH_API:
     """
-    Idrac api supported actions
+    Supported API actions
     """
     IDRAC_MANAGER = RedfishApi.Managers
     IDRAC_DELL_MANAGERS = f"{RedfishApi.Version}/Dell/Managers"
@@ -582,7 +582,7 @@ class REDFISH_API:
 # $select=SecurityCertificate.*
 
 class REDFISH_JSON:
-    """All Keys we expect idrac uses based on specification.
+    """All keys we expect the BMC uses based on the specification.
     """
     Id = "Id"
     # Describes the source of the payload.
@@ -677,7 +677,7 @@ class ApiRespondString:
 
 
 class BootSourceOverrideEnabled(Enum):
-    """IDRAC boot source override modes
+    """Boot source override modes.
     """
     Disabled = "Disabled"
     Continuous = "Continuous"
@@ -692,7 +692,7 @@ class BootSourceOverrideMode(Enum):
 
 
 class MediaTypes(Enum):
-    """IDRAC virtual media types
+    """Virtual media types.
     """
     CD = "CD"
     DVD = "DVD"

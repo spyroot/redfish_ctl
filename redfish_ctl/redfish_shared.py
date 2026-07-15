@@ -31,7 +31,7 @@ class RedfishActions(Enum):
 
 class RedfishApiRespond(Enum):
     """This base redfish api error.
-    IDRAC overwrite so in case of different semantics
+    BMC overwrite so in case of different semantics
     we don't have special cases.
     """
     Ok = auto()
