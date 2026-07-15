@@ -27,7 +27,13 @@ from .supermicro import capabilities as _supermicro  # noqa: F401
 
 def capabilities_for_service_root(
         service_root: Optional[Mapping[str, Any]]) -> VendorCapabilities:
-    """Return the capability profile for a parsed Redfish ServiceRoot."""
+    """Return the capability profile for a parsed Redfish ServiceRoot.
+
+    :param service_root: parsed Redfish ServiceRoot mapping used to classify the
+        vendor; may be ``None``.
+    :return: the matching :class:`VendorCapabilities` profile, or the generic
+        profile when the vendor cannot be classified.
+    """
     return get_vendor(classify_vendor(service_root))
 
 

@@ -47,10 +47,15 @@ class VendorCapabilities:
     evidence: Mapping[str, str] = field(default_factory=dict, compare=False, hash=False)
 
     def __post_init__(self):
+        """Freeze the ``evidence`` mapping into a read-only proxy."""
         object.__setattr__(self, "evidence", MappingProxyType(dict(self.evidence)))
 
     def to_dict(self) -> Dict[str, object]:
-        """Return a JSON-ready representation of the capability profile."""
+        """Return a JSON-ready representation of the capability profile.
+
+        :return: a dict mapping capability field names to their values, safe to
+            serialize as JSON.
+        """
         return {
             "vendor": self.vendor,
             "oem_prefix": self.oem_prefix,
@@ -72,20 +77,34 @@ _REGISTRY: Dict[str, VendorCapabilities] = {}
 
 
 def register(caps: VendorCapabilities) -> VendorCapabilities:
-    """Register a vendor capability profile (idempotent)."""
+    """Register a vendor capability profile (idempotent).
+
+    :param caps: the capability profile to store, keyed by ``caps.vendor``.
+    :return: the same profile that was registered.
+    """
     _REGISTRY[caps.vendor] = caps
     return caps
 
 
 def get(vendor: Optional[str]) -> VendorCapabilities:
-    """Return the profile for ``vendor``, or the generic profile if unknown."""
+    """Return the profile for ``vendor``, or the generic profile if unknown.
+
+    :param vendor: vendor name to look up (case-insensitive); ``None`` yields the
+        generic profile.
+    :return: the registered :class:`VendorCapabilities` profile, or ``GENERIC``
+        when the vendor is ``None`` or not registered.
+    """
     if vendor is None:
         return GENERIC
     return _REGISTRY.get(vendor.lower(), GENERIC)
 
 
 def all_vendors() -> Dict[str, VendorCapabilities]:
-    """A copy of the registry."""
+    """Return a copy of the registry.
+
+    :return: a new dict mapping vendor name to its :class:`VendorCapabilities`
+        profile.
+    """
     return dict(_REGISTRY)
 
 

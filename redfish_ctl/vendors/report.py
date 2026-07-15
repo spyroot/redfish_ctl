@@ -8,7 +8,13 @@ REPORT_SCHEMA = "redfish_ctl.capability_report.v1"
 
 
 def capability_report(vendor: Optional[str] = None) -> dict:
-    """Return registered vendor capability profiles for IaC consumers."""
+    """Return registered vendor capability profiles for IaC consumers.
+
+    :param vendor: if set, limit the report to this one vendor profile; when
+        ``None`` or empty, include every registered vendor.
+    :return: a dict with the report ``schema``, a ``summary`` vendor count, and a
+        ``vendors`` map of vendor name to its profile dict.
+    """
     if vendor:
         caps = get(vendor)
         vendors = {caps.vendor: caps.to_dict()}
