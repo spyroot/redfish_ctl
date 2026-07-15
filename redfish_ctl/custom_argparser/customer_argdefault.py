@@ -28,6 +28,11 @@ TermList = ["xterm", "linux", "ansi", "xterm-256color"]
 
 def make_color_string(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
     """Printer error and if terminal support color print red or green etc.
+
+    :param msg: message whose bracketed and braced tokens are colorized.
+    :param tcolor: color code applied to text inside square brackets.
+    :return: the message with color escape codes when the terminal supports
+        color, otherwise the original message unchanged.
     """
     current_term = os.getenv("TERM")
     if current_term is not None and current_term in TermList:
@@ -43,11 +48,24 @@ def make_color_string(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
 
 
 def insertChar(s: str, pos: int, ch):
+    """Insert a character or substring into a string at a given position.
+
+    :param s: source string.
+    :param pos: index at which to insert.
+    :param ch: character or substring to insert.
+    :return: new string with ``ch`` inserted at ``pos``.
+    """
     return s[:pos] + ch + s[pos:]
 
 
 def make_action_colorful(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
     """Printer error and if terminal support color print red or green etc.
+
+    :param msg: message whose braces and first ``--`` option are colorized.
+    :param tcolor: accepted for signature parity with make_color_string; not used
+        by this function, which applies fixed colors.
+    :return: the message with color escape codes when the terminal supports
+        color, otherwise the original message unchanged.
     """
     current_term = os.getenv("TERM")
 
@@ -76,9 +94,14 @@ def make_action_colorful(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
 
 class BiosSubcommand(argparse.ArgumentParser):
     def __init__(self, **kwargs):
+        """Initialize the BiosSubcommand argument parser."""
         super(BiosSubcommand, self).__init__(**kwargs)
 
     def format_help(self):
+        """Return the formatted help text for this parser.
+
+        :return: the formatted help string from the base ArgumentParser.
+        """
         return super().format_help()
 
 
@@ -89,11 +112,19 @@ class CustomArgumentDefaultsHelpFormatter(argparse.HelpFormatter):
     """
 
     def format_help(self):
+        """Return the formatted help text.
+
+        :return: the formatted help string from the base formatter.
+        """
         f = super().format_help()
         return f
 
     def _get_help_string(self, action):
-        """
+        """Return the help string for an action, appending its default value.
+
+        :param action: the argparse action whose help string is built.
+        :return: the help text, with a ``(default: ...)`` suffix added when the
+            action has a default that is neither suppressed nor already shown.
         """
         help_msg = action.help
         if '%(default)' not in action.help:
@@ -109,6 +140,13 @@ class CustomArgumentDefaultsHelpFormatter(argparse.HelpFormatter):
     #     self.add_argument(action)
 
     def _split_lines(self, text, width):
+        """Split help text into lines, honoring an ``R|`` raw-text prefix.
+
+        :param text: the help text to wrap.
+        :param width: the maximum line width.
+        :return: list of lines; raw splitlines when ``text`` begins with ``R|``,
+            otherwise the default wrapped lines.
+        """
         if text.startswith('R|'):
             return text[2:].splitlines()
             # this is the RawTextHelpFormatter._split_lines
@@ -152,15 +190,30 @@ class CustomArgumentDefaultsHelpFormatter(argparse.HelpFormatter):
         return multiline_text
 
     def _format_actions_usage(self, actions, groups):
+        """Format the usage string for actions and colorize it.
+
+        :param actions: the actions to include in the usage string.
+        :param groups: the mutually exclusive groups to render.
+        :return: the colorized usage string.
+        """
         text = super()._format_actions_usage(actions, groups)
         # return the text
         return make_color_string(text)
 
     def _format_action(self, action):
+        """Format a single action for the help output and colorize it.
+
+        :param action: the action to format.
+        :return: the colorized formatted action string.
+        """
         s = super()._format_action(action)
         return make_action_colorful(s)
 
     def _iter_indented_subactions(self, action):
+        """Iterate a subparser action's sub-actions with increased indentation.
+
+        :param action: the action whose sub-actions are iterated.
+        """
         try:
             get_subactions = action._get_subactions
         except AttributeError:
