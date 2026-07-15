@@ -1,4 +1,4 @@
-"""iDRAC query for a boot options
+"""Query boot options.
 
     redfish_ctl boot-options
 

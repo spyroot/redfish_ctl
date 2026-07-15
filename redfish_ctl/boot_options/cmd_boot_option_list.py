@@ -1,6 +1,6 @@
-"""iDRAC boot options.
+"""List boot options.
 
-Command provides the option to retrieve boot source from iDRAC and serialize
+Command provides the option to retrieve boot source from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
 caller can save to a file and consume asynchronously or synchronously.
@@ -71,7 +71,7 @@ class BootOptionsList(RedfishManagerBase,
                 data_type: Optional[str] = "json",
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False, **kwargs) -> CommandResult:
-        """List boot source from idrac.
+        """List boot source from a Redfish endpoint.
 
         The data payload contain list of all devices.
 
