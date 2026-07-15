@@ -51,10 +51,10 @@ class GetAttachStatus(
         }
         python redfish_ctl.py chassis
         :param do_async: note async will subscribe to an event loop.
-        :param do_expanded:  will do expand query
-        :param filename: if filename indicate call will save a response to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         cmd_result = self.sync_invoke(

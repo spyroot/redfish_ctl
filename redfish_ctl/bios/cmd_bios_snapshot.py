@@ -87,7 +87,7 @@ class BiosSnapshot(RedfishManagerBase,
         :param attr_name: comma-separated attribute names to snapshot (default: all).
         :param from_spec: bios-change spec whose attribute names scope the snapshot.
         :param filename: if set, save the response to this file.
-        :param data_type: json or xml.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded: accepted for CLI compatibility; not used by this command.

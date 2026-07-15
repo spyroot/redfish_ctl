@@ -59,7 +59,7 @@ class PciDeviceQuery(RedfishManagerBase,
         """Query pci device or function from idrac.
         :param verbose:
         :param do_async:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type: a data serialized back.
         :param pci_type: PCIeDevices or  PCIeFunctions
         :return: in data type json will return json

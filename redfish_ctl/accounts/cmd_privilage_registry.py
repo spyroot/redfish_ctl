@@ -49,9 +49,9 @@ class QueryPrivilegeRegistry(RedfishManagerBase,
         :param schema_filter: filter account services based on schema filter key.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param filename: if filename indicate call will save the response to this file.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         cmd_result = self.base_query(f"{self.idrac_members}/PrivilegeRegistry",

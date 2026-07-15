@@ -63,8 +63,8 @@ class FirmwareInventoryQuery(RedfishManagerBase,
                 do_async: Optional[bool] = False, **kwargs) -> CommandResult:
         """Query firmware from idrac
         :param do_deep: will return verbose output for each pci device.
-        :param do_async: will schedule asyncio task.
-        :param verbose: verbose output.
+        :param do_async: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param filename: if filename indicate call will save respond to a file.
         :param data_type: a data serialized back.
         :return: in data type json will return json

@@ -47,10 +47,10 @@ class Manager(RedfishManagerBase,
         """Queries manager services from iDRAC.
         :param do_expanded:
         :param do_async:
-        :param verbose:
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_deep:
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:
+        :param filename: if filename indicate call will save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return:
         :raise: AuthenticationFailed, UnexpectedResponse
         """

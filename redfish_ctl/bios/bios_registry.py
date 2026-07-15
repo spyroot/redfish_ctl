@@ -142,9 +142,9 @@ class BiosRegistry(RedfishManagerBase,
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param is_value_only:  will only return value , choices that attribute can take.
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param filename: if filename indicate call will save the response to this file.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         target_api = self._resolve_registry_uri(do_async)

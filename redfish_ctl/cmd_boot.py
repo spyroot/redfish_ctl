@@ -67,9 +67,9 @@ class BootQuery(RedfishManagerBase,
                 **kwargs) -> CommandResult:
         """Query boot source from idrac
         :param do_async: will use asyncio
-        :param verbose:
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_deep:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """

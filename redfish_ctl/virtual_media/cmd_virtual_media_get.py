@@ -79,9 +79,9 @@ class VirtualMediaGet(RedfishManagerBase,
 
         :param device_id: filter based on device
         :param filter_key: filter based on key.
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: will not block and return result as future.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type:  json, xml etc.
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse

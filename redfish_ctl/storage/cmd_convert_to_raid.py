@@ -68,10 +68,10 @@ class ConvertToRaid(
 
         :param exclude_filter:  excluded disk or command separate disks
         :param controller: if empty cmd will return list of controllers.
-        :param verbose: enables verbose output
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: will not block and return result as future.
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type:  json, xml etc.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
          :param do_expanded:
         :return: named tuple CommandResult
         :raise: AuthenticationFailed, UnexpectedResponse

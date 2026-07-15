@@ -84,7 +84,7 @@ class ExportSystemConfig(RedfishManagerBase,
         :param do_async:
         :param data_type:
         :param verbose:
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: accepted for CLI compatibility; not used by this command.
         :param include_in_export:
         :param target:
         :param export_format:

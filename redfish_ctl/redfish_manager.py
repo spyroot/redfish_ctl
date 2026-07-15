@@ -434,7 +434,7 @@ class RedfishManager:
         :param do_async: sync will subscribe to an event loop and issue async request.
         :param do_expanded:  will do expand query based on spec.
         :param query_expansion:  allow to overwrite expansion, and it always appended to request.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param verbose: enables verbose output, mainly to debug if endpoint return something strange.
         :param data_type: json or xml
         :param key: Optional json key in case we want to get something from a root element only.

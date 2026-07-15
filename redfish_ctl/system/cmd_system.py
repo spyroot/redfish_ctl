@@ -95,7 +95,7 @@ class SystemQuery(RedfishManagerBase,
         :param verbose:
         :param do_deep: if caller indicate deep, method will perform deep call
                      for each end point.
-        :param filename: if filename indicate call will save a bios setting to a file.
+        :param filename: if filename indicate call will save the response to this file.
         :param data_type:  what data type we use to serialize data.
         :return: json or xml and dict that host type of action and rest api end point.
         """

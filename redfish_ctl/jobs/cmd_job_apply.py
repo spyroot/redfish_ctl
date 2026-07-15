@@ -72,12 +72,12 @@ class JobApply(RedfishManagerBase,
         :param default_reboot_type:  a default reset type applied in order clean all scheduled jobs
         :param sleep_time:  a default sleep time, in sync mode we wait to see task moved on
         :param do_async: note async will subscribe to an event loop.
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param setting: job we apply
         :param do_watch: will watch job progress.
         :param do_reboot: many jobs applied only after boot, watch will just block.
-        :param data_type: json or xml
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         target_api = f"{self.idrac_members}/{REDFISH_API.Jobs}"

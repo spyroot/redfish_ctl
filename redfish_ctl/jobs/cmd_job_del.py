@@ -56,9 +56,9 @@ class JobDel(RedfishManagerBase,
 
         :param job_id: iDRAC job_id JID_744718373591
         :param do_async: note async will subscribe to an event loop.
-        :param verbose: enables verbose output
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param data_type: json or xml
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         req = f"{self.idrac_members}/Oem/Dell/Jobs/{job_id}"
