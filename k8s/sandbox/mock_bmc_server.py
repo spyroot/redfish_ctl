@@ -30,11 +30,23 @@ class MockBMCServer(ThreadingHTTPServer):
 
 
 def _build_fixture_index(corpus_dir: Path) -> dict[str, Path]:
+    """Index the corpus directory's JSON fixtures by lower-cased file name.
+
+    :param corpus_dir: directory holding the flattened ``*.json`` fixtures.
+    :return: mapping of lower-cased file name to its path.
+    """
     root = Path(corpus_dir)
     return {path.name.lower(): path for path in root.glob("*.json")}
 
 
 def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
+    """Load the optional ``rest_api_map.npy`` URL/status/error mapping.
+
+    :param corpus_dir: directory that may contain ``rest_api_map.npy``.
+    :return: the decoded map, or an empty dict when the file is absent.
+    :raises ValueError: if NumPy is missing, the file fails to load, or it
+        does not decode to an object.
+    """
     map_path = Path(corpus_dir) / "rest_api_map.npy"
     if not map_path.exists():
         return {}
@@ -55,6 +67,16 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
 
 
 def _validate_rest_api_map(api_map: dict[str, Any], map_path: Path) -> None:
+    """Validate a loaded Redfish API map and normalize its status values.
+
+    Coerces each ``http_status_mapping`` value to an int in place after
+    checking the mapping sub-objects are dicts and the statuses are valid.
+
+    :param api_map: the decoded API map to validate and normalize in place.
+    :param map_path: source path, used only for error messages.
+    :raises ValueError: if a mapping section is not an object or a status is
+        not an integer in the 100-599 range.
+    """
     for key in ("url_file_mapping", "http_status_mapping", "error_file_mapping"):
         value = api_map.get(key)
         if value is not None and not isinstance(value, dict):
@@ -80,11 +102,25 @@ def _validate_rest_api_map(api_map: dict[str, Any], map_path: Path) -> None:
 
 
 def _mapping_dict(api_map: dict[str, Any], key: str) -> dict[str, Any]:
+    """Return one sub-mapping of the API map, or ``{}`` when absent.
+
+    :param api_map: the decoded Redfish API map.
+    :param key: sub-mapping name to fetch (e.g. ``url_file_mapping``).
+    :return: the sub-mapping dict, or an empty dict when missing or not a dict.
+    """
     value = api_map.get(key) or {}
     return value if isinstance(value, dict) else {}
 
 
 def _candidate_map_keys(request_path: str) -> tuple[str, ...]:
+    """Return the map keys to try for a request path, most specific first.
+
+    The Redfish service root is looked up both with and without its trailing
+    slash so either spelling in the map matches.
+
+    :param request_path: the raw request path.
+    :return: ordered tuple of candidate keys to look up.
+    """
     path = _normalize_request_path(request_path)
     if path == "/redfish/v1":
         return (path, "/redfish/v1/")
@@ -92,6 +128,12 @@ def _candidate_map_keys(request_path: str) -> tuple[str, ...]:
 
 
 def _lookup_mapping(mapping: dict[str, Any], request_path: str) -> Any:
+    """Return the mapping value for a request path's first matching key.
+
+    :param mapping: a sub-mapping keyed by normalized request path.
+    :param request_path: the request path to resolve.
+    :return: the mapped value, or None when no candidate key matches.
+    """
     for key in _candidate_map_keys(request_path):
         if key in mapping:
             return mapping[key]
@@ -99,6 +141,16 @@ def _lookup_mapping(mapping: dict[str, Any], request_path: str) -> Any:
 
 
 def _resolve_mapped_fixture(corpus_dir: Path, mapped_name: Any) -> Path | None:
+    """Resolve a mapped fixture name to a file contained in the corpus dir.
+
+    Rejects non-string, empty, or absolute names and, via a containment
+    guard, any name that resolves outside ``corpus_dir`` (e.g. ``../``).
+
+    :param corpus_dir: the corpus root that must contain the resolved file.
+    :param mapped_name: candidate file name from the API map.
+    :return: the resolved file path, or None when it is invalid, escapes the
+        corpus dir, or does not exist.
+    """
     if not isinstance(mapped_name, str) or not mapped_name:
         return None
     root = Path(corpus_dir)
@@ -123,6 +175,14 @@ def _resolve_mapped_fixture(corpus_dir: Path, mapped_name: Any) -> Path | None:
 
 
 def _normalize_request_path(request_path: str) -> str:
+    """Return the decoded URL path with any trailing slash stripped.
+
+    Drops the query string, percent-decodes the path, and removes a trailing
+    slash (except for the bare root ``/``).
+
+    :param request_path: the raw request line path or a mapping key.
+    :return: the normalized path.
+    """
     path = unquote(urlsplit(request_path).path)
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
@@ -130,7 +190,13 @@ def _normalize_request_path(request_path: str) -> str:
 
 
 def fixture_for_redfish_path(corpus_dir: Path, request_path: str) -> Path | None:
-    """Return the flattened corpus file for a Redfish request path."""
+    """Return the flattened corpus file for a Redfish request path.
+
+    :param corpus_dir: directory holding the flattened fixtures.
+    :param request_path: the Redfish request path to resolve.
+    :return: the matching fixture path, or None for a non-Redfish path or a
+        path with no flattened fixture.
+    """
     path = _normalize_request_path(request_path)
     if not path.startswith("/redfish/v1"):
         return None
@@ -140,6 +206,16 @@ def fixture_for_redfish_path(corpus_dir: Path, request_path: str) -> Path | None
 
 
 def _load_trace(trace_path: Path) -> dict[str, Any]:
+    """Load a replay or mutation-rules trace file as a mapping.
+
+    Parses the file as JSON and falls back to YAML when JSON fails and PyYAML
+    is available.
+
+    :param trace_path: path to the trace file to load.
+    :return: the decoded trace object.
+    :raises ValueError: if the content is not JSON, PyYAML is absent for a
+        YAML file, or the decoded value is not an object.
+    """
     text = Path(trace_path).read_text(encoding="utf-8")
     try:
         data = json.loads(text)
@@ -157,6 +233,15 @@ def _load_trace(trace_path: Path) -> dict[str, Any]:
 
 
 def _body_contains(actual: Any, expected: Any) -> bool:
+    """Recursively test whether ``expected`` is contained in ``actual``.
+
+    Dicts match as a subset (every expected key/value present), lists match
+    element-by-element over the expected length, and scalars match by equality.
+
+    :param actual: the value taken from the request body.
+    :param expected: the subset pattern to look for.
+    :return: True if every part of ``expected`` is present in ``actual``.
+    """
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
             return False
@@ -183,15 +268,29 @@ class _OverlayStore:
     """
 
     def __init__(self) -> None:
+        """Initialize an empty overlay store guarded by a lock."""
         self._overlays: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
     def overlay_for(self, request_path: str) -> dict[str, Any]:
+        """Return a deep copy of the accumulated overlay for a resource path.
+
+        :param request_path: the resource path whose overlay is requested.
+        :return: a private copy of the overlay, or ``{}`` when none exists.
+        """
         path = _normalize_request_path(request_path)
         with self._lock:
             return copy.deepcopy(self._overlays.get(path, {}))
 
     def _apply_transitions(self, transitions: list[Any]) -> None:
+        """Apply ``set``/``delete`` state transitions to the overlays.
+
+        Each transition names a resource ``path`` and a ``field``/``json_path``;
+        the caller must already hold ``self._lock``.
+
+        :param transitions: transition dicts to apply in order; non-dicts and
+            entries without a string ``path`` are skipped.
+        """
         # Callers hold ``self._lock``; this only mutates ``self._overlays``.
         for transition in transitions:
             if not isinstance(transition, dict):
@@ -211,6 +310,12 @@ class _OverlayStore:
 
     @staticmethod
     def _path_parts(keys: Any) -> list[str]:
+        """Normalize a ``field``/``json_path`` spec into a list of key parts.
+
+        :param keys: a single string key or a list of string keys.
+        :return: the keys as a list.
+        :raises ValueError: if ``keys`` is neither a string nor a list of strings.
+        """
         if isinstance(keys, str):
             return [keys]
         if isinstance(keys, list) and all(isinstance(key, str) for key in keys):
@@ -219,6 +324,14 @@ class _OverlayStore:
 
     @classmethod
     def _set_value(cls, data: dict[str, Any], keys: Any, value: Any) -> None:
+        """Set a nested value in ``data``, creating intermediate dicts.
+
+        Any non-dict node encountered along the path is replaced with a dict.
+
+        :param data: the overlay dict mutated in place.
+        :param keys: the field or json_path locating where to set the value.
+        :param value: the value to store at the resolved location.
+        """
         parts = cls._path_parts(keys)
         cursor = data
         for key in parts[:-1]:
@@ -231,6 +344,14 @@ class _OverlayStore:
 
     @classmethod
     def _delete_value(cls, data: dict[str, Any], keys: Any) -> None:
+        """Delete a nested key from ``data`` if present.
+
+        Walks to the parent of the target key and removes it; a missing or
+        non-dict node along the way makes this a no-op.
+
+        :param data: the overlay dict mutated in place.
+        :param keys: the field or json_path locating the key to remove.
+        """
         parts = cls._path_parts(keys)
         cursor = data
         for key in parts[:-1]:
@@ -245,6 +366,11 @@ class ReplayState(_OverlayStore):
     """Ordered write replay with in-memory state overlays for corpus reads."""
 
     def __init__(self, trace: dict[str, Any]) -> None:
+        """Build replay state from a decoded trace.
+
+        :param trace: decoded trace with a ``scenario`` and a ``steps`` list.
+        :raises ValueError: if ``steps`` is present but not a list.
+        """
         super().__init__()
         self.scenario = str(trace.get("scenario") or "default")
         steps = trace.get("steps") or []
@@ -255,9 +381,19 @@ class ReplayState(_OverlayStore):
 
     @classmethod
     def from_file(cls, trace_path: Path) -> "ReplayState":
+        """Load replay state from a trace file.
+
+        :param trace_path: path to the replay trace file.
+        :return: a new ``ReplayState`` built from the file.
+        """
         return cls(_load_trace(trace_path))
 
     def status(self) -> dict[str, Any]:
+        """Return a snapshot of replay progress.
+
+        :return: dict with the scenario, matched/total step counts, the names
+            of pending steps, and whether the trace is complete.
+        """
         with self._lock:
             pending = [
                 str(step.get("name") or f"step-{index}")
@@ -274,6 +410,12 @@ class ReplayState(_OverlayStore):
         }
 
     def reset(self, scenario: str | None = None) -> bool:
+        """Clear matched steps and overlays, restarting the replay.
+
+        :param scenario: if given, only reset when it names this trace's
+            scenario; otherwise reset unconditionally.
+        :return: True if reset, False when ``scenario`` names another scenario.
+        """
         if scenario is not None and scenario != self.scenario:
             return False
         with self._lock:
@@ -288,6 +430,19 @@ class ReplayState(_OverlayStore):
         body: Any,
         corpus_state: Any = None,
     ) -> dict[str, Any] | None:
+        """Match a write against the next pending step and apply its effects.
+
+        Only the next unmatched step is considered, so writes must arrive in
+        the trace's order.
+
+        :param method: HTTP method of the write.
+        :param request_path: target resource path.
+        :param body: parsed request body.
+        :param corpus_state: accepted for interface parity with
+            :class:`MutationRules`; not used by this engine.
+        :return: the step's response dict (defaulting to ``{"status": 204}``),
+            or None when the next step does not match.
+        """
         path = _normalize_request_path(request_path)
         with self._lock:
             next_index = self._next_pending_index()
@@ -302,6 +457,10 @@ class ReplayState(_OverlayStore):
             return response if isinstance(response, dict) else {"status": 204}
 
     def _next_pending_index(self) -> int | None:
+        """Return the index of the first unmatched step.
+
+        :return: the earliest pending step index, or None when all matched.
+        """
         for index in range(len(self.steps)):
             if index not in self._matched:
                 return index
@@ -314,6 +473,15 @@ class ReplayState(_OverlayStore):
         path: str,
         body: Any,
     ) -> bool:
+        """Whether a step matches a write's method, path, and body.
+
+        :param step: the trace step to test.
+        :param method: HTTP method of the write.
+        :param path: normalized request path.
+        :param body: parsed request body, compared against the step's ``body``
+            and/or ``body_contains`` constraints.
+        :return: True if the step matches the write.
+        """
         if str(step.get("method", "")).upper() != method.upper():
             return False
         if _normalize_request_path(str(step.get("path", ""))) != path:
@@ -343,6 +511,12 @@ class MutationRules(_OverlayStore):
     """
 
     def __init__(self, spec: dict[str, Any], *, seed: int = 0) -> None:
+        """Build mutation rules from a decoded spec.
+
+        :param spec: decoded spec with a ``vendor`` and a ``rules`` list.
+        :param seed: RNG seed for reproducible stochastic failure injection.
+        :raises ValueError: if ``rules`` is present but not a list.
+        """
         super().__init__()
         self.vendor = str(spec.get("vendor") or "generic")
         rules = spec.get("rules") or []
@@ -359,9 +533,20 @@ class MutationRules(_OverlayStore):
 
     @classmethod
     def from_file(cls, path: Path, *, seed: int = 0) -> "MutationRules":
+        """Load mutation rules from a spec file.
+
+        :param path: path to the mutation-rules file.
+        :param seed: RNG seed for reproducible failure injection.
+        :return: a new ``MutationRules`` built from the file.
+        """
         return cls(_load_trace(path), seed=seed)
 
     def status(self) -> dict[str, Any]:
+        """Return a snapshot of mutation-rules activity.
+
+        :return: dict with the mode, vendor, rule count, the names of applied
+            and failed rules, and the RNG seed.
+        """
         with self._lock:
             return {
                 "mode": "mutation-rules",
@@ -373,6 +558,12 @@ class MutationRules(_OverlayStore):
             }
 
     def reset(self, scenario: str | None = None) -> bool:
+        """Clear overlays and history and re-seed the RNG.
+
+        :param scenario: if given, only reset when it names this spec's vendor;
+            otherwise reset unconditionally.
+        :return: True if reset, False when ``scenario`` names another vendor.
+        """
         if scenario is not None and scenario != self.vendor:
             return False
         with self._lock:
@@ -389,6 +580,22 @@ class MutationRules(_OverlayStore):
         body: Any,
         corpus_state: Any = None,
     ) -> dict[str, Any] | None:
+        """Evaluate every rule against a write and apply the matches.
+
+        Candidate rules are shape-matched (method/path/body) outside the lock
+        and their precondition corpus is pre-read; under the lock the matching
+        rules' preconditions are checked, optional failure injection is rolled,
+        and all matches' transitions are applied.
+
+        :param method: HTTP method of the write.
+        :param request_path: target resource path.
+        :param body: parsed request body.
+        :param corpus_state: callable mapping a resource path to its corpus
+            fixture, used to evaluate rule preconditions; a non-callable value
+            disables precondition corpus reads.
+        :return: the first matching rule's response (or an injected failure
+            response), or None when no rule matches.
+        """
         path = _normalize_request_path(request_path)
         corpus_lookup = corpus_state if callable(corpus_state) else (lambda _p: {})
         # Shape-match rules (method/path/body) OUTSIDE the lock, then pre-read the
@@ -429,7 +636,11 @@ class MutationRules(_OverlayStore):
 
     @staticmethod
     def _precondition_paths(rules: list[dict[str, Any]]) -> set[str]:
-        """Normalized resource paths every candidate rule's preconditions read."""
+        """Normalized resource paths every candidate rule's preconditions read.
+
+        :param rules: candidate rules whose ``when`` blocks are scanned.
+        :return: the set of normalized resource paths referenced by preconditions.
+        """
         paths: set[str] = set()
         for rule in rules:
             for condition in rule.get("when") or []:
@@ -449,6 +660,10 @@ class MutationRules(_OverlayStore):
 
         Deep-copied at store time so the snapshot is a private copy immune to any
         later mutation of what ``corpus_lookup`` returned — at no lock-time cost.
+
+        :param rules: candidate rules whose precondition paths are pre-read.
+        :param corpus_lookup: callable returning the corpus fixture for a path.
+        :return: mapping of each precondition path to a deep-copied snapshot.
         """
         return {
             path: copy.deepcopy(corpus_lookup(path) or {})
@@ -463,14 +678,32 @@ class MutationRules(_OverlayStore):
         deep-copies before mutating, so a second copy would be dead work under the
         lock. A miss returns ``{}`` (impossible in practice — the cache covers
         every literal ``when`` path) so the locked section stays strictly I/O-free.
+
+        :param corpus_cache: pre-read snapshots keyed by normalized path.
+        :return: a callable resolving a resource path to its cached snapshot.
         """
 
         def lookup(resource_path: str) -> Any:
+            """Return the cached snapshot for a resource path (``{}`` on miss).
+
+            :param resource_path: the resource path to resolve.
+            :return: the cached snapshot, or ``{}`` when not cached.
+            """
             return corpus_cache.get(_normalize_request_path(resource_path), {})
 
         return lookup
 
     def _roll_failure(self, matched: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """Roll stochastic failure injection for the matched rules.
+
+        Each matched rule with a ``failure`` block is rolled against its
+        probability; the first hit records the rule as failed and returns its
+        failure response. Rules without a failure block never touch the RNG.
+
+        :param matched: rules whose preconditions already hold.
+        :return: the failure response of the first rule that rolls a failure,
+            or None when no failure fires.
+        """
         for rule in matched:
             failure = rule.get("failure")
             if not isinstance(failure, dict):
@@ -488,6 +721,15 @@ class MutationRules(_OverlayStore):
         return None
 
     def _effective_state(self, resource_path: str, corpus_lookup: Any) -> dict[str, Any]:
+        """Return the current effective state of a resource for preconditions.
+
+        Merges the pre-read corpus fixture with any overlay already applied by
+        earlier writes.
+
+        :param resource_path: the resource whose state is needed.
+        :param corpus_lookup: callable returning the corpus fixture for a path.
+        :return: a deep-copied merge of the fixture and the current overlay.
+        """
         path = _normalize_request_path(resource_path)
         base = copy.deepcopy(corpus_lookup(path) or {})
         overlay = self._overlays.get(path)
@@ -507,6 +749,12 @@ class MutationRules(_OverlayStore):
         Pure and lock-free: depends only on the immutable rule and the request,
         never on overlays or corpus files, so candidate selection and the corpus
         pre-read run before ``self._lock``.
+
+        :param rule: the rule to test.
+        :param method: HTTP method of the write.
+        :param path: normalized request path (matched literally or by glob).
+        :param body: parsed request body, checked against ``body``/``body_contains``.
+        :return: True if the rule's shape matches the request.
         """
         if str(rule.get("method", "")).upper() != method.upper():
             return False
@@ -525,7 +773,12 @@ class MutationRules(_OverlayStore):
         return True
 
     def _rule_preconditions_hold(self, rule: dict[str, Any], corpus_lookup: Any) -> bool:
-        """Whether every ``when`` precondition holds against the pre-read state."""
+        """Whether every ``when`` precondition holds against the pre-read state.
+
+        :param rule: the rule whose ``when`` conditions are evaluated.
+        :param corpus_lookup: callable returning the pre-read corpus snapshot.
+        :return: True if every precondition holds (vacuously true when none).
+        """
         for condition in rule.get("when") or []:
             if not isinstance(condition, dict):
                 return False
@@ -534,6 +787,17 @@ class MutationRules(_OverlayStore):
         return True
 
     def _precondition_holds(self, condition: dict[str, Any], corpus_lookup: Any) -> bool:
+        """Evaluate one ``when`` precondition against the effective state.
+
+        Resolves the condition's ``field``/``json_path`` in the resource's
+        effective state and applies its ``exists``, ``absent``, ``equals``, or
+        ``not_equals`` test.
+
+        :param condition: the precondition to evaluate.
+        :param corpus_lookup: callable returning the pre-read corpus snapshot.
+        :return: True if the condition holds; False on a malformed condition or
+            a missing value where one is required.
+        """
         resource_path = condition.get("path")
         if not isinstance(resource_path, str):
             return False
@@ -566,6 +830,14 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
     server_version = "redfish-ctl-mock-bmc/1.0"
 
     def _fixture_for_request(self) -> Path | None:
+        """Resolve the corpus fixture for the current request.
+
+        Prefers an ``url_file_mapping`` entry from the API map, then falls back
+        to the flattened ``_redfish_v1_*.json`` file-name index.
+
+        :return: the fixture path, or None for a non-Redfish path or one with
+            no matching fixture.
+        """
         fixture_index = getattr(type(self), "fixture_index")
         api_map = getattr(type(self), "api_map", {})
         corpus_dir = getattr(type(self), "corpus_dir")
@@ -583,6 +855,15 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         return fixture_index.get(key.lower())
 
     def _captured_error_for_request(self) -> tuple[int, Path | None] | None:
+        """Return a captured error response for the current request, if any.
+
+        Consults the API map's ``http_status_mapping`` and ``error_file_mapping``
+        so previously captured error responses are replayed.
+
+        :return: a ``(status, error_fixture_or_None)`` pair when an error is
+            recorded for the path, or None when the request should be served
+            normally.
+        """
         api_map = getattr(type(self), "api_map", {})
         if not api_map:
             return None
@@ -605,7 +886,11 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         return status or 500, error_fixture
 
     def _active_writer(self) -> "ReplayState | MutationRules | None":
-        """The write engine in effect (mutation-rules takes precedence)."""
+        """The write engine in effect (mutation-rules takes precedence).
+
+        :return: the active ``MutationRules`` or ``ReplayState``, or None when
+            no write engine is configured.
+        """
         return getattr(type(self), "mutation_rules", None) or getattr(
             type(self), "replay_state", None
         )
@@ -616,6 +901,10 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         Deliberately excludes the write engine's own overlay: the engine holds
         its lock and merges that overlay itself, so returning it here would
         double-apply it (and risk re-entrancy on the engine lock).
+
+        :param request_path: the resource path whose corpus state is needed.
+        :return: the fixture merged with any identity overlay, or ``{}`` for a
+            non-Redfish path or a path with no fixture.
         """
         fixture_index = getattr(type(self), "fixture_index")
         path = _normalize_request_path(request_path)
@@ -635,6 +924,11 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         return payload
 
     def _send_json(self, status: int, payload: dict[str, object]) -> None:
+        """Send a JSON response with the given status and payload.
+
+        :param status: HTTP status code to send.
+        :param payload: JSON-serializable body, sent sorted by key.
+        """
         content = json.dumps(payload, sort_keys=True).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -643,11 +937,23 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def _send_empty(self, status: int) -> None:
+        """Send an empty response with the given status.
+
+        :param status: HTTP status code to send with a zero-length body.
+        """
         self.send_response(status)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
     def _serve_fixture(self, send_body: bool) -> None:
+        """Serve the fixture (or captured error) for the current request.
+
+        Replays a captured error when the API map records one, otherwise sends
+        the resolved fixture with any identity and write-engine overlays applied,
+        or 404 when no fixture matches.
+
+        :param send_body: whether to write the response body (False for HEAD).
+        """
         captured_error = self._captured_error_for_request()
         if captured_error is not None:
             status, error_fixture = captured_error
@@ -694,6 +1000,11 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
 
     def do_GET(self) -> None:
+        """Handle a GET request.
+
+        Serves the ``/__replay_status`` endpoint when a write engine is active,
+        otherwise serves the corpus fixture for the path.
+        """
         if _normalize_request_path(self.path) == "/__replay_status":
             writer = self._active_writer()
             if writer is None:
@@ -704,9 +1015,14 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self._serve_fixture(send_body=True)
 
     def do_HEAD(self) -> None:
+        """Handle a HEAD request by serving fixture headers without a body."""
         self._serve_fixture(send_body=False)
 
     def do_OPTIONS(self) -> None:
+        """Handle an OPTIONS request by advertising the allowed methods.
+
+        Write methods are advertised only when a write engine is active.
+        """
         self.send_response(204)
         allow = "GET, HEAD, OPTIONS"
         if self._active_writer() is not None:
@@ -716,21 +1032,33 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
+        """Handle a POST request.
+
+        Serves the ``/__set_scenario`` control endpoint, otherwise dispatches
+        the write to the active engine.
+        """
         if _normalize_request_path(self.path) == "/__set_scenario":
             self._handle_set_scenario()
             return
         self._handle_replay_write("POST")
 
     def do_PATCH(self) -> None:
+        """Handle a PATCH request by dispatching it to the active write engine."""
         self._handle_replay_write("PATCH")
 
     def do_PUT(self) -> None:
+        """Handle a PUT request by dispatching it to the active write engine."""
         self._handle_replay_write("PUT")
 
     def do_DELETE(self) -> None:
+        """Handle a DELETE request by dispatching it to the active write engine."""
         self._handle_replay_write("DELETE")
 
     def _read_json_body(self) -> Any:
+        """Read and JSON-decode the request body.
+
+        :return: the decoded body, or ``{}`` when the request has no body.
+        """
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length == 0:
             return {}
@@ -738,6 +1066,12 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         return json.loads(content) if content else {}
 
     def _handle_set_scenario(self) -> None:
+        """Handle the ``/__set_scenario`` control endpoint.
+
+        Resets the active write engine to the requested scenario, replying 404
+        when no engine is active or the scenario is unknown and 400 when the
+        scenario is not a string.
+        """
         writer = self._active_writer()
         if writer is None:
             self._send_json(404, {"error": "replay is not enabled"})
@@ -753,6 +1087,13 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self._send_json(200, writer.status())
 
     def _handle_replay_write(self, method: str) -> None:
+        """Dispatch a write to the active engine and send its response.
+
+        Replies 405 when no engine is active and 409 when no rule or step
+        matches; otherwise sends the engine's response status and body.
+
+        :param method: HTTP method of the write being handled.
+        """
         writer = self._active_writer()
         if writer is None:
             self._send_method_not_allowed()
@@ -780,6 +1121,7 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self._send_json(status, payload)
 
     def _send_method_not_allowed(self) -> None:
+        """Send a 405 response advertising the read-only method set."""
         self.send_response(405)
         self.send_header("Allow", "GET, HEAD, OPTIONS")
         self.send_header("Content-Type", "application/json")
@@ -789,11 +1131,22 @@ class CorpusRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def log_message(self, format: str, *args: object) -> None:
+        """Log a request line only when ``MOCK_BMC_VERBOSE`` is ``1``.
+
+        :param format: printf-style format string from the base handler.
+        """
         if os.environ.get("MOCK_BMC_VERBOSE") == "1":
             super().log_message(format, *args)
 
 
 def _deep_update(target: dict[str, Any], overlay: dict[str, Any]) -> None:
+    """Recursively merge ``overlay`` into ``target`` in place.
+
+    Nested dicts are merged key by key; any other value replaces the target's.
+
+    :param target: the mapping mutated in place.
+    :param overlay: the values to merge on top of ``target``.
+    """
     for key, value in overlay.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
             _deep_update(target[key], value)
@@ -810,6 +1163,9 @@ def identity_overlay_from_env() -> dict[str, dict[str, Any]]:
     non-structural fields are overlaid — never ``Id`` or ``@odata.id``, which
     the link-walk depends on. Returns an empty overlay when neither env var is
     set, so a single-node sandbox is unchanged.
+
+    :return: mapping of resource path to the fields to overlay, empty when
+        neither ``MOCK_BMC_RACK`` nor ``MOCK_BMC_SLOT`` is set.
     """
     rack = os.environ.get("MOCK_BMC_RACK", "").strip()
     slot = os.environ.get("MOCK_BMC_SLOT", "").strip()
@@ -831,6 +1187,20 @@ def make_handler(
     mutation_rules: Path | None = None,
     seed: int = 0,
 ) -> type[CorpusRequestHandler]:
+    """Build a request-handler class bound to a corpus and optional write engine.
+
+    Loads the corpus fixtures and API map onto a fresh handler subclass and
+    attaches at most one write engine (replay trace or mutation rules) plus any
+    per-pod identity overlay.
+
+    :param corpus_dir: directory of flattened Redfish fixtures to serve.
+    :param replay_trace: optional ordered write-replay trace file.
+    :param mutation_rules: optional order-independent mutation-rules file.
+    :param seed: RNG seed for mutation-rules failure injection.
+    :return: a ``CorpusRequestHandler`` subclass configured for the corpus.
+    :raises FileNotFoundError: if ``corpus_dir`` is not a directory.
+    :raises ValueError: if both write engines are given or no fixtures exist.
+    """
     root = Path(corpus_dir)
     if not root.is_dir():
         raise FileNotFoundError(f"corpus directory not found: {root}")
@@ -868,6 +1238,18 @@ def run_server(
     mutation_rules: Path | None = None,
     seed: int = 0,
 ) -> Iterator[ThreadingHTTPServer]:
+    """Run the mock BMC server in a background thread as a context manager.
+
+    Starts the server on a daemon thread, yields it for the duration of the
+    ``with`` block, then shuts it down and joins the thread on exit.
+
+    :param host: interface address to bind.
+    :param port: TCP port to bind.
+    :param corpus_dir: directory of flattened Redfish fixtures to serve.
+    :param replay_trace: optional ordered write-replay trace file.
+    :param mutation_rules: optional order-independent mutation-rules file.
+    :param seed: RNG seed for mutation-rules failure injection.
+    """
     server = MockBMCServer(
         (host, port),
         make_handler(
@@ -888,6 +1270,11 @@ def run_server(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse the mock BMC server command-line arguments.
+
+    :param argv: argument vector to parse; None reads ``sys.argv``.
+    :return: the parsed argument namespace.
+    """
     parser = argparse.ArgumentParser(
         description="Serve a flattened Redfish JSON corpus over read-only HTTP."
     )
@@ -923,6 +1310,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the mock BMC server until interrupted.
+
+    Parses arguments, starts the server, and serves requests until Ctrl-C.
+
+    :param argv: argument vector to parse; None reads ``sys.argv``.
+    :return: process exit code — 2 on a corpus/config error, else 0.
+    """
     args = parse_args(argv)
     server = None
     try:
