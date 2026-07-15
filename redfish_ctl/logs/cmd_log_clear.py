@@ -203,8 +203,14 @@ class LogClear(RedfishManagerBase,
         if log_service is None:
             return CommandResult(
                 {"clearable_log_services": services}, None, None, None)
+        if not services:
+            raise InvalidArgument(
+                "no clearable log services found on this Redfish endpoint "
+                "(none expose #LogService.ClearLog)")
 
         target_uri = self._resolve_target(log_service, services)
+        # ClearLog is DMTF-typically 204 No Content, but read_api_respond accepts
+        # any 2xx as success, so a box that answers 200/202 is not a false error.
         return self.invoke_action(
             target_uri,
             "ClearLog",

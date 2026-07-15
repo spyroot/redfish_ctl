@@ -9,6 +9,7 @@ no live BMC.
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.logs.cmd_log_clear import LogClear
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 
@@ -103,3 +104,36 @@ def test_log_clear_unknown_service_raises(redfish_mock_factory):
         mgr.sync_invoke(ApiRequestType.LogClear, "log-clear", log_service="Nope")
 
     assert _post_requests(svc) == []
+
+
+def test_log_clear_no_clearable_services_raises(redfish_mock):
+    """A box exposing no ClearLog action (the Dell mock) fails with a clear message."""
+    with pytest.raises(
+            InvalidArgument, match="no clearable log services found"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.LogClear, "log-clear", log_service="Sel")
+
+
+def test_resolve_target_matches_id_case_insensitively():
+    """_resolve_target matches a LogService Id regardless of case."""
+    services = [{"Id": "SEL", "uri": "/redfish/v1/Managers/1/LogServices/SEL"}]
+    assert LogClear._resolve_target("sel", services) == (
+        "/redfish/v1/Managers/1/LogServices/SEL")
+
+
+def test_resolve_target_ambiguous_id_raises():
+    """A LogService Id present under two roots is ambiguous and must be rejected."""
+    services = [
+        {"Id": "SEL", "uri": "/redfish/v1/Systems/1/LogServices/SEL"},
+        {"Id": "SEL", "uri": "/redfish/v1/Managers/1/LogServices/SEL"},
+    ]
+    with pytest.raises(InvalidArgument, match="ambiguous"):
+        LogClear._resolve_target("SEL", services)
+
+
+def test_resolve_target_unknown_uri_raises():
+    """A full URI that matches no discovered clearable service is rejected."""
+    services = [{"Id": "SEL", "uri": "/redfish/v1/Managers/1/LogServices/SEL"}]
+    with pytest.raises(
+            InvalidArgument, match="no clearable log service at URI"):
+        LogClear._resolve_target("/redfish/v1/Managers/1/LogServices/Nope", services)
