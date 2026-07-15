@@ -2,6 +2,10 @@
 
 Command provides  query tasks service and obtains list of task.
 
+Example::
+
+    redfish_ctl tasks
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -20,14 +24,15 @@ class TasksList(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the tasks command."""
         super(TasksList, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command and all optional flags.
-        :param cls:
-        :return:
+        """Register the tasks subcommand and its arguments.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = cls.base_parser()
         help_text = "command fetch tasks list"
@@ -40,14 +45,14 @@ class TasksList(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = True,
                 **kwargs) -> CommandResult:
-        """Executes tasks list
+        """List tasks from the Redfish TaskService and discover their actions.
 
+        :param filename: if set, save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
-        :param do_expanded:  will do expand query
-        :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
-        :return: CommandResult and if filename provide will save to a file.
+        :param do_expanded: issue an expanded ($expand) Redfish query.
+        :return: CommandResult wrapping the tasks list and per-member discovered actions.
         """
         target_api = "/redfish/v1/TaskService/Tasks"
         cmd_result = self.base_query(target_api,
