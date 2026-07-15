@@ -107,10 +107,13 @@ class RedfishError(RedfishRespondMessage):
         """
         Redfish specs defines a verbose output. Motivation that is has more information
         about the error as possible.  It also defines multiply errors.
+        :param http_status_code: HTTP status code the server returned.
         :param code: a string
         :param message: Displays a human-readable error message that corresponds
                         to the message in the message registry.
         :param message_extended: list of redfish that describe one or more error messages.
+        :param exception_msg: raw error text for a JSON-decode failure; accepted for
+                        signature parity with the base class but not forwarded to it here.
         """
         super().__init__(
             http_status_code=http_status_code,
@@ -123,6 +126,10 @@ class RedfishError(RedfishRespondMessage):
 
     @staticmethod
     def new_msg():
+        """Return a fresh empty :class:`RedfishErrorMessage`.
+
+        :return: a new, empty error-message object.
+        """
         return RedfishErrorMessage()
 
     @property
@@ -141,6 +148,9 @@ class RedfishError(RedfishRespondMessage):
         carries only a ``MessageId`` + ``MessageArgs`` with no human-readable
         ``Message`` (e.g. iLO ``PropertyNotWritableOrUnknown``). Fall back to the
         id + args in that case so the error stays informative.
+
+        :param m: an extended-info entry, either a ``RedfishMessage`` or a raw dict.
+        :return: the rendered message string, or ``""`` when nothing is renderable.
         """
         try:
             if isinstance(m, dict):
@@ -166,6 +176,9 @@ class RedfishError(RedfishRespondMessage):
         status. Robust to ``message_extended`` being raw dicts or objects, and to
         a missing/None ``Message`` — the failure mode that previously made
         ``str(exception)`` raise and surface as ``<exception str() failed>``.
+
+        :return: the combined human-readable error text, suffixed with the HTTP
+            status when one is present.
         """
         parts = []
         top = getattr(self, "_message", None)
@@ -183,8 +196,16 @@ class RedfishError(RedfishRespondMessage):
         return f"{body} (HTTP {code})" if code else body
 
     def __repr__(self) -> str:
+        """Return the same human-readable rendering as :meth:`__str__`.
+
+        :return: the formatted error string.
+        """
         return self.__str__()
 
     @message_extended.setter
     def message_extended(self, value):
+        """Set the list of extended-info messages.
+
+        :param value: the extended-info messages to store.
+        """
         self._message_extended = value

@@ -8,6 +8,10 @@ def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
 
     Used so settings honor the going-forward ``REDFISH_*`` names first and fall back
     to the legacy ``IDRAC_*`` names during the rename. Pass the REDFISH_* name first.
+
+    :param names: environment variable names to check, in priority order.
+    :param default: value returned when none of ``names`` is set.
+    :return: the first set variable's value, or ``default`` when none is set.
     """
     for name in names:
         value = os.environ.get(name)

@@ -39,6 +39,16 @@ class RedfishQuery:
         top: Optional[int] = None,
         only: bool = False,
     ):
+        """Initialize a Redfish query parameter set.
+
+        :param select: property name(s) for ``$select``; a list or comma string.
+        :param filter: expression for ``$filter``.
+        :param expand: ``$expand`` mode; True expands all (``*``) or a string
+            names the expansion.
+        :param expand_levels: depth for ``$expand`` (``$levels``); defaults to 1.
+        :param top: page size for ``$top``.
+        :param only: when True, add the Redfish ``only`` parameter.
+        """
         self.select = select
         self.filter = filter
         self.expand = expand
@@ -47,10 +57,17 @@ class RedfishQuery:
         self.only = bool(only)
 
     def is_empty(self) -> bool:
-        """True when no query parameter is set."""
+        """True when no query parameter is set.
+
+        :return: True if no query parameter is active.
+        """
         return not self._active_names()
 
     def _active_names(self) -> List[str]:
+        """List the query parameters that are currently set.
+
+        :return: the names (e.g. ``$select``, ``$top``) of the active parameters.
+        """
         names = []
         if self.select:
             names.append("$select")
@@ -65,6 +82,12 @@ class RedfishQuery:
         return names
 
     def _validate(self, one_param_per_uri: bool) -> None:
+        """Validate the parameter values and cardinality.
+
+        :param one_param_per_uri: when True, allow at most one active parameter.
+        :raises ValueError: if ``$top`` or ``$expand`` levels are out of range,
+            or more than one parameter is set while ``one_param_per_uri`` is True.
+        """
         if self.top is not None and (not isinstance(self.top, int) or self.top < 0):
             raise ValueError("$top must be an integer >= 0")
         if self.expand_levels is not None and (
@@ -79,6 +102,10 @@ class RedfishQuery:
             )
 
     def _pairs(self) -> List[str]:
+        """Build the encoded ``key=value`` fragments for the active parameters.
+
+        :return: the URL-encoded query fragments in Redfish order.
+        """
         pairs: List[str] = []
         if self.select:
             value = self.select if isinstance(self.select, str) else ",".join(self.select)
@@ -95,7 +122,13 @@ class RedfishQuery:
         return pairs
 
     def to_query_string(self, one_param_per_uri: bool = False) -> str:
-        """Return the leading ``?...`` query string, or ``""`` when empty."""
+        """Return the leading ``?...`` query string, or ``""`` when empty.
+
+        :param one_param_per_uri: when True, enforce at most one query parameter.
+        :return: the ``?...`` query string, or an empty string when no parameter
+            is set.
+        :raises ValueError: if validation fails (see :meth:`_validate`).
+        """
         self._validate(one_param_per_uri)
         pairs = self._pairs()
         if not pairs:
@@ -103,5 +136,10 @@ class RedfishQuery:
         return "?" + "&".join(pairs)
 
     def apply(self, url: str, one_param_per_uri: bool = False) -> str:
-        """Append the query string to ``url`` (assumes ``url`` has no query yet)."""
+        """Append the query string to ``url`` (assumes ``url`` has no query yet).
+
+        :param url: base URL with no existing query string.
+        :param one_param_per_uri: when True, enforce at most one query parameter.
+        :return: ``url`` with the query string appended.
+        """
         return url + self.to_query_string(one_param_per_uri)
