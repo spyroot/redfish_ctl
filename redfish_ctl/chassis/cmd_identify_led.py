@@ -1,4 +1,7 @@
-"""Read or set Redfish identify LED state on Chassis or ComputerSystem resources."""
+"""Read or set Redfish identify LED state on Chassis or ComputerSystem resources.
+
+    redfish_ctl identify-led --resource chassis --target-id Chassis_0 --on --confirm
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -23,12 +26,16 @@ class IdentifyLed(RedfishManagerBase,
     """Read or set the physical identify LED on a chassis or system."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the identify-led command."""
         super(IdentifyLed, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the guarded ``identify-led`` subcommand."""
+        """Register the guarded ``identify-led`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--resource",
@@ -75,6 +82,11 @@ class IdentifyLed(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` URIs from a Redfish collection payload.
+
+        :param data: parsed collection response body.
+        :return: list of member URI strings; empty when data is not a mapping.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -86,12 +98,27 @@ class IdentifyLed(RedfishManagerBase,
 
     @staticmethod
     def _resource_id(uri, data):
+        """Resolve the resource Id for a member from its payload or URI.
+
+        :param uri: member ``@odata.id`` URI.
+        :param data: parsed member response body.
+        :return: the payload ``Id`` when present, else the last URI path segment.
+        """
         if isinstance(data, dict) and isinstance(data.get("Id"), str):
             return data["Id"]
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _property_for(data, property_name):
+        """Choose the identify-LED property to read or patch on a resource.
+
+        :param data: parsed resource body to inspect for LED properties.
+        :param property_name: explicit property to use, or None to auto-select.
+        :return: the chosen property name (``LocationIndicatorActive`` or
+            ``IndicatorLED``).
+        :raises InvalidArgument: if the requested property is unsupported or the
+            resource exposes no identify-LED property.
+        """
         if property_name:
             if property_name not in _PROPERTIES:
                 raise InvalidArgument(f"unsupported LED property {property_name!r}")
@@ -106,15 +133,36 @@ class IdentifyLed(RedfishManagerBase,
 
     @staticmethod
     def _payload(property_name, active):
+        """Build the PATCH payload for the chosen identify-LED property.
+
+        :param property_name: LED property being set.
+        :param active: desired on/off state.
+        :return: dict payload — a boolean for ``LocationIndicatorActive``, else
+            ``Lit``/``Off`` for ``IndicatorLED``.
+        """
         if property_name == "LocationIndicatorActive":
             return {property_name: bool(active)}
         return {property_name: "Lit" if active else "Off"}
 
     @staticmethod
     def _target_matches(uri, resource_id, target_id):
+        """Test whether a member matches the requested target.
+
+        :param uri: member ``@odata.id`` URI.
+        :param resource_id: the member's resolved Id.
+        :param target_id: requested Id or URI.
+        :return: True if the Id matches case-insensitively or the URI matches.
+        """
         return resource_id.casefold() == target_id.casefold() or uri == target_id
 
     def _get(self, uri, do_async):
+        """Query a Redfish resource and return its parsed object body.
+
+        :param uri: resource URI to query.
+        :param do_async: issue the query on the async event loop when True.
+        :return: the parsed response body as a dict.
+        :raises InvalidArgument: if the query errors or the body is not an object.
+        """
         result = self.base_query(uri, do_async=do_async)
         if result.error is not None:
             raise InvalidArgument(f"Unable to read {uri}: {result.error}")
@@ -123,6 +171,16 @@ class IdentifyLed(RedfishManagerBase,
         return result.data
 
     def _resolve(self, resource, target_id, property_name, do_async):
+        """Locate the target member and its identify-LED property.
+
+        :param resource: collection key, ``chassis`` or ``system``.
+        :param target_id: resource Id or ``@odata.id`` URI to match.
+        :param property_name: explicit LED property, or None to auto-select.
+        :param do_async: issue the queries on the async event loop when True.
+        :return: dict with resource, target_id, target URI, property, and current value.
+        :raises InvalidArgument: if the resource is unsupported, target_id is
+            missing, or no matching member is found.
+        """
         if resource not in _COLLECTIONS:
             raise InvalidArgument(f"unsupported identify LED resource {resource!r}")
         if not target_id:
@@ -146,6 +204,13 @@ class IdentifyLed(RedfishManagerBase,
 
     @staticmethod
     def _active_from_flags(active, active_on, active_off):
+        """Reduce the desired LED state from the CLI flags.
+
+        :param active: explicit boolean state, or None to fall back to flags.
+        :param active_on: True when ``--on`` was given.
+        :param active_off: True when ``--off`` was given.
+        :return: the desired boolean state, or None when no state was requested.
+        """
         if active is not None:
             return bool(active)
         if active_on:
@@ -168,7 +233,24 @@ class IdentifyLed(RedfishManagerBase,
                 active_off: Optional[bool] = False,
                 confirm: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read or preview/apply an identify LED state change."""
+        """Read or preview/apply an identify LED state change.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param resource: collection to search, ``chassis`` or ``system``.
+        :param target_id: resource Id or ``@odata.id`` URI to read or patch.
+        :param property_name: LED property to patch; auto-selected when omitted.
+        :param active: explicit desired state, overriding the on/off flags.
+        :param active_on: request the LED on.
+        :param active_off: request the LED off.
+        :param confirm: apply the PATCH; without it the command only previews.
+        :return: CommandResult carrying the resolved target and, by mode, the
+            current value (read), a dry-run preview, or the applied PATCH status
+            and the observed LED value.
+        """
         target = self._resolve(resource, target_id, property_name, do_async)
         desired = self._active_from_flags(active, active_on, active_off)
         if desired is None:

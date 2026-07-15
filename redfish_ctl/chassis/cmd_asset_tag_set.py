@@ -1,4 +1,7 @@
-"""Read or set Redfish AssetTag on Chassis or ComputerSystem resources."""
+"""Read or set Redfish AssetTag on Chassis or ComputerSystem resources.
+
+    redfish_ctl asset-tag-set --resource chassis --target-id Chassis_0 --asset-tag lab-01 --confirm
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -22,12 +25,16 @@ class AssetTagSet(RedfishManagerBase,
     """Read or set AssetTag on a chassis or system resource."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the asset-tag-set command."""
         super(AssetTagSet, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the guarded ``asset-tag-set`` subcommand."""
+        """Register the guarded ``asset-tag-set`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--resource",
@@ -58,6 +65,11 @@ class AssetTagSet(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` URIs from a Redfish collection payload.
+
+        :param data: parsed collection response body.
+        :return: list of member URI strings; empty when data is not a mapping.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -69,17 +81,39 @@ class AssetTagSet(RedfishManagerBase,
 
     @staticmethod
     def _resource_id(uri, data):
+        """Resolve the resource Id for a member from its payload or URI.
+
+        :param uri: member ``@odata.id`` URI.
+        :param data: parsed member response body.
+        :return: the payload ``Id`` when present, else the last URI path segment.
+        """
         if isinstance(data, dict) and isinstance(data.get("Id"), str):
             return data["Id"]
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     def _get(self, uri, do_async):
+        """Query a Redfish resource and return its parsed body.
+
+        :param uri: resource URI to query.
+        :param do_async: issue the query on the async event loop when True.
+        :return: the parsed response body, or an empty dict when absent.
+        :raises InvalidArgument: if the query returns an error.
+        """
         result = self.base_query(uri, do_async=do_async)
         if result.error:
             raise InvalidArgument(f"failed to query {uri}: {result.error}")
         return result.data or {}
 
     def _resolve(self, resource, target_id, do_async):
+        """Locate the AssetTag-bearing member matching ``target_id``.
+
+        :param resource: collection key, ``chassis`` or ``system``.
+        :param target_id: resource Id or ``@odata.id`` URI to match.
+        :param do_async: issue the queries on the async event loop when True.
+        :return: dict with resource, target_id, target URI, and current AssetTag.
+        :raises InvalidArgument: if the resource is unsupported, target_id is
+            missing, the target lacks AssetTag, or no member matches.
+        """
         if resource not in _COLLECTIONS:
             raise InvalidArgument(f"unsupported AssetTag resource {resource!r}")
         if not target_id:
@@ -112,7 +146,21 @@ class AssetTagSet(RedfishManagerBase,
                 asset_tag: Optional[str] = None,
                 confirm: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read, preview, or apply an AssetTag value."""
+        """Read, preview, or apply an AssetTag value.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: note async will subscribe to an event loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param resource: collection to search, ``chassis`` or ``system``.
+        :param target_id: resource Id or ``@odata.id`` URI to read or patch.
+        :param asset_tag: AssetTag value to apply; omit to read the current value.
+        :param confirm: apply the PATCH; without it the command only previews.
+        :return: CommandResult carrying the resolved target and, by mode, the
+            current value (read), a dry-run preview, or the applied PATCH status
+            and the observed AssetTag.
+        """
         target = self._resolve(resource, target_id, do_async)
         if asset_tag is None:
             target["read_only"] = True

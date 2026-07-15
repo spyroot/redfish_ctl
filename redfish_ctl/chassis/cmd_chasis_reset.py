@@ -24,6 +24,7 @@ class ChassisReset(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the chassis-reset command."""
         super(ChassisReset, self).__init__(*args, **kwargs)
 
     @staticmethod
