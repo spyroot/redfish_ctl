@@ -87,6 +87,30 @@ URL (unless status `0`) is mapped. `tests/test_full_corpus_contract.py` pins all
 including the error-capture cases. The two additive keys are optional, so pre-capture corpora
 still validate.
 
+## Per-vendor structure — as shipped (verified)
+The committed maps share the required skeleton — one IP-named top dir holding the flattened
+`_redfish_v1_*.json` files, a `rest_api_map.npy`, and a `corpus_manifest.json` — but they do
+**not** have identical keys or value formats. A consumer must normalize, not assume:
+
+| corpus | npy keys | `url_file_mapping` values |
+| --- | --- | --- |
+| `dell_xr8620t` | 2 (`url_file_mapping`, `allowed_methods_mapping`) | bare filenames |
+| `hpe_dl360` | 2 | absolute capture-host paths |
+| `supermicro_gb300` | 2 | absolute capture-host paths |
+| `supermicro_x10` | 4 (adds `http_status_mapping`, `error_file_mapping`) | absolute capture-host paths |
+
+So a consumer **must** (1) resolve `url_file_mapping`/`error_file_mapping` values by their
+basename — older captures store `/…/.json_responses/<ip>/…` absolute paths, not filenames — and
+(2) **tolerate the 2-key form**: default the success status to `200` and expose no error
+examples when `http_status_mapping`/`error_file_mapping` are absent (only captures taken after
+the lossless-capture change carry them). All four resolve fully today (every mapped basename
+exists in the archive).
+
+`tests/test_full_corpus_contract.py::test_committed_full_corpus_npy_is_sound` is the hard gate
+for this: it extracts each committed tarball and asserts the npy loads, carries the two required
+keys plus only known keys, and every `url_file_mapping` value resolves to a real JSON file by
+basename — so a corrupt or incomplete shipped map fails the build.
+
 `corpus_manifest.json` records `schema_version`, `artifact_type`, vendor/model/host_id,
 `redfish_version`, the counts (`json_file_count`, `url_file_mapping_count`,
 `error_file_mapping_count`, `allowed_methods_mapping_count`), per-method `method_counts`,
