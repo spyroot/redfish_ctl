@@ -3,8 +3,8 @@
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -21,7 +21,7 @@ def _as_list(values) -> list[str]:
     return normalized
 
 
-class _SubscriptionBase(IDracManager):
+class _SubscriptionBase(RedfishManagerBase):
     """Shared EventService subscription helpers."""
 
     @staticmethod
@@ -31,7 +31,7 @@ class _SubscriptionBase(IDracManager):
 
     def _subscription_collection_uri(self, do_async):
         service = self.base_query(
-            IDRAC_API.EventServiceQuery,
+            REDFISH_API.EventServiceQuery,
             do_async=do_async,
         ).data or {}
         subscriptions_uri = self._link(service, "Subscriptions")

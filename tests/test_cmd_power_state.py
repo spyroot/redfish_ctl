@@ -5,8 +5,8 @@ from unittest import TestCase
 
 import pytest
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
@@ -23,8 +23,8 @@ class TestPowerState(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> IDracManager:
-        redfish_api = IDracManager(
+    def setUpClass(cls) -> RedfishManagerBase:
+        redfish_api = RedfishManagerBase(
             idrac_ip=os.environ.get('IDRAC_IP', ''),
             idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
             idrac_password=os.environ.get('IDRAC_PASSWORD', ''),

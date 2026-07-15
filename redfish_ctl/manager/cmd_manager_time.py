@@ -18,8 +18,8 @@ import datetime
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -47,7 +47,7 @@ def build_time_payload(set_now: bool,
     return payload
 
 
-class ManagerTime(IDracManager,
+class ManagerTime(RedfishManagerBase,
                   scm_type=ApiRequestType.ManagerTime,
                   name='manager-time',
                   metaclass=Singleton):

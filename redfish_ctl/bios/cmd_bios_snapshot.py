@@ -23,12 +23,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import from_json_spec, save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BiosSnapshot(IDracManager,
+class BiosSnapshot(RedfishManagerBase,
                    scm_type=ApiRequestType.BiosSnapshot,
                    name='bios_snapshot',
                    metaclass=Singleton):

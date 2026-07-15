@@ -27,12 +27,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class BootOptionsList(IDracManager,
+class BootOptionsList(RedfishManagerBase,
                       scm_type=ApiRequestType.BootOptions,
                       name='boot_sources_query',
                       metaclass=Singleton):

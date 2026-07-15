@@ -2,12 +2,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class EventServiceQuery(IDracManager,
+class EventServiceQuery(RedfishManagerBase,
                         scm_type=ApiRequestType.EventServiceQuery,
                         name='event-service',
                         metaclass=Singleton):
@@ -67,7 +67,7 @@ class EventServiceQuery(IDracManager,
                 **kwargs) -> CommandResult:
         """Read EventService state without opening or creating subscriptions."""
         service = self.base_query(
-            IDRAC_API.EventServiceQuery,
+            REDFISH_API.EventServiceQuery,
             filename=filename,
             do_async=do_async,
             do_expanded=do_expanded,

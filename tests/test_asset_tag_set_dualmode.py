@@ -3,7 +3,7 @@
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -94,7 +94,7 @@ def test_asset_tag_set_confirm_patches_and_rereads_chassis_tag(
     assert patches[0].json() == {"AssetTag": "restored-tag"}
     assert result.data["applied"] == {
         "target": "/redfish/v1/Chassis/Chassis_0",
-        "status": "IdracApiRespond.Ok",
+        "status": "RedfishApiRespond.Ok",
         "error": None,
     }
     assert result.data["observed"] == "restored-tag"

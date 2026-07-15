@@ -15,12 +15,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class SecureBoot(IDracManager,
+class SecureBoot(RedfishManagerBase,
                  scm_type=ApiRequestType.SecureBoot,
                  name='secure-boot',
                  metaclass=Singleton):

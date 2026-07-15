@@ -3,12 +3,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Power(IDracManager,
+class Power(RedfishManagerBase,
             scm_type=ApiRequestType.Power,
             name="power",
             metaclass=Singleton):
@@ -181,7 +181,7 @@ class Power(IDracManager,
             "battery_collections": [],
             "batteries": [],
         }
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         chassis_uris = self._members(chassis.data)
 
         for chassis_uri in chassis_uris:

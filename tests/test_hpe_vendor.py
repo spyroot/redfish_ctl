@@ -7,7 +7,7 @@ requests path via redfish_mock_factory("hpe"). HPE uses a THIRD id scheme
 System_0 — so these tests prove the discovery-first, link-navigated commands
 work on a vendor they were never special-cased for.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_hpe_discovery_resolves_ilo_ids(redfish_mock_factory):

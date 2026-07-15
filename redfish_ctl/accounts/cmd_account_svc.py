@@ -7,13 +7,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class QueryAccountService(IDracManager,
+class QueryAccountService(RedfishManagerBase,
                           scm_type=ApiRequestType.QueryAccountService,
                           name='query_account_svc',
                           metaclass=Singleton):
@@ -103,7 +103,7 @@ class QueryAccountService(IDracManager,
             if schema_filter in self._json_filter_dict:
                 json_filter = self._json_filter_dict[schema_filter]
 
-        cmd_result = self.base_query(IDRAC_API.AccountServiceQuery,
+        cmd_result = self.base_query(REDFISH_API.AccountServiceQuery,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=is_expanded)

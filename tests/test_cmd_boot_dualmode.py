@@ -13,7 +13,7 @@ import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.compute.cmd_power_state import RebootHost
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

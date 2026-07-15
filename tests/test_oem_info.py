@@ -4,7 +4,7 @@ Surfaces vendor OEM extensions uniformly, closing the asymmetry where only Dell
 OEM had commands. Verified on the HPE iLO (Oem.Hpe) and GB300 (Oem.Nvidia /
 Oem.OpenBmc) corpora.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_oem_info_surfaces_hpe(redfish_mock_factory):

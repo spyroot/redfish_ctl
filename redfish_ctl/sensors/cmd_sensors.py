@@ -12,12 +12,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Sensors(IDracManager,
+class Sensors(RedfishManagerBase,
               scm_type=ApiRequestType.Sensors,
               name='sensors',
               metaclass=Singleton):
@@ -55,7 +55,7 @@ class Sensors(IDracManager,
         its Reading; otherwise each member is fetched individually.
         """
         readings = []
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):
             try:
                 cdata = self.base_query(chassis_uri, do_async=do_async).data or {}

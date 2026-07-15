@@ -3,13 +3,13 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API, ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class EnvironmentMetrics(IDracManager,
+class EnvironmentMetrics(RedfishManagerBase,
                          scm_type=ApiRequestType.EnvironmentMetrics,
                          name="environment-metrics",
                          metaclass=Singleton):
@@ -103,7 +103,7 @@ class EnvironmentMetrics(IDracManager,
         })
 
     def _append_chassis_metrics(self, rows, seen, do_async=False):
-        chassis = self.base_query(IDRAC_API.Chassis, do_async=do_async)
+        chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):
             chassis_data = self._query_optional(chassis_uri, do_async=do_async)
             metrics_uri = self._link(chassis_data, "EnvironmentMetrics")

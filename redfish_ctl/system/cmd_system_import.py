@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, IdracApiRespond, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ImportSystemConfig(IDracManager,
+class ImportSystemConfig(RedfishManagerBase,
                          scm_type=ApiRequestType.ImportSystem,
                          name='import_sysconfig',
                          metaclass=Singleton):
@@ -149,7 +149,7 @@ class ImportSystemConfig(IDracManager,
         data = {}
 
         cmd_result, api_resp = self.base_post(r, payload)
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             task_state = self.fetch_task(task_id)
             cmd_result.data['task_state'] = task_state

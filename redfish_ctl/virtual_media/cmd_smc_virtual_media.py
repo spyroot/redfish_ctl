@@ -23,12 +23,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class SmcVirtualMediaMount(IDracManager,
+class SmcVirtualMediaMount(RedfishManagerBase,
                            scm_type=ApiRequestType.SmcVirtualMediaMount,
                            name='vm-mount',
                            metaclass=Singleton):

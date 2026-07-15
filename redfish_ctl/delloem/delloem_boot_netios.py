@@ -16,20 +16,20 @@ from abc import abstractmethod
 from typing import Optional
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
-from ..idrac_shared import IdracApiRespond
+from ..redfish_manager_shared import RedfishApiRespond
 from ..redfish_shared import RedfishJson
 from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
+from ..redfish_manager_shared import RedfishApiRespond, ResetType
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import RedfishApiRespond
 
 
-class DellOemNetIsoBoot(IDracManager,
+class DellOemNetIsoBoot(RedfishManagerBase,
                         scm_type=ApiRequestType.DellOemNetIsoBoot,
                         name='delloem_netios_boot',
                         metaclass=Singleton):
@@ -98,7 +98,7 @@ class DellOemNetIsoBoot(IDracManager,
             target_api, payload=payload,
             do_async=do_async, expected_status=202)
 
-        if api_resp == IdracApiRespond.AcceptedTaskGenerated:
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']
             self.logger.info(f"Fetching task {task_id} state.")
             task_state = self.fetch_task(task_id)

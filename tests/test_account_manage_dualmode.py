@@ -1,6 +1,6 @@
 """Dual-mode tests for guarded account management commands."""
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 ACCOUNTS_PATH = "/redfish/v1/AccountService/Accounts"

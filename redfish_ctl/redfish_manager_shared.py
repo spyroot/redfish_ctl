@@ -1,6 +1,6 @@
 """Shared resource
 
-This is shared Enum, Classes used by idrac ctl.
+This is shared Enum, Classes used by redfish_ctl.
 Many classes mapped directly to JSON schem.
 
 Author Mus spyroot@gmail.com
@@ -478,7 +478,7 @@ class IdracResetActions(Enum):
     ManagerReset = "Manager.Reset"
 
 
-class IDRAC_API:
+class REDFISH_API:
     """
     Idrac api supported actions
     """
@@ -532,7 +532,7 @@ class IDRAC_API:
 
 # $select=SecurityCertificate.*
 
-class IDRAC_JSON:
+class REDFISH_JSON:
     """All Keys we expect idrac uses based on specification.
     """
     Id = "Id"
@@ -603,7 +603,7 @@ class JobApplyTypes:
     Immediate = "Immediate"
 
 
-class IdracApiRespond(Enum):
+class RedfishApiRespond(Enum):
     """We need report to a client either redfish created task and accepted
     or ok and success.  Note that some API has mismatch between
     200/204  hence it better differentiate each case

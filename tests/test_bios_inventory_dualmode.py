@@ -5,22 +5,22 @@ tests/idrac_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json), and again
 real hardware when IDRAC_IP is set. Mirrors tests/test_cmd_boot_dualmode.py: invoke
 the command through sync_invoke and assert the CommandResult shape.
 
-This is also the regression guard for the IDRAC_API.BIOS member: BiosQuery.execute
-builds the URL as f"{self.idrac_manage_servers}{IDRAC_API.BIOS}", so a missing BIOS
+This is also the regression guard for the REDFISH_API.BIOS member: BiosQuery.execute
+builds the URL as f"{self.idrac_manage_servers}{REDFISH_API.BIOS}", so a missing BIOS
 member raises AttributeError before any request is made.
 
 Author Mus spyroot@gmail.com
 """
 import json
 
-from redfish_ctl.idrac_shared import IDRAC_API, ApiRequestType
+from redfish_ctl.redfish_manager_shared import REDFISH_API, ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_idrac_api_has_bios_member():
-    """IDRAC_API exposes a BIOS base path so BiosQuery can build its URL."""
+    """REDFISH_API exposes a BIOS base path so BiosQuery can build its URL."""
     # The base resource hangs off idrac_manage_servers (.../System.Embedded.1).
-    assert IDRAC_API.BIOS == "/Bios"
+    assert REDFISH_API.BIOS == "/Bios"
 
 
 def test_bios_inventory_query(redfish_api):

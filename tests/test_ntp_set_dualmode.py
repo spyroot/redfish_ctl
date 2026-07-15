@@ -3,7 +3,7 @@
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -71,7 +71,7 @@ def test_ntp_set_confirm_patches_only_the_ntp_block(redfish_mock_factory):
     assert result.data["applied"] == [{
         "Manager": "BMC_0",
         "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-        "status": "IdracApiRespond.Ok",
+        "status": "RedfishApiRespond.Ok",
         "error": None,
     }]
 
@@ -95,7 +95,7 @@ def test_ntp_set_clear_patches_empty_server_list_only(redfish_mock_factory):
     assert result.data["applied"] == [{
         "Manager": "BMC_0",
         "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-        "status": "IdracApiRespond.Ok",
+        "status": "RedfishApiRespond.Ok",
         "error": None,
     }]
 

@@ -13,8 +13,8 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -119,8 +119,8 @@ def _temperature_summary(readings: tuple[Any, ...]) -> dict[str, int | float | N
     }
 
 
-def _node_manager(node: FleetNode) -> IDracManager:
-    return IDracManager(
+def _node_manager(node: FleetNode) -> RedfishManagerBase:
+    return RedfishManagerBase(
         idrac_ip=node.address,
         idrac_username=node.username,
         idrac_password=node.password,
@@ -197,7 +197,7 @@ def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]
     }
 
 
-class FleetInventory(IDracManager,
+class FleetInventory(RedfishManagerBase,
                      scm_type=ApiRequestType.FleetInventory,
                      name="fleet",
                      metaclass=Singleton):

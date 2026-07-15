@@ -7,12 +7,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class TasksList(IDracManager,
+class TasksList(RedfishManagerBase,
                 scm_type=ApiRequestType.TasksList,
                 name='chassis_service_query',
                 metaclass=Singleton):

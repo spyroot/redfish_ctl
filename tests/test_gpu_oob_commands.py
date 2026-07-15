@@ -11,7 +11,7 @@ navigates the real link graph on a non-Dell host:
 
 These exercise the corpus-as-sim: no bespoke fixtures, just behavioral asserts.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_metric_definitions_lists_report_defs(redfish_mock_factory):

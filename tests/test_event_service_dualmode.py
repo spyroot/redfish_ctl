@@ -2,8 +2,8 @@
 import json
 
 from redfish_ctl.events.cmd_event_service import EventServiceQuery
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -138,7 +138,7 @@ def test_event_service_tolerates_missing_subscriptions_link(redfish_mock_factory
 
 def test_event_service_exposes_cli_entrypoint():
     """The event-service command is wired into the package registry."""
-    registry = IDracManager().get_registry()
+    registry = RedfishManagerBase().get_registry()
     assert registry[ApiRequestType.EventServiceQuery]["event-service"] is EventServiceQuery
 
     cmd_parser, cmd_name, cmd_help = EventServiceQuery.register_subcommand(

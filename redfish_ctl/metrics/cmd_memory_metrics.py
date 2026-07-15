@@ -3,14 +3,14 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from .common import link, members, nvidia_oem, resource_id
 
 
-class MemoryMetrics(IDracManager,
+class MemoryMetrics(RedfishManagerBase,
                     scm_type=ApiRequestType.MemoryMetrics,
                     name="memory-metrics",
                     metaclass=Singleton):

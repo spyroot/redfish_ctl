@@ -9,13 +9,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class JobServices(IDracManager,
+class JobServices(RedfishManagerBase,
                   scm_type=ApiRequestType.JobServices,
                   name='job_service_query',
                   metaclass=Singleton):
@@ -63,7 +63,7 @@ class JobServices(IDracManager,
         :param data_type: json or xml
         :return: CommandResult and if filename provide will save to a file.
         """
-        cmd_result = self.base_query(IDRAC_API.JobServiceQuery,
+        cmd_result = self.base_query(REDFISH_API.JobServiceQuery,
                                      filename=filename,
                                      do_async=do_async,
                                      do_expanded=do_expanded)

@@ -6,17 +6,17 @@ but BootSourcesRegistryQuery already starts with ``/`` — producing
 404s. Found by the Codex worker. The constant is an absolute suffix, so callers
 must join WITHOUT an extra slash.
 """
-from redfish_ctl.idrac_shared import IDRAC_API
+from redfish_ctl.redfish_manager_shared import REDFISH_API
 
 
 def test_boot_sources_registry_query_is_absolute_suffix():
     """The query constant starts with '/' (it is a path suffix, not a fragment)."""
-    assert IDRAC_API.BootSourcesRegistryQuery.startswith("/")
+    assert REDFISH_API.BootSourcesRegistryQuery.startswith("/")
 
 
 def test_boot_sources_registry_path_has_no_double_slash():
     """Joining the system path with the constant yields a single-slash path."""
     base = "/redfish/v1/Systems/System.Embedded.1"
-    path = f"{base}{IDRAC_API.BootSourcesRegistryQuery}"
+    path = f"{base}{REDFISH_API.BootSourcesRegistryQuery}"
     assert "//" not in path
     assert path == "/redfish/v1/Systems/System.Embedded.1/BootSources/BootSourcesRegistry"

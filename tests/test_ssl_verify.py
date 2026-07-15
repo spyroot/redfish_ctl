@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager import RedfishManager
 
 
@@ -48,7 +48,7 @@ def captured_verify(monkeypatch):
     return seen
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, RedfishManagerBase])
 def test_default_manager_skips_verification(manager_cls, captured_verify):
     """No flag -> insecure default -> requests.get receives verify=False.
 
@@ -60,7 +60,7 @@ def test_default_manager_skips_verification(manager_cls, captured_verify):
     assert captured_verify["verify"] is False
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, RedfishManagerBase])
 def test_insecure_true_skips_verification(manager_cls, captured_verify):
     """insecure=True -> verify=False (explicit skip is honored)."""
     mgr = manager_cls(insecure=True)
@@ -68,7 +68,7 @@ def test_insecure_true_skips_verification(manager_cls, captured_verify):
     assert captured_verify["verify"] is False
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, RedfishManagerBase])
 def test_insecure_false_enables_verification(manager_cls, captured_verify):
     """insecure=False -> verify=True (opt-in verification path)."""
     mgr = manager_cls(insecure=False)
@@ -76,7 +76,7 @@ def test_insecure_false_enables_verification(manager_cls, captured_verify):
     assert captured_verify["verify"] is True
 
 
-@pytest.mark.parametrize("manager_cls", [RedfishManager, IDracManager])
+@pytest.mark.parametrize("manager_cls", [RedfishManager, RedfishManagerBase])
 def test_get_carries_timeout_and_reuses_one_session(manager_cls, captured_verify):
     """Every GET is bounded by a timeout and reuses one pooled Session.
 
@@ -95,18 +95,18 @@ def test_internal_verify_flag_is_inverse_of_insecure():
     """_is_verify_cert is the inverse of the insecure intent for both managers."""
     assert RedfishManager(insecure=True)._is_verify_cert is False
     assert RedfishManager(insecure=False)._is_verify_cert is True
-    assert IDracManager(insecure=True)._is_verify_cert is False
-    assert IDracManager(insecure=False)._is_verify_cert is True
+    assert RedfishManagerBase(insecure=True)._is_verify_cert is False
+    assert RedfishManagerBase(insecure=False)._is_verify_cert is True
     # Default (no flag) must skip verification.
     assert RedfishManager()._is_verify_cert is False
-    assert IDracManager()._is_verify_cert is False
+    assert RedfishManagerBase()._is_verify_cert is False
 
 
 def test_cli_verify_ssl_flag_drives_insecure():
     """--verify-ssl off (default) -> insecure skip; on -> verification enabled.
 
     Mirrors how ``redfish_main.main`` derives the ``insecure`` value it passes to
-    IDracManager from the parsed ``verify_ssl`` flag, without constructing a real
+    RedfishManagerBase from the parsed ``verify_ssl`` flag, without constructing a real
     client. ``--insecure`` stays a harmless explicit "skip".
     """
     # Default namespace: verify_ssl absent/False -> insecure (skip) is True.

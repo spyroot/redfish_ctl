@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.reconcile import DesiredState, reconcile
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -301,7 +301,7 @@ def test_reconcile_confirm_applies_only_required_changes():
             {
                 "Manager": "BMC_0",
                 "target": "/redfish/v1/Managers/BMC_0/NetworkProtocol",
-                "status": "IdracApiRespond.Ok",
+                "status": "RedfishApiRespond.Ok",
                 "error": None,
             }
         ],
@@ -505,7 +505,7 @@ def test_reconcile_dry_run_uses_gb300_corpus_without_writes():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = RedfishManagerBase(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",

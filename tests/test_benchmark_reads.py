@@ -1,6 +1,6 @@
 """Request-count benchmark harness for hot read paths."""
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from tests.request_benchmark import assert_read_budget, recorded_requests
 
 FIRMWARE_INVENTORY_PATH = "/redfish/v1/UpdateService/FirmwareInventory"

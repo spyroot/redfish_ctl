@@ -48,8 +48,8 @@ from .cmd_exceptions import (
 )
 from .cmd_utils import save_if_needed
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .idrac_manager import IDracManager
-from .idrac_shared import RedfishAction, RedfishActionEncoder
+from .redfish_manager_base import RedfishManagerBase
+from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
@@ -352,7 +352,7 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.setup_otlp("redfish-ctl")
 
     # idrac manager main interface main uses to interact with IDRAC.
-    redfish_api = IDracManager(idrac_ip=cmd_args.idrac_ip,
+    redfish_api = RedfishManagerBase(idrac_ip=cmd_args.idrac_ip,
                                idrac_username=cmd_args.idrac_username,
                                idrac_password=cmd_args.idrac_password,
                                idrac_port=cmd_args.idrac_port,
@@ -459,7 +459,7 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
     """Create command tree structure.
     :return: a dict that store mapping for each command.
     """
-    redfish_api = IDracManager()
+    redfish_api = RedfishManagerBase()
     command_name_to_cmd = {}
     commands_registry = redfish_api.get_registry()
     command_name = collections.namedtuple("Command", "type name")

@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 _IP = os.environ.get("HPE_EMULATOR_IP")
 
@@ -22,9 +22,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _manager():
-    """Build an IDracManager pointed at the running emulator."""
-    from redfish_ctl.idrac_manager import IDracManager
-    return IDracManager(
+    """Build an RedfishManagerBase pointed at the running emulator."""
+    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    return RedfishManagerBase(
         idrac_ip=_IP,
         idrac_username=os.environ.get("HPE_EMULATOR_USER", "root"),
         idrac_password=os.environ.get("HPE_EMULATOR_PASSWORD", "root_password"),

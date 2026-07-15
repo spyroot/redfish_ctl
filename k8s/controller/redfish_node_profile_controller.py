@@ -15,7 +15,7 @@ try:  # pragma: no cover - exercised only in a deployed controller image.
 except ImportError:  # pragma: no cover - unit tests call the handler directly.
     kopf = None
 
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
 REDFISH_GROUP = "redfish.ctl.dev"
 REDFISH_VERSION = "v1alpha1"
@@ -262,7 +262,7 @@ def reconcile_profile(
     *,
     credentials: Mapping[str, str] | None = None,
     current_status: Mapping[str, Any] | None = None,
-    manager_factory: ManagerFactory = IDracManager,
+    manager_factory: ManagerFactory = RedfishManagerBase,
     reconcile_func: ReconcileFunc | None = None,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:

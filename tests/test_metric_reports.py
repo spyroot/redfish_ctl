@@ -5,7 +5,7 @@ HGX_ProcessorMetrics_0) through the real requests path, proving the command
 navigates by links and flattens MetricValues on a non-Dell host. This is the
 out-of-band GPU/accelerator telemetry path (no host OS, no driver).
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_metric_reports_reads_telemetry(redfish_mock_factory):

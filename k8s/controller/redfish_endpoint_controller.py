@@ -21,7 +21,7 @@ from redfish_ctl.api import (
     get_system,
     get_thermal,
 )
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
 REDFISH_GROUP = "redfish.ctl.dev"
 REDFISH_VERSION = "v1alpha1"
@@ -131,7 +131,7 @@ def poll_endpoint(
     spec: Mapping[str, Any],
     *,
     credentials: Mapping[str, str] | None = None,
-    manager_factory: ManagerFactory = IDracManager,
+    manager_factory: ManagerFactory = RedfishManagerBase,
     polled_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Read a BMC through the facade and return a status patch payload."""

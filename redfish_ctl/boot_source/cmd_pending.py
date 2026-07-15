@@ -10,17 +10,17 @@ from typing import Optional
 
 from ..redfish_shared import RedfishJson
 from ..cmd_utils import str2bool
-from ..idrac_shared import IdracApiRespond, ResetType
+from ..redfish_manager_shared import RedfishApiRespond, ResetType
 from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import IdracApiRespond, Singleton, ApiRequestType
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
-from ..idrac_shared import IDRAC_API
-from ..idrac_shared import IdracApiRespond
+from ..redfish_manager_shared import REDFISH_API
+from ..redfish_manager_shared import RedfishApiRespond
 
 
-class BootSourcePending(IDracManager,
+class BootSourcePending(RedfishManagerBase,
                         scm_type=ApiRequestType.BootSourcePending,
                         name='query_pending',
                         metaclass=Singleton):

@@ -5,8 +5,8 @@ import pytest
 
 import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, InvalidArgumentFormat
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.jobs.cmd_jobs import JobList
 from redfish_ctl.redfish_manager import CommandResult
 from tests.test_utils import create_json_resp
@@ -149,7 +149,7 @@ def test_job_delete_all_posts_clear_queue_payload_in_mock_mode(
         assert task_id == redfish_service.JOB_ID
         return task_state
 
-    monkeypatch.setattr(IDracManager, "fetch_task", fetch_task)
+    monkeypatch.setattr(RedfishManagerBase, "fetch_task", fetch_task)
 
     result = redfish_mock.sync_invoke(
         ApiRequestType.JobRmDellServices,
@@ -289,8 +289,8 @@ def test_fetch_task_raises_authentication_failed_on_task_poll_401(
         task_get_urls.append(url)
         return create_json_resp({"error": "unauthorized"}, status_code=401)
 
-    monkeypatch.setattr(IDracManager, "get_job", get_job)
-    monkeypatch.setattr(IDracManager, "api_get_call", api_get_call)
+    monkeypatch.setattr(RedfishManagerBase, "get_job", get_job)
+    monkeypatch.setattr(RedfishManagerBase, "api_get_call", api_get_call)
 
     with pytest.raises(AuthenticationFailed):
         redfish_api.fetch_task(JOB_ID, sleep_time=0)
