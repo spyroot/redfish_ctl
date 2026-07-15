@@ -4,6 +4,9 @@ Command provides the option to clear boot source pending values
 via dell oem.  If boot options change boot order
 or boot options flags.
 
+Example.
+redfish_ctl boot-options-clear
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -30,6 +33,7 @@ class BootOptionsClearPending(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-options-clear command."""
         super(BootOptionsClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod

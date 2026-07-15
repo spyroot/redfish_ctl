@@ -3,6 +3,9 @@
 This resource is used to represent the Boot Sources pending configuration
 and related resources to clear pending and navigation to Jobs resource.
 
+Example.
+redfish_ctl boot-settings
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -27,6 +30,7 @@ class BootSettings(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot-settings command."""
         super(BootSettings, self).__init__(*args, **kwargs)
 
     @staticmethod
