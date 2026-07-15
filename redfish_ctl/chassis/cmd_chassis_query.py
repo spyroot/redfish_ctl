@@ -3,6 +3,8 @@
 Command provides raw query chassis
 and provide list of supported actions.
 
+    redfish_ctl chassis
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -25,10 +27,15 @@ class ChassisQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the chassis command."""
         super(ChassisQuery, self).__init__(*args, **kwargs)
 
     @property
     def help(self):
+        """Describe the Chassis schema for CLI help output.
+
+        :return: help text summarizing the Chassis schema.
+        """
         return '''The Chassis schema represents the physical components of a system'''
 
     @staticmethod

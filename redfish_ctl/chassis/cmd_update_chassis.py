@@ -30,11 +30,15 @@ class ChassisUpdate(RedfishManagerBase,
     This  action update chassis .
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the chassis-update command."""
         super(ChassisUpdate, self).__init__(*args, **kwargs)
 
     @property
     def accepted(self):
-        """Accepted; a Task has been generated"""
+        """Accepted; a Task has been generated.
+
+        :return: the HTTP 202 status code.
+        """
         return 202
 
     @property
@@ -82,7 +86,7 @@ class ChassisUpdate(RedfishManagerBase,
         Update chassis from spec file.
 
         :param do_reboot: will reboot a chassis
-        :param chassis_id of the property of the Chassis resource
+        :param chassis_id: Chassis resource Id used to build the target URI.
         :param from_spec:  a path to json spec file
         :param do_async: optional for asyncio
         :param data_type: a data type
