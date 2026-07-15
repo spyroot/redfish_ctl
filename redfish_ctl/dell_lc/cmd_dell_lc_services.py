@@ -3,6 +3,9 @@
 Command provides query and provide action LC services
 supports.
 
+Example:
+    redfish_ctl dell-lc-svc
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -20,6 +23,7 @@ class DellLcQuery(RedfishManagerBase,
     """A command query Dell LC services.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-svc command."""
         super(DellLcQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -47,12 +51,12 @@ class DellLcQuery(RedfishManagerBase,
                 **kwargs) -> CommandResult:
         """Executes query for dell LC.
         python redfish_ctl.py chassis
-        :param data_filter:
+        :param data_filter: key to filter the response on (e.g. PowerState); when set, forces an expanded query.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param filename: if filename indicate call will save a bios setting to a file.
-        :param verbose: enables verbose output
-        :param data_type: json or xml
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
         target_api = "/redfish/v1/Dell/Managers/iDRAC.Embedded.1/DellLCService"

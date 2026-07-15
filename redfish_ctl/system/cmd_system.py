@@ -5,6 +5,9 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest of commands
 caller can save to a file and consume asynchronously or synchronously.
 
+    redfish_ctl system
+    redfish_ctl system --deep
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -27,6 +30,7 @@ class SystemQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the system command."""
         super(SystemQuery, self).__init__(*args, **kwargs)
 
     @staticmethod

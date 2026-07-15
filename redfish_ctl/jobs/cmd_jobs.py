@@ -9,7 +9,7 @@ Example.
 
 List of scheduled jobs
 
-redfish_ctl.py jobs --scheduled
+redfish_ctl jobs --scheduled
 
 Author Mus spyroot@gmail.com
 """
@@ -32,6 +32,7 @@ class JobList(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the jobs command."""
         super(JobList, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -129,7 +130,11 @@ class JobList(RedfishManagerBase,
 
     @staticmethod
     def resolve_job_type(jb_type: str):
-        """
+        """Map a CLI job-type keyword to its Redfish JobType value.
+
+        :param jb_type: CLI job-type keyword (bios_config, firmware_update, reboot_no_force).
+        :return: matching Redfish JobType string.
+        :raises ValueError: if the job type keyword is not recognized.
         """
         if jb_type == "bios_config":
             return "BIOSConfiguration"
@@ -189,6 +194,11 @@ class JobList(RedfishManagerBase,
         members = data.get('Members', [])
 
         def by_state(*states):
+            """Return member jobs whose JobState matches one of ``states``.
+
+            :param states: JobState values to filter on.
+            :return: list of member job dicts in one of the given states.
+            """
             return [job for job in members if job.get('JobState') in states]
 
         if filter_scheduled:

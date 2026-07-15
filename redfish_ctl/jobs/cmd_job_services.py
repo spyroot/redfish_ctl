@@ -4,6 +4,10 @@ Command query jobs services.
 It  represents the properties for the job service
 and has links to jobs managed by the job service.
 
+Example::
+
+    redfish_ctl jobs-service
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -23,6 +27,7 @@ class JobServices(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the jobs-service command."""
         super(JobServices, self).__init__(*args, **kwargs)
 
     @staticmethod

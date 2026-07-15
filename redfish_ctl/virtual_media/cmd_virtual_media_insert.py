@@ -68,7 +68,7 @@ We note that Image is null and not inserted.
             "WriteProtected": true
 
 Insert virtual media
-python redfish_ctl.py insert_virtual_media --uri_path http://my_ip/ubuntu-22.04.1-desktop-amd64.iso --device_id 1
+redfish_ctl insert_vm --uri_path http://my_ip/ubuntu-22.04.1-desktop-amd64.iso --device_id 1
 
 Author Mus spyroot@gmail.com
 """
@@ -92,6 +92,7 @@ class VirtualMediaInsert(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the insert_vm command."""
         super(VirtualMediaInsert, self).__init__(*args, **kwargs)
 
     @staticmethod

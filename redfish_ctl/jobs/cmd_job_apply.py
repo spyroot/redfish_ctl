@@ -1,6 +1,11 @@
-"""iDRAC query chassis services
+"""Apply pending Redfish jobs.
 
 Command provide option to trigger and apply current pending jobs.
+
+Example::
+
+    redfish_ctl job-apply bios --reboot
+
 Author Mus spyroot@gmail.com
 """
 import logging
@@ -24,6 +29,7 @@ class JobApply(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the job-apply command."""
         super(JobApply, self).__init__(*args, **kwargs)
 
     @staticmethod

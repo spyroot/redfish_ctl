@@ -35,6 +35,7 @@ class SmcVirtualMediaMount(RedfishManagerBase,
     """Supermicro OEM virtual media: mount / unmount / status an ISO via CfgCD."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the vm-mount command."""
         super(SmcVirtualMediaMount, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -66,11 +67,19 @@ class SmcVirtualMediaMount(RedfishManagerBase,
 
     def _vm1(self, manager_id: str) -> str:
         """Base OEM virtual-media PATH. base_post/base_patch prepend the host,
-        so these helpers deal in paths; only api_get_call needs the full URL."""
+        so these helpers deal in paths; only api_get_call needs the full URL.
+
+        :param manager_id: BMC manager id.
+        :return: OEM VM1 resource path for the given manager.
+        """
         return f"/redfish/v1/Managers/{manager_id}/VM1"
 
     def _get(self, path: str) -> Optional[dict]:
-        """Best-effort GET (path -> full URL) returning JSON or None (never raises)."""
+        """Best-effort GET (path -> full URL) returning JSON or None (never raises).
+
+        :param path: resource path to fetch; the host/URL prefix is added here.
+        :return: decoded JSON body, or None on error or a non-200 response.
+        """
         try:
             resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}{path}", {})
             if resp is not None and resp.status_code == 200:
@@ -80,7 +89,11 @@ class SmcVirtualMediaMount(RedfishManagerBase,
         return None
 
     def _status(self, manager_id: str) -> dict:
-        """Read the VM1 collection + CD1 device to report mount state."""
+        """Read the VM1 collection + CD1 device to report mount state.
+
+        :param manager_id: BMC manager id.
+        :return: dict with the VM1 Members list and the CD1 mount fields.
+        """
         vm1 = self._get(self._vm1(manager_id)) or {}
         cd1 = self._get(self._vm1(manager_id) + "/CD1")
         return {
@@ -106,11 +119,14 @@ class SmcVirtualMediaMount(RedfishManagerBase,
 
         :param host: CIFS/NFS share host.
         :param path: path to the ISO on the share (e.g. /dl/ubuntu.iso).
-        :param user: share username (optional).
-        :param password: share password (optional).
+        :param share_user: share username (optional).
+        :param share_pass: share password (optional).
         :param do_unmount: unmount instead of mount.
         :param do_status: report status only.
         :param manager_id: BMC manager id (Supermicro default "1").
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: accepted for CLI compatibility; not used by this command.
         :return: CommandResult.
         """
         cfgcd = self._vm1(manager_id) + "/CfgCD"

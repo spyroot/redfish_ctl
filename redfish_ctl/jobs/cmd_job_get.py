@@ -3,6 +3,10 @@
 Command provides the option to retrieve job information  from iDRAC
 and serialize back as caller as JSON, YAML, and XML.
 
+Example::
+
+    redfish_ctl job --job_id JID_744718373591
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -23,6 +27,7 @@ class JobGet(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the job command."""
         super(JobGet, self).__init__(*args, **kwargs)
 
     @staticmethod

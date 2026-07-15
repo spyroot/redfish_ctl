@@ -2,6 +2,10 @@
 
 Command provides the option to delete a job from iDRAC.
 
+Example::
+
+    redfish_ctl job-rm --job_id JID_744718373591
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -21,6 +25,7 @@ class JobDel(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the job-rm command."""
         super(JobDel, self).__init__(*args, **kwargs)
 
     @staticmethod

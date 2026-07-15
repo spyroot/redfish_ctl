@@ -2,8 +2,8 @@
 
 Command provides the option to import configuration.
 
-python redfish_ctl.py system-export --filename system.json
-python redfish_ctl.py system-import --config system.json
+    redfish_ctl system-export --filename system.json
+    redfish_ctl system-import --config system.json
 
 Author Mus spyroot@gmail.com
 """
@@ -26,6 +26,7 @@ class ImportSystemConfig(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the system-import command."""
         super(ImportSystemConfig, self).__init__(*args, **kwargs)
 
     @staticmethod

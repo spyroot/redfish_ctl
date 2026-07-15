@@ -5,6 +5,8 @@ back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command caller can save
 to a file and consume asynchronously or synchronously.
 
+    redfish_ctl system-export --filename system.json
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -25,6 +27,7 @@ class ExportSystemConfig(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the system-export command."""
         super(ExportSystemConfig, self).__init__(*args, **kwargs)
 
     @staticmethod
