@@ -45,7 +45,11 @@ _POWER_ON_STATES = {"On", "PoweringOn"}
 
 
 def _as_number(value: Any) -> float | None:
-    """Coerce a Redfish reading to float, tolerating strings and rejecting bools."""
+    """Coerce a Redfish reading to float, tolerating strings and rejecting bools.
+
+    :param value: the reading to coerce.
+    :return: the value as a float, or None when it is None, a bool, or non-numeric.
+    """
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
@@ -57,13 +61,21 @@ def _as_number(value: Any) -> float | None:
 
 
 def _as_int(value: Any) -> int | None:
-    """Coerce a count to int with the same string-tolerant, bool-rejecting rules."""
+    """Coerce a count to int with the same string-tolerant, bool-rejecting rules.
+
+    :param value: the count to coerce.
+    :return: the value as an int, or None when it is not numeric.
+    """
     number = _as_number(value)
     return int(number) if number is not None else None
 
 
 def _epoch_from_rfc3339(value: str | None) -> float | None:
-    """Parse the controller's RFC3339 ``lastPolled`` into an epoch second."""
+    """Parse the controller's RFC3339 ``lastPolled`` into an epoch second.
+
+    :param value: an RFC3339 timestamp string, or None.
+    :return: the timestamp as epoch seconds, or None when empty or unparseable.
+    """
     if not value:
         return None
     text = value.strip()
@@ -83,6 +95,9 @@ def _infer_backend(address: str) -> str:
 
     A ``*.svc.cluster.local`` address is served by the sandbox mock-BMC; anything
     else is treated as a real/live target. Purely cosmetic (dashboard badge).
+
+    :param address: the endpoint address to classify.
+    :return: ``"mock"`` for an in-cluster mock address, otherwise ``"live"``.
     """
     host = urlsplit(address).netloc or address
     if host.endswith(".svc.cluster.local") or host in {"mock-bmc", "ilo-sim"}:
@@ -95,6 +110,9 @@ def normalize_endpoint(obj: Mapping[str, Any]) -> dict[str, Any]:
 
     Tolerates a resource the controller has not polled yet: an absent or empty
     ``status`` yields ``state="Pending"`` with null readings rather than raising.
+
+    :param obj: one RedfishEndpoint object with ``metadata``/``spec``/``status``.
+    :return: a flattened, consumer-facing row of normalized fields and readings.
     """
     meta = obj.get("metadata") or {}
     spec = obj.get("spec") or {}
@@ -150,7 +168,11 @@ def normalize_endpoint(obj: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def fleet_summary(nodes: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """Aggregate per-node rows into fleet counters for the dashboard header."""
+    """Aggregate per-node rows into fleet counters for the dashboard header.
+
+    :param nodes: normalized node rows.
+    :return: fleet counters (total, ready, pending, power, and health tallies).
+    """
     summary = {
         "total": len(nodes),
         "ready": 0,
@@ -189,6 +211,10 @@ def fleet_firmware_drift(nodes: Sequence[Mapping[str, Any]]) -> dict[str, list[s
     BlueField DPU at 32.x), which is NOT drift. Real drift is the same component
     id (``CX8_0``) carrying different versions across the fleet. An empty result
     means every node runs the same firmware per component.
+
+    :param nodes: normalized node rows carrying ``nicFirmware`` components.
+    :return: mapping of component id to its sorted versions, only for components
+        that disagree across nodes; empty when there is no cross-node drift.
     """
     by_component: dict[str, set[str]] = {}
     for node in nodes:
@@ -203,7 +229,12 @@ def fleet_firmware_drift(nodes: Sequence[Mapping[str, Any]]) -> dict[str, list[s
 
 
 def render_fleet_json(nodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Assemble the ``/api/nodes`` payload: summary + normalized node rows."""
+    """Assemble the ``/api/nodes`` payload: summary + normalized node rows.
+
+    :param nodes: normalized node rows.
+    :return: a payload with a ``summary`` (including ``firmwareDriftComponents``)
+        and the list of ``nodes``.
+    """
     node_list = list(nodes)
     summary = fleet_summary(node_list)
     summary["firmwareDriftComponents"] = fleet_firmware_drift(node_list)
@@ -216,7 +247,12 @@ def render_fleet_json(nodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 def find_node(
     nodes: Sequence[Mapping[str, Any]], name: str
 ) -> Mapping[str, Any] | None:
-    """Return the node row with matching name, or None (backs /api/nodes/<name>)."""
+    """Return the node row with matching name, or None (backs /api/nodes/<name>).
+
+    :param nodes: normalized node rows.
+    :param name: the node name to match.
+    :return: the matching node row, or None when no row matches.
+    """
     return next((node for node in nodes if node.get("name") == name), None)
 
 
@@ -226,6 +262,9 @@ def _escape_label(value: Any) -> str:
     Backslash, double-quote, and line-feed/carriage-return must be escaped, or a
     value containing one (e.g. a newline in an operator-supplied address) would
     split or corrupt the metric line and fail the whole scrape.
+
+    :param value: the label value to escape.
+    :return: the value with backslash, double-quote, and newline/carriage-return escaped.
     """
     return (
         str(value)
@@ -237,6 +276,13 @@ def _escape_label(value: Any) -> str:
 
 
 def _metric_line(name: str, labels: Mapping[str, str], value: float | int) -> str:
+    """Format one Prometheus text-exposition line from a name, labels, and value.
+
+    :param name: the metric name.
+    :param labels: label key/value pairs to render inside the braces.
+    :param value: the metric value.
+    :return: a single ``name{labels} value`` exposition line.
+    """
     label_str = ",".join(f'{key}="{_escape_label(val)}"' for key, val in labels.items())
     return f"{name}{{{label_str}}} {value}"
 
@@ -247,6 +293,9 @@ def render_metrics(nodes: Sequence[Mapping[str, Any]]) -> str:
     Exposes per-node gauges keyed by ``node`` so an operator can alert on power
     loss, health degradation, or a temperature ceiling straight off the CR
     status the controller populated — no direct BMC scrape needed.
+
+    :param nodes: normalized node rows.
+    :return: the fleet rendered as a Prometheus text-exposition document.
     """
     lines: list[str] = []
     lines.append("# HELP redfish_endpoint_info Static endpoint metadata (value always 1).")
@@ -341,7 +390,11 @@ def render_metrics(nodes: Sequence[Mapping[str, Any]]) -> str:
 
 
 def _esc(value: Any) -> str:
-    """Minimal HTML-escape for text interpolated into the dashboard."""
+    """Minimal HTML-escape for text interpolated into the dashboard.
+
+    :param value: the text to escape.
+    :return: the value with ``&``, ``<``, ``>``, and ``"`` escaped.
+    """
     return (
         str(value)
         .replace("&", "&amp;")
@@ -358,6 +411,10 @@ def _nic_firmware_cell(node: Mapping[str, Any], drift_ids: set[str]) -> str:
     cell is drift-flagged only if this node carries such a component — so a lone
     node with a NIC and a DPU (two versions, but no cross-node disagreement) is
     not falsely flagged.
+
+    :param node: the normalized node row to render.
+    :param drift_ids: firmware component ids that disagree across the fleet.
+    :return: the HTML ``<td>`` cell for the node's NIC firmware.
     """
     versions = node.get("nicFirmwareVersions") or []
     adapters = node.get("nicAdapterCount")
@@ -379,6 +436,11 @@ def render_html(nodes: Sequence[Mapping[str, Any]], generated_at: str | None = N
     Server-rendered so it works with zero external assets (CSP-safe, offline); a
     tiny inline poller refetches ``/api/nodes`` to keep the tab title current, and
     a 10s interval reloads the page so the table tracks the controller's polls.
+
+    :param nodes: normalized node rows.
+    :param generated_at: timestamp label to show in the header; defaults to the
+        current UTC time when not provided.
+    :return: the complete dashboard HTML document.
     """
     summary = fleet_summary(nodes)
     drift_map = fleet_firmware_drift(nodes)
@@ -527,6 +589,10 @@ class _EndpointCache:
     to the control plane)."""
 
     def __init__(self, ttl_seconds: float = 3.0) -> None:
+        """Initialize the cache with a freshness window.
+
+        :param ttl_seconds: seconds a cached listing stays fresh before a reload.
+        """
         self._ttl = ttl_seconds
         self._cond = threading.Condition()
         self._at = 0.0
@@ -534,10 +600,22 @@ class _EndpointCache:
         self._loading = False
 
     def _is_fresh(self) -> bool:
+        """Whether the cached value is loaded and still within its TTL.
+
+        :return: True when a value has been loaded and has not yet expired.
+        """
         # Callers hold ``self._cond``. ``_at == 0`` means never loaded.
         return bool(self._at) and (time.monotonic() - self._at) <= self._ttl
 
     def get(self, loader) -> list[dict[str, Any]]:
+        """Return the cached listing, refreshing via ``loader`` when stale.
+
+        Single-flight: a burst of callers past the TTL triggers at most one
+        ``loader`` call; the rest wait on the condition and reuse its result.
+
+        :param loader: zero-argument callable that produces a fresh listing.
+        :return: the cached (or freshly loaded) list of normalized node rows.
+        """
         with self._cond:
             if self._is_fresh():
                 return self._value
@@ -572,6 +650,9 @@ def load_endpoints(namespace: str) -> list[dict[str, Any]]:  # pragma: no cover 
 
     Imports the Kubernetes client lazily so the pure renderers above stay
     importable (and unit-testable) without the ``kubernetes`` package.
+
+    :param namespace: the Kubernetes namespace to list RedfishEndpoint CRs from.
+    :return: normalized node rows sorted by name.
     """
     from kubernetes import client, config
 
@@ -599,9 +680,18 @@ class _Handler(BaseHTTPRequestHandler):
     cache: _EndpointCache = _EndpointCache()
 
     def log_message(self, *_args: Any) -> None:  # keep stdout to real events
+        """Silence the stdlib per-request access log so only real events reach stdout."""
         return
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
+        """Write one HTTP response with no-store caching headers.
+
+        Skips the body for a HEAD request.
+
+        :param code: the HTTP status code.
+        :param body: the response body bytes.
+        :param content_type: the ``Content-Type`` header value.
+        """
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -611,9 +701,17 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _nodes(self) -> list[dict[str, Any]]:
+        """Return the cached, normalized node rows for this handler's namespace.
+
+        :return: the list of node rows from the shared endpoint cache.
+        """
         return self.cache.get(lambda: load_endpoints(self.namespace))
 
     def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
+        """Route a GET/HEAD request to the health, dashboard, JSON API, or metrics endpoint.
+
+        Backend errors are surfaced as a 503 JSON body rather than a bare stack trace.
+        """
         path = urlsplit(self.path).path.rstrip("/") or "/"
         try:
             if path == "/healthz":
@@ -665,7 +763,13 @@ def run_server(
     port: int = 8080,
     namespace: str | None = None,
 ) -> None:  # pragma: no cover - process entry point
-    """Serve the dashboard/API/metrics with a thread-per-request server."""
+    """Serve the dashboard/API/metrics with a thread-per-request server.
+
+    :param host: the bind address to listen on.
+    :param port: the TCP port to listen on.
+    :param namespace: the namespace to watch; falls back to the ``WATCH_NAMESPACE``
+        environment variable, then to ``redfish-sandbox``.
+    """
     _Handler.namespace = namespace or os.environ.get("WATCH_NAMESPACE", "redfish-sandbox")
     server = FleetServer((host, port), _Handler)
     print(
