@@ -1,4 +1,8 @@
-"""Read Redfish Chassis Control resources."""
+"""Read Redfish Chassis Control resources.
+
+Example:
+    redfish_ctl controls
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -15,17 +19,26 @@ class Controls(RedfishManagerBase,
     """Read chassis Controls collections and member Control setpoints."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the controls command."""
         super(Controls, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``controls`` subcommand."""
+        """Register the read-only ``controls`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return cmd_parser, "controls", "command read chassis control data"
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` links from a Redfish collection.
+
+        :param data: collection payload expected to hold a ``Members`` array.
+        :return: list of member ``@odata.id`` strings; empty if data is not a dict.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -37,6 +50,12 @@ class Controls(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` of a linked resource under a given key.
+
+        :param data: resource payload to read the link from.
+        :param key: name of the property holding the linked resource object.
+        :return: the linked ``@odata.id`` string, or None when absent.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -44,27 +63,56 @@ class Controls(RedfishManagerBase,
 
     @staticmethod
     def _chassis_id(chassis_uri):
+        """Derive the chassis identifier from a chassis URI.
+
+        :param chassis_uri: chassis ``@odata.id`` path.
+        :return: the last path segment of the URI.
+        """
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _status(data):
+        """Return the ``Status`` sub-object of a resource.
+
+        :param data: resource payload to read ``Status`` from.
+        :return: the ``Status`` dict, or an empty dict when absent.
+        """
         status = data.get("Status") if isinstance(data, dict) else None
         return status if isinstance(status, dict) else {}
 
     @staticmethod
     def _sensor_reading(control, key):
+        """Read a value from a Control's embedded ``Sensor`` object.
+
+        :param control: control payload that may hold a ``Sensor`` sub-object.
+        :param key: name of the sensor field to read.
+        :return: the sensor field value, or None when the sensor is absent.
+        """
         sensor = control.get("Sensor") if isinstance(control, dict) else None
         if isinstance(sensor, dict):
             return sensor.get(key)
         return None
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI, returning an empty dict instead of raising on failure.
+
+        :param uri: Redfish resource URI to query.
+        :param do_async: when True, issue the query asynchronously.
+        :return: the response data dict, or an empty dict on any error.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _read_control_members(self, chassis_id, members, do_async=False):
+        """Query each Control member and flatten it into a summary row.
+
+        :param chassis_id: identifier of the chassis owning the controls.
+        :param members: list of Control member URIs to query.
+        :param do_async: when True, issue the member queries asynchronously.
+        :return: list of dicts describing each reachable Control.
+        """
         controls = []
         for member_uri in members:
             control = self._query_optional(member_uri, do_async=do_async)
@@ -97,6 +145,13 @@ class Controls(RedfishManagerBase,
 
     @staticmethod
     def _summary(chassis_count, collections, controls):
+        """Build aggregate counts across chassis, collections, and controls.
+
+        :param chassis_count: number of chassis discovered.
+        :param collections: list of Control collection rows.
+        :param controls: list of flattened Control rows.
+        :return: dict with chassis, collection, and control-type counts.
+        """
         return {
             "chassis": chassis_count,
             "control_collections": len(collections),
@@ -116,7 +171,16 @@ class Controls(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read Control resources linked from chassis members."""
+        """Read Control resources linked from chassis members.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping a dict with the control summary,
+            collections, and flattened controls.
+        """
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         chassis_uris = self._members(chassis.data)
         control_collections = []
