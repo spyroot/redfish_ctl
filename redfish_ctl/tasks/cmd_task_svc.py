@@ -1,4 +1,4 @@
-"""iDRAC manager command
+"""Task service command.
 
 Command provides the option to retrieve task services.
 
@@ -20,7 +20,7 @@ class Manager(RedfishManagerBase,
               scm_type=ApiRequestType.ManagerQuery,
               name='task_svc_query',
               metaclass=Singleton):
-    """iDRAC Manager server Command, fetch manager service,
+    """Task service command, fetch the task service,
     caller can save to a file or output to a file or pass downstream.
     """
     def __init__(self, *args, **kwargs):
