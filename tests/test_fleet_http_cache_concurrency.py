@@ -16,7 +16,6 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +80,7 @@ def test_fleet_http_cache_single_flight_and_ttl_reload() -> None:
     # Reload-after-expiry is proven deterministically below (and in the unit test).
     Handler.cache = module._EndpointCache(ttl_seconds=30.0)
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server = module.FleetServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

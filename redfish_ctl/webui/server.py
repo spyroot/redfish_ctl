@@ -267,12 +267,24 @@ def make_manager_factory():
     return factory, f"{address}:{port}"
 
 
+class ExplorerServer(ThreadingHTTPServer):
+    """Threaded explorer server with a generous socket listen backlog.
+
+    The stdlib default (``request_queue_size = 5``) drops connections at the OS
+    accept queue when many clients connect at once, surfacing as resets/timeouts.
+    128 lets a burst of explorer clients queue instead of being reset.
+    """
+
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def run_server(bind_host: str = "0.0.0.0", bind_port: int = 8299) -> None:  # pragma: no cover
     """Serve the explorer, reading the target BMC from REDFISH_*/IDRAC_* env."""
     factory, label = make_manager_factory()
     _Handler.manager_factory = staticmethod(factory)
     _Handler.target_label = label
-    server = ThreadingHTTPServer((bind_host, bind_port), _Handler)
+    server = ExplorerServer((bind_host, bind_port), _Handler)
     print(f"redfish_ctl explorer on {bind_host}:{bind_port} -> BMC {label}", flush=True)
     try:
         server.serve_forever()

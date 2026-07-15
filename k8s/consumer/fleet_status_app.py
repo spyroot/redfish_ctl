@@ -647,6 +647,19 @@ class _Handler(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
 
+class FleetServer(ThreadingHTTPServer):
+    """Threaded consumer server with a generous socket listen backlog.
+
+    The stdlib default (``request_queue_size = 5``) drops connections at the OS
+    accept queue when a crowd of dashboard clients connects at once. 128 lets the
+    burst queue instead of being reset (the short-TTL cache then serves them all
+    from one load).
+    """
+
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def run_server(
     host: str = "0.0.0.0",
     port: int = 8080,
@@ -654,7 +667,7 @@ def run_server(
 ) -> None:  # pragma: no cover - process entry point
     """Serve the dashboard/API/metrics with a thread-per-request server."""
     _Handler.namespace = namespace or os.environ.get("WATCH_NAMESPACE", "redfish-sandbox")
-    server = ThreadingHTTPServer((host, port), _Handler)
+    server = FleetServer((host, port), _Handler)
     print(
         f"redfish-fleet-consumer serving on {host}:{port} "
         f"(namespace={_Handler.namespace})",

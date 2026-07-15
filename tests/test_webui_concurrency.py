@@ -17,7 +17,6 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from http.server import ThreadingHTTPServer
 from types import SimpleNamespace
 from typing import Any
 
@@ -103,7 +102,7 @@ def test_webui_concurrent_invokes_keep_command_payloads_isolated() -> None:
     """Every concurrent /api/invoke returns its own command's data, not a peer's."""
     manager = _RacyManager()
     handler_cls = _make_handler_class(manager)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+    server = webui.ExplorerServer(("127.0.0.1", 0), handler_cls)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
