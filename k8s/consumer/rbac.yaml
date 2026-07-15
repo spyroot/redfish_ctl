@@ -1,0 +1,50 @@
+# RBAC for the fleet-status consumer.
+#
+# Deliberately minimal: the consumer only READS RedfishEndpoint objects (and
+# their status subresource). It has NO access to Secrets and NO write verbs, so
+# it cannot reach a BMC credential or mutate any resource. This is the security
+# boundary that lets a dashboard be exposed more widely than the controller.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redfish-fleet-consumer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-fleet-consumer
+    app.kubernetes.io/component: redfish-sandbox
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: redfish-fleet-consumer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-fleet-consumer
+    app.kubernetes.io/component: redfish-sandbox
+rules:
+  - apiGroups:
+      - redfish.ctl.dev
+    resources:
+      - redfishendpoints
+      - redfishendpoints/status
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: redfish-fleet-consumer
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: redfish-fleet-consumer
+    app.kubernetes.io/component: redfish-sandbox
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: redfish-fleet-consumer
+subjects:
+  - kind: ServiceAccount
+    name: redfish-fleet-consumer
+    namespace: redfish-sandbox

@@ -1,0 +1,33 @@
+# redfish_ctl web explorer image.
+#
+# Serves a tree of the tool's read-only commands and invokes them live against a
+# BMC through the tool's own registry. Unlike the fleet-status consumer, this
+# talks to the BMC directly, so it needs redfish_ctl installed and BMC creds.
+#
+# Build:
+#   docker build -f docker/Dockerfile.explorer -t redfish-ctl-explorer:local .
+FROM python:3.12-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN groupadd --system --gid 10001 redfish \
+    && useradd --system --uid 10001 --gid redfish \
+        --home-dir /home/redfish --create-home redfish
+
+WORKDIR /app
+
+COPY pyproject.toml setup.py requirements.txt README.md LICENSE ./
+COPY idrac_ctl ./idrac_ctl
+COPY redfish_ctl ./redfish_ctl
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install --no-cache-dir . \
+    && python -m pip check
+
+USER redfish
+
+EXPOSE 8299
+ENTRYPOINT ["python", "-m", "redfish_ctl.webui"]
+CMD ["--host", "0.0.0.0", "--port", "8299"]

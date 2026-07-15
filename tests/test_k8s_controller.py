@@ -73,6 +73,7 @@ def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
         "powerState",
         "health",
         "temperature",
+        "networkFirmware",
         "lastPolled",
         "conditions",
         "consecutiveFailures",
@@ -80,6 +81,9 @@ def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
         "nextPollAfter",
     }
     assert status_props["temperature"]["properties"]["maxCelsius"]["type"] == "number"
+    nic_fw_props = status_props["networkFirmware"]["properties"]
+    assert nic_fw_props["distinctVersions"]["items"]["type"] == "string"
+    assert nic_fw_props["components"]["items"]["properties"]["version"]["type"] == "string"
     # Reachability/backoff fields the error path writes; the structural CRD must
     # allow them or the API server would prune them and the freeze stays silent.
     assert status_props["consecutiveFailures"]["type"] == "integer"
@@ -103,6 +107,11 @@ def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
             "name": "HEALTH",
             "type": "string",
             "jsonPath": ".status.health",
+        },
+        {
+            "name": "NIC-FW",
+            "type": "integer",
+            "jsonPath": ".status.networkFirmware.firmwareCount",
         },
         {
             "name": "POLLED",
@@ -194,6 +203,15 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
     assert status["temperature"]["count"] == 56
     assert status["temperature"]["maxCelsius"] == 54.1875
     assert status["lastPolled"] == "2026-07-10T14:45:00Z"
+    # NIC/DPU firmware is pulled read-only and folded into status: the GB300
+    # corpus carries 4 ConnectX-8 NICs + 1 BlueField-3 DPU and their firmware.
+    nic_fw = status["networkFirmware"]
+    assert nic_fw["adapterCount"] == 5
+    assert nic_fw["nicCount"] == 4
+    assert nic_fw["dpuCount"] == 1
+    assert "40.45.3048" in nic_fw["distinctVersions"]
+    assert any(c["id"] == "CX8_0" and c["version"] == "40.45.3048"
+               for c in nic_fw["components"])
     assert seen_methods
     assert set(seen_methods) == {"GET"}
 
