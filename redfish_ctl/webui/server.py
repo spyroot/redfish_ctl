@@ -21,7 +21,11 @@ from .catalog import CATALOG, catalog_json, resolve
 
 
 def _env_first(*names: str, default: str = "") -> str:
-    """Return the first set environment variable value (REDFISH_* before IDRAC_*)."""
+    """Return the first set environment variable value (REDFISH_* before IDRAC_*).
+
+    :param default: value returned when none of ``names`` is set.
+    :return: the first non-empty environment value, or ``default``.
+    """
     for name in names:
         value = os.environ.get(name)
         if value:
@@ -32,9 +36,14 @@ def _env_first(*names: str, default: str = "") -> str:
 def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
     """Invoke an allow-listed read command through the tool registry.
 
-    Returns ``{ok, data}`` on success or ``{ok: False, error, data}`` on a command
-    error. Raises KeyError if ``command`` is not in the read-only catalog (a guard
-    against invoking any mutating action).
+    Only allow-listed read commands are dispatched; an unknown name raises KeyError
+    as a guard against invoking any mutating action.
+
+    :param manager: RedfishManagerBase used to dispatch the command.
+    :param command: allow-listed read command name from the catalog.
+    :return: ``{"ok": True, "data": ...}`` on success, or
+        ``{"ok": False, "error": ..., "data": ...}`` on a command error.
+    :raises KeyError: if ``command`` is not in the read-only catalog.
     """
     entry = resolve(command)
     if entry is None:
@@ -46,6 +55,11 @@ def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
 
 
 def _esc(value: Any) -> str:
+    """Escape HTML-special characters in ``value`` for safe embedding in markup.
+
+    :param value: value to stringify and escape.
+    :return: the string with ``&``, ``<``, ``>``, and ``"`` replaced by entities.
+    """
     return (
         str(value)
         .replace("&", "&amp;")
@@ -56,7 +70,11 @@ def _esc(value: Any) -> str:
 
 
 def render_page(target_label: str) -> str:
-    """Server-render the explorer shell with the command tree from the catalog."""
+    """Server-render the explorer shell with the command tree from the catalog.
+
+    :param target_label: BMC address label shown in the page header.
+    :return: the full HTML page as a string.
+    """
     tree = []
     for domain, entries in CATALOG:
         items = "".join(
@@ -181,15 +199,26 @@ class _Handler(BaseHTTPRequestHandler):
     target_label = ""
 
     def log_message(self, *_a: Any) -> None:
+        """Silence the default per-request logging of BaseHTTPRequestHandler."""
         return
 
     def _get_manager(self) -> Any:
+        """Return the shared manager, building it once under the manager lock.
+
+        :return: the lazily constructed RedfishManagerBase instance.
+        """
         with self.manager_lock:
             if self.__class__.manager is None:
                 self.__class__.manager = self.__class__.manager_factory()
             return self.__class__.manager
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
+        """Write an HTTP response with the given status, body, and no-store headers.
+
+        :param code: HTTP status code.
+        :param body: response body bytes (skipped for HEAD requests).
+        :param content_type: value for the ``Content-Type`` header.
+        """
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -199,6 +228,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
+        """Route GET/HEAD requests to healthz, catalog JSON, the page, or 404."""
         path = urlsplit(self.path).path.rstrip("/") or "/"
         if path == "/healthz":
             self._send(200, b'{"status":"ok"}', "application/json")
@@ -215,6 +245,11 @@ class _Handler(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
     def do_POST(self) -> None:  # noqa: N802
+        """Invoke the requested allow-listed read command and return its JSON result.
+
+        Serves only ``/api/invoke``; rejects unknown paths, bad JSON, and
+        non-allow-listed commands, and returns 502 on a transport/backend failure.
+        """
         if urlsplit(self.path).path.rstrip("/") != "/api/invoke":
             self._send(404, b'{"error":"not found"}', "application/json")
             return
@@ -246,7 +281,10 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def make_manager_factory():
-    """Build a factory that constructs the tool's RedfishManagerBase from env/flags."""
+    """Build a factory that constructs the tool's RedfishManagerBase from env/flags.
+
+    :return: tuple of (manager factory callable, ``"address:port"`` target label).
+    """
     address = _env_first("REDFISH_IP", "IDRAC_IP")
     username = _env_first("REDFISH_USERNAME", "IDRAC_USERNAME", default="root")
     password = _env_first("REDFISH_PASSWORD", "IDRAC_PASSWORD")
@@ -254,6 +292,10 @@ def make_manager_factory():
     scheme = _env_first("REDFISH_SCHEME", default="https")
 
     def factory() -> RedfishManagerBase:
+        """Construct a RedfishManagerBase from the captured connection settings.
+
+        :return: a new RedfishManagerBase for the configured BMC.
+        """
         return RedfishManagerBase(
             idrac_ip=address,
             idrac_username=username,
@@ -280,7 +322,11 @@ class ExplorerServer(ThreadingHTTPServer):
 
 
 def run_server(bind_host: str = "0.0.0.0", bind_port: int = 8299) -> None:  # pragma: no cover
-    """Serve the explorer, reading the target BMC from REDFISH_*/IDRAC_* env."""
+    """Serve the explorer, reading the target BMC from REDFISH_*/IDRAC_* env.
+
+    :param bind_host: interface address to bind the HTTP server to.
+    :param bind_port: TCP port to listen on.
+    """
     factory, label = make_manager_factory()
     _Handler.manager_factory = staticmethod(factory)
     _Handler.target_label = label

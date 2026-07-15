@@ -13,6 +13,7 @@ from .server import run_server
 
 
 def main() -> None:
+    """Parse ``--host``/``--port`` and run the web explorer server."""
     parser = argparse.ArgumentParser(prog="redfish_ctl.webui", description=__doc__)
     parser.add_argument("--host", default="0.0.0.0", help="bind host (default 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8299, help="bind port (default 8299)")
