@@ -30,12 +30,16 @@ class SystemReset(RedfishManagerBase,
     """Reset the host ComputerSystem via a discovered ComputerSystem.Reset action."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the system-reset command."""
         super(SystemReset, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``system-reset`` subcommand and its safety flags."""
+        """Register the ``system-reset`` subcommand and its safety flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--reset_type', required=False, dest='reset_type', type=str,
@@ -63,6 +67,17 @@ class SystemReset(RedfishManagerBase,
 
         Returns a dry-run preview (target + payload, no POST) unless ``--confirm``
         is given; the destructiveness guard lives in ``invoke_action``.
+
+        :param reset_type: the ComputerSystem ResetType to request (On, ForceOff,
+                           GracefulRestart, ForceRestart, ...).
+        :param confirm: actually perform the reset; without it this is a dry-run.
+        :param dry_run: force a dry-run preview even when ``--confirm`` is given.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the request on the asyncio path.
+        :return: CommandResult; a dry-run preview (resolved target + payload, no
+                 POST) unless ``--confirm`` is given, otherwise the reset response.
         """
         return self.invoke_action(
             self.idrac_manage_servers,

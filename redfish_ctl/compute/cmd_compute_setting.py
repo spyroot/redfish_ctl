@@ -1,5 +1,7 @@
 """iDRAC query compute settings
 
+    redfish_ctl compute-query
+
 It represents  ComputerSystem schema or system instance and
 the software-visible resources, or items within the data plane,
 such as memory, CPU, and other devices that it can access.
@@ -23,14 +25,15 @@ class QueryCompute(RedfishManagerBase,
     """Query compute
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the compute-query command."""
         super(QueryCompute, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command
-        :param cls:
-        :return:
+        """Register the compute-query subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = cls.base_parser()
         help_text = "command query compute settings."
@@ -43,14 +46,17 @@ class QueryCompute(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """
+        """Query the host ComputerSystem settings resource.
+
+        On firmware 6.10+ this targets the ComputerSystem ``/Settings`` URI;
+        on older firmware it queries the ComputerSystem resource itself.
+
         :param do_expanded: will use expand output at level 1
         :param do_async: will issue asyncio request and won't block
-        :param filename:
-        :param data_type:
-        :param verbose:
-        :param kwargs:
-        :return:
+        :param filename: if set, save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult with the ComputerSystem settings query response.
         """
         idrac_version = self.idrac_manager_version
         ver_by_parts = idrac_version.split(".")
