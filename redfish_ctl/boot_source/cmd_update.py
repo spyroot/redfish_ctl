@@ -1,4 +1,4 @@
-"""iDRAC update boot sources.
+"""Update boot sources.
 
 Command provides option to query boot source for
 pending values.

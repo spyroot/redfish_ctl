@@ -1,4 +1,4 @@
-"""iDRAC query boot source pending values.
+"""Query boot source pending values.
 
 Command provides option to query boot source for
 pending values.

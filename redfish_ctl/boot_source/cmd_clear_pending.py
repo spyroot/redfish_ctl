@@ -1,4 +1,4 @@
-"""iDRAC command clear boot options pending values.
+"""Clear pending boot-source values command.
 
 Command provides the option to clear boot source pending values
 via dell oem.  If boot options change boot order
@@ -29,7 +29,7 @@ class BootOptionsClearPending(RedfishManagerBase,
                               metaclass=Singleton):
     """
     This cmd action is used to clear all BIOS pending
-    values currently in iDRAC.
+    values currently staged on the Redfish endpoint.
     """
 
     def __init__(self, *args, **kwargs):

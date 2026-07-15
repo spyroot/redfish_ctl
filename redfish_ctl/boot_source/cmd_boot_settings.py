@@ -1,4 +1,4 @@
-"""iDRAC boot settings query
+"""Boot settings query command.
 
 This resource is used to represent the Boot Sources pending configuration
 and related resources to clear pending and navigation to Jobs resource.

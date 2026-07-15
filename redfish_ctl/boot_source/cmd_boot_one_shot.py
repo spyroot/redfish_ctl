@@ -1,9 +1,9 @@
-"""iDRAC enable boot options.
+"""Query a one-shot boot source device.
 
 This cmd return Dell Boot Sources Configuration and the related
 resources.
 
-Command provides the option to retrieve boot source from iDRAC and serialize
+Command provides the option to retrieve boot source from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
 caller can save to a file and consume asynchronously or synchronously.
@@ -90,7 +90,7 @@ class BootOneShot(RedfishManagerBase,
                 dry_run: Optional[bool] = False,
                 confirm: Optional[bool] = True,
                 **kwargs) -> CommandResult:
-        """Query information for particular boot source device from idrac.
+        """Query information for particular boot source device from a Redfish endpoint.
         Example python redfish_ctl.py get_boot_source --dev "HardDisk.List.1-1"
 
         VenHw(986D1755-B9D0-4F8D-A0DA-D1DB18672045)
