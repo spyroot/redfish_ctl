@@ -7,6 +7,7 @@ import argparse
 import copy
 import fnmatch
 import json
+import logging
 import os
 import random
 import sys
@@ -23,6 +24,7 @@ DEFAULT_CORPUS_DIR = Path(
     os.environ.get("MOCK_BMC_CORPUS_DIR", "/corpus/gb300")
 )
 REST_API_STATUS_MAP_JSON = "rest_api_map.status.json"
+LOGGER = logging.getLogger(__name__)
 
 
 class MockBMCServer(ThreadingHTTPServer):
@@ -51,12 +53,30 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
     """
     corpus_path = Path(corpus_dir)
     sidecar_path = corpus_path / REST_API_STATUS_MAP_JSON
-    if sidecar_path.exists():
-        return _load_rest_api_map_json(sidecar_path)
-
     map_path = corpus_path / "rest_api_map.npy"
+    if sidecar_path.exists():
+        sidecar_map = _load_rest_api_map_json(sidecar_path)
+        if not map_path.exists():
+            return sidecar_map
+        legacy_map = _load_rest_api_map_npy(map_path)
+        merged = copy.deepcopy(legacy_map)
+        for key in ("http_status_mapping", "error_file_mapping"):
+            _log_status_sidecar_overrides(merged, sidecar_map, key, sidecar_path)
+            merged[key] = sidecar_map[key]
+        _validate_rest_api_map(merged, sidecar_path)
+        return merged
+
     if not map_path.exists():
         return {}
+    return _load_rest_api_map_npy(map_path)
+
+
+def _load_rest_api_map_npy(map_path: Path) -> dict[str, Any]:
+    """Load and validate a legacy NumPy Redfish API map.
+
+    :param map_path: path to ``rest_api_map.npy``.
+    :return: decoded and validated Redfish API map data.
+    """
     try:
         import numpy as np
     except ModuleNotFoundError:
@@ -71,6 +91,37 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
         raise ValueError(f"Redfish API map must contain an object: {map_path}")
     _validate_rest_api_map(data, map_path)
     return data
+
+
+def _log_status_sidecar_overrides(
+    legacy_map: dict[str, Any],
+    sidecar_map: dict[str, Any],
+    key: str,
+    sidecar_path: Path,
+) -> None:
+    """Warn when a status sidecar replaces a legacy map value.
+
+    :param legacy_map: legacy map loaded from ``rest_api_map.npy``.
+    :param sidecar_map: status/error sidecar map.
+    :param key: mapping section being overlaid.
+    :param sidecar_path: sidecar path used in log context.
+    """
+    legacy_values = _mapping_dict(legacy_map, key)
+    sidecar_values = _mapping_dict(sidecar_map, key)
+    for request_path, sidecar_value in sidecar_values.items():
+        if request_path not in legacy_values:
+            continue
+        legacy_value = legacy_values[request_path]
+        if legacy_value == sidecar_value:
+            continue
+        LOGGER.warning(
+            "%s overrides %s for %s: %r -> %r",
+            sidecar_path.name,
+            key,
+            request_path,
+            legacy_value,
+            sidecar_value,
+        )
 
 
 def _load_rest_api_map_json(map_path: Path) -> dict[str, Any]:
