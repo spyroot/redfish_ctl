@@ -7,6 +7,8 @@ reflect the new state.
 
 python redfish_ctl.py storage-convert-noraid -c AHCI.Embedded.2-1
 
+    redfish_ctl storage-convert-noraid -c AHCI.Embedded.2-1
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod

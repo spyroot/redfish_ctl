@@ -6,6 +6,8 @@ controller disk from iDRAC.
 Example
 python redfish_ctl.py storage-get --storage_controller NonRAID.Slot.6-1
 
+    redfish_ctl storage-get -c AHCI.Embedded.2-1
+
 Expanded
 python redfish_ctl.py storage-get --storage_controller NonRAID.Slot.6-1 -e
 

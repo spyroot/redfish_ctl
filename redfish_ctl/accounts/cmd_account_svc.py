@@ -2,6 +2,8 @@
 
 Command query account services.
 
+    redfish_ctl account-svc
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
