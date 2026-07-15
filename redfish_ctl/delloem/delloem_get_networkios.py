@@ -20,6 +20,7 @@ class GetNetworkIsoAttachStatus(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-net-ios-status command."""
         super(GetNetworkIsoAttachStatus, self).__init__(*args, **kwargs)
 
     @staticmethod

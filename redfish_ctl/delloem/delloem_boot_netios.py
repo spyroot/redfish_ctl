@@ -37,6 +37,7 @@ class DellOemNetIsoBoot(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-boot-netios command."""
         super(DellOemNetIsoBoot, self).__init__(*args, **kwargs)
 
     @staticmethod

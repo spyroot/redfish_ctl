@@ -19,6 +19,7 @@ class DellOemTask(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the oem-net-iso-task command."""
         super(DellOemTask, self).__init__(*args, **kwargs)
 
     @staticmethod
