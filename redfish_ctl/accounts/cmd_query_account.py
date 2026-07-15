@@ -24,6 +24,7 @@ class QueryAccount(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the query_account command."""
         super(QueryAccount, self).__init__(*args, **kwargs)
 
     @staticmethod
