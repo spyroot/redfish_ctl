@@ -1,4 +1,4 @@
-"""iDRAC query boot source device.
+"""Query a boot source device.
 
 This cmd return Dell Boot Sources configuration for
 a particular boot source.
@@ -58,7 +58,7 @@ class BootSource(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Query information for particular boot source device from idrac.
+        """Query information for particular boot source device from a Redfish endpoint.
         Example python redfish_ctl.py boot-source-get --dev "HardDisk.List.1-1"
 
         :param boot_source: a device HardDisk.List.1-1

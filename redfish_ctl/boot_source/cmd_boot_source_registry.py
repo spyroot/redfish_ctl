@@ -1,4 +1,4 @@
-"""iDRAC query boot source registry.
+"""Query the boot source registry.
 
 And the registry defines a representation of Boot Sources instances
 
@@ -23,7 +23,7 @@ class QueryBootSourceRegistry(
     scm_type=ApiRequestType.BootSourceRegistry,
     name='boot_source_registry',
     metaclass=Singleton):
-    """A command query iDRAC resource based on a resource path.
+    """Query a Redfish endpoint resource by resource path.
     """
 
     def __init__(self, *args, **kwargs):

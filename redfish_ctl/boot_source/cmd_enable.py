@@ -1,4 +1,4 @@
-"""iDRAC enable boot options.
+"""Enable a boot source option.
 
 Command provides the option to enable boot source,
 so it is used during a boot process. BootSources settings,
