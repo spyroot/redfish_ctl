@@ -1,6 +1,6 @@
 """Redfish discovery command
 
-Command discover all idrac / redfish resources.
+Command discover all Redfish resources.
 
     redfish_ctl discovery
     redfish_ctl discovery --network 192.168.254.0/24
