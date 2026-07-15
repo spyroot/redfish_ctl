@@ -1,7 +1,9 @@
-"""iDRAC query chassis services
+"""Initialize a volume on a storage controller.
 
-Command provides raw query chassis and provide
-list of supported actions.
+Discovers the volume's ``Initialize`` Redfish action and posts a fast
+initialize request to the storage controller.
+
+    redfish_ctl volume-init --dev_id AHCI.Integrated.1-1 --vol_id Disk.Direct.0-0:AHCI.Integrated.1-1
 
 Author Mus spyroot@gmail.com
 """
@@ -22,6 +24,7 @@ class VolumeInit(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the volume-init command."""
         super(VolumeInit, self).__init__(*args, **kwargs)
 
     @staticmethod

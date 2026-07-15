@@ -12,6 +12,8 @@ to a file and consume asynchronously or synchronously.
 "RAID.SL.3-1"
 "Disk.Bay.2:Enclosure.Internal.0-1:RAID.Mezzanine.1-1"
 
+    redfish_ctl volumes --device_id RAID.Mezzanine.1-1
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -36,6 +38,7 @@ class VirtualDiskQuery(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the volumes command."""
         super(VirtualDiskQuery, self).__init__(*args, **kwargs)
 
     @staticmethod

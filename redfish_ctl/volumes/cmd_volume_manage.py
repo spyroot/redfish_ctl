@@ -1,4 +1,10 @@
-"""Create and delete Redfish Volume resources through the Storage collection."""
+"""Create and delete Redfish Volume resources through the Storage collection.
+
+Both commands preview by default and require ``--confirm`` to mutate.
+
+    redfish_ctl volume-create --controller RAID.Integrated.1-1 --name vol0 --raid_type RAID1 --drive Disk.Bay.0 --drive Disk.Bay.1 --confirm
+    redfish_ctl volume-delete --controller RAID.Integrated.1-1 --volume_id Volume-1 --confirm --confirm_volume_id Volume-1
+"""
 from abc import abstractmethod
 from typing import Iterable, Optional
 
@@ -9,12 +15,20 @@ from ..redfish_manager import CommandResult
 
 
 def _last_segment(uri: str) -> str:
-    """Return the last Redfish URI segment."""
+    """Return the last path segment of a Redfish URI.
+
+    :param uri: Redfish URI or id to reduce to its final segment.
+    :return: the trailing path segment with surrounding slashes removed.
+    """
     return str(uri).rstrip("/").split("/")[-1]
 
 
 def _as_list(values: Optional[Iterable[str]]) -> list[str]:
-    """Normalize argparse and direct-call values into a string list."""
+    """Normalize argparse and direct-call values into a string list.
+
+    :param values: None, a single string, or an iterable of string values.
+    :return: a list of strings; empty when values is None.
+    """
     if values is None:
         return []
     if isinstance(values, str):
@@ -23,7 +37,14 @@ def _as_list(values: Optional[Iterable[str]]) -> list[str]:
 
 
 def _collect_supported_raid_types(payload: object) -> list[str]:
-    """Find advertised RAID type values in a Redfish payload."""
+    """Find advertised RAID type values in a Redfish payload.
+
+    Walks the payload collecting ``SupportedRAIDTypes`` and
+    ``RAIDType@Redfish.AllowableValues`` list entries.
+
+    :param payload: a Redfish Storage/Volume structure (dict, list, or scalar).
+    :return: sorted, de-duplicated list of advertised RAID type strings.
+    """
     supported: list[str] = []
     stack = [payload]
     while stack:
@@ -43,7 +64,13 @@ def _collect_supported_raid_types(payload: object) -> list[str]:
 
 
 def build_volume_payload(name: str, raid_type: str, drive_uris: list[str]) -> dict:
-    """Build the standard DMTF Volume create payload."""
+    """Build the standard DMTF Volume create payload.
+
+    :param name: volume name to send in the create request.
+    :param raid_type: Redfish RAIDType value, for example RAID1.
+    :param drive_uris: Redfish drive URIs to link into the volume.
+    :return: the Volume create payload dict.
+    """
     return {
         "Name": name,
         "RAIDType": raid_type,
@@ -55,6 +82,13 @@ class _VolumeMutationBase(RedfishManagerBase):
     """Shared Storage/Volume collection helpers for guarded mutations."""
 
     def _storage(self, controller: str, do_async: bool = False) -> dict:
+        """Fetch the Storage resource for a controller.
+
+        :param controller: storage controller id, for example RAID.Integrated.1-1.
+        :param do_async: note async will subscribe to an event loop.
+        :return: the Storage resource dict; empty dict when no data is returned.
+        :raises InvalidArgument: if controller is empty.
+        """
         if not controller:
             raise InvalidArgument("provide --controller")
         result = self.sync_invoke(
@@ -66,6 +100,13 @@ class _VolumeMutationBase(RedfishManagerBase):
         return result.data or {}
 
     def _volumes_uri(self, storage: dict, controller: str) -> str:
+        """Return the Volumes collection URI from a Storage resource.
+
+        :param storage: a Redfish Storage resource dict.
+        :param controller: controller id, used only in the error message.
+        :return: the Volumes collection ``@odata.id`` URI.
+        :raises UnsupportedAction: if the controller advertises no Volumes link.
+        """
         volumes = storage.get("Volumes")
         if not isinstance(volumes, dict) or not volumes.get("@odata.id"):
             raise UnsupportedAction(
@@ -74,6 +115,13 @@ class _VolumeMutationBase(RedfishManagerBase):
         return str(volumes["@odata.id"])
 
     def _resolve_drive_uris(self, storage: dict, drives: list[str]) -> list[str]:
+        """Resolve drive ids or URIs against a Storage resource's drives.
+
+        :param storage: a Redfish Storage resource dict listing member drives.
+        :param drives: drive ids or full Redfish drive URIs to resolve.
+        :return: the list of resolved Redfish drive URIs.
+        :raises InvalidArgument: if drives is empty or a drive id is unknown.
+        """
         if not drives:
             raise InvalidArgument("provide at least one --drive")
         drive_map = {
@@ -95,6 +143,12 @@ class _VolumeMutationBase(RedfishManagerBase):
         return resolved
 
     def _volume_collection(self, controller: str, do_async: bool = False) -> dict:
+        """Fetch the Volume collection for a controller.
+
+        :param controller: storage controller id whose volumes to fetch.
+        :param do_async: note async will subscribe to an event loop.
+        :return: the Volume collection dict; empty dict when no data is returned.
+        """
         result = self.sync_invoke(
             ApiRequestType.VolumeQuery,
             "vol_query",
@@ -108,6 +162,14 @@ class _VolumeMutationBase(RedfishManagerBase):
             controller: str,
             volume_id: str,
             do_async: bool = False) -> tuple[str, str, list[str]]:
+        """Resolve a volume id or URI to its Redfish Volume URI.
+
+        :param controller: storage controller id owning the volume.
+        :param volume_id: volume id or full Redfish Volume URI to resolve.
+        :param do_async: note async will subscribe to an event loop.
+        :return: tuple of (volume URI, resolved volume id, sorted available ids).
+        :raises InvalidArgument: if volume_id is empty or not found.
+        """
         if not volume_id:
             raise InvalidArgument("provide --volume_id")
         collection = self._volume_collection(controller, do_async=do_async)
@@ -138,11 +200,17 @@ class VolumeCreate(
     """Create a Redfish Volume through a Storage resource's Volumes collection."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the volume-create command."""
         super(VolumeCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the volume-create command and its flags.
+
+        :param cls: the CLI manager class providing the base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--controller", required=True, type=str,
@@ -174,6 +242,19 @@ class VolumeCreate(
                 dry_run: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Create a Redfish volume, previewing unless explicitly confirmed.
+
+        :param controller: storage controller id, for example RAID.Integrated.1-1.
+        :param volume_name: name to send in the Volume create payload.
+        :param raid_type: Redfish RAIDType value, validated against the controller.
+        :param drives: drive ids or Redfish drive URIs to include in the volume.
+        :param confirm: if set (and not dry_run), actually create the volume.
+        :param dry_run: force a preview even when confirm is present.
+        :param do_async: note async will subscribe to an event loop.
+        :return: CommandResult with the dry-run preview, or the create result.
+        :raises InvalidArgument: if raid_type, drives, or controller are invalid.
+        :raises UnsupportedAction: if the controller advertises no Volumes link.
+        """
         storage = self._storage(controller, do_async=bool(do_async))
         target = self._volumes_uri(storage, controller)
         allowed = _collect_supported_raid_types(storage)
@@ -222,11 +303,17 @@ class VolumeDelete(
     """Delete a Redfish Volume member after explicit confirmation."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the volume-delete command."""
         super(VolumeDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the volume-delete command and its flags.
+
+        :param cls: the CLI manager class providing the base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--controller", required=True, type=str,
@@ -253,6 +340,17 @@ class VolumeDelete(
                 dry_run: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Delete a Redfish volume, previewing unless explicitly confirmed.
+
+        :param controller: storage controller id owning the volume.
+        :param volume_id: volume id or Redfish Volume URI to delete.
+        :param confirm: if set (and not dry_run), actually delete the volume.
+        :param confirm_volume_id: must match the resolved id to authorize deletion.
+        :param dry_run: force a preview even when confirm is present.
+        :param do_async: note async will subscribe to an event loop.
+        :return: CommandResult with the preview, a mismatch error, or the delete result.
+        :raises InvalidArgument: if volume_id is empty or not found.
+        """
         uri, resolved_id, _ = self._resolve_volume_uri(
             controller,
             volume_id,

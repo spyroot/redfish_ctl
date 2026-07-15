@@ -1,7 +1,9 @@
-"""iDRAC query chassis services
+"""Query the volumes of a storage controller.
 
-Command provides raw query chassis and provide
-list of supported actions.
+Fetches the Volumes collection for a storage controller and returns the
+discovered Redfish actions along with the volume data.
+
+    redfish_ctl volume-get --dev_id AHCI.Integrated.1-1
 
 Author Mus spyroot@gmail.com
 """
@@ -21,6 +23,7 @@ class VolumeQuery(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the volume-get command."""
         super(VolumeQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
