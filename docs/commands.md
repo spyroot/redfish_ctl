@@ -68,7 +68,8 @@ Safety labels:
 
 - **Read**: expected to read state only.
 - **Guarded**: does not mutate by default; requires `--confirm` or an equivalent apply flag.
-- **Write**: may mutate when invoked, even if an optional preview flag exists.
+- **Write**: can mutate when invoked; do not run live without explicit target approval, even if an
+  optional preview flag exists.
 
 | Command | Purpose | Safety |
 |---|---|---|
@@ -229,8 +230,8 @@ covered by the Dell, Supermicro, HPE, or generic fixture corpora listed in [Vend
 ## Mutating Workflow Pattern
 
 Commands labeled **Guarded** block or preview writes by default and require an explicit intent flag,
-usually `--confirm`. Commands labeled **Write** can mutate as soon as they are invoked; some still
-offer `--show` or `--dry_run`, but those previews are optional.
+usually `--confirm`. Commands labeled **Write** can mutate as soon as they are invoked; do not run
+them live without explicit target approval, and use `--show` or `--dry_run` first when available.
 
 Before running either kind of write, use the same four phases:
 

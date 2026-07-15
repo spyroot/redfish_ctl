@@ -76,7 +76,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="X-SF-Token=<your-splunk-access-token>"
 
 # 3. run any operation with tracing enabled
 redfish_ctl --otlp-traces system            # a read; shows redfish-ctl → bmc in the service map
-redfish_ctl --otlp-traces reboot --dry_run   # a guarded mutation, previewed
+redfish_ctl --otlp-traces system-reset --dry_run   # guarded reset preview; no POST
 ```
 
 Within seconds the operation appears in APM: a `redfish-ctl → bmc` service map, a trace waterfall of
