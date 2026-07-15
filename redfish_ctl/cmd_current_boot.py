@@ -1,5 +1,8 @@
 """iDRAC enable boot options.
 
+    redfish_ctl current_boot
+    redfish_ctl current_boot --filename current_boot.json
+
 This cmd return Dell Boot Sources Configuration and the related
 resources.
 
@@ -30,6 +33,7 @@ class GetCurrentBoot(RedfishManagerBase,
     cmd_name = "current_boot_query"
 
     def __init__(self, *args, **kwargs):
+        """Initialize the current_boot command."""
         super(GetCurrentBoot, self).__init__(*args, **kwargs)
 
     @staticmethod

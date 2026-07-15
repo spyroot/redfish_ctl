@@ -1,5 +1,8 @@
 """iDRAC boot query command
 
+    redfish_ctl boot
+    redfish_ctl boot --deep --filename boot.json
+
 Command provides the option to retrieve boot source from iDRAC and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
 registers to the command line ctl tool. Similarly to the rest command
@@ -28,6 +31,7 @@ class BootQuery(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the boot command."""
         super(BootQuery, self).__init__(*args, **kwargs)
 
     @staticmethod

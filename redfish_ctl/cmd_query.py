@@ -1,5 +1,8 @@
 """iDRAC query command
 
+    redfish_ctl query --resource /redfish/v1/Managers
+    redfish_ctl query --resource /redfish/v1/Systems --expanded
+
 Command provides capability raw query based URI resource,
 in case specific action might not implement yet; hence it
 is easy to query.
@@ -23,6 +26,7 @@ class QueryIDRAC(
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the query command."""
         super(QueryIDRAC, self).__init__(*args, **kwargs)
 
     @staticmethod

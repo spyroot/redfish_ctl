@@ -1,3 +1,15 @@
+"""Exception types shared across redfish_ctl commands.
+
+These errors let a redfish_ctl command tell an expected, non-fatal condition (for
+example a 404 that is acceptable) apart from a genuinely unexpected response that
+must abort. They cover invalid arguments and JSON specs, missing or undiscoverable
+resources, uncommitted pending changes, and HTTP/JSON errors (``JsonHttpError`` and
+its POST/PATCH/DELETE subclasses).
+
+Author Mus spyroot@gmail.com
+"""
+
+
 class InvalidArgument(Exception):
     pass
 
@@ -75,6 +87,11 @@ class JsonHttpError(Exception):
     we raise.
     """
     def __init__(self, *args, **kwargs):
+        """Initialize the error and capture an optional ``json_error`` payload.
+
+        :param args: positional arguments forwarded to ``Exception``.
+        :param kwargs: keyword arguments; the ``json_error`` entry is stored on the instance.
+        """
         super(JsonHttpError, self).__init__(args, kwargs)
         self.json_error = kwargs.get('json_error')
 
