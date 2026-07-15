@@ -27,6 +27,12 @@ def probe_reachable(url: str, auth, verify: bool, timeout: float) -> bool:
 
     Any HTTP response — 200, 401, or 403 — means the Redfish service answered, so
     the BMC is reachable. A connection error / timeout means it is not up yet.
+
+    :param url: ServiceRoot URL to probe.
+    :param auth: requests auth tuple ``(username, password)``, or None for anonymous.
+    :param verify: whether to verify the TLS certificate.
+    :param timeout: per-request timeout in seconds.
+    :return: True if the service answered with any HTTP status, else False.
     """
     try:
         requests.get(url, auth=auth, verify=verify, timeout=timeout)
@@ -52,9 +58,18 @@ def wait_for(predicate,
     ``invert_first`` first waits for the predicate to be False (e.g. the BMC to go
     DOWN) before waiting for it to be True — the down-then-up reboot pattern.
 
+    :param predicate: no-arg callable returning bool; polled until it is True.
+    :param description: human label for what is being awaited; echoed in the result.
+    :param timeout: max seconds to keep polling before giving up.
+    :param interval: seconds to sleep between probes.
+    :param invert_first: first wait for the predicate to be False, then for True.
     :return: ``{waiting_for, satisfied, waited_s[, precondition_met]}``
     """
     def probe() -> bool:
+        """Evaluate ``predicate`` once, treating any raised exception as False.
+
+        :return: the predicate's boolean result, or False if it raised.
+        """
         try:
             return bool(predicate())
         except Exception:
@@ -98,6 +113,14 @@ def wait_reachable(url: str, auth, verify: bool,
     A thin wrapper over :func:`wait_for` with a reachability predicate; keeps the
     ``reachable`` / ``went_down`` keys its callers (the ``wait`` command,
     ``manager-reboot --wait``) expect, and carries the ``waiting_for`` label.
+
+    :param url: ServiceRoot URL to poll.
+    :param auth: requests auth tuple ``(username, password)``, or None for anonymous.
+    :param verify: whether to verify the TLS certificate.
+    :param timeout: max seconds to wait for the service.
+    :param interval: seconds between polls.
+    :param reboot_cycle: first wait for the BMC to go DOWN, then for it to come back UP.
+    :return: ``{waiting_for, reachable, waited_s[, went_down]}``.
     """
     probe_timeout = max(1.0, min(interval or 5.0, 5.0))
     res = wait_for(lambda: probe_reachable(url, auth, verify, probe_timeout),
@@ -117,11 +140,16 @@ class WaitReady(RedfishManagerBase,
     """Poll the Redfish ServiceRoot until the BMC is reachable (bounded by a timeout)."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the wait command."""
         super(WaitReady, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
+        """Register the ``wait`` command parser and its flags.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd = cls.base_parser()
         cmd.add_argument('--timeout', required=False, type=float, dest='wait_timeout', default=300.0,
                          help="max seconds to wait for the BMC (default 300)")
@@ -137,7 +165,14 @@ class WaitReady(RedfishManagerBase,
                 wait_interval: Optional[float] = 5.0,
                 wait_reboot_cycle: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Poll the ServiceRoot until reachable (optionally after a down phase)."""
+        """Poll the ServiceRoot until reachable (optionally after a down phase).
+
+        :param wait_timeout: max seconds to wait for the BMC (default 300).
+        :param wait_interval: seconds between polls (default 5).
+        :param wait_reboot_cycle: first wait for the BMC to go DOWN, then come back UP.
+        :return: CommandResult with the reachability result (``reachable``, ``waited_s``,
+            ``target``); its error is set when the BMC is not reachable within the timeout.
+        """
         scheme = "http" if self._is_http else "https"
         url = f"{scheme}://{self.redfish_ip}:{self._port}/redfish/v1/"
         auth = (self._username, self._password) if self._username else None
