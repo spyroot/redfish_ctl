@@ -30,9 +30,9 @@ MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confi
 LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/attribute/cmd_attribute_clear_pending.py:84 execute base_post",
     "redfish_ctl/attribute/cmd_attribute_update.py:88 execute base_patch",
-    "redfish_ctl/bios/cmd_bios_clear_pending.py:78 execute base_post",
-    "redfish_ctl/bios/cmd_change_bios.py:356 execute base_patch",
-    "redfish_ctl/bios/cmd_change_boot_order.py:176 execute base_patch",
+    "redfish_ctl/bios/cmd_bios_clear_pending.py:81 execute base_post",
+    "redfish_ctl/bios/cmd_change_bios.py:369 execute base_patch",
+    "redfish_ctl/bios/cmd_change_boot_order.py:177 execute base_patch",
     "redfish_ctl/boot_source/cmd_clear_pending.py:70 execute base_post",
     "redfish_ctl/boot_source/cmd_enable.py:120 execute base_patch",
     "redfish_ctl/boot_source/cmd_update.py:171 execute base_patch",

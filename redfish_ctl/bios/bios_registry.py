@@ -31,6 +31,7 @@ class BiosRegistry(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Construct the bios-registry command, forwarding credentials to the base manager."""
         super(BiosRegistry, self).__init__(*args, **kwargs)
 
     def _resolve_registry_uri(self, do_async):
@@ -42,6 +43,9 @@ class BiosRegistry(RedfishManagerBase,
         points at the registry JSON. Prefer the Dell subpath when it resolves,
         otherwise follow the standard AttributeRegistry -> Registries -> Uri chain.
         Falls back to the Dell path so existing behavior is unchanged.
+
+        :param do_async: note async will subscribe to an event loop.
+        :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
         """
         dell_uri = f"{self.idrac_manage_servers}/Bios/BiosRegistry"
         try:

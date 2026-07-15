@@ -3,6 +3,8 @@
 Command provides raw query chassis and provide
 list of supported actions.
 
+    redfish_ctl bios-pending
+
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
@@ -22,6 +24,7 @@ class BiosQueryPending(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Construct the bios-pending query command, forwarding credentials to the base manager."""
         super(BiosQueryPending, self).__init__(*args, **kwargs)
 
     @staticmethod

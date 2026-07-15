@@ -1,7 +1,7 @@
 """iDRAC change boot order and boot options.
 It requires server reboot.
 
-python redfish_ctl.py change-boot-order --from_spec specs/change_boot_order_spec.json
+    redfish_ctl change-boot-order --from_spec specs/change_boot_order_spec.json
 
 Author Mus spyroot@gmail.com
 """
@@ -25,6 +25,7 @@ class ChangeBootOrder(
     """
 
     def __init__(self, *args, **kwargs):
+        """Construct the change-boot-order command, forwarding credentials to the base manager."""
         super(ChangeBootOrder, self).__init__(*args, **kwargs)
 
     @staticmethod
