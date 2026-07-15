@@ -15,6 +15,12 @@ class SyncInvoker(Protocol):
     def sync_invoke(
         self, api_call: ApiRequestType, name: str, **kwargs: Any
     ) -> CommandResult:
+        """Invoke a registered command synchronously and return its result.
+
+        :param api_call: the :class:`ApiRequestType` selecting the command family.
+        :param name: the registered command name to invoke.
+        :return: the :class:`CommandResult` produced by the command.
+        """
         ...
 
 
@@ -275,6 +281,14 @@ def _invoke(
     name: str,
     **kwargs: Any,
 ) -> Any:
+    """Invoke a command and return its data, raising on a command error.
+
+    :param manager: synchronous invoker used to run the command.
+    :param api_call: the :class:`ApiRequestType` to invoke.
+    :param name: the registered command name to invoke.
+    :return: the command result data.
+    :raises RedfishApiError: when the command returns an error.
+    """
     result = manager.sync_invoke(api_call, name, **kwargs)
     if result.error:
         raise RedfishApiError(str(result.error))
@@ -282,28 +296,54 @@ def _invoke(
 
 
 def _mapping(data: Any) -> Mapping[str, Any]:
+    """Return ``data`` when it is a mapping, else an empty mapping.
+
+    :param data: value to coerce.
+    :return: ``data`` if it is a mapping, otherwise an empty dict.
+    """
     return data if isinstance(data, Mapping) else {}
 
 
 def _rows(data: Any) -> tuple[Mapping[str, Any], ...]:
+    """Return the mapping rows from a list value.
+
+    :param data: value to coerce.
+    :return: a tuple of the mapping items; empty when ``data`` is not a list.
+    """
     if not isinstance(data, list):
         return ()
     return tuple(row for row in data if isinstance(row, Mapping))
 
 
 def _server_list(servers: str | Iterable[str]) -> list[str]:
+    """Normalize an NTP server argument to a list.
+
+    :param servers: a single server string or an iterable of server strings.
+    :return: the servers as a list (a lone string becomes a one-item list).
+    """
     if isinstance(servers, str):
         return [servers]
     return list(servers)
 
 
 def _server_tuple(data: Any, fallback: Iterable[str]) -> tuple[str, ...]:
+    """Coerce a server list, falling back when the value is not a list.
+
+    :param data: candidate server list from the command payload.
+    :param fallback: servers to use when ``data`` is not a list.
+    :return: a tuple of server strings.
+    """
     values = data if isinstance(data, list) else list(fallback)
     return tuple(str(value) for value in values)
 
 
 def get_system(manager: SyncInvoker, *, deep: bool = False) -> SystemStatus:
-    """Return typed ComputerSystem status through the existing system command."""
+    """Return typed ComputerSystem status through the existing system command.
+
+    :param manager: synchronous invoker used to run the system command.
+    :param deep: when True, request a deep ComputerSystem query.
+    :return: a :class:`SystemStatus` built from the command payload.
+    """
     data = _mapping(
         _invoke(
             manager,
@@ -326,7 +366,12 @@ def get_system(manager: SyncInvoker, *, deep: bool = False) -> SystemStatus:
 def get_sensors(
     manager: SyncInvoker, *, expanded: bool = False
 ) -> tuple[SensorReading, ...]:
-    """Return typed chassis sensor readings through the sensors command."""
+    """Return typed chassis sensor readings through the sensors command.
+
+    :param manager: synchronous invoker used to run the sensors command.
+    :param expanded: when True, issue an expanded ($expand) sensors query.
+    :return: a tuple of :class:`SensorReading` rows.
+    """
     rows = _rows(
         _invoke(
             manager,
@@ -350,7 +395,11 @@ def get_sensors(
 
 
 def get_thermal(manager: SyncInvoker) -> ThermalStatus:
-    """Return typed thermal status through the thermal command."""
+    """Return typed thermal status through the thermal command.
+
+    :param manager: synchronous invoker used to run the thermal command.
+    :return: a :class:`ThermalStatus` with temperatures, fans, and summary.
+    """
     data = _mapping(_invoke(manager, ApiRequestType.Thermal, "thermal"))
     temperature_rows = _rows(data.get("temperature_readings"))
     fan_rows = _rows(data.get("fans"))
@@ -386,7 +435,11 @@ def get_thermal(manager: SyncInvoker) -> ThermalStatus:
 
 
 def get_gpu_metrics(manager: SyncInvoker) -> GpuMetricsStatus:
-    """Return typed GPU metric rows through the gpu-metrics command."""
+    """Return typed GPU metric rows through the gpu-metrics command.
+
+    :param manager: synchronous invoker used to run the gpu-metrics command.
+    :return: a :class:`GpuMetricsStatus` with per-GPU rows and summary.
+    """
     data = _mapping(_invoke(manager, ApiRequestType.GpuMetrics, "gpu-metrics"))
     gpu_rows = tuple(
         GpuMetricRow(
@@ -427,6 +480,9 @@ def get_network_firmware(manager: SyncInvoker) -> NetworkFirmwareStatus:
     Read-only. Surfaces every network adapter (ConnectX NICs, BlueField DPUs) and
     the firmware version of each network component, plus a summary whose
     ``distinct_versions`` is the fleet firmware-drift signal.
+
+    :param manager: synchronous invoker used to run the nic-firmware command.
+    :return: a :class:`NetworkFirmwareStatus` with adapters, firmware, and summary.
     """
     data = _mapping(_invoke(manager, ApiRequestType.NicFirmware, "nic-firmware"))
     adapters = tuple(
@@ -471,7 +527,14 @@ def set_ntp(
     manager_id: str | None = None,
     confirm: bool = False,
 ) -> NtpSetResult:
-    """Preview or apply NTP servers through the guarded ntp-set command."""
+    """Preview or apply NTP servers through the guarded ntp-set command.
+
+    :param manager: synchronous invoker used to run the ntp-set command.
+    :param servers: a single server string or an iterable of NTP servers.
+    :param manager_id: restrict the change to this Manager id when set.
+    :param confirm: when False, only preview the plan; when True, apply the change.
+    :return: a typed :class:`NtpSetResult` with the plan, skipped, and applied rows.
+    """
     requested_servers = _server_list(servers)
     data = _mapping(
         _invoke(
@@ -531,7 +594,15 @@ def reboot(
     wait: bool = False,
     async_call: bool = False,
 ) -> RebootResult:
-    """Preview or execute a host ComputerSystem reset through reboot."""
+    """Preview or execute a host ComputerSystem reset through reboot.
+
+    :param manager: synchronous invoker used to run the reboot command.
+    :param reset_type: the Redfish reset type to request (default GracefulRestart).
+    :param confirm: when False, only preview the reset; when True, execute it.
+    :param wait: wait for the reset to complete (only honored when confirmed).
+    :param async_call: issue the reset as an asynchronous invocation.
+    :return: a typed :class:`RebootResult` describing the planned or executed reset.
+    """
     data = _mapping(
         _invoke(
             manager,
@@ -556,7 +627,11 @@ def reboot(
 
 
 def bios_profile_list(manager: SyncInvoker) -> tuple[BiosProfileSummary, ...]:
-    """Return typed BIOS profile summaries through bios-profile list."""
+    """Return typed BIOS profile summaries through bios-profile list.
+
+    :param manager: synchronous invoker used to run the bios-profile command.
+    :return: a tuple of :class:`BiosProfileSummary` catalog rows.
+    """
     rows = _rows(
         _invoke(
             manager,
@@ -582,7 +657,12 @@ def bios_profile_show(
     manager: SyncInvoker,
     profile_name: str,
 ) -> BiosProfileSpec:
-    """Return a typed BIOS profile specification through bios-profile show."""
+    """Return a typed BIOS profile specification through bios-profile show.
+
+    :param manager: synchronous invoker used to run the bios-profile command.
+    :param profile_name: name of the BIOS profile to show.
+    :return: a typed :class:`BiosProfileSpec` with the profile attributes.
+    """
     data = _mapping(
         _invoke(
             manager,
@@ -607,7 +687,12 @@ def bios_profile_diff(
     manager: SyncInvoker,
     profile_name: str,
 ) -> BiosProfileDiffResult:
-    """Return a typed BIOS profile diff through bios-profile diff."""
+    """Return a typed BIOS profile diff through bios-profile diff.
+
+    :param manager: synchronous invoker used to run the bios-profile command.
+    :param profile_name: name of the BIOS profile to diff against current settings.
+    :return: a typed :class:`BiosProfileDiffResult` with per-attribute rows.
+    """
     data = _mapping(
         _invoke(
             manager,
@@ -643,7 +728,14 @@ def bios_profile_apply(
     confirm: bool = False,
     dry_run: bool = False,
 ) -> BiosProfileApplyResult:
-    """Preview or stage a BIOS profile through guarded bios-profile apply."""
+    """Preview or stage a BIOS profile through guarded bios-profile apply.
+
+    :param manager: synchronous invoker used to run the bios-profile command.
+    :param profile_name: name of the BIOS profile to apply.
+    :param confirm: when True, stage the profile change instead of only previewing.
+    :param dry_run: request a dry-run apply from the underlying command.
+    :return: a typed :class:`BiosProfileApplyResult` with the staged change and rollback.
+    """
     data = _mapping(
         _invoke(
             manager,
