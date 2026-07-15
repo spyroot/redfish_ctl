@@ -1,5 +1,8 @@
 """Dual-mode-style coverage for the guarded BIOS reset command."""
 
+import pytest
+
+from redfish_ctl.bios.cmd_bios_reset_default import BiosResetDefault
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 
@@ -54,6 +57,28 @@ def test_bios_reset_confirm_posts_to_dell_discovered_target(
     assert posts[0].json() == {}
 
 
+def test_bios_reset_confirm_dry_run_still_does_not_post(
+    redfish_mock,
+    redfish_service,
+) -> None:
+    """--dry_run wins over --confirm so operators can preview a confirmed call."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosResetDefault,
+        "bios_reset",
+        confirm=True,
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["blocked"] is None
+    assert result.data["target"] == (
+        "/redfish/v1/Systems/System.Embedded.1/Bios/Settings/Actions/Bios.ResetBios"
+    )
+    assert _post_requests(redfish_service) == []
+
+
 def test_bios_reset_confirm_posts_to_hpe_discovered_target(
     redfish_mock_factory,
 ) -> None:
@@ -79,3 +104,34 @@ def test_bios_reset_confirm_posts_to_hpe_discovered_target(
         "/redfish/v1/systems/1/bios/actions/bios.resetbios/"
     )
     assert posts[0].json() == {}
+
+
+def test_bios_reset_fallback_uri_normalizes_bios_fragment() -> None:
+    """Fallback URI joining stays valid even if the API fragment shape changes."""
+    assert BiosResetDefault._bios_fallback_uri("/redfish/v1/Systems/1") == (
+        "/redfish/v1/Systems/1/Bios"
+    )
+    assert BiosResetDefault._bios_fallback_uri("/redfish/v1/Systems/1/") == (
+        "/redfish/v1/Systems/1/Bios"
+    )
+
+
+def test_bios_reset_system_query_failure_is_not_hidden(monkeypatch) -> None:
+    """Connectivity/auth/parsing failures on the ComputerSystem read propagate."""
+    command = BiosResetDefault(
+        idrac_ip="127.0.0.1",
+        idrac_username="user",
+        idrac_password="password",
+        idrac_port=443,
+        insecure=True,
+        is_http=True,
+    )
+    command.__dict__["idrac_manage_servers"] = "/redfish/v1/Systems/1"
+
+    def fail_query(*_args, **_kwargs):
+        raise RuntimeError("system read failed")
+
+    monkeypatch.setattr(command, "base_query", fail_query)
+
+    with pytest.raises(RuntimeError, match="system read failed"):
+        command._bios_uri(do_async=False)

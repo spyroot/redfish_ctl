@@ -63,14 +63,16 @@ class BiosResetDefault(RedfishManagerBase,
         :return: the linked BIOS resource URI, or the standard ``/Bios`` fallback.
         """
         system_uri = self.idrac_manage_servers
-        try:
-            system = self.base_query(system_uri, do_async=do_async).data or {}
-        except Exception:
-            system = {}
+        system = self.base_query(system_uri, do_async=do_async).data or {}
         bios_link = system.get("Bios") if isinstance(system, dict) else None
         if isinstance(bios_link, dict) and bios_link.get("@odata.id"):
             return bios_link["@odata.id"]
-        return f"{system_uri}{RedfishApi.Bios}"
+        return self._bios_fallback_uri(system_uri)
+
+    @staticmethod
+    def _bios_fallback_uri(system_uri: str) -> str:
+        """Build the conventional BIOS URI under a ComputerSystem URI."""
+        return f"{system_uri.rstrip('/')}/{str(RedfishApi.Bios).strip('/')}"
 
     def execute(self,
                 confirm: Optional[bool] = False,
