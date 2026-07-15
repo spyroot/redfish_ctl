@@ -1,5 +1,7 @@
 """iDRAC update compute settings
 
+    redfish_ctl compute-update
+
 TODO , this looks like overlap between 6.00.3 and 6.10.
 
 It represents  ComputerSystem schema or system instance and
@@ -25,14 +27,15 @@ class UpdateCompute(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the compute-update command."""
         super(UpdateCompute, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command
-        :param cls:
-        :return:
+        """Register the compute-update subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = cls.base_parser()
         help_text = "command update compute settings."
@@ -48,14 +51,17 @@ class UpdateCompute(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """
-        :param do_expanded:
+        """Query the host ComputerSystem settings resource for update.
+
+        On firmware 6.10+ this targets the ComputerSystem ``/Settings`` URI;
+        on older firmware it queries the ComputerSystem resource itself.
+
+        :param do_expanded: issue an expanded ($expand) Redfish query.
         :param do_async: will issue asyncio request and won't block
-        :param filename:
-        :param data_type:
-        :param verbose:
-        :param kwargs:
-        :return:
+        :param filename: if set, save the response to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult with the ComputerSystem settings query response.
         """
 
         idrac_version = self.idrac_manager_version

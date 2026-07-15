@@ -1,5 +1,7 @@
 """iDRAC reset a power state for compute system command.
 
+    redfish_ctl reboot --reset_type GracefulRestart
+
 This action is used to reset the system.
 Command provides the option to reboot, and change power state.
 
@@ -40,14 +42,15 @@ class RebootHost(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the reboot command."""
         super(RebootHost, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register command
-        :param cls:
-        :return:
+        """Register the reboot subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
         """
         cmd_parser = argparse.ArgumentParser(add_help=False)
         cmd_parser.add_argument(
@@ -83,9 +86,10 @@ class RebootHost(RedfishManagerBase,
         and wait for reboot to complete. It makes sense to call this method
         only if reset already called.
 
-        :param sleep_time:
-        :param max_retry:
-        :return:
+        :param sleep_time: seconds to sleep between reboot-pending polls.
+        :param max_retry: maximum retries while waiting for the reboot job.
+        :return: the jobs-query CommandResult if that query errors; otherwise
+                 None once the reboot-pending wait loop completes.
         """
         _reboot = 1
         retry_counter = 0
@@ -159,8 +163,8 @@ class RebootHost(RedfishManagerBase,
                            GracefulShutdown, PushPowerButton, Nmi, PowerCycle"
         :param sleep_time: wait for the reboot job to start.
         :param max_retry: maximum retry while waiting for the reboot job.
-        :param filename:
-        :param data_type:
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
         :param kwargs:
         :return: CommandResult; on a real fire ``.data`` carries the task id/state,
                  on a dry-run it carries the resolved target + payload.
