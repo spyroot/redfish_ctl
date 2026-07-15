@@ -22,6 +22,7 @@ class Manager(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the manager command."""
         super(Manager, self).__init__(*args, **kwargs)
 
     @staticmethod

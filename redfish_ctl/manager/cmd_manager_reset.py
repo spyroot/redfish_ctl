@@ -2,6 +2,8 @@
 
 command reset-reboot IDRAC manger.
 
+    redfish_ctl manager-reboot
+
 Author Mus spyroot@gmail.com
 """
 import argparse
@@ -22,6 +24,7 @@ class ManagerReset(RedfishManagerBase,
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialize the manager-reboot command."""
         super(ManagerReset, self).__init__(*args, **kwargs)
 
     @staticmethod
@@ -68,13 +71,17 @@ class ManagerReset(RedfishManagerBase,
                 do_wait: Optional[bool] = False,
                 wait_timeout: Optional[float] = 300.0,
                 **kwargs) -> CommandResult:
-        """Reset IDRAC manager services
-        :param do_async will not wait
-        :param do_graceful
-        :param verbose:
-        :param do_deep:
-        :param data_type:
-        :return:
+        """Reset IDRAC manager services.
+
+        :param data_type: json or xml; ``json`` adds the JSON content-type header.
+        :param do_deep: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: create a task and return without waiting for it.
+        :param do_graceful: request a ``GracefulRestart`` (default); otherwise send an empty payload.
+        :param do_wait: after the reset, poll ServiceRoot until the BMC goes down then becomes reachable again.
+        :param wait_timeout: with ``do_wait``, the maximum seconds to wait for the BMC to cycle.
+        :return: CommandResult from the reset POST, with task_state/task_id added when a
+            task is generated and a ``wait`` result added when ``do_wait`` is set.
         :raise: AuthenticationFailed, UnexpectedResponse
         """
         headers = {}

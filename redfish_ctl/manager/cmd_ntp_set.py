@@ -1,4 +1,7 @@
-"""Set ManagerNetworkProtocol NTP servers with a guarded PATCH."""
+"""Set ManagerNetworkProtocol NTP servers with a guarded PATCH.
+
+    redfish_ctl ntp-set
+"""
 
 import ipaddress
 import re
@@ -15,6 +18,14 @@ _HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
 def _normalize_ntp_servers(servers, clear: bool = False) -> list[str]:
+    """Normalize and validate NTP server arguments into a clean list.
+
+    :param servers: one server string, a comma-joined string, or a list of them.
+    :param clear: request an empty NTP list; rejects any provided ``servers``.
+    :return: the normalized list of NTP servers (empty when ``clear`` is set).
+    :raises InvalidArgument: when ``clear`` is combined with servers, no server is
+        given, more than four are given, or a server is not plausible.
+    """
     if clear:
         if servers:
             raise InvalidArgument("--clear cannot be used with --server")
@@ -44,6 +55,11 @@ def _normalize_ntp_servers(servers, clear: bool = False) -> list[str]:
 
 
 def _is_plausible_ntp_server(server: str) -> bool:
+    """Check whether a string is a plausible NTP IP address or hostname.
+
+    :param server: the candidate NTP server value.
+    :return: True when it parses as an IP or a valid dotted hostname, else False.
+    """
     if not server or any(ch.isspace() for ch in server):
         return False
     if "://" in server or "/" in server:
@@ -68,12 +84,16 @@ class NtpSet(RedfishManagerBase,
     """Set ManagerNetworkProtocol NTP servers after dry-run preview."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the ntp-set command."""
         super(NtpSet, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the guarded ntp-set subcommand."""
+        """Register the guarded ntp-set subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--server', action='append', dest='servers', metavar='HOST',
@@ -92,16 +112,37 @@ class NtpSet(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` of a link field, or None when absent.
+
+        :param data: the resource body to read the link from.
+        :param key: the link field name (e.g. ``NetworkProtocol``).
+        :return: the linked resource URI, or None when the field is not a link.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     def _get(self, uri, do_async):
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: Redfish resource URI to query.
+        :param do_async: run the query asynchronously (subscribes to the event loop).
+        :return: the resource body dict, or {} on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _ntp_plan(self, servers, manager_id, do_async):
+        """Build the per-manager PATCH plan for the requested NTP servers.
+
+        :param servers: the normalized NTP servers to set (empty to clear).
+        :param manager_id: optional Manager id to restrict the plan to.
+        :param do_async: run the discovery queries asynchronously.
+        :return: tuple of (plan, skipped) — the targets to PATCH and the managers
+            skipped with a reason.
+        :raises InvalidArgument: when no NTP-capable NetworkProtocol matches.
+        """
         ntp_payload = {"NTPServers": servers}
         if servers:
             ntp_payload["ProtocolEnabled"] = True
@@ -153,7 +194,22 @@ class NtpSet(RedfishManagerBase,
                 clear: Optional[bool] = False,
                 confirm: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Preview or apply NTP servers on ManagerNetworkProtocol resources."""
+        """Preview or apply NTP servers on ManagerNetworkProtocol resources.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: run the discovery and PATCH requests asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param servers: the NTP hostnames or IPs to set (up to four).
+        :param manager_id: optional Manager id to restrict the write to.
+        :param clear: restore an empty NTP server list instead of setting servers.
+        :param confirm: apply the PATCH; without it the command only previews.
+        :return: CommandResult whose data is the dry-run preview (dry_run, plan,
+            skipped) without ``--confirm``, or the applied results with it.
+        :raises InvalidArgument: when the servers are invalid or no NTP-capable
+            resource is found (via the normalize/plan helpers).
+        """
         normalized_servers = _normalize_ntp_servers(servers, bool(clear))
         plan, skipped = self._ntp_plan(normalized_servers, manager_id, do_async)
 

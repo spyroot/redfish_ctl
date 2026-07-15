@@ -54,12 +54,16 @@ class ManagerTime(RedfishManagerBase,
     """Read or set each Manager's Redfish DateTime clock."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the manager-time command."""
         super(ManagerTime, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register ``manager-time`` (read by default; --now/--set to write)."""
+        """Register ``manager-time`` (read by default; --now/--set to write).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             '--now', action='store_true', required=False, dest='set_now',
@@ -83,7 +87,19 @@ class ManagerTime(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Read each Manager's DateTime; with --now/--set, PATCH it and read back."""
+        """Read each Manager's DateTime; with --now/--set, PATCH it and read back.
+
+        :param set_now: set the clock to this host's current UTC time.
+        :param set_datetime: an explicit ISO-8601 DateTime to set (wins over set_now).
+        :param set_offset: optional DateTimeLocalOffset to set alongside (e.g. +00:00).
+        :param filename: if set, save the resulting rows to this file.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: run the per-manager queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data is a list of per-manager time rows, or an
+            empty list with an error string when discovery fails or no managers exist.
+        """
         payload = build_time_payload(set_now, set_datetime, set_offset)
 
         try:
