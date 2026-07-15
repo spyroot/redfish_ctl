@@ -1,4 +1,4 @@
-"""iDRAC reset a chassis power state.
+"""Update a chassis.
 
 The Chassis schema represents the physical components of a system.
 This resource represents the sheet-metal confined spaces

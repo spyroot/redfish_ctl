@@ -1,4 +1,4 @@
-"""iDRAC query chassis services
+"""Query chassis services.
 
 Command provides raw query chassis
 and provide list of supported actions.

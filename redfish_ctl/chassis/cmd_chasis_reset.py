@@ -1,4 +1,4 @@
-"""iDRAC reset a chassis power state.
+"""Reset a chassis power state.
 
  redfish_ctl chassis-reset --reset_type ForceOff
 
