@@ -137,6 +137,25 @@ manager reset, NTP set, account mutation, and RAID operations outside Dell
 storage volume create/delete remain `unverified` until a trace or rule file
 grounds them.
 
+## Captured Error Replay Matrix
+
+Captured-error replay is grounded only when a committed corpus artifact carries
+`http_status_mapping` and `error_file_mapping` entries in `rest_api_map.npy`.
+The current contract guarantees the recorded HTTP status and a JSON error body;
+legacy absolute captured-file paths may replay through the mock's generated
+error body rather than byte-for-byte archive content.
+
+`tests/test_captured_status_replay.py`, the captured-status replay test, pins
+the matrix against the committed full-corpus artifacts.
+
+| Vendor/model | Corpus evidence | Captured-error replay |
+| --- | --- | --- |
+| Dell XR8620t | `full_corpus/dell_xr8620t_full_corpus.tar.gz` has no captured non-2xx mappings | unverified |
+| Supermicro GB300 | `full_corpus/supermicro_gb300_full_corpus.tar.gz` has no captured non-2xx mappings | unverified |
+| HPE DL360 | `full_corpus/hpe_dl360_full_corpus.tar.gz` has no captured non-2xx mappings | unverified |
+| Supermicro X10 | `full_corpus/supermicro_x10_full_corpus.tar.gz` records four captured `403` responses | supported |
+| NVIDIA GB300 node2 | `tests/nvidia_gb300_node2_corpus.tar.gz` has no `rest_api_map.npy` | unverified |
+
 ## Freeze Tests
 
 `tests/test_simulator_contract_freeze.py`, the RF-SIM-00 freeze test file, pins

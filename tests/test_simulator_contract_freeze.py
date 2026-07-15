@@ -249,5 +249,8 @@ def test_contract_doc_records_current_rule_matrix() -> None:
         "| HPE DL360 | supported | supported | supported | unsupported | supported | unsupported |",
         "| Supermicro X10 | supported | supported | unsupported | unsupported | supported | unsupported |",
         "| NVIDIA GB300 node2 | supported | supported | supported | supported | supported | unsupported |",
+        "## Captured Error Replay Matrix",
+        "| Supermicro X10 | `full_corpus/supermicro_x10_full_corpus.tar.gz` records four captured `403` responses | supported |",
+        "| Dell XR8620t | `full_corpus/dell_xr8620t_full_corpus.tar.gz` has no captured non-2xx mappings | unverified |",
     ]:
         assert expected in text
