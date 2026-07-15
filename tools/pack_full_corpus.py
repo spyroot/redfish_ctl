@@ -33,6 +33,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 _METHODS = ("GET", "HEAD", "OPTIONS", "POST", "PATCH", "PUT", "DELETE")
+REST_API_STATUS_MAP_JSON = "rest_api_map.status.json"
+_PACK_METADATA_JSON = {"corpus_manifest.json", REST_API_STATUS_MAP_JSON}
 # Credential/secret + account-identity keys to scrub (matched on the last dotted
 # segment, case-insensitive). Everything NOT matched is left ORIGINAL — a full
 # corpus keeps serials, MACs, IPs, hostnames, schemas, registries as captured.
@@ -90,9 +92,60 @@ def load_api_map(host_dir: Path) -> dict:
     return api_map
 
 
+def _resource_json_files(host_dir: Path) -> list[Path]:
+    """Return captured resource JSON files, excluding pack metadata sidecars."""
+    return sorted(
+        p for p in host_dir.glob("*.json")
+        if p.name not in _PACK_METADATA_JSON
+    )
+
+
+def _resource_json_paths(json_files: list[Path]) -> list[Path]:
+    """Filter a caller-provided JSON file list down to captured resources."""
+    return [p for p in json_files if p.name not in _PACK_METADATA_JSON]
+
+
+def _status_sidecar_payload(api_map: dict) -> dict:
+    """Build the JSON status sidecar payload from an API map."""
+    return {
+        "http_status_mapping": {
+            path: int(status)
+            for path, status in (api_map.get("http_status_mapping", {}) or {}).items()
+        },
+        "error_file_mapping": {
+            path: str(filename)
+            for path, filename in (api_map.get("error_file_mapping", {}) or {}).items()
+        },
+    }
+
+
+def _status_sidecar_problems(host_dir: Path, api_map: dict) -> list[str]:
+    """Return validation problems for an existing status sidecar, if present."""
+    sidecar_path = host_dir / REST_API_STATUS_MAP_JSON
+    if not sidecar_path.exists():
+        return []
+    try:
+        sidecar = json.loads(sidecar_path.read_text())
+    except (OSError, ValueError) as exc:
+        return [f"{REST_API_STATUS_MAP_JSON} is not valid JSON: {exc}"]
+    expected = _status_sidecar_payload(api_map)
+    problems: list[str] = []
+    for key in ("http_status_mapping", "error_file_mapping"):
+        if key not in sidecar:
+            problems.append(f"{REST_API_STATUS_MAP_JSON} missing required key {key}")
+            continue
+        if not isinstance(sidecar[key], dict):
+            problems.append(f"{REST_API_STATUS_MAP_JSON} {key} must be an object")
+            continue
+        if sidecar[key] != expected[key]:
+            problems.append(f"{REST_API_STATUS_MAP_JSON} {key} does not match rest_api_map.npy")
+    return problems
+
+
 def build_manifest(host_dir: Path, api_map: dict, vendor: str, model: str,
                    json_files: list[Path], redaction_status: str) -> dict:
     """Assemble corpus_manifest.json (counts derived from the map + files)."""
+    resource_json = _resource_json_paths(json_files)
     ufm = api_map["url_file_mapping"]
     amm = api_map["allowed_methods_mapping"]
     efm = api_map.get("error_file_mapping", {}) or {}
@@ -130,7 +183,7 @@ def build_manifest(host_dir: Path, api_map: dict, vendor: str, model: str,
         "bmc_firmware_version": "",
         "discovery_timestamp": "",
         "redfish_ctl_commit": commit,
-        "json_file_count": len(json_files),
+        "json_file_count": len(resource_json),
         "url_file_mapping_count": len(ufm),
         "error_file_mapping_count": len(efm),
         "allowed_methods_mapping_count": len(amm),
@@ -166,12 +219,14 @@ def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]
     amm = api_map["allowed_methods_mapping"]
     efm = api_map.get("error_file_mapping", {}) or {}
     hsm = api_map.get("http_status_mapping", {}) or {}
-    names = {p.name for p in json_files}
+    resource_json = _resource_json_paths(json_files)
+    names = {p.name for p in resource_json}
+    problems.extend(_status_sidecar_problems(host_dir, api_map))
     if "_redfish_v1.json" not in names:
         problems.append("ServiceRoot missing: no _redfish_v1.json (the entry point must be captured)")
     if "/redfish/v1/" not in ufm and "/redfish/v1" not in ufm:
         problems.append("ServiceRoot URL /redfish/v1/ not in url_file_mapping")
-    for p in json_files:
+    for p in resource_json:
         try:
             json.loads(p.read_text())
         except (ValueError, OSError) as e:
@@ -179,9 +234,9 @@ def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]
     overlap = set(ufm) & set(efm)
     if overlap:
         problems.append(f"url in BOTH url_file_mapping and error_file_mapping: {sorted(overlap)[:5]}")
-    if len(json_files) != len(ufm) + len(efm):
+    if len(resource_json) != len(ufm) + len(efm):
         problems.append(
-            f"json_file_count {len(json_files)} != url_file_mapping {len(ufm)} "
+            f"json_file_count {len(resource_json)} != url_file_mapping {len(ufm)} "
             f"+ error_file_mapping {len(efm)}")
     # methods may cover just the 2xx set (legacy) or the 2xx+error set (new capture)
     if len(amm) not in (len(ufm), len(ufm) + len(efm)):
@@ -192,7 +247,7 @@ def validate(host_dir: Path, api_map: dict, json_files: list[Path]) -> list[str]
         if Path(fname).name not in names:
             problems.append(f"mapped file missing from corpus: {url} -> {fname}")
     mapped = {Path(f).name for f in ufm.values()} | {Path(f).name for f in efm.values()}
-    for p in json_files:
+    for p in resource_json:
         if p.name == "rest_api_map.npy" or p.name == "corpus_manifest.json":
             continue
         if p.name not in mapped:
@@ -214,7 +269,7 @@ def pack(host_dir: Path, output: Path, vendor: str, model: str,
          redact: bool = True, dry_run: bool = False) -> int:
     """Validate + (optionally redact) + pack a full corpus. Fail closed."""
     host_dir = host_dir.resolve()
-    json_files = sorted(p for p in host_dir.glob("*.json"))
+    json_files = _resource_json_files(host_dir)
     if not json_files:
         print(f"no *.json in {host_dir}", file=sys.stderr)
         return 2
@@ -242,6 +297,13 @@ def pack(host_dir: Path, output: Path, vendor: str, model: str,
         (dest / p.name).write_text(json.dumps(data, indent=4))
     # copy the EXACT rest_api_map.npy (same-run; no credentials in URLs/methods)
     (dest / "rest_api_map.npy").write_bytes((host_dir / "rest_api_map.npy").read_bytes())
+    sidecar_path = host_dir / REST_API_STATUS_MAP_JSON
+    if sidecar_path.exists():
+        (dest / REST_API_STATUS_MAP_JSON).write_bytes(sidecar_path.read_bytes())
+    elif "http_status_mapping" in api_map or "error_file_mapping" in api_map:
+        (dest / REST_API_STATUS_MAP_JSON).write_text(
+            json.dumps(_status_sidecar_payload(api_map), indent=2)
+        )
     manifest["artifact_checksum"] = artifact_payload_checksum(dest)
     (dest / "corpus_manifest.json").write_text(json.dumps(manifest, indent=2))
 

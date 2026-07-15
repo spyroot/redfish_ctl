@@ -258,6 +258,13 @@ def _write_capture_host(root):
         },
     }
     np.save(host / "rest_api_map.npy", api)
+    (host / "rest_api_map.status.json").write_text(json.dumps(
+        {
+            "http_status_mapping": api["http_status_mapping"],
+            "error_file_mapping": api["error_file_mapping"],
+        },
+        indent=2,
+    ))
     return host
 
 
@@ -321,7 +328,14 @@ def test_error_capture_full_pack_roundtrips(tmp_path):
         tar.extractall(unpack)
     root = unpack / host.name
     assert (root / "_redfish_v1_Chassis_1_PCIeDevices_178.error.json").exists()
+    sidecar = root / "rest_api_map.status.json"
+    assert sidecar.exists()
     api = pack_full_corpus.load_api_map(root)
+    sidecar_data = json.loads(sidecar.read_text())
+    assert sidecar_data == {
+        "http_status_mapping": api["http_status_mapping"],
+        "error_file_mapping": api["error_file_mapping"],
+    }
     assert api["http_status_mapping"]["/redfish/v1/Chassis/1/PCIeDevices/178"] == 404
     assert "/redfish/v1/Chassis/1/PCIeDevices/178" in api["error_file_mapping"]
     files = sorted(p for p in root.glob("*.json") if p.name != "corpus_manifest.json")
@@ -395,6 +409,19 @@ def test_committed_full_corpus_npy_is_sound(tarball: Path, tmp_path: Path) -> No
     keys = set(api)
     assert _REQUIRED_NPY_KEYS <= keys, f"{tarball.name}: missing required keys {_REQUIRED_NPY_KEYS - keys}"
     assert keys <= _KNOWN_NPY_KEYS, f"{tarball.name}: unexpected keys {keys - _KNOWN_NPY_KEYS}"
+    if {"http_status_mapping", "error_file_mapping"} <= keys:
+        sidecar = root / "rest_api_map.status.json"
+        assert sidecar.exists(), f"{tarball.name}: missing rest_api_map.status.json"
+        assert json.loads(sidecar.read_text()) == {
+            "http_status_mapping": {
+                path: int(status)
+                for path, status in (api.get("http_status_mapping", {}) or {}).items()
+            },
+            "error_file_mapping": {
+                path: str(filename)
+                for path, filename in (api.get("error_file_mapping", {}) or {}).items()
+            },
+        }
     url_map = api["url_file_mapping"]
     assert url_map, f"{tarball.name}: url_file_mapping is empty"
     unresolved = [u for u, f in url_map.items() if not (root / Path(str(f)).name).exists()]
