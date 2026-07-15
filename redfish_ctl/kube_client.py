@@ -42,7 +42,10 @@ def _load_kube_config() -> None:  # pragma: no cover - needs a real cluster/kube
 
 
 def _build_core_v1_api() -> Any:  # pragma: no cover - needs the kubernetes package.
-    """Return a fresh CoreV1Api bound to the loaded configuration."""
+    """Return a fresh CoreV1Api bound to the loaded configuration.
+
+    :return: a new ``CoreV1Api`` client instance.
+    """
     from kubernetes import client
 
     return client.CoreV1Api()
@@ -56,6 +59,9 @@ def get_core_v1_api() -> Any:
     config and builds the client exactly once. Raises ``ImportError`` (or the
     underlying config error) if kubernetes is unavailable; callers that must
     degrade offline catch that and fall back.
+
+    :return: the shared process-wide ``CoreV1Api`` instance.
+    :raises ImportError: when the kubernetes package is not installed.
     """
     global _CORE_V1_API
     api = _CORE_V1_API
