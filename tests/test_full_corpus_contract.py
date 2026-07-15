@@ -326,3 +326,77 @@ def test_error_capture_full_pack_roundtrips(tmp_path):
     assert "/redfish/v1/Chassis/1/PCIeDevices/178" in api["error_file_mapping"]
     files = sorted(p for p in root.glob("*.json") if p.name != "corpus_manifest.json")
     assert pack_full_corpus.validate(root, api, files) == []
+
+
+# --------------------------------------------------------------------------- #
+# Sanity gate over the REAL committed full_corpus/*.tar.gz maps. The tests above
+# pin the contract on synthetic host dirs; these validate the ACTUAL shipped
+# rest_api_map.npy files, so a corrupt or incomplete map fails the build. The
+# maps legitimately vary (2 keys or 4; filename or capture-host absolute path).
+# --------------------------------------------------------------------------- #
+
+_FULL_CORPUS_TARBALLS = sorted((REPO_ROOT / "full_corpus").glob("*_full_corpus.tar.gz"))
+_KNOWN_NPY_KEYS = {"url_file_mapping", "allowed_methods_mapping",
+                   "http_status_mapping", "error_file_mapping"}
+_REQUIRED_NPY_KEYS = {"url_file_mapping", "allowed_methods_mapping"}
+_EXPECTED_TARBALLS = {
+    "dell_xr8620t_full_corpus.tar.gz", "hpe_dl360_full_corpus.tar.gz",
+    "supermicro_gb300_full_corpus.tar.gz", "supermicro_x10_full_corpus.tar.gz",
+}
+
+
+def _is_lfs_pointer(path: Path) -> bool:
+    """Whether ``path`` is an unfetched Git-LFS pointer instead of the real blob.
+
+    :param path: the file to inspect.
+    :return: True when its first bytes carry the LFS pointer signature.
+    """
+    with open(path, "rb") as handle:
+        return handle.read(40).startswith(b"version https://git-lfs")
+
+
+def test_full_corpus_tarballs_present() -> None:
+    """The four vendor full_corpus tarballs are committed (LFS pointers count).
+
+    Guards against a silently-empty gate: if the artifacts vanish, the
+    parametrized soundness test would collect zero cases and pass vacuously.
+
+    :return: None.
+    """
+    names = {t.name for t in _FULL_CORPUS_TARBALLS}
+    assert _EXPECTED_TARBALLS <= names, f"missing full_corpus tarballs: {_EXPECTED_TARBALLS - names}"
+
+
+@pytest.mark.parametrize(
+    "tarball", _FULL_CORPUS_TARBALLS, ids=[t.name for t in _FULL_CORPUS_TARBALLS]
+)
+def test_committed_full_corpus_npy_is_sound(tarball: Path, tmp_path: Path) -> None:
+    """Validate a shipped full_corpus rest_api_map.npy against the map contract.
+
+    Runs on the ACTUAL committed artifact (not synthetic data): the npy loads
+    with ``allow_pickle``, carries the two required maps and only known keys,
+    ``url_file_mapping`` is non-empty, every mapped value resolves to a JSON file
+    in the archive by basename (older captures store absolute capture-host
+    paths), and ``allowed_methods_mapping`` is non-empty. Skips a tarball that is
+    still an unfetched LFS pointer.
+
+    :param tarball: the full_corpus/*.tar.gz to validate.
+    :param tmp_path: pytest-provided temp dir the tarball extracts into.
+    :return: None.
+    """
+    if _is_lfs_pointer(tarball):
+        pytest.skip(f"{tarball.name} is an unfetched LFS pointer — run `git lfs pull`")
+    with tarfile.open(tarball) as archive:
+        archive.extractall(tmp_path)  # noqa: S202 - our own trusted committed corpus
+    maps = list(tmp_path.rglob("rest_api_map.npy"))
+    assert len(maps) == 1, f"{tarball.name}: expected one rest_api_map.npy, found {len(maps)}"
+    root = maps[0].parent
+    api = np.load(maps[0], allow_pickle=True).item()
+    keys = set(api)
+    assert _REQUIRED_NPY_KEYS <= keys, f"{tarball.name}: missing required keys {_REQUIRED_NPY_KEYS - keys}"
+    assert keys <= _KNOWN_NPY_KEYS, f"{tarball.name}: unexpected keys {keys - _KNOWN_NPY_KEYS}"
+    url_map = api["url_file_mapping"]
+    assert url_map, f"{tarball.name}: url_file_mapping is empty"
+    unresolved = [u for u, f in url_map.items() if not (root / Path(str(f)).name).exists()]
+    assert not unresolved, f"{tarball.name}: {len(unresolved)} unresolved url_file_mapping entries, e.g. {unresolved[:3]}"
+    assert api["allowed_methods_mapping"], f"{tarball.name}: allowed_methods_mapping is empty"
