@@ -1,6 +1,6 @@
-"""iDRAC reset manager ,
+"""Reset the manager.
 
-command reset-reboot IDRAC manger.
+Reset/reboot the Redfish manager.
 
     redfish_ctl manager-reboot
 
@@ -19,7 +19,7 @@ class ManagerReset(RedfishManagerBase,
                    scm_type=ApiRequestType.ManagerReset,
                    name='manager_reset',
                    metaclass=Singleton):
-    """iDRAC Manager server Command, fetch manager service,
+    """Reset the manager command, targets the manager service,
     caller can save to a file or output to a file or pass downstream.
     """
 
@@ -71,7 +71,7 @@ class ManagerReset(RedfishManagerBase,
                 do_wait: Optional[bool] = False,
                 wait_timeout: Optional[float] = 300.0,
                 **kwargs) -> CommandResult:
-        """Reset IDRAC manager services.
+        """Reset the manager services.
 
         :param data_type: json or xml; ``json`` adds the JSON content-type header.
         :param do_deep: accepted for CLI compatibility; not used by this command.
