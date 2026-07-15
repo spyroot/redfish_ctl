@@ -27,18 +27,27 @@ class ConsoleInfo(RedfishManagerBase,
     """Report serial / graphical / shell console access for every manager."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the console-info command."""
         super(ConsoleInfo, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the ``console-info`` subcommand (read-only)."""
+        """Register the ``console-info`` subcommand (read-only).
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command report console access (serial/graphical/shell) per manager"
         return cmd_parser, "console-info", help_text
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning {} on any failure."""
+        """GET a resource body, returning {} on any failure.
+
+        :param uri: Redfish resource URI to query.
+        :param do_async: run the query asynchronously (subscribes to the event loop).
+        :return: the resource body dict, or {} on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -51,7 +60,16 @@ class ConsoleInfo(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Report each manager's console blocks (capability, not a live stream)."""
+        """Report each manager's console blocks (capability, not a live stream).
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: run the per-manager queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult whose data is a list of console rows
+            (Manager, Console, Enabled, ConnectTypes, MaxSessions).
+        """
         rows = []
         try:
             manager_ids = self.discover_manager_ids() or []
