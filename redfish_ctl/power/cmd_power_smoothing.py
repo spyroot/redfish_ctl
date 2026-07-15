@@ -1,4 +1,11 @@
-"""Read NVIDIA PowerSmoothing resources exposed through GPU processors."""
+"""Read NVIDIA PowerSmoothing resources exposed through GPU processors.
+
+    redfish_ctl power-smoothing
+
+Walks ``/redfish/v1/Systems`` -> each system ``Processors`` -> GPU
+processors -> ``Oem/Nvidia/PowerSmoothing``, aggregating smoothing state,
+preset profiles, and admin override profiles.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -16,18 +23,28 @@ class PowerSmoothing(RedfishManagerBase,
     """Read GPU PowerSmoothing state and profile setpoints."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the power-smoothing command."""
         super(PowerSmoothing, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``power-smoothing`` subcommand."""
+        """Register the read-only ``power-smoothing`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         help_text = "command read NVIDIA GPU PowerSmoothing profiles"
         return cmd_parser, "power-smoothing", help_text
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` URIs from a Redfish collection.
+
+        :param data: parsed collection resource that may hold ``Members``.
+        :return: list of member ``@odata.id`` strings, empty when absent
+            or malformed.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -39,6 +56,12 @@ class PowerSmoothing(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` referenced by ``data[key]``.
+
+        :param data: parsed resource that may hold a link object under ``key``.
+        :param key: name of the link property to dereference.
+        :return: the ``@odata.id`` string, or None when absent or malformed.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -46,6 +69,12 @@ class PowerSmoothing(RedfishManagerBase,
 
     @staticmethod
     def _nested_link(data, *keys):
+        """Follow a chain of nested keys and return the final ``@odata.id``.
+
+        :param data: parsed resource to descend into.
+        :return: the ``@odata.id`` at the end of the key chain, or None when
+            any step is missing or malformed.
+        """
         value = data
         for key in keys:
             if not isinstance(value, dict):
@@ -57,10 +86,21 @@ class PowerSmoothing(RedfishManagerBase,
 
     @staticmethod
     def _resource_id(uri):
+        """Derive the resource id from a Redfish URI.
+
+        :param uri: resource ``@odata.id`` path.
+        :return: the trailing path segment used as the resource id.
+        """
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _action_target(data, key):
+        """Return the POST ``target`` of a named Redfish action.
+
+        :param data: parsed resource carrying an ``Actions`` block.
+        :param key: action name to look up under ``Actions``.
+        :return: the action ``target`` URI string, or None when absent.
+        """
         actions = data.get("Actions") if isinstance(data, dict) else None
         action = actions.get(key) if isinstance(actions, dict) else None
         if isinstance(action, dict) and isinstance(action.get("target"), str):
@@ -69,6 +109,14 @@ class PowerSmoothing(RedfishManagerBase,
 
     @staticmethod
     def _profile(system_id, gpu_id, profile, fallback_uri):
+        """Build a flat profile row from a PowerSmoothing profile resource.
+
+        :param system_id: system id the profile belongs to.
+        :param gpu_id: GPU processor id the profile belongs to.
+        :param profile: parsed profile resource.
+        :param fallback_uri: URI used when the profile omits ``@odata.id``.
+        :return: dict of the selected profile setpoint fields.
+        """
         return {
             "System": system_id,
             "GPU": gpu_id,
@@ -84,12 +132,26 @@ class PowerSmoothing(RedfishManagerBase,
         }
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI and return its data, swallowing errors.
+
+        :param uri: Redfish resource path to GET.
+        :param do_async: when True, issue the query on the async event loop.
+        :return: the response data dict, or an empty dict on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _read_profile(self, system_id, gpu_id, profile_uri, do_async=False):
+        """Read a single PowerSmoothing profile and flatten it.
+
+        :param system_id: system id the profile belongs to.
+        :param gpu_id: GPU processor id the profile belongs to.
+        :param profile_uri: profile resource URI to GET.
+        :param do_async: when True, issue the query on the async event loop.
+        :return: the flattened profile dict, or None when the resource is empty.
+        """
         profile = self._query_optional(profile_uri, do_async=do_async)
         if not isinstance(profile, dict) or not profile:
             return None
@@ -100,6 +162,15 @@ class PowerSmoothing(RedfishManagerBase,
                               gpu_id,
                               profiles_uri,
                               do_async=False):
+        """Read a PresetProfiles collection and its member profiles.
+
+        :param system_id: system id the profiles belong to.
+        :param gpu_id: GPU processor id the profiles belong to.
+        :param profiles_uri: ``PresetProfiles`` collection URI to walk.
+        :param do_async: when True, issue queries on the async event loop.
+        :return: tuple of (collection summary dict, list of profile dicts),
+            or (None, []) when the collection is empty.
+        """
         collection = self._query_optional(profiles_uri, do_async=do_async)
         if not isinstance(collection, dict) or not collection:
             return None, []
@@ -135,6 +206,17 @@ class PowerSmoothing(RedfishManagerBase,
                                     gpu_id,
                                     smoothing_uri,
                                     do_async=False):
+        """Read one GPU PowerSmoothing resource and append it to ``data``.
+
+        Appends the smoothing row plus any preset-profile collection and
+        admin override profile to the corresponding lists in ``data``.
+
+        :param data: aggregation dict mutated in place with smoothing results.
+        :param system_id: system id the GPU belongs to.
+        :param gpu_id: GPU processor id being read.
+        :param smoothing_uri: ``PowerSmoothing`` resource URI to GET.
+        :param do_async: when True, issue queries on the async event loop.
+        """
         smoothing = self._query_optional(smoothing_uri, do_async=do_async)
         if not isinstance(smoothing, dict) or not smoothing:
             return
@@ -202,6 +284,23 @@ class PowerSmoothing(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Read NVIDIA GPU PowerSmoothing state and profiles across systems.
+
+        Walks every ``/redfish/v1/Systems`` member to its GPU processors and
+        their ``Oem/Nvidia/PowerSmoothing`` resource, aggregating smoothing
+        state, preset profiles, and admin override profiles.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this
+            command.
+        :param do_async: when True, run Redfish queries on the async event
+            loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this
+            command.
+        :return: CommandResult holding the aggregated smoothing data and a
+            summary.
+        """
         data = {
             "summary": {},
             "power_smoothing": [],

@@ -1,4 +1,12 @@
-"""Read Redfish Chassis PowerSubsystem resources."""
+"""Read Redfish Chassis PowerSubsystem resources.
+
+    redfish_ctl power
+
+Walks ``/redfish/v1/Chassis`` -> each chassis ``PowerSubsystem`` -> its
+``PowerSupplies`` and ``Batteries`` collections, aggregating subsystem
+allocation, per-supply metrics, and battery state. Navigation is by
+ServiceRoot links and ``@odata.id`` with no hardcoded ids.
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -15,17 +23,27 @@ class Power(RedfishManagerBase,
     """Read chassis power subsystems, supplies, metrics, and batteries."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the power command."""
         super(Power, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``power`` subcommand."""
+        """Register the read-only ``power`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return cmd_parser, "power", "command read chassis power subsystem data"
 
     @staticmethod
     def _members(data):
+        """Extract member ``@odata.id`` URIs from a Redfish collection.
+
+        :param data: parsed collection resource that may hold ``Members``.
+        :return: list of member ``@odata.id`` strings, empty when absent
+            or malformed.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -37,6 +55,12 @@ class Power(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
+        """Return the ``@odata.id`` referenced by ``data[key]``.
+
+        :param data: parsed resource that may hold a link object under ``key``.
+        :param key: name of the link property to dereference.
+        :return: the ``@odata.id`` string, or None when absent or malformed.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict) and isinstance(value.get("@odata.id"), str):
             return value["@odata.id"]
@@ -44,33 +68,68 @@ class Power(RedfishManagerBase,
 
     @staticmethod
     def _status(data):
+        """Return the ``Status`` sub-object of a resource.
+
+        :param data: parsed resource that may carry a ``Status`` block.
+        :return: the ``Status`` dict, or an empty dict when absent.
+        """
         status = data.get("Status") if isinstance(data, dict) else None
         return status if isinstance(status, dict) else {}
 
     @staticmethod
     def _chassis_id(chassis_uri):
+        """Derive the chassis id from a chassis URI.
+
+        :param chassis_uri: chassis ``@odata.id`` path.
+        :return: the trailing path segment used as the chassis id.
+        """
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _reading(value):
+        """Unwrap a Redfish metric value to its numeric reading.
+
+        :param value: a metric object carrying a ``Reading`` key, or a
+            bare value.
+        :return: ``value["Reading"]`` when ``value`` is a dict, otherwise
+            ``value``.
+        """
         if isinstance(value, dict):
             return value.get("Reading")
         return value
 
     @staticmethod
     def _first_present(*values):
+        """Return the first argument that is not None.
+
+        :return: the first non-None value, or None when all are None.
+        """
         for value in values:
             if value is not None:
                 return value
         return None
 
     def _query_optional(self, uri, do_async=False):
+        """Query a URI and return its data, swallowing errors.
+
+        :param uri: Redfish resource path to GET.
+        :param do_async: when True, issue the query on the async event loop.
+        :return: the response data dict, or an empty dict on any failure.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _read_power_supplies(self, chassis_id, supplies_uri, do_async=False):
+        """Read a chassis PowerSupplies collection and its members.
+
+        :param chassis_id: chassis id the supplies belong to.
+        :param supplies_uri: ``PowerSupplies`` collection URI to walk.
+        :param do_async: when True, issue queries on the async event loop.
+        :return: tuple of (collection summary dict, list of supply dicts),
+            or (None, []) when the response is not a dict.
+        """
         data = self._query_optional(supplies_uri, do_async=do_async)
         if not isinstance(data, dict):
             return None, []
@@ -131,6 +190,14 @@ class Power(RedfishManagerBase,
         return collection, supplies
 
     def _read_batteries(self, chassis_id, batteries_uri, do_async=False):
+        """Read a chassis Batteries collection and its members.
+
+        :param chassis_id: chassis id the batteries belong to.
+        :param batteries_uri: ``Batteries`` collection URI to walk.
+        :param do_async: when True, issue queries on the async event loop.
+        :return: tuple of (collection summary dict, list of battery dicts),
+            or (None, []) when the response is not a dict.
+        """
         data = self._query_optional(batteries_uri, do_async=do_async)
         if not isinstance(data, dict):
             return None, []
@@ -173,6 +240,22 @@ class Power(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
+        """Read chassis power subsystems, supplies, metrics, and batteries.
+
+        Walks every ``/redfish/v1/Chassis`` member to its ``PowerSubsystem``,
+        then its ``PowerSupplies`` and ``Batteries`` collections, aggregating
+        subsystem allocation, per-supply metrics, and battery state.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this
+            command.
+        :param do_async: when True, run Redfish queries on the async event
+            loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this
+            command.
+        :return: CommandResult holding the aggregated power data and a summary.
+        """
         data = {
             "summary": {},
             "subsystems": [],
