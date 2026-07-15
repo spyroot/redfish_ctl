@@ -1,4 +1,8 @@
-"""Read Redfish MemoryMetrics resources."""
+"""Read Redfish MemoryMetrics resources.
+
+    redfish_ctl memory-metrics
+    redfish_ctl memory-metrics --filename memory.json
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -17,12 +21,16 @@ class MemoryMetrics(RedfishManagerBase,
     """Read Memory Metrics linked from Memory and Processor MemorySummary."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the memory-metrics command."""
         super(MemoryMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``memory-metrics`` subcommand."""
+        """Register the read-only ``memory-metrics`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return (
             cmd_parser,
@@ -31,6 +39,12 @@ class MemoryMetrics(RedfishManagerBase,
         )
 
     def _query_optional(self, uri, do_async=False):
+        """Query a Redfish URI, returning an empty dict on any error.
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: when True, issue the query asynchronously.
+        :return: the parsed resource dict, or an empty dict when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -38,6 +52,15 @@ class MemoryMetrics(RedfishManagerBase,
 
     @staticmethod
     def _row(parent_type, parent_id, parent_uri, metrics_uri, metrics):
+        """Build a single MemoryMetrics row.
+
+        :param parent_type: kind of parent resource (Memory or ProcessorMemorySummary).
+        :param parent_id: id of the parent resource.
+        :param parent_uri: URI of the parent resource.
+        :param metrics_uri: URI of the MemoryMetrics resource.
+        :param metrics: parsed MemoryMetrics resource.
+        :return: dict describing the parent and its memory metrics.
+        """
         return {
             "ParentType": parent_type,
             "ParentId": parent_id,
@@ -56,6 +79,14 @@ class MemoryMetrics(RedfishManagerBase,
 
     @staticmethod
     def _summary(systems_count, memory_modules_count, summary_count, rows):
+        """Summarize counts across the collected MemoryMetrics rows.
+
+        :param systems_count: number of systems that contributed metrics.
+        :param memory_modules_count: total number of memory modules examined.
+        :param summary_count: number of processor memory-summary metrics found.
+        :param rows: collected MemoryMetrics rows.
+        :return: dict of aggregate counts across the metric rows.
+        """
         return {
             "systems": systems_count,
             "memory_modules": memory_modules_count,
@@ -85,6 +116,16 @@ class MemoryMetrics(RedfishManagerBase,
                        parent_uri,
                        metrics_uri,
                        do_async=False):
+        """Fetch a MemoryMetrics resource and append its row when new and non-empty.
+
+        :param rows: list of rows to append to.
+        :param seen: set of metrics URIs already collected, updated in place.
+        :param parent_type: kind of parent resource for the row.
+        :param parent_id: id of the parent resource.
+        :param parent_uri: URI of the parent resource.
+        :param metrics_uri: URI of the MemoryMetrics resource to fetch.
+        :param do_async: when True, issue the query asynchronously.
+        """
         if not metrics_uri or metrics_uri in seen:
             return
         metrics = self._query_optional(metrics_uri, do_async=do_async)
@@ -104,6 +145,14 @@ class MemoryMetrics(RedfishManagerBase,
                                seen,
                                system,
                                do_async=False):
+        """Append MemoryMetrics rows for the Memory modules of a system.
+
+        :param rows: list of rows to append to.
+        :param seen: set of metrics URIs already collected, updated in place.
+        :param system: parsed ComputerSystem resource.
+        :param do_async: when True, issue the queries asynchronously.
+        :return: number of memory modules examined.
+        """
         memory_count = 0
         memory_uri = link(system, "Memory")
         if not memory_uri:
@@ -131,6 +180,14 @@ class MemoryMetrics(RedfishManagerBase,
                                           seen,
                                           system,
                                           do_async=False):
+        """Append processor MemorySummary metric rows for a system.
+
+        :param rows: list of rows to append to.
+        :param seen: set of metrics URIs already collected, updated in place.
+        :param system: parsed ComputerSystem resource.
+        :param do_async: when True, issue the queries asynchronously.
+        :return: number of processor memory-summary metrics appended.
+        """
         summary_count = 0
         processors_uri = link(system, "Processors")
         if not processors_uri:
@@ -165,7 +222,15 @@ class MemoryMetrics(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk Systems -> Memory Metrics and Processor MemorySummary Metrics."""
+        """Walk Systems -> Memory Metrics and Processor MemorySummary Metrics.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the memory-metrics summary and metric rows.
+        """
         rows = []
         seen = set()
         systems_count = 0

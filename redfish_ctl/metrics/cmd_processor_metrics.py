@@ -1,4 +1,8 @@
-"""Read Redfish ProcessorMetrics resources."""
+"""Read Redfish ProcessorMetrics resources.
+
+    redfish_ctl processor-metrics
+    redfish_ctl processor-metrics --filename processors.json
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -17,12 +21,16 @@ class ProcessorMetrics(RedfishManagerBase,
     """Read Processor Metrics linked from ComputerSystem processors."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the processor-metrics command."""
         super(ProcessorMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``processor-metrics`` subcommand."""
+        """Register the read-only ``processor-metrics`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return (
             cmd_parser,
@@ -31,6 +39,12 @@ class ProcessorMetrics(RedfishManagerBase,
         )
 
     def _query_optional(self, uri, do_async=False):
+        """Query a Redfish URI, returning an empty dict on any error.
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: when True, issue the query asynchronously.
+        :return: the parsed resource dict, or an empty dict when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -38,11 +52,25 @@ class ProcessorMetrics(RedfishManagerBase,
 
     @staticmethod
     def _core_voltage(metrics):
+        """Return the ``CoreVoltage`` block of a ProcessorMetrics resource.
+
+        :param metrics: parsed ProcessorMetrics resource, or any value.
+        :return: the ``CoreVoltage`` dict, or ``None`` when absent.
+        """
         value = metrics.get("CoreVoltage") if isinstance(metrics, dict) else None
         return value if isinstance(value, dict) else None
 
     @staticmethod
     def _row(system_uri, processor_uri, processor, metrics_uri, metrics):
+        """Build a single ProcessorMetrics row.
+
+        :param system_uri: URI of the owning ComputerSystem.
+        :param processor_uri: URI of the Processor resource.
+        :param processor: parsed Processor resource.
+        :param metrics_uri: URI of the ProcessorMetrics resource.
+        :param metrics: parsed ProcessorMetrics resource.
+        :return: dict describing the processor and its metrics.
+        """
         processor_id = processor.get("Id") or resource_id(processor_uri)
         return {
             "SystemId": resource_id(system_uri),
@@ -66,6 +94,13 @@ class ProcessorMetrics(RedfishManagerBase,
 
     @staticmethod
     def _summary(systems_count, processors_count, rows):
+        """Summarize counts across the collected ProcessorMetrics rows.
+
+        :param systems_count: number of systems that contributed processors.
+        :param processors_count: total number of processors examined.
+        :param rows: collected ProcessorMetrics rows.
+        :return: dict of aggregate counts across the metric rows.
+        """
         return {
             "systems": systems_count,
             "processors": processors_count,
@@ -97,7 +132,15 @@ class ProcessorMetrics(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk Systems -> Processors -> Metrics links."""
+        """Walk Systems -> Processors -> Metrics links.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the processor-metrics summary and metric rows.
+        """
         rows = []
         systems_count = 0
         processors_count = 0

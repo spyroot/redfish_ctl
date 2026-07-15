@@ -1,4 +1,8 @@
-"""Read consolidated Redfish GPU metric rows."""
+"""Read consolidated Redfish GPU metric rows.
+
+    redfish_ctl gpu-metrics
+    redfish_ctl gpu-metrics --filename gpus.json
+"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -25,12 +29,16 @@ class GpuMetrics(RedfishManagerBase,
     """Read per-GPU ProcessorMetrics, Sensor, and MemoryMetrics links."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize the gpu-metrics command."""
         super(GpuMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the read-only ``gpu-metrics`` subcommand."""
+        """Register the read-only ``gpu-metrics`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         return (
             cmd_parser,
@@ -39,6 +47,12 @@ class GpuMetrics(RedfishManagerBase,
         )
 
     def _query_optional(self, uri, do_async=False):
+        """Query a Redfish URI, returning an empty dict on any error.
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: when True, issue the query asynchronously.
+        :return: the parsed resource dict, or an empty dict when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -46,6 +60,12 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _odata_ids(data, key):
+        """Collect ``@odata.id`` URIs from a link that may be single or a list.
+
+        :param data: parsed Redfish resource, or any value.
+        :param key: name of the link property to read.
+        :return: list of ``@odata.id`` URIs; empty when none are present.
+        """
         value = data.get(key) if isinstance(data, dict) else None
         if isinstance(value, dict):
             odata_id = value.get("@odata.id")
@@ -61,11 +81,21 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _links(data):
+        """Return the ``Links`` block of a Redfish resource.
+
+        :param data: parsed Redfish resource, or any value.
+        :return: the ``Links`` dict, or an empty dict when absent.
+        """
         links = data.get("Links") if isinstance(data, dict) else None
         return links if isinstance(links, dict) else {}
 
     @staticmethod
     def _status(data):
+        """Extract present Health, HealthRollup, and State keys from ``Status``.
+
+        :param data: parsed Redfish resource, or any value.
+        :return: dict of any present status keys, or None when there is no Status block.
+        """
         status = data.get("Status") if isinstance(data, dict) else None
         if not isinstance(status, dict):
             return None
@@ -77,6 +107,12 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _is_gpu(processor, processor_uri):
+        """Decide whether a processor resource represents a GPU.
+
+        :param processor: parsed Processor resource.
+        :param processor_uri: URI of the processor, used to derive its id.
+        :return: True when the processor is a GPU, False otherwise.
+        """
         processor_id = processor.get("Id") or resource_id(processor_uri)
         return (
             processor.get("ProcessorType") == "GPU"
@@ -85,6 +121,12 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _clock_mhz(processor, metrics):
+        """Collect base, min, max, operating, and limit clock speeds for a GPU.
+
+        :param processor: parsed Processor resource.
+        :param metrics: parsed ProcessorMetrics resource.
+        :return: dict of clock speeds keyed base/min/max/operating/speed_limit.
+        """
         return {
             "base": processor.get("BaseSpeedMHz"),
             "min": processor.get("MinSpeedMHz"),
@@ -98,6 +140,11 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _compute_utilization(metrics):
+        """Read NVIDIA OEM compute-utilization percentages from GPU metrics.
+
+        :param metrics: parsed ProcessorMetrics resource.
+        :return: dict of labeled utilization values that parse as floats.
+        """
         nvidia = nvidia_oem(metrics) or {}
         values = {}
         for key, label in GPU_COMPUTE_PROPERTIES.items():
@@ -111,6 +158,11 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _throttle_durations(metrics):
+        """Read GPU throttle durations as seconds from metrics or NVIDIA OEM data.
+
+        :param metrics: parsed ProcessorMetrics resource.
+        :return: dict of labeled throttle durations in seconds.
+        """
         nvidia = nvidia_oem(metrics) or {}
         values = {}
         for key, label in GPU_THROTTLE_PROPERTIES.items():
@@ -126,6 +178,11 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _ecc_errors(metrics):
+        """Extract lifetime ECC error counts from memory metrics.
+
+        :param metrics: parsed MemoryMetrics resource.
+        :return: dict of labeled ECC counts, or empty when no ``LifeTime`` block exists.
+        """
         lifetime = metrics.get("LifeTime") if isinstance(metrics, dict) else None
         if not isinstance(lifetime, dict):
             return {}
@@ -137,6 +194,11 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _row_remapping(metrics):
+        """Extract NVIDIA row-remapping fields from memory metrics.
+
+        :param metrics: parsed MemoryMetrics resource.
+        :return: dict of labeled row-remapping values plus extra keys, or empty when absent.
+        """
         nvidia = nvidia_oem(metrics) or {}
         remapping = nvidia.get("RowRemapping")
         if not isinstance(remapping, dict):
@@ -152,6 +214,13 @@ class GpuMetrics(RedfishManagerBase,
         }
 
     def _temperature_readings(self, processor_uri, processor, do_async=False):
+        """Collect GPU temperature sensor readings linked through its chassis.
+
+        :param processor_uri: URI of the GPU processor being matched.
+        :param processor: parsed Processor resource.
+        :param do_async: when True, issue the chassis and sensor queries asynchronously.
+        :return: dict mapping sensor id to temperature reading in Celsius.
+        """
         links = self._links(processor)
         chassis_ids = self._odata_ids(links, "Chassis")
         readings = {}
@@ -175,6 +244,14 @@ class GpuMetrics(RedfishManagerBase,
         return readings
 
     def _memory_metric_row(self, memory_uri, memory, metrics_uri, metrics):
+        """Build a single linked-memory metric row for a GPU.
+
+        :param memory_uri: URI of the Memory resource.
+        :param memory: parsed Memory resource.
+        :param metrics_uri: URI of the MemoryMetrics resource.
+        :param metrics: parsed MemoryMetrics resource.
+        :return: dict describing the memory module and its metrics.
+        """
         memory_oem = nvidia_oem(memory) or {}
         return {
             "MemoryId": memory.get("Id") or resource_id(memory_uri),
@@ -200,6 +277,12 @@ class GpuMetrics(RedfishManagerBase,
         }
 
     def _linked_memory_metrics(self, processor, do_async=False):
+        """Collect memory-metric rows for the Memory linked from a GPU processor.
+
+        :param processor: parsed Processor resource.
+        :param do_async: when True, issue the memory and metrics queries asynchronously.
+        :return: list of memory metric rows; empty when none are linked.
+        """
         rows = []
         links = self._links(processor)
         for memory_uri in self._odata_ids(links, "Memory"):
@@ -221,6 +304,12 @@ class GpuMetrics(RedfishManagerBase,
         return rows
 
     def _summary_memory_metrics(self, processor, do_async=False):
+        """Read the aggregated MemorySummary metrics for a GPU processor.
+
+        :param processor: parsed Processor resource.
+        :param do_async: when True, issue the metrics query asynchronously.
+        :return: dict of summary memory metrics, or None when none are linked.
+        """
         memory_summary = processor.get("MemorySummary")
         if not isinstance(memory_summary, dict):
             return None
@@ -244,6 +333,14 @@ class GpuMetrics(RedfishManagerBase,
         }
 
     def _gpu_row(self, system_uri, processor_uri, processor, do_async=False):
+        """Build the consolidated metric row for a single GPU processor.
+
+        :param system_uri: URI of the owning ComputerSystem.
+        :param processor_uri: URI of the GPU processor.
+        :param processor: parsed Processor resource.
+        :param do_async: when True, issue linked-resource queries asynchronously.
+        :return: dict of GPU identity, status, clocks, temperatures, and metrics.
+        """
         metrics_uri = link(processor, "Metrics")
         metrics = (
             self._query_optional(metrics_uri, do_async=do_async)
@@ -299,6 +396,13 @@ class GpuMetrics(RedfishManagerBase,
 
     @staticmethod
     def _summary(systems_count, processors_count, rows):
+        """Summarize counts across the collected GPU rows.
+
+        :param systems_count: number of systems that contributed processors.
+        :param processors_count: total number of processors examined.
+        :param rows: collected GPU metric rows.
+        :return: dict of aggregate counts across the GPU rows.
+        """
         return {
             "systems": systems_count,
             "processors": processors_count,
@@ -325,7 +429,15 @@ class GpuMetrics(RedfishManagerBase,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """Walk Systems -> GPU Processors and linked GPU metric resources."""
+        """Walk Systems -> GPU Processors and linked GPU metric resources.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: when True, issue the Redfish queries asynchronously.
+        :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :return: CommandResult wrapping the GPU summary and per-GPU metric rows.
+        """
         rows = []
         systems_count = 0
         processors_count = 0
