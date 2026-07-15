@@ -39,6 +39,12 @@ spec:
             # plan/approve/apply write path.
             - /app/k8s/controller/redfish_endpoint_controller.py
             - /app/k8s/controller/redfish_node_profile_controller.py
+          env:
+            # Base cadence for the endpoint controller's poll timer. Per-CR
+            # spec.pollInterval slows individual endpoints below this floor.
+            # (Helm renders the same var from .Values.controller.pollInterval.)
+            - name: REDFISH_CONTROLLER_POLL_INTERVAL
+              value: "30s"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

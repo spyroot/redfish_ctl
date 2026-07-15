@@ -100,3 +100,38 @@ spec:
                 lastPolled:
                   type: string
                   format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                      - reason
+                      - lastTransitionTime
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                consecutiveFailures:
+                  type: integer
+                  minimum: 0
+                lastError:
+                  type: string
+                  nullable: true
+                nextPollAfter:
+                  type: string
+                  format: date-time
+                  nullable: true
