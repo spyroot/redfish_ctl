@@ -42,8 +42,26 @@ def _build_fixture_index(corpus_dir: Path) -> dict[str, Path]:
     return {path.name.lower(): path for path in root.glob("*.json")}
 
 
+def _numpy_available() -> bool:
+    """Report whether NumPy can be imported to read a legacy ``.npy`` map.
+
+    :return: True when ``import numpy`` succeeds, False otherwise.
+    """
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
     """Load the optional Redfish URL/status/error mapping.
+
+    When both a status JSON sidecar and a legacy ``rest_api_map.npy`` are
+    present (the norm for packed full corpora), the legacy map is merged
+    under the sidecar's replay keys. Without NumPy the legacy map cannot be
+    read, so the sidecar alone is served and the skip is logged loudly; a
+    malformed sidecar still fails startup.
 
     :param corpus_dir: directory that may contain a status JSON sidecar or
         legacy ``rest_api_map.npy``.
@@ -57,6 +75,15 @@ def _load_rest_api_map(corpus_dir: Path) -> dict[str, Any]:
     if sidecar_path.exists():
         sidecar_map = _load_rest_api_map_json(sidecar_path)
         if not map_path.exists():
+            return sidecar_map
+        if not _numpy_available():
+            LOGGER.warning(
+                "NumPy is unavailable; serving status/error replay from %s "
+                "only and skipping the legacy-only keys (url_file_mapping, "
+                "allowed_methods_mapping) in %s",
+                sidecar_path.name,
+                map_path.name,
+            )
             return sidecar_map
         legacy_map = _load_rest_api_map_npy(map_path)
         merged = copy.deepcopy(legacy_map)
@@ -79,7 +106,7 @@ def _load_rest_api_map_npy(map_path: Path) -> dict[str, Any]:
     """
     try:
         import numpy as np
-    except ModuleNotFoundError:
+    except ImportError:
         raise ValueError(
             f"NumPy is required to load Redfish API map: {map_path}"
         ) from None

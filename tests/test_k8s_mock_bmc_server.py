@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -326,6 +327,36 @@ def test_status_json_sidecar_preserves_legacy_url_file_mapping_alias(
     }
     assert error_status == 404
     assert error_payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+
+
+def test_status_json_sidecar_serves_replay_without_numpy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With both map files and no NumPy the mock serves the sidecar replay.
+
+    Packed full corpora ship ``rest_api_map.npy`` next to the JSON status
+    sidecar, and the sidecar exists so status replay works without NumPy —
+    so startup on such a corpus in a NumPy-free environment (a bare-host
+    run or slim deployment) must fall back to the sidecar loudly instead of
+    raising; only the legacy-only URL aliases degrade.
+    """
+    module = _load_server_module()
+    corpus = _write_sidecar_with_legacy_alias_corpus(tmp_path)
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    caplog.set_level(logging.WARNING, logger="mock_bmc_server")
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        root_status, _ = _http(base, "/redfish/v1")
+        error_status, error_payload = _http(base, "/redfish/v1/Missing")
+
+    assert root_status == 200
+    assert error_status == 404
+    assert error_payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+    assert "NumPy is unavailable" in caplog.text
+    assert "url_file_mapping" in caplog.text
 
 
 def test_status_json_sidecar_warns_when_overriding_legacy_status(
