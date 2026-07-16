@@ -22,7 +22,7 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key
 
 DOCSTRING_BASE ?= origin/main
 
@@ -94,3 +94,75 @@ k8s-explorer: ## Build and deploy the redfish_ctl web explorer (set REDFISH_IP/S
 
 clean: ## Remove local build, test, and type-check artifacts.
 	rm -rf build dist *.egg-info .coverage htmlcov .pytest_cache .ruff_cache .mypy_cache
+
+# ---------------------------------------------------------------------------
+# GB300 remote docker test fleet — ALL gates run there, never on a laptop.
+# Slot/host resolution comes from scripts/gb300.sh + .internal/gb300-fleet.env
+# (gitignored; see TEAM_GUIDE.md "GB300 Docker test environment").
+#   SLOT  = fleet slot number (required for the per-slot targets)
+#   AGENT = your agent name; isolates your /work volume and container
+#   REF   = git ref to test (default main); any pushed branch works
+# ---------------------------------------------------------------------------
+GB300_SH    := ./scripts/gb300.sh
+GB300_HOSTC  = $$($(GB300_SH) host $(SLOT))
+AGENT      ?= $(shell whoami)
+REF        ?= main
+PYTEST_ARGS ?= -q
+GB300_IMAGE ?= redfish-ctl-dev
+
+gb300-check: ## Live-check every fleet slot: ssh, docker, dev image, disk.
+	@printf '%-5s %-22s %-8s %-10s %-6s\n' SLOT HOST DOCKER IMAGE DISK; \
+	for s in $$($(GB300_SH) list); do \
+		h=$$($(GB300_SH) host $$s); \
+		out=$$(ssh -o BatchMode=yes -o ConnectTimeout=5 $$h ' \
+			d=no; docker info >/dev/null 2>&1 && d=ok; \
+			i=absent; docker image inspect $(GB300_IMAGE) >/dev/null 2>&1 && i=present; \
+			df=$$(df -h / | awk "NR==2 {print \$$5}"); \
+			echo "$$d $$i $$df"' 2>/dev/null) || out="UNREACHABLE - -"; \
+		printf '%-5s %-22s %-8s %-10s %-6s\n' "$$s" "$$h" $$out; \
+	done
+
+gb300-image: ## Build the dev image on a slot from this checkout's HEAD. SLOT=<n>
+	@test -n "$(SLOT)" || { echo "usage: make gb300-image SLOT=<n>"; exit 2; }
+	git archive --format=tar HEAD | ssh $(GB300_HOSTC) \
+		'docker build -t $(GB300_IMAGE) -f docker/Dockerfile.gb300-dev -'
+
+gb300-test: ## Run the offline pytest suite on a slot. SLOT=<n> [REF=main] [AGENT=me]
+	@test -n "$(SLOT)" || { echo "usage: make gb300-test SLOT=<n> [REF=<branch>]"; exit 2; }
+	$(GB300_SH) run $(SLOT) $(AGENT) $(REF) pytest $(PYTEST_ARGS)
+
+# Ruff scope matches the project convention: the tree carries pre-existing
+# lint debt, so only files changed vs origin/main are checked (a whole-tree
+# run reports ~300 legacy findings and would always fail).
+GB300_RUFF_CHANGED = git fetch -q origin main && \
+	{ git diff --name-only origin/main...HEAD -- "*.py" | xargs -r ruff check; }
+
+gb300-lint: ## Ruff over files changed vs origin/main, on a slot. SLOT=<n> REF=<branch>
+	@test -n "$(SLOT)" || { echo "usage: make gb300-lint SLOT=<n> REF=<branch>"; exit 2; }
+	$(GB300_SH) run $(SLOT) $(AGENT) $(REF) sh -c '$(GB300_RUFF_CHANGED)'
+
+gb300-gate: ## Full PR gate on a slot: pytest + changed-files ruff + whole-tree docstring gate.
+	@test -n "$(SLOT)" || { echo "usage: make gb300-gate SLOT=<n> [REF=<branch>]"; exit 2; }
+	$(GB300_SH) run $(SLOT) $(AGENT) $(REF) sh -c \
+		'pytest -q && $(GB300_RUFF_CHANGED) && python tools/docstring_gate.py --all'
+
+gb300-shell: ## Interactive dev shell on a slot (conda env active). SLOT=<n> [AGENT=me]
+	@test -n "$(SLOT)" || { echo "usage: make gb300-shell SLOT=<n>"; exit 2; }
+	$(GB300_SH) shell $(SLOT) $(AGENT)
+
+gb300-clean: ## Remove exited rfctl containers + dangling layers on a slot. SLOT=<n>
+	@test -n "$(SLOT)" || { echo "usage: make gb300-clean SLOT=<n>"; exit 2; }
+	ssh $(GB300_HOSTC) ' \
+		ids=$$(docker ps -aq --filter status=exited --filter name=rfctl); \
+		if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi; \
+		docker image prune -f'
+
+gb300-push-key: ## Operator only: install the git key + gh token on every slot.
+	@test -f "$(HOME)/.ssh/id_rsa" || { echo "no ~/.ssh/id_rsa"; exit 2; }
+	@for s in $$($(GB300_SH) list); do \
+		h=$$($(GB300_SH) host $$s); \
+		scp -o BatchMode=yes -o ConnectTimeout=5 -q ~/.ssh/id_rsa $$h:.ssh/redfish_ctl_git \
+			&& gh auth token | ssh $$h 'cat > .ssh/redfish_ctl_gh_token; chmod 600 .ssh/redfish_ctl_git .ssh/redfish_ctl_gh_token' \
+			&& echo "slot $$s ($$h): key + token installed" \
+			|| echo "slot $$s ($$h): FAILED"; \
+	done
