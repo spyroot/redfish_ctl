@@ -45,24 +45,49 @@ def _base_names(class_def: ast.ClassDef) -> set:
     return names
 
 
-def _member_assignment(stmt: ast.stmt) -> tuple:
-    """Extract (names, value) when a class-body statement defines a member.
+def _member_values(stmt: ast.stmt):
+    """Yield ``(name, value node)`` for each member a statement defines.
 
-    Handles plain assignments and annotated assignments with a value
-    (``B: int = ()`` still creates an enum member), so an annotation cannot
-    hide a value from the audit.
+    Handles plain assignments, annotated assignments with a value
+    (``B: int = ()`` still creates an enum member, so an annotation cannot
+    hide a value from the audit), and same-length tuple unpacking
+    (``A, B = "x", "y"`` creates one member per name). Statements that
+    create no member — annotation-only lines, method definitions — yield
+    nothing.
 
     :param stmt: a statement from an enum class body.
-    :return: ``(target names, value node)``, or ``([], None)`` for
-        statements that do not assign a member value.
+    :return: iterator of ``(member name, assigned-value AST node)`` pairs.
     """
     if isinstance(stmt, ast.Assign):
-        names = [t.id for t in stmt.targets if isinstance(t, ast.Name)]
-        return names, stmt.value
-    if isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
+        for target in stmt.targets:
+            if isinstance(target, ast.Name):
+                yield target.id, stmt.value
+            elif (
+                isinstance(target, ast.Tuple)
+                and isinstance(stmt.value, ast.Tuple)
+                and len(target.elts) == len(stmt.value.elts)
+            ):
+                for elt, value in zip(target.elts, stmt.value.elts):
+                    if isinstance(elt, ast.Name):
+                        yield elt.id, value
+    elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
         if isinstance(stmt.target, ast.Name):
-            return [stmt.target.id], stmt.value
-    return [], None
+            yield stmt.target.id, stmt.value
+
+
+def _is_int_literal(node: ast.AST) -> bool:
+    """Report whether a value node is an integer literal.
+
+    Unwraps a leading unary sign so an explicit negative member such as
+    ``X = -1`` (an ``ast.UnaryOp``, not an ``ast.Constant``) is still
+    recognized as an int — ints sort fine, so a later ``auto()`` is legal.
+
+    :param node: the assigned-value AST node.
+    :return: True when the node is a plain or sign-prefixed int literal.
+    """
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        node = node.operand
+    return isinstance(node, ast.Constant) and isinstance(node.value, int)
 
 
 def _is_auto_call(node: ast.AST) -> bool:
@@ -107,23 +132,20 @@ def _enum_auto_violations(tree: ast.AST, rel_path: str) -> list:
             continue
         saw_non_int_member = False
         for stmt in node.body:
-            targets, value = _member_assignment(stmt)
-            if not targets or all(t.startswith("_") for t in targets):
-                continue
-            if _is_auto_call(value):
-                if saw_non_int_member:
-                    violations.append(
-                        f"{rel_path}:{stmt.lineno} {node.name}.{targets[0]} uses"
-                        " auto() after a non-integer member value; Python 3.13+"
-                        " raises 'unable to sort non-numeric values' at import."
-                        " Give members explicit values or define"
-                        " _generate_next_value_."
-                    )
-            elif not (
-                isinstance(value, ast.Constant)
-                and isinstance(value.value, int)
-            ):
-                saw_non_int_member = True
+            for name, value in _member_values(stmt):
+                if name.startswith("_"):
+                    continue
+                if _is_auto_call(value):
+                    if saw_non_int_member:
+                        violations.append(
+                            f"{rel_path}:{stmt.lineno} {node.name}.{name} uses"
+                            " auto() after a non-integer member value; Python"
+                            " 3.13+ raises 'unable to sort non-numeric values'"
+                            " at import. Give members explicit values or"
+                            " define _generate_next_value_."
+                        )
+                elif not _is_int_literal(value):
+                    saw_non_int_member = True
     return violations
 
 
@@ -185,6 +207,40 @@ def test_audit_flags_annotated_member():
         "    C = auto()\n"
     )
     violations = _enum_auto_violations(ast.parse(source), "annotated.py")
+    assert len(violations) == 1
+    assert "Broken.C" in violations[0]
+
+
+def test_audit_accepts_negative_int_members():
+    """An explicit negative int member does not poison later auto() calls.
+
+    ``X = -1`` parses as ``ast.UnaryOp``, not ``ast.Constant``; ints sort
+    fine on every interpreter, so the audit must not flag the layout
+    (reviewer-found false positive).
+    """
+    source = (
+        "from enum import Enum, auto\n"
+        "class Levels(Enum):\n"
+        "    Below = -1\n"
+        "    Above = auto()\n"
+    )
+    assert _enum_auto_violations(ast.parse(source), "levels.py") == []
+
+
+def test_audit_flags_tuple_unpacked_members():
+    """Tuple-unpacked members with non-int values are still tracked.
+
+    ``A, B = "x", "y"`` creates one member per name, so a later ``auto()``
+    breaks import on Python 3.13+ exactly as with plain assignments
+    (reviewer-found false negative).
+    """
+    source = (
+        "from enum import Enum, auto\n"
+        "class Broken(Enum):\n"
+        "    A, B = 'x', 'y'\n"
+        "    C = auto()\n"
+    )
+    violations = _enum_auto_violations(ast.parse(source), "unpacked.py")
     assert len(violations) == 1
     assert "Broken.C" in violations[0]
 
