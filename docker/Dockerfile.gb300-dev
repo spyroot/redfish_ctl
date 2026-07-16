@@ -1,0 +1,82 @@
+# Full development image for running the redfish_ctl gates on a remote docker
+# host (the shared arm64 test fleet), so no test or docker run ever lands on an
+# operator workstation. One image serves every agent: each agent gets its own
+# named /work volume and container, created via the gb300-* Makefile targets.
+#
+# The image holds the TOOLCHAIN ONLY — conda env, git, gh, node, ssh client.
+# The repository is cloned into the per-agent /work volume by the entrypoint
+# (or by the agent), so code changes never invalidate an image layer. Secrets
+# (git SSH key, gh token) are NEVER baked into the image: the run targets
+# bind-mount them read-only under /secrets and the entrypoint wires them up.
+#
+# Build (streamed from a repo checkout, no local docker needed):
+#   git archive HEAD | ssh <host> 'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -'
+# or simply:  make gb300-image SLOT=<n>
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# System toolchain: build/test basics, git + ssh for the GitHub flow, gh CLI
+# from the official apt repo (multi-arch, works on aarch64 and x86_64).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        bats ca-certificates curl git git-lfs jq make openssh-client rsync \
+        shellcheck unzip vim-tiny \
+ && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends gh \
+ && rm -rf /var/lib/apt/lists/* \
+ && git lfs install --system
+
+# GitHub's public SSH host keys (public information, safe to bake) so git over
+# SSH works non-interactively on first use.
+RUN mkdir -p /etc/ssh \
+ && curl -fsS https://api.github.com/meta \
+    | jq -r '.ssh_keys[] | "github.com \(.)"' >> /etc/ssh/ssh_known_hosts
+
+# Miniforge = conda for whatever arch the node runs (arm64 on the GB300 fleet).
+RUN curl -fsSL "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh" \
+        -o /tmp/miniforge.sh \
+ && bash /tmp/miniforge.sh -b -p /opt/conda \
+ && rm /tmp/miniforge.sh
+ENV PATH="/opt/conda/bin:$PATH"
+
+# Create the project conda env from the committed manifest. Two build-time
+# rewrites: the final "pip: -e ." line needs the full repo, which is not in
+# the build context — stripped here, the entrypoint runs "pip install -e ."
+# inside /work once the clone exists; and the open-ended python>=3.10 spec is
+# pinned to the top of the CI matrix (an unpinned solve pulls 3.14t, whose
+# enum auto() breaks ApiRequestType). nodejs comes from conda-forge so JS
+# tooling (node --test etc.) is available in the same env.
+WORKDIR /deps
+COPY environment.yml ./
+RUN sed -e '/- -e \./d' -e 's/- python>=3.10/- python=3.12/' \
+        environment.yml > environment.docker.yml \
+ && conda env create -f environment.docker.yml \
+ && conda install -n redfish_ctl -c conda-forge -y nodejs \
+ && conda clean -afy \
+ && rm -rf /deps
+
+# Non-root user; uid 1000 matches the default first user on the nodes so
+# bind-mounted files stay readable.
+RUN userdel -r ubuntu 2>/dev/null || true \
+ && useradd -m -u 1000 -s /bin/bash dev
+USER dev
+WORKDIR /work
+
+# Conda env active in every shell, interactive or not. ~/.local/bin carries
+# the entry scripts from the entrypoint's user-level "pip install -e .[dev]".
+ENV BASH_ENV=/home/dev/.bashrc_conda \
+    PATH="/home/dev/.local/bin:$PATH"
+RUN echo 'source /opt/conda/etc/profile.d/conda.sh && conda activate redfish_ctl' \
+        > /home/dev/.bashrc_conda \
+ && cat /home/dev/.bashrc_conda >> /home/dev/.bashrc
+
+COPY --chmod=755 docker/gb300/entrypoint.sh /usr/local/bin/gb300-entrypoint
+ENTRYPOINT ["/usr/local/bin/gb300-entrypoint"]
+CMD ["bash"]
