@@ -38,10 +38,22 @@ _require() {
     fi
 }
 
+# Caller-supplied values are embedded in remote shell strings, so they are
+# validated against tight charsets up front: a stray space or metacharacter
+# fails loudly here instead of malforming an ssh/docker command later.
+_check() {
+    local what="$1" value="$2" pattern="$3"
+    if ! [[ "$value" =~ $pattern ]]; then
+        echo "gb300.sh: invalid $what '$value' (must match $pattern)" >&2
+        exit 2
+    fi
+}
+
 cmd="${1:-}"
 case "$cmd" in
     host)
         slot="${2:?usage: gb300.sh host <slot>}"
+        _check slot "$slot" '^[0-9]+$'
         if [ -n "${GB300_HOST:-}" ]; then
             echo "${GB300_USER:+$GB300_USER@}$GB300_HOST"
             exit 0
@@ -59,8 +71,11 @@ case "$cmd" in
     run|shell)
         slot="${2:?usage: gb300.sh $cmd <slot> <agent> ...}"
         agent="${3:?usage: gb300.sh $cmd <slot> <agent> ...}"
+        _check slot "$slot" '^[0-9]+$'
+        _check agent "$agent" '^[A-Za-z0-9._-]+$'
         host="$("$0" host "$slot")"
         image="${GB300_IMAGE:-redfish-ctl-dev}"
+        _check image "$image" '^[A-Za-z0-9._/:-]+$'
         # The remote snippet assembles the secret mounts on the node itself so
         # a missing key file never turns into a root-owned bind-mount dir.
         remote_prefix='m="";
@@ -71,6 +86,7 @@ case "$cmd" in
                 --name rfctl-$agent -v rfctl-work-$agent:/work \$m $image bash"
         fi
         ref="${4:?usage: gb300.sh run <slot> <agent> <ref> <cmd...>}"
+        _check ref "$ref" '^[A-Za-z0-9._/-]+$'
         shift 4
         [ $# -gt 0 ] || { echo "gb300.sh run: no command given" >&2; exit 2; }
         printf -v quoted '%q ' "$@"
