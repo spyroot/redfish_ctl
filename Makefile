@@ -133,17 +133,26 @@ gb300-check: ## Live-check every fleet slot: ssh, docker, dev image, disk.
 		printf '%-5s %-22s %-8s %-10s %-6s\n' "$$s" "$$h" $$out; \
 	done
 
+# Both build targets stage the context in a temp file instead of piping it
+# straight into ssh: a pipeline's exit status is the last command's, so a
+# partial archive failure could otherwise be masked by a succeeding build.
 gb300-image: ## Build the public base image on a slot from this checkout's HEAD. SLOT=<n>
 	@test -n "$(SLOT)" || { echo "usage: make gb300-image SLOT=<n>"; exit 2; }
-	git archive --format=tar HEAD | ssh $(GB300_HOSTC) \
-		'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -'
+	@ctx=$$(mktemp) && \
+	git archive --format=tar HEAD > "$$ctx" && \
+	ssh $(GB300_HOSTC) \
+		'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -' < "$$ctx"; \
+	rc=$$?; rm -f "$$ctx"; exit $$rc
 
 gb300-agent-image: ## Build the internal agent image (base + staged credentials) on a slot. SLOT=<n>
 	@test -n "$(SLOT)" || { echo "usage: make gb300-agent-image SLOT=<n>"; exit 2; }
 	@test -f .internal/docker/secrets/git_key || { \
 		echo "stage credentials first — see .internal/docker/README.md"; exit 2; }
-	tar -C .internal/docker -cf - . | ssh $(GB300_HOSTC) \
-		'docker build -t redfish-ctl-agent -f Dockerfile.gb300-agent -'
+	@ctx=$$(mktemp) && \
+	tar -C .internal/docker -cf "$$ctx" . && \
+	ssh $(GB300_HOSTC) \
+		'docker build -t redfish-ctl-agent -f Dockerfile.gb300-agent -' < "$$ctx"; \
+	rc=$$?; rm -f "$$ctx"; exit $$rc
 
 gb300-provision: ## Build base + agent images on every slot (operator bootstrap).
 	@for s in $$($(GB300_SH) list); do \
