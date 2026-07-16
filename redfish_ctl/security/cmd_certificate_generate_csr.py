@@ -221,6 +221,21 @@ class CertificateGenerateCSR(RedfishManagerBase,
             return None
         return {"@odata.id": uri}
 
+    def _certificate_service_uri(self, do_async):
+        """Resolve the CertificateService URI from the service root, with a standard fallback.
+
+        :param do_async: issue the service-root query over the async Redfish path when True.
+        :return: the CertificateService ``@odata.id``, or the standard fallback URI.
+        """
+        try:
+            root = self.base_query(RedfishApi.Version, do_async=do_async).data or {}
+        except Exception:
+            root = {}
+        link = root.get("CertificateService")
+        if isinstance(link, dict) and link.get("@odata.id"):
+            return link["@odata.id"]
+        return f"{RedfishApi.Version}/CertificateService"
+
     def _payload(self,
                  common_name,
                  organization=None,
@@ -339,7 +354,7 @@ class CertificateGenerateCSR(RedfishManagerBase,
         :return: a CommandResult with the GenerateCSR result or dry-run preview.
         """
         return self.invoke_action(
-            f"{RedfishApi.Version}/CertificateService",
+            self._certificate_service_uri(do_async),
             "GenerateCSR",
             payload=self._payload(
                 common_name,
