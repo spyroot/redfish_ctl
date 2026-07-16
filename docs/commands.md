@@ -91,6 +91,7 @@ Safety labels:
 | `bios-pending` | Read pending BIOS values. | Read |
 | `bios-profile` | List/show committed BIOS tuning profiles, diff against current BIOS attributes, or preview/apply a profile with `--confirm`. | Guarded |
 | `bios-registry` | Read BIOS registry metadata, choices, and writable attributes. | Read |
+| `bios-reset` | Preview or perform the Redfish BIOS resource's `Bios.ResetBios` action; requires `--confirm` to execute. | Guarded |
 | `bios-snapshot` | Capture a BIOS restore point for rollback-able changes. | Read |
 | `bmc-scan` | Scan a network segment for Redfish BMCs. | Read |
 | `boot` | Read boot source data (vendor-neutral: falls back to the ComputerSystem `Boot` object). | Read |
