@@ -49,8 +49,10 @@ jobs:
         id: changes
         if: github.event_name == 'pull_request'
         run: |
-          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}"
-          changed="$(git diff --name-only FETCH_HEAD...HEAD)"
+          # Fail safe: if the base fetch or diff fails (e.g. merge-base beyond
+          # the shallow fetch), fall through to the full suite.
+          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}" || true
+          changed="$(git diff --name-only FETCH_HEAD...HEAD 2>/dev/null || true)"
           echo "$changed"
           if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^docs/|\.md$'; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
@@ -61,13 +63,21 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
         run: pytest -q
       - name: Offline tests (docs-only fast path — docs-coupled tests)
-        # Docs edits can still break tests that read docs/ or README.md (path
-        # links, Makefile/docker doc contracts), so run exactly those instead
-        # of the whole suite. The set is discovered by grep, so a new
-        # docs-reading test is picked up automatically.
+        # Docs edits can still break tests that read docs/ or any Markdown
+        # file (path links, Makefile/docker doc contracts, simulator-contract
+        # references), so run exactly those instead of the whole suite. The
+        # set is discovered by grep over every test module, so a new
+        # docs-reading test is picked up automatically; if a shared fixture
+        # module (conftest or a helper) ever becomes docs-coupled, fall back
+        # to the full suite rather than guess.
         if: steps.changes.outputs.docs_only == 'true'
         run: |
-          files="$(grep -rlE '\bdocs/|commands\.md|README\.md' tests/test_*.py || true)"
+          if grep -qlE '\bdocs/|\.md\b' tests/conftest.py tests/test_utils.py tests/vendor_corpus.py 2>/dev/null; then
+            echo "shared test helper is docs-coupled; running the full suite"
+            pytest -q
+            exit 0
+          fi
+          files="$(grep -rlE '\bdocs/|\.md\b' tests/test_*.py || true)"
           if [ -n "$files" ]; then
             # shellcheck disable=SC2086
             pytest -q $files
