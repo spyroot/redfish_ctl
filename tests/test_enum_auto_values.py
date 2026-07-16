@@ -20,8 +20,11 @@ from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 PACKAGE_DIR = Path(redfish_ctl.__file__).resolve().parent
 
-# Enum-family base-class names whose subclasses use _generate_next_value_.
-_ENUM_BASES = {"Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"}
+# Enum-family bases that inherit the DEFAULT int-increment
+# _generate_next_value_. StrEnum is deliberately absent: it ships its own
+# generator (lowercased member name, prior values ignored), so mixing string
+# members with auto() is legal there and must not be flagged.
+_ENUM_BASES = {"Enum", "IntEnum", "Flag", "IntFlag"}
 
 
 def _base_names(class_def: ast.ClassDef) -> set:
@@ -40,6 +43,26 @@ def _base_names(class_def: ast.ClassDef) -> set:
         elif isinstance(base, ast.Attribute):
             names.add(base.attr)
     return names
+
+
+def _member_assignment(stmt: ast.stmt) -> tuple:
+    """Extract (names, value) when a class-body statement defines a member.
+
+    Handles plain assignments and annotated assignments with a value
+    (``B: int = ()`` still creates an enum member), so an annotation cannot
+    hide a value from the audit.
+
+    :param stmt: a statement from an enum class body.
+    :return: ``(target names, value node)``, or ``([], None)`` for
+        statements that do not assign a member value.
+    """
+    if isinstance(stmt, ast.Assign):
+        names = [t.id for t in stmt.targets if isinstance(t, ast.Name)]
+        return names, stmt.value
+    if isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
+        if isinstance(stmt.target, ast.Name):
+            return [stmt.target.id], stmt.value
+    return [], None
 
 
 def _is_auto_call(node: ast.AST) -> bool:
@@ -84,12 +107,10 @@ def _enum_auto_violations(tree: ast.AST, rel_path: str) -> list:
             continue
         saw_non_int_member = False
         for stmt in node.body:
-            if not isinstance(stmt, ast.Assign):
-                continue
-            targets = [t.id for t in stmt.targets if isinstance(t, ast.Name)]
+            targets, value = _member_assignment(stmt)
             if not targets or all(t.startswith("_") for t in targets):
                 continue
-            if _is_auto_call(stmt.value):
+            if _is_auto_call(value):
                 if saw_non_int_member:
                     violations.append(
                         f"{rel_path}:{stmt.lineno} {node.name}.{targets[0]} uses"
@@ -99,8 +120,8 @@ def _enum_auto_violations(tree: ast.AST, rel_path: str) -> list:
                         " _generate_next_value_."
                     )
             elif not (
-                isinstance(stmt.value, ast.Constant)
-                and isinstance(stmt.value.value, int)
+                isinstance(value, ast.Constant)
+                and isinstance(value.value, int)
             ):
                 saw_non_int_member = True
     return violations
@@ -148,6 +169,40 @@ def test_audit_flags_the_original_breakage():
     violations = _enum_auto_violations(ast.parse(source), "broken.py")
     assert len(violations) == 1
     assert "Broken.C" in violations[0]
+
+
+def test_audit_flags_annotated_member():
+    """An annotated assignment cannot hide a non-integer member value.
+
+    ``B: tuple = ()`` still creates an enum member, so the audit tracks it
+    exactly like a plain assignment; skipping AnnAssign nodes would let the
+    original breakage return behind a type annotation.
+    """
+    source = (
+        "from enum import Enum, auto\n"
+        "class Broken(Enum):\n"
+        "    B: tuple = ()\n"
+        "    C = auto()\n"
+    )
+    violations = _enum_auto_violations(ast.parse(source), "annotated.py")
+    assert len(violations) == 1
+    assert "Broken.C" in violations[0]
+
+
+def test_audit_exempts_strenum():
+    """StrEnum legally mixes string members with auto().
+
+    ``StrEnum._generate_next_value_`` returns the lowercased member name and
+    ignores prior values, so no sorting happens and the audit must not flag
+    such classes.
+    """
+    source = (
+        "from enum import StrEnum, auto\n"
+        "class Names(StrEnum):\n"
+        "    A = 'explicit'\n"
+        "    B = auto()\n"
+    )
+    assert _enum_auto_violations(ast.parse(source), "strenum.py") == []
 
 
 def test_audit_accepts_custom_generator():
