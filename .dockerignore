@@ -9,7 +9,6 @@
 COORDINATION.md
 
 # Bulky, run-time-only, or captured data the package does not need to run.
-tests/supermicro_fixtures/
 dumps/
 reports/
 .json_responses/
