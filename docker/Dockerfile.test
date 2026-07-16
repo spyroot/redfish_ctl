@@ -3,6 +3,11 @@
 # paths and Linux is case-SENSITIVE, so a fixture-lookup bug that macOS's
 # case-insensitive filesystem hides would surface here.
 #
+# The image holds DEPENDENCIES ONLY — the repo is mounted at /work by
+# docker/run-tests.sh at run time. Code edits therefore never invalidate a
+# layer: the image rebuilds only when setup.py/requirements change, and
+# repeated test runs stop stranding dangling images on the host.
+#
 # Build + run:  ./docker/run-tests.sh   (or see the commands at the bottom)
 FROM ubuntu:24.04
 
@@ -19,15 +24,27 @@ RUN apt-get update \
 RUN python3 -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
-WORKDIR /app
-COPY . /app
+# Resolve the package's runtime + dev dependencies from the manifests plus a
+# version stub (setup.py reads redfish_ctl/version.py and README.md, and
+# declares the idrac_ctl alias package), install them, then drop the stub
+# package — only the dependency set stays.
+WORKDIR /deps
+COPY setup.py pyproject.toml requirements.txt README.md ./
+COPY redfish_ctl/version.py redfish_ctl/version.py
+COPY idrac_ctl/__init__.py idrac_ctl/__init__.py
+RUN touch redfish_ctl/__init__.py \
+ && pip install --no-cache-dir -e ".[dev]" pytest-cov \
+ && pip uninstall -y redfish_ctl \
+ && rm -rf /deps
 
-# Install the package with its dev/test extras (pytest, ruff, requests-mock, ...).
-RUN pip install --no-cache-dir -e ".[dev]" pytest-cov
+# The suite imports the package from the mounted tree (tests/conftest.py puts
+# the repo root on sys.path; PYTHONPATH covers non-pytest invocations too).
+WORKDIR /work
+ENV PYTHONPATH=/work
 
 # Default: the offline suite (live tests auto-skip with no IDRAC_IP).
 CMD ["pytest", "-q"]
 
 # Manual equivalent of run-tests.sh:
 #   docker build -f docker/Dockerfile.test -t redfish-ctl-test .
-#   docker run --rm redfish-ctl-test
+#   docker run --rm -v "$PWD:/work" -w /work redfish-ctl-test

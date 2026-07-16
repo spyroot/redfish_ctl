@@ -40,8 +40,40 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Detect docs-only change
+        # A PR that touches ONLY docs/ and Markdown files skips the full suite
+        # below and runs just the docs-coupled tests instead. Anything else —
+        # including push events, where the base diff is not fetched — runs the
+        # full suite. Step-level (not job/workflow-level) so the required
+        # check names always report and branch protection is never left pending.
+        id: changes
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}"
+          changed="$(git diff --name-only FETCH_HEAD...HEAD)"
+          echo "$changed"
+          if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^docs/|\.md$'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Offline tests (no BMC, no IDRAC_IP)
+        if: steps.changes.outputs.docs_only != 'true'
         run: pytest -q
+      - name: Offline tests (docs-only fast path — docs-coupled tests)
+        # Docs edits can still break tests that read docs/ or README.md (path
+        # links, Makefile/docker doc contracts), so run exactly those instead
+        # of the whole suite. The set is discovered by grep, so a new
+        # docs-reading test is picked up automatically.
+        if: steps.changes.outputs.docs_only == 'true'
+        run: |
+          files="$(grep -rlE '\bdocs/|commands\.md|README\.md' tests/test_*.py || true)"
+          if [ -n "$files" ]; then
+            # shellcheck disable=SC2086
+            pytest -q $files
+          else
+            echo "no docs-coupled tests detected"
+          fi
       - name: Lint changed-file hygiene (informational)
         # The tree carries pre-existing ruff debt, so lint is reported but does
         # not fail the build. New code should still be clean.

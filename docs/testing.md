@@ -72,9 +72,12 @@ read-only GB300 observation. HPE coverage comes from the HPE iLO emulator corpus
 
 ## Mac/Linux Parity
 
-`docker/run-tests.sh` builds `ubuntu:24.04`, installs `.[dev]`, and runs the offline suite. Linux is
-case-sensitive and macOS is not, so this catches fixture-path mistakes that can hide on a laptop.
-Sensitive local files are excluded from the image.
+`docker/run-tests.sh` builds a deps-only `ubuntu:24.04` image (the `.[dev]` dependency set, no source
+copy) and runs the offline suite against the repo mounted at `/work`. Linux is case-sensitive and
+macOS is not, so this catches fixture-path mistakes that can hide on a laptop. Because the image
+holds only dependencies, code edits reuse the cached image — it rebuilds only when
+`requirements.txt`/`setup.py` change, and the script prunes dangling layers after a rebuild. No
+source files are baked into the image.
 
 ## Coverage
 
