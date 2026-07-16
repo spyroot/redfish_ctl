@@ -112,6 +112,7 @@ class ApiRequestType(Enum):
     SystemReset = auto()
     Logs = auto()
     LogClear = auto()
+    LogCollectDiagnosticData = auto()
     EthernetInterfaces = auto()
     SecureBoot = auto()
     CertificatesQuery = auto()

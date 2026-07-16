@@ -145,6 +145,7 @@ Safety labels:
 | `leak-detectors` | Read chassis LeakDetection detector states and linked leak policy data. | Read |
 | `logs` | Read system and manager log entries. | Read |
 | `log-clear` | Clear a discovered LogService (LogService.ClearLog); lists clearable services when no target is given, requires `--confirm` to write. | Guarded |
+| `log-collect-diag` | Collect diagnostic data from a discovered LogService (LogService.CollectDiagnosticData); lists capable services when no target is given, requires `--confirm` to write. | Guarded |
 | `manager` | Read manager data. | Read |
 | `manager-network` | Read BMC ManagerNetworkProtocol service state, including HTTP/HTTPS/IPMI/SSH and NTP. | Read |
 | `manager-reboot` | Reboot the BMC manager. | Write |
