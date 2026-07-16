@@ -109,6 +109,7 @@ Safety labels:
 | `capability-report` | Export registered vendor capability profiles for IaC and inventory tooling. | Read |
 | `certificates` | Read CertificateService and linked certificate inventory metadata without certificate bodies. | Read |
 | `change-boot-order` | Change boot order and boot options. | Write |
+| `cert-gen-csr` | Generate a CertificateService CSR through the `CertificateService.GenerateCSR` action; `--dry_run` previews without POSTing. | Write |
 | `chassis` | Read chassis services. | Read |
 | `chassis-reset` | Change chassis power state. | Write |
 | `component-integrity` | Read ComponentIntegrity/SPDM attestation resources. | Read |

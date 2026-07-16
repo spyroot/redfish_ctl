@@ -115,6 +115,7 @@ class ApiRequestType(Enum):
     EthernetInterfaces = auto()
     SecureBoot = auto()
     CertificatesQuery = auto()
+    CertificateGenerateCSR = auto()
     FirmwareUpdate = auto()
     Triggers = auto()
     NetworkPorts = auto()

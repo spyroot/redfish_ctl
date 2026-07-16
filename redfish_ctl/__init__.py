@@ -111,6 +111,7 @@ from .logs.cmd_log_clear import *
 from .network.cmd_ethernet_interfaces import *
 from .security.cmd_secure_boot import *
 from .security.cmd_certificates import *
+from .security.cmd_certificate_generate_csr import *
 from .firmware.cmd_firmware_update import *
 from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
