@@ -7,6 +7,9 @@ now log at debug and still return a usable object).
 
 Author Mus spyroot@gmail.com
 """
+from unittest.mock import Mock
+
+import pytest
 from requests.models import Response
 
 from redfish_ctl.redfish_manager import RedfishManager
@@ -63,6 +66,22 @@ def test_json_without_extended_info_is_empty():
     resp = create_json_resp({"SomeOtherKey": "value"})
     parsed = RedfishManager.parse_json_respond_msg(resp)
     assert parsed.message_extended == []
+
+
+def test_unexpected_exception_propagates():
+    """An exception outside the handled set must reach the caller.
+
+    Regression for the ``finally: return`` cleanup (PEP 765): the return in
+    the ``finally`` block swallowed every in-flight exception, not just the
+    handled ``JSONDecodeError``/``TypeError``, so genuine faults surfaced as
+    an empty-but-valid respond object.
+    """
+    resp = Mock(spec=Response)
+    resp.status_code = 200
+    resp.json.side_effect = RuntimeError("unexpected parser fault")
+
+    with pytest.raises(RuntimeError, match="unexpected parser fault"):
+        RedfishManager.parse_json_respond_msg(resp)
 
 
 def test_parse_error_without_error_envelope_returns_redfish_error():

@@ -13,6 +13,17 @@ write into a commit with reboot before this was fixed. The only valid
 member references are through the enum class itself
 (``RedfishApiRespond.Success``); comparisons must use ``==``/``in``.
 
+Rule 2 — new direct mutation calls must carry a guard argument (see
+``test_new_direct_mutation_calls_are_guarded_or_baselined`` below).
+
+Rule 3 — no ``return``/``break``/``continue`` escaping a ``finally`` block.
+Such a statement silently swallows any in-flight exception (and any earlier
+``return``), and Python 3.14 emits ``SyntaxWarning`` for it (PEP 765).
+``parse_json_respond_msg`` shipped with ``finally: return redfish_resp``,
+which hid every unexpected parse failure. Statements bound inside the
+``finally`` itself — a ``return`` in a nested ``def``, or a ``break``/
+``continue`` targeting a loop that starts inside the ``finally`` — are fine.
+
 Author Mus spyroot@gmail.com
 """
 import ast
@@ -150,6 +161,60 @@ def _unguarded_direct_mutation_findings() -> list[str]:
     return findings
 
 
+def _escaping_finally_statements(stmts, in_loop=False):
+    """Yield return/break/continue statements that would escape a finally.
+
+    Walks the statement list of a ``finally`` body. Nested function and
+    class definitions open a new scope, so nothing inside them escapes;
+    ``break``/``continue`` inside a loop that starts within the ``finally``
+    bind to that loop and are equally harmless.
+
+    :param stmts: statement list to scan (a ``finalbody`` or nested block).
+    :param in_loop: True once inside a loop that started within the finally.
+    """
+    for node in stmts:
+        if isinstance(node, ast.Return):
+            yield node
+        elif isinstance(node, ast.Break | ast.Continue):
+            if not in_loop:
+                yield node
+        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            continue
+        elif isinstance(node, ast.For | ast.AsyncFor | ast.While):
+            yield from _escaping_finally_statements(node.body, in_loop=True)
+            yield from _escaping_finally_statements(node.orelse, in_loop=in_loop)
+        elif isinstance(node, ast.Match):
+            for case in node.cases:
+                yield from _escaping_finally_statements(case.body, in_loop=in_loop)
+        else:
+            blocks = [
+                getattr(node, field, [])
+                for field in ("body", "orelse", "finalbody", "handlers")
+            ]
+            for block in blocks:
+                if block and isinstance(block[0], ast.ExceptHandler):
+                    for handler in block:
+                        yield from _escaping_finally_statements(
+                            handler.body, in_loop=in_loop)
+                else:
+                    yield from _escaping_finally_statements(block, in_loop=in_loop)
+
+
+def _return_in_finally_findings() -> list[str]:
+    """Every control-flow statement escaping a ``finally`` in the package."""
+    findings = set()
+    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(PACKAGE_ROOT.parent)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Try):
+                continue
+            for stmt in _escaping_finally_statements(node.finalbody):
+                kind = type(stmt).__name__.lower()
+                findings.add(f"{rel}:{stmt.lineno} {kind} in finally")
+    return sorted(findings)
+
+
 def test_no_enum_member_truthiness_on_respond_values():
     """No module may test an API respond value via member attribute access.
 
@@ -191,3 +256,104 @@ def execute(self):
 
     assert function.name == "execute"
     assert not (_function_arg_names(function) & MUTATION_GUARD_ARGS)
+
+
+def test_no_return_break_continue_in_finally():
+    """No module may end a ``finally`` block with escaping control flow.
+
+    A finding here means a ``return``/``break``/``continue`` whose target is
+    outside the ``finally`` — it swallows in-flight exceptions and raises
+    ``SyntaxWarning`` on Python 3.14 (PEP 765). Move the statement after the
+    ``try`` statement instead.
+    """
+    assert _return_in_finally_findings() == []
+
+
+def _findings_for_snippet(snippet: str) -> list[str]:
+    """Run the finally-escape detector over one parsed snippet."""
+    tree = ast.parse(snippet)
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            found.extend(_escaping_finally_statements(node.finalbody))
+    return [type(stmt).__name__ for stmt in found]
+
+
+def test_finally_detector_recognizes_the_shipped_shape():
+    """The detector flags the exact ``finally: return`` shape that shipped."""
+    assert _findings_for_snippet("""
+def parse(resp):
+    out = 1
+    try:
+        out = resp.json()
+    except ValueError:
+        pass
+    finally:
+        return out
+""") == ["Return"]
+
+
+def test_finally_detector_flags_loop_escapes_and_nested_blocks():
+    """``break`` escaping via an ``if`` inside ``finally`` is still flagged."""
+    assert _findings_for_snippet("""
+def drain(items):
+    for item in items:
+        try:
+            item.close()
+        finally:
+            if item.bad:
+                break
+""") == ["Break"]
+
+
+def test_finally_detector_flags_continue_escape():
+    """``continue`` targeting a loop outside the ``finally`` is flagged."""
+    assert _findings_for_snippet("""
+def retry(items):
+    for item in items:
+        try:
+            item.send()
+        finally:
+            continue
+""") == ["Continue"]
+
+
+def test_finally_detector_flags_return_in_nested_try_finally():
+    """A ``return`` in an inner ``finally`` escapes both enclosing trys.
+
+    The helper visits every ``Try`` node independently, so the one statement
+    is reported once for the outer ``finally`` and once for the inner; the
+    package sweep dedupes by file and line.
+    """
+    assert _findings_for_snippet("""
+def close(conn):
+    try:
+        conn.flush()
+    finally:
+        try:
+            conn.close()
+        finally:
+            return None
+""") == ["Return", "Return"]
+
+
+def test_finally_detector_ignores_bound_statements():
+    """Statements bound inside the finally itself are not findings.
+
+    Covers a ``return`` after (not inside) the ``finally``, a ``return`` in
+    a nested ``def``, and a ``break`` targeting a loop opened inside the
+    ``finally`` body.
+    """
+    assert _findings_for_snippet("""
+def parse(resp):
+    out = 1
+    try:
+        out = resp.json()
+    finally:
+        def flush():
+            return None
+        for chunk in out:
+            if not chunk:
+                break
+    return out
+""") == []

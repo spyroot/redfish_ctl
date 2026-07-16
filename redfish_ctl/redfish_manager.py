@@ -29,7 +29,6 @@ from .redfish_exceptions import (
 )
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
-from .telemetry import tracing
 from .redfish_respond_error import RedfishError
 from .redfish_shared import (
     RedfishApi,
@@ -39,6 +38,7 @@ from .redfish_shared import (
     RedfishJsonSpec,
     env_first,
 )
+from .telemetry import tracing
 
 """Each command encapsulate result in named tuple"""
 CommandResult = collections.namedtuple("cmd_result",
@@ -591,8 +591,7 @@ class RedfishManager:
         except TypeError as type_err:
             logging.debug(f"unexpected respond payload shape: {type_err}")
 
-        finally:
-            return redfish_resp
+        return redfish_resp
 
     @staticmethod
     def default_error_handler(response) -> RedfishApiRespond:
