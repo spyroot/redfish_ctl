@@ -87,24 +87,33 @@ case "$cmd" in
         _check slot "$slot" '^[0-9]+$'
         _check agent "$agent" '^[A-Za-z0-9._-]+$'
         host="$("$0" host "$slot")"
-        image="${GB300_IMAGE:-redfish-ctl-dev}"
-        _check image "$image" '^[A-Za-z0-9._/:-]+$'
+        # Image selection: an explicit GB300_IMAGE wins; otherwise the node
+        # picks the credentialed agent image when it has been provisioned and
+        # falls back to the public base loudly, so a fresh setup works before
+        # the operator stages credentials.
+        if [ -n "${GB300_IMAGE:-}" ]; then
+            _check image "$GB300_IMAGE" '^[A-Za-z0-9._/:-]+$'
+            image_snippet="img=$GB300_IMAGE;"
+        else
+            image_snippet='img=redfish-ctl-agent;
+docker image inspect "$img" >/dev/null 2>&1 || { echo "gb300: agent image not on this node yet, using base redfish-ctl-dev" >&2; img=redfish-ctl-dev; };'
+        fi
         # The remote snippet assembles the secret mounts on the node itself so
         # a missing key file never turns into a root-owned bind-mount dir.
         remote_prefix='m="";
 [ -f "$HOME/.ssh/redfish_ctl_git" ] && m="$m -v $HOME/.ssh/redfish_ctl_git:/secrets/git_key:ro";
 [ -f "$HOME/.ssh/redfish_ctl_gh_token" ] && m="$m -v $HOME/.ssh/redfish_ctl_gh_token:/secrets/gh_token:ro";'
         if [ "$cmd" = "shell" ]; then
-            exec ssh -t "$host" "$remote_prefix docker run -it --rm \
-                --name rfctl-$agent -v rfctl-work-$agent:/work \$m $image bash"
+            exec ssh -t "$host" "$remote_prefix $image_snippet docker run -it --rm \
+                --name rfctl-$agent -v rfctl-work-$agent:/work \$m \$img bash"
         fi
         ref="${4:?usage: gb300.sh run <slot> <agent> <ref> <cmd...>}"
         _check ref "$ref" '^[A-Za-z0-9._/-]+$'
         shift 4
         [ $# -gt 0 ] || { echo "gb300.sh run: no command given" >&2; exit 2; }
         printf -v quoted '%q ' "$@"
-        exec ssh "$host" "$remote_prefix docker run --rm \
-            -v rfctl-work-$agent:/work -e RFCTL_REF=$ref \$m $image bash -lc $(printf '%q' "$quoted")"
+        exec ssh "$host" "$remote_prefix $image_snippet docker run --rm \
+            -v rfctl-work-$agent:/work -e RFCTL_REF=$ref \$m \$img bash -lc $(printf '%q' "$quoted")"
         ;;
     *)
         echo "usage: gb300.sh {host <slot>|list|run <slot> <agent> <ref> <cmd...>|shell <slot> <agent>}" >&2

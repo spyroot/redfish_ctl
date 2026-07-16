@@ -111,26 +111,20 @@ GB300_HOSTC  = $$($(GB300_SH) host $(SLOT))
 AGENT      ?= $(shell whoami)
 REF        ?= main
 PYTEST_ARGS ?= -q
-GB300_IMAGE ?= redfish-ctl-dev
-# Same charset gb300.sh enforces for run/shell; keeps an overridden image tag
-# from reaching the remote shell strings in gb300-check/gb300-image. The value
-# is read from the environment (make exports it), never shell-parsed, so the
-# guard itself cannot be escaped.
-export GB300_IMAGE
-GB300_IMAGE_OK = case "$$GB300_IMAGE" in (*[!A-Za-z0-9._/:-]*|"") \
-	echo "invalid GB300_IMAGE"; exit 2;; esac
+# Image choice lives in scripts/gb300.sh: the credentialed agent image when a
+# node has it, the public base otherwise; pass GB300_IMAGE=<name> to pin one.
 
-gb300-check: ## Live-check every fleet slot: ssh, docker, dev image, disk.
-	@$(GB300_IMAGE_OK); \
-	printf '%-5s %-22s %-8s %-10s %-6s\n' SLOT HOST DOCKER IMAGE DISK; \
+gb300-check: ## Live-check every fleet slot: ssh, docker, base + agent images, disk.
+	@printf '%-5s %-22s %-8s %-8s %-8s %-6s\n' SLOT HOST DOCKER BASE AGENT DISK; \
 	for s in $$($(GB300_SH) list); do \
 		h=$$($(GB300_SH) host $$s); \
 		out=$$(ssh -o BatchMode=yes -o ConnectTimeout=5 $$h ' \
 			d=no; docker info >/dev/null 2>&1 && d=ok; \
-			i=absent; docker image inspect $(GB300_IMAGE) >/dev/null 2>&1 && i=present; \
+			b=absent; docker image inspect redfish-ctl-dev >/dev/null 2>&1 && b=present; \
+			a=absent; docker image inspect redfish-ctl-agent >/dev/null 2>&1 && a=present; \
 			df=$$(df -h / | awk "NR==2 {print \$$5}"); \
-			echo "$$d $$i $$df"' 2>/dev/null) || out="UNREACHABLE - -"; \
-		printf '%-5s %-22s %-8s %-10s %-6s\n' "$$s" "$$h" $$out; \
+			echo "$$d $$b $$a $$df"' 2>/dev/null) || out="UNREACHABLE - - -"; \
+		printf '%-5s %-22s %-8s %-8s %-8s %-6s\n' "$$s" "$$h" $$out; \
 	done
 
 # Both build targets stage the context in a temp file instead of piping it
