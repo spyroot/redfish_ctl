@@ -7,9 +7,10 @@ now log at debug and still return a usable object).
 
 Author Mus spyroot@gmail.com
 """
+from unittest.mock import Mock
+
 import pytest
 from requests.models import Response
-from unittest.mock import Mock
 
 from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.redfish_respond import RedfishRespondMessage
