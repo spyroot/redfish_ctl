@@ -25,7 +25,7 @@ class ApiRequestType(Enum):
     ComputerSystemReset = auto()
 
     ConvertToRaid = auto()
-    ConvertNoneRaid = ()
+    ConvertNoneRaid = auto()
     Drives = auto()
     VolumeInit = auto()
     VolumeQuery = auto()
@@ -137,7 +137,7 @@ class ApiRequestType(Enum):
     BootQuery = auto()
 
     GetAttachStatus = auto()
-    DellOemNetIsoBoot = ()
+    DellOemNetIsoBoot = auto()
     DellOemDetach = auto()
     TaskGet = auto()
 
