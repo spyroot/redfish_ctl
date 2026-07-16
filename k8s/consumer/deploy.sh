@@ -11,6 +11,13 @@
 set -euo pipefail
 
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-redfish-sandbox}"
+
+# The sandbox tears itself down after a green run; deploying into a missing
+# cluster otherwise fails with an opaque kubectl context error.
+if ! kind get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER_NAME}"; then
+	printf 'sandbox cluster "%s" is not running.\nStart it and keep it up first:  KEEP_CLUSTER=1 make k8s-sandbox\n' "${KIND_CLUSTER_NAME}" >&2
+	exit 1
+fi
 NAMESPACE="${NAMESPACE:-redfish-sandbox}"
 KUBECTL_CONTEXT="${KUBECTL_CONTEXT:-kind-${KIND_CLUSTER_NAME}}"
 IMAGE="${IMAGE:-redfish-ctl-consumer:local}"
