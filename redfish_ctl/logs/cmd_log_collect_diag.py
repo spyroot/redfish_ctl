@@ -36,7 +36,11 @@ class LogCollectDiagnosticData(RedfishManagerBase,
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the guarded ``log-collect-diag`` subcommand."""
+        """Register the guarded ``log-collect-diag`` subcommand.
+
+        :param cls: the owning command class, used to build the base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
         cmd_parser = cls.base_parser()
         cmd_parser.add_argument(
             "--log-service", required=False, dest="log_service", type=str,
@@ -65,7 +69,11 @@ class LogCollectDiagnosticData(RedfishManagerBase,
 
     @staticmethod
     def _members(data):
-        """Return the ``@odata.id`` strings from a Redfish collection."""
+        """Return the ``@odata.id`` strings from a Redfish collection.
+
+        :param data: a Redfish collection body (or any value; non-dicts yield []).
+        :return: list of member ``@odata.id`` strings.
+        """
         if not isinstance(data, dict):
             return []
         return [
@@ -75,19 +83,37 @@ class LogCollectDiagnosticData(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return a Redfish link target from a ``{key: {@odata.id}}`` property."""
+        """Return a Redfish link target from a ``{key: {@odata.id}}`` property.
+
+        :param data: the resource body holding the link (may be None).
+        :param key: the property name whose ``@odata.id`` to extract.
+        :return: the link target URI, or None when absent or malformed.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     def _get(self, uri, do_async):
-        """GET a resource body, returning ``{}`` when discovery cannot read it."""
+        """GET a resource body, returning ``{}`` when discovery cannot read it.
+
+        :param uri: Redfish resource URI to fetch.
+        :param do_async: issue the query on the async event loop when True.
+        :return: the parsed response body, or {} when the query fails.
+        """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
 
     def _roots(self, do_async):
-        """Return ComputerSystem, Manager, and Chassis root URIs to inspect."""
+        """Return ComputerSystem, Manager, and Chassis root URIs to inspect.
+
+        Log services hang off different roots per vendor — Systems/Managers on
+        iLO, Chassis on the GB300 — so all three collections are walked.
+
+        :param do_async: issue the Chassis collection query on the async loop
+            when True.
+        :return: list of root resource URIs to inspect for log services.
+        """
         roots = []
         for finder in (self.discover_computer_system_ids, self.discover_manager_ids):
             try:
@@ -101,7 +127,15 @@ class LogCollectDiagnosticData(RedfishManagerBase,
         return roots
 
     def _discover_log_services(self, do_async):
-        """Discover LogServices exposing CollectDiagnosticData across roots."""
+        """Discover LogServices exposing CollectDiagnosticData across roots.
+
+        Walks each root's ``LogServices`` collection and keeps the services
+        whose ``Actions`` block exposes ``#LogService.CollectDiagnosticData``.
+
+        :param do_async: issue the underlying queries on the async loop when True.
+        :return: list of ``{"Id": <id>, "uri": <service uri>}`` dicts,
+            de-duplicated by service URI and ordered by discovery.
+        """
         services = []
         seen = set()
         for root_uri in self._roots(do_async):
@@ -124,7 +158,16 @@ class LogCollectDiagnosticData(RedfishManagerBase,
 
     @staticmethod
     def _resolve_target(log_service, services):
-        """Resolve a LogService Id or full URI to a discovered service URI."""
+        """Resolve a LogService Id or full URI to a discovered service URI.
+
+        :param log_service: a LogService Id (case-insensitive) or a full
+            Redfish URI.
+        :param services: the discovered collection-capable services from
+            :meth:`_discover_log_services`.
+        :return: the resolved LogService URI.
+        :raises InvalidArgument: when the id/URI is empty, matches no capable
+            service, or is ambiguous across several services.
+        """
         requested = (log_service or "").strip()
         if not requested:
             raise InvalidArgument("log service id or URI cannot be empty")
@@ -149,7 +192,13 @@ class LogCollectDiagnosticData(RedfishManagerBase,
 
     @staticmethod
     def _payload(diagnostic_data_type, oem_diagnostic_data_type):
-        """Build the CollectDiagnosticData action payload."""
+        """Build the CollectDiagnosticData action payload.
+
+        :param diagnostic_data_type: ``DiagnosticDataType`` value to send.
+        :param oem_diagnostic_data_type: ``OEMDiagnosticDataType`` value to
+            include when set (used when the data type is OEM).
+        :return: the JSON-serializable action payload dict.
+        """
         payload = {"DiagnosticDataType": diagnostic_data_type}
         if oem_diagnostic_data_type:
             payload["OEMDiagnosticDataType"] = oem_diagnostic_data_type
@@ -168,7 +217,31 @@ class LogCollectDiagnosticData(RedfishManagerBase,
                 **kwargs) -> CommandResult:
         """List capable services, or collect diagnostic data from one service.
 
+        With no ``--log-service`` the command discovers and returns the
+        collection-capable services WITHOUT mutating. With a target it invokes
+        CollectDiagnosticData, which only fires with ``--confirm``;
         ``--dry_run`` is a no-POST override even when ``--confirm`` is also set.
+
+        :param log_service: LogService Id or full URI to collect from; None
+            lists the capable services.
+        :param diagnostic_data_type: ``DiagnosticDataType`` value to send
+            (default ``Manager``).
+        :param oem_diagnostic_data_type: ``OEMDiagnosticDataType`` value to
+            include when set (used when the data type is OEM).
+        :param confirm: authorize the CollectDiagnosticData POST to actually fire.
+        :param dry_run: resolve the target and show it without POSTing;
+            overrides ``confirm``.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the underlying queries/POST on the async loop
+            when True.
+        :return: a CommandResult whose data is the capable-service list (when
+            no target is given), the collection outcome, or the blocked/dry-run
+            preview.
+        :raises InvalidArgument: when no capable services exist, or when
+            ``log_service`` is empty, matches no capable service, or is
+            ambiguous across several services.
         """
         services = self._discover_log_services(do_async)
         if log_service is None:
