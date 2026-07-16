@@ -25,8 +25,21 @@ set -euo pipefail
 _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _env_file="${GB300_ENV_FILE:-$_repo_root/.internal/gb300-fleet.env}"
 if [ -f "$_env_file" ]; then
+    # The env file supplies DEFAULTS: values already set in the caller's
+    # environment (for example `make gb300-test GB300_IMAGE=...`) win over
+    # it, so snapshot pre-set values and restore them after sourcing.
+    _saved=""
+    for _v in GB300_USER GB300_IP_BASE GB300_SLOT0_OCTET GB300_SLOTS \
+              GB300_HOST GB300_IMAGE; do
+        if [ -n "${!_v:-}" ]; then
+            _saved="$_saved $_v=${!_v}"
+        fi
+    done
     # shellcheck disable=SC1090
     source "$_env_file"
+    for _kv in $_saved; do
+        export "${_kv?}"
+    done
 fi
 
 _require() {
