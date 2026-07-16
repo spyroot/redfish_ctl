@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -176,6 +178,38 @@ def _write_url_map_corpus(tmp_path: Path) -> Path:
     return corpus
 
 
+def _write_sidecar_with_legacy_alias_corpus(tmp_path: Path) -> Path:
+    corpus = _write_url_map_corpus(tmp_path)
+    error_path = "/redfish/v1/Missing"
+    error_file = "_redfish_v1_Missing.error.json"
+
+    (corpus / error_file).write_text(
+        json.dumps({"error": {"code": "Base.1.17.CapturedMissing"}}),
+        encoding="utf-8",
+    )
+    (corpus / STATUS_SIDECAR).write_text(
+        json.dumps(
+            {
+                "http_status_mapping": {error_path: 404},
+                "error_file_mapping": {error_path: error_file},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return corpus
+
+
+def _write_sidecar_with_legacy_status_conflict_corpus(tmp_path: Path) -> Path:
+    corpus = _write_sidecar_with_legacy_alias_corpus(tmp_path)
+    error_path = "/redfish/v1/Missing"
+    api_map = np.load(corpus / "rest_api_map.npy", allow_pickle=True).item()
+    api_map["http_status_mapping"][error_path] = 200
+    api_map["error_file_mapping"][error_path] = "_legacy_missing.error.json"
+    np.save(corpus / "rest_api_map.npy", api_map)
+    return corpus
+
+
 def test_mock_bmc_maps_redfish_paths_to_gb300_corpus() -> None:
     """Redfish URLs resolve to the flattened files in the GB300 corpus."""
     module = _load_server_module()
@@ -274,6 +308,78 @@ def test_mock_bmc_serves_url_file_mapping_alias(tmp_path: Path) -> None:
     }
 
 
+def test_status_json_sidecar_preserves_legacy_url_file_mapping_alias(
+    tmp_path: Path,
+) -> None:
+    """A status sidecar must not shadow non-derived URL aliases from the npy map."""
+    module = _load_server_module()
+    corpus = _write_sidecar_with_legacy_alias_corpus(tmp_path)
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        alias_status, alias_payload = _http(base, "/redfish/v1/Alias")
+        error_status, error_payload = _http(base, "/redfish/v1/Missing")
+
+    assert alias_status == 200
+    assert alias_payload == {
+        "@odata.id": "/redfish/v1/Systems/Original",
+        "Id": "Original",
+    }
+    assert error_status == 404
+    assert error_payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+
+
+def test_status_json_sidecar_serves_replay_without_numpy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With both map files and no NumPy the mock serves the sidecar replay.
+
+    Packed full corpora ship ``rest_api_map.npy`` next to the JSON status
+    sidecar, and the sidecar exists so status replay works without NumPy —
+    so startup on such a corpus in a NumPy-free environment (a bare-host
+    run or slim deployment) must fall back to the sidecar loudly instead of
+    raising; only the legacy-only URL aliases degrade.
+    """
+    module = _load_server_module()
+    corpus = _write_sidecar_with_legacy_alias_corpus(tmp_path)
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    caplog.set_level(logging.WARNING, logger="mock_bmc_server")
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        root_status, _ = _http(base, "/redfish/v1")
+        error_status, error_payload = _http(base, "/redfish/v1/Missing")
+
+    assert root_status == 200
+    assert error_status == 404
+    assert error_payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+    assert "NumPy is unavailable" in caplog.text
+    assert "url_file_mapping" in caplog.text
+
+
+def test_status_json_sidecar_warns_when_overriding_legacy_status(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Sidecar overrides of legacy replay entries are visible in logs."""
+    module = _load_server_module()
+    corpus = _write_sidecar_with_legacy_status_conflict_corpus(tmp_path)
+    caplog.set_level(logging.WARNING, logger="mock_bmc_server")
+
+    with module.run_server("127.0.0.1", 0, corpus) as server:
+        base = "http://{}:{}".format(*server.server_address)
+        status, payload = _http(base, "/redfish/v1/Missing")
+
+    assert status == 404
+    assert payload == {"error": {"code": "Base.1.17.CapturedMissing"}}
+    assert (
+        "rest_api_map.status.json overrides http_status_mapping "
+        "for /redfish/v1/Missing"
+    ) in caplog.text
+
+
 def test_rest_api_map_rejects_malformed_status_values(tmp_path: Path) -> None:
     """A bad status map fails startup instead of silently dropping a status."""
     module = _load_server_module()
@@ -295,6 +401,21 @@ def test_rest_api_map_rejects_incomplete_status_json_sidecar(tmp_path: Path) -> 
     """A sidecar must not shadow a usable legacy map without both replay maps."""
     module = _load_server_module()
     corpus = _write_status_sidecar_corpus(tmp_path)
+    (corpus / STATUS_SIDECAR).write_text(
+        json.dumps({"http_status_mapping": {"/redfish/v1/Missing": 404}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="error_file_mapping"):
+        module.make_handler(corpus)
+
+
+def test_rest_api_map_rejects_incomplete_status_json_sidecar_with_legacy_map(
+    tmp_path: Path,
+) -> None:
+    """A partial sidecar fails closed even when a legacy map is present."""
+    module = _load_server_module()
+    corpus = _write_sidecar_with_legacy_alias_corpus(tmp_path)
     (corpus / STATUS_SIDECAR).write_text(
         json.dumps({"http_status_mapping": {"/redfish/v1/Missing": 404}}),
         encoding="utf-8",
