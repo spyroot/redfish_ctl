@@ -22,7 +22,7 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-agent-image gb300-provision gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key
 
 DOCSTRING_BASE ?= origin/main
 
@@ -98,11 +98,14 @@ clean: ## Remove local build, test, and type-check artifacts.
 # ---------------------------------------------------------------------------
 # GB300 remote docker test fleet — ALL gates run there, never on a laptop.
 # Slot/host resolution comes from scripts/gb300.sh + .internal/gb300-fleet.env
-# (gitignored; see TEAM_GUIDE.md "GB300 Docker test environment").
+# (gitignored; see TEAM_GUIDE.md "GB300 Docker test environment"). The env
+# file is also included here so a locally defined image name (for example an
+# internal agent image layered on the public base) wins over the default.
 #   SLOT  = fleet slot number (required for the per-slot targets)
 #   AGENT = your agent name; isolates your /work volume and container
 #   REF   = git ref to test (default main); any pushed branch works
 # ---------------------------------------------------------------------------
+-include .internal/gb300-fleet.env
 GB300_SH    := ./scripts/gb300.sh
 GB300_HOSTC  = $$($(GB300_SH) host $(SLOT))
 AGENT      ?= $(shell whoami)
@@ -130,11 +133,23 @@ gb300-check: ## Live-check every fleet slot: ssh, docker, dev image, disk.
 		printf '%-5s %-22s %-8s %-10s %-6s\n' "$$s" "$$h" $$out; \
 	done
 
-gb300-image: ## Build the dev image on a slot from this checkout's HEAD. SLOT=<n>
+gb300-image: ## Build the public base image on a slot from this checkout's HEAD. SLOT=<n>
 	@test -n "$(SLOT)" || { echo "usage: make gb300-image SLOT=<n>"; exit 2; }
-	@$(GB300_IMAGE_OK)
 	git archive --format=tar HEAD | ssh $(GB300_HOSTC) \
-		'docker build -t $(GB300_IMAGE) -f docker/Dockerfile.gb300-dev -'
+		'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -'
+
+gb300-agent-image: ## Build the internal agent image (base + staged credentials) on a slot. SLOT=<n>
+	@test -n "$(SLOT)" || { echo "usage: make gb300-agent-image SLOT=<n>"; exit 2; }
+	@test -f .internal/docker/secrets/git_key || { \
+		echo "stage credentials first — see .internal/docker/README.md"; exit 2; }
+	tar -C .internal/docker -cf - . | ssh $(GB300_HOSTC) \
+		'docker build -t redfish-ctl-agent -f Dockerfile.gb300-agent -'
+
+gb300-provision: ## Build base + agent images on every slot (operator bootstrap).
+	@for s in $$($(GB300_SH) list); do \
+		echo "=== slot $$s ==="; \
+		$(MAKE) gb300-image SLOT=$$s && $(MAKE) gb300-agent-image SLOT=$$s || exit 1; \
+	done
 
 gb300-test: ## Run the offline pytest suite on a slot. SLOT=<n> [REF=main] [AGENT=me]
 	@test -n "$(SLOT)" || { echo "usage: make gb300-test SLOT=<n> [REF=<branch>]"; exit 2; }
