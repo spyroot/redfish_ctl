@@ -306,6 +306,37 @@ def drain(items):
 """) == ["Break"]
 
 
+def test_finally_detector_flags_continue_escape():
+    """``continue`` targeting a loop outside the ``finally`` is flagged."""
+    assert _findings_for_snippet("""
+def retry(items):
+    for item in items:
+        try:
+            item.send()
+        finally:
+            continue
+""") == ["Continue"]
+
+
+def test_finally_detector_flags_return_in_nested_try_finally():
+    """A ``return`` in an inner ``finally`` escapes both enclosing trys.
+
+    The helper visits every ``Try`` node independently, so the one statement
+    is reported once for the outer ``finally`` and once for the inner; the
+    package sweep dedupes by file and line.
+    """
+    assert _findings_for_snippet("""
+def close(conn):
+    try:
+        conn.flush()
+    finally:
+        try:
+            conn.close()
+        finally:
+            return None
+""") == ["Return", "Return"]
+
+
 def test_finally_detector_ignores_bound_statements():
     """Statements bound inside the finally itself are not findings.
 
