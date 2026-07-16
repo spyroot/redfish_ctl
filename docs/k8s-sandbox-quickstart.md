@@ -37,10 +37,16 @@ open -a Docker            # macOS; wait until `docker info` succeeds
 ## 1. Stand up the sandbox (mock BMC) in one go
 
 The sandbox target builds the images, creates the kind cluster, and deploys the
-controller plus a mock BMC that serves the committed corpus:
+controller plus a mock BMC that serves the committed corpus. On success the
+cluster is torn down automatically (a leftover kind cluster holds ~1.4GB RAM);
+set `KEEP_CLUSTER=1` to keep it up — required before `make k8s-consumer` or
+`make k8s-explorer`, which deploy into the running cluster. A failed run always
+leaves the cluster up for diagnosis.
 
 ```bash
-make k8s-sandbox         # kind up → mock-bmc → controller → sample RedfishEndpoint
+make k8s-sandbox                  # kind up → verify → kind down
+KEEP_CLUSTER=1 make k8s-sandbox   # keep the cluster for k8s-consumer / iteration
+make k8s-sandbox-down             # tear a kept cluster down when finished
 ```
 
 The active kube context becomes `kind-redfish-sandbox`. Confirm the controller

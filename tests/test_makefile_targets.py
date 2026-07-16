@@ -16,8 +16,10 @@ REQUIRED_TARGETS = {
     "build",
     "docker-test",
     "docker-image",
+    "docker-clean",
     "docs-voice-check",
     "k8s-sandbox",
+    "k8s-sandbox-down",
     "clean",
 }
 
@@ -48,8 +50,10 @@ def test_make_dry_run_uses_expected_safe_local_commands() -> None:
             "bench-concurrency",
             "docker-test",
             "docker-image",
+            "docker-clean",
             "docs-voice-check",
             "k8s-sandbox",
+            "k8s-sandbox-down",
         ],
         cwd=REPO_ROOT,
         check=False,
@@ -64,6 +68,8 @@ def test_make_dry_run_uses_expected_safe_local_commands() -> None:
     assert "twine check" in result.stdout
     assert "docker/run-tests.sh" in result.stdout
     assert "docker build" in result.stdout
+    assert "kind delete cluster --name redfish-sandbox" in result.stdout
+    assert "docker image prune -f" in result.stdout
     assert "\\b(I|me|my|mine|myself)\\b" in result.stdout
     assert "README.md docs/" in result.stdout
     assert "k8s/sandbox" in result.stdout

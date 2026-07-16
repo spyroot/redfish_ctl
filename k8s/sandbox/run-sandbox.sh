@@ -342,3 +342,13 @@ fi
 if has_backend "corpus-mock"; then
 	drive_node_profile gb300-mock
 fi
+
+# Tear the throwaway cluster down on success unless the caller keeps it for
+# iteration (KEEP_CLUSTER=1 — needed before `make k8s-consumer`/`k8s-explorer`,
+# which deploy into this cluster). A failure exits earlier via `set -e`, so the
+# cluster stays up for diagnostics. On a laptop a leftover kind cluster holds
+# ~1.4GB RAM and steady CPU; in CI the teardown is a few harmless seconds.
+if [ "${KEEP_CLUSTER:-0}" != "1" ]; then
+	section "tearing down the sandbox cluster (KEEP_CLUSTER=1 to keep it)"
+	kind delete cluster --name "${KIND_CLUSTER_NAME}"
+fi

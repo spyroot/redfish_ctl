@@ -77,6 +77,15 @@ docstring-gate-all: ## Fail if ANY method in the tree lacks docs (whole-tree gat
 k8s-sandbox: ## Run the local Kubernetes read-path sandbox when present.
 	./k8s/sandbox/run-sandbox.sh
 
+k8s-sandbox-down: ## Delete the sandbox kind cluster (frees ~1.4GB RAM and steady CPU).
+	kind delete cluster --name redfish-sandbox
+
+docker-clean: ## Reclaim local docker space: sandbox cluster, exited redfish containers, dangling layers.
+	-kind delete cluster --name redfish-sandbox
+	@ids="$$(docker ps -aq --filter status=exited --filter name=redfish)"; \
+	 if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi
+	docker image prune -f
+
 k8s-consumer: ## Build and deploy the fleet-status consumer into the sandbox.
 	./k8s/consumer/deploy.sh
 
