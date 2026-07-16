@@ -4,9 +4,9 @@ import json
 import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
-from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_virtual_media_query_returns_collection(redfish_api):
@@ -300,6 +300,33 @@ def test_virtual_media_eject_skips_post_when_device_is_already_empty(
     redfish_mock, redfish_service
 ):
     """non-strict eject returns Ok without POSTing when media is not inserted."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.VirtualMediaEject,
+        "virtual_disk_eject",
+        device_id="1",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {"Status": RedfishApiRespond.Ok}
+    assert redfish_service.last_request.method == "GET"
+
+
+def test_virtual_media_eject_treats_missing_image_on_empty_slot_as_ejected(
+    redfish_mock, redfish_service
+):
+    collection_path = "/redfish/v1/Systems/System.Embedded.1/VirtualMedia"
+    collection = dict(redfish_service._state(collection_path))
+    members = [dict(member) for member in collection["Members"]]
+    target_member = next(member for member in members if member.get("Id") == "1")
+    target_member["Inserted"] = False
+    target_member.pop("Image", None)
+    target_member.pop("ImageName", None)
+    collection["Members"] = members
+    redfish_service._overlay[collection_path] = collection
+    redfish_service._overlay[collection_path.lower()] = collection
+
+    assert "Image" not in target_member
+
     result = redfish_mock.sync_invoke(
         ApiRequestType.VirtualMediaEject,
         "virtual_disk_eject",

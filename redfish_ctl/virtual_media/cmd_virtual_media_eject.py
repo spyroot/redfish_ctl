@@ -14,9 +14,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
 
 
 class VirtualMediaEject(RedfishManagerBase,
@@ -85,13 +85,7 @@ class VirtualMediaEject(RedfishManagerBase,
             raise InvalidArgument(f"Invalid device id {device_id}, "
                                   f"supported device id {valid_dev_id}")
 
-        # if another image already mounted.
-        inserted = {
-            'image': m['Image'] for m
-            in members if m['Id'] == device_id and m['Inserted'] is False
-        }
-
-        if 'image' in inserted:
+        if any(m['Id'] == device_id and m.get('Inserted') is False for m in members):
             if do_strict:
                 raise InvalidArgument("Image already ejected")
             else:
