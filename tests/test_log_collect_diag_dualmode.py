@@ -124,6 +124,28 @@ def test_log_collect_diag_confirm_posts_payload(gb300_node2_manager):
     assert posts[0].json() == {"DiagnosticDataType": "Manager"}
 
 
+def test_log_collect_diag_confirm_dry_run_still_does_not_post(gb300_node2_manager):
+    """--dry_run remains a no-POST preview even when --confirm is also present."""
+    manager, requests = gb300_node2_manager
+
+    result = manager.sync_invoke(
+        ApiRequestType.LogCollectDiagnosticData,
+        "log-collect-diag",
+        log_service=MANAGER_DUMP,
+        diagnostic_data_type="Manager",
+        confirm=True,
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["blocked"] is None
+    assert result.data["target"] == COLLECT_TARGET
+    assert result.data["payload"] == {"DiagnosticDataType": "Manager"}
+    assert _post_requests(requests) == []
+
+
 def test_log_collect_diag_oem_payload_includes_oem_type(gb300_node2_manager):
     """OEM diagnostic-data collection includes the OEM type when supplied."""
     manager, requests = gb300_node2_manager

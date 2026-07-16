@@ -56,7 +56,7 @@ class LogCollectDiagnosticData(RedfishManagerBase,
             help="fire the CollectDiagnosticData POST; without it the command previews")
         cmd_parser.add_argument(
             "--dry_run", action="store_true", dest="dry_run", default=False,
-            help="resolve the target and show it without POSTing")
+            help="resolve the target and show it without POSTing; overrides --confirm")
         return (
             cmd_parser,
             "log-collect-diag",
@@ -166,7 +166,10 @@ class LogCollectDiagnosticData(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """List capable services, or collect diagnostic data from one service."""
+        """List capable services, or collect diagnostic data from one service.
+
+        ``--dry_run`` is a no-POST override even when ``--confirm`` is also set.
+        """
         services = self._discover_log_services(do_async)
         if log_service is None:
             return CommandResult(
