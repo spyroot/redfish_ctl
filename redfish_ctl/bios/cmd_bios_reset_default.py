@@ -71,7 +71,11 @@ class BiosResetDefault(RedfishManagerBase,
 
     @staticmethod
     def _bios_fallback_uri(system_uri: str) -> str:
-        """Build the conventional BIOS URI under a ComputerSystem URI."""
+        """Build the conventional BIOS URI under a ComputerSystem URI.
+
+        :param system_uri: the ComputerSystem resource URI to base the path on.
+        :return: the conventional ``<system_uri>/Bios`` resource URI.
+        """
         return f"{system_uri.rstrip('/')}/{str(RedfishApi.Bios).strip('/')}"
 
     def execute(self,
