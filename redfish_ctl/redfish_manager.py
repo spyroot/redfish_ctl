@@ -591,8 +591,7 @@ class RedfishManager:
         except TypeError as type_err:
             logging.debug(f"unexpected respond payload shape: {type_err}")
 
-        finally:
-            return redfish_resp
+        return redfish_resp
 
     @staticmethod
     def default_error_handler(response) -> RedfishApiRespond:
