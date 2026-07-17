@@ -29,9 +29,10 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..cmd_exceptions import UnexpectedResponse
 from ..redfish_manager import CommandResult
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import ApiRequestType, Singleton
 
 
 class BootOptionsList(RedfishManagerBase,
@@ -100,9 +101,14 @@ class BootOptionsList(RedfishManagerBase,
             f"/BootOptions?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)
-        data = response.json()
-        extra = data
         self.default_error_handler(response)
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise UnexpectedResponse(
+                "BootOptions response was not valid JSON."
+            ) from exc
+        extra = data
         if 'Members' in data:
             data = data['Members']
             data = [d['@odata.id'] for d in data]
