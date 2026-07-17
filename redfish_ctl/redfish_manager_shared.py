@@ -59,6 +59,7 @@ class ApiRequestType(Enum):
     FirmwareInventoryQuery = auto()
     UpdateServiceQuery = auto()
     UpdateStart = auto()
+    DellSoftwareUpdateQueries = auto()
     PciDeviceQuery = auto()
     SystemQuery = auto()
     VirtualDiskQuery = auto()
