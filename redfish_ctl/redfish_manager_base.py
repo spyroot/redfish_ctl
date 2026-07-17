@@ -956,16 +956,21 @@ class RedfishManagerBase(RedfishManager):
 
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
-            return requests.delete(
-                req, verify=self._is_verify_cert,
-                headers=headers
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return requests.delete(
-                req, verify=self._is_verify_cert,
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                verify=self._is_verify_cert,
                 auth=(self._username, self._password),
-                headers=headers
+                headers=headers,
             )
+        return tracing.traced_request(req, "DELETE", request_call)
 
     def api_post_call(
             self, req: str, payload: str, hdr: dict) -> requests.models.Response:
@@ -982,19 +987,23 @@ class RedfishManagerBase(RedfishManager):
 
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
-            return requests.post(
+            request_call = functools.partial(
+                requests.post,
                 req,
                 data=payload,
                 verify=self._is_verify_cert,
-                headers=headers
+                headers=headers,
             )
         else:
-            return requests.post(
-                req, data=payload,
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
                 verify=self._is_verify_cert,
                 headers=headers,
-                auth=(self._username, self._password)
+                auth=(self._username, self._password),
             )
+        return tracing.traced_request(req, "POST", request_call)
 
     async def api_async_post_call(
             self, loop, req: str, payload: str, hdr: Dict):
@@ -1011,24 +1020,26 @@ class RedfishManagerBase(RedfishManager):
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.post, req,
-                    data=payload,
-                    verify=self._is_verify_cert,
-                    headers=headers
-                )
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.post, req,
-                    data=payload,
-                    headers=headers,
-                    verify=self._is_verify_cert,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                headers=headers,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
             )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "POST", request_call),
+        )
 
     async def api_async_patch_until_complete(
             self, r: str,
@@ -1124,18 +1135,23 @@ class RedfishManagerBase(RedfishManager):
 
         if self.x_auth is not None:
             headers.update({'X-Auth-Token': self.x_auth})
-            return requests.patch(
-                req, data=payload,
-                verify=self._is_verify_cert,
-                headers=headers
-            )
-        else:
-            return requests.patch(
-                req, data=payload,
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
                 verify=self._is_verify_cert,
                 headers=headers,
-                auth=(self._username, self._password)
             )
+        else:
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
+            )
+        return tracing.traced_request(req, "PATCH", request_call)
 
     async def api_async_patch_call(
             self, loop, req, payload: str, hdr: Dict):
@@ -1154,20 +1170,26 @@ class RedfishManagerBase(RedfishManager):
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(requests.patch, req,
-                                        data=payload,
-                                        verify=self._is_verify_cert,
-                                        headers=headers)
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.patch, req, data=payload,
-                    verify=self._is_verify_cert, headers=headers,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
             )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "PATCH", request_call),
+        )
 
     async def api_async_delete_call(
             self, loop, req, payload: str, hdr: Dict):
@@ -1186,21 +1208,26 @@ class RedfishManagerBase(RedfishManager):
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.delete, req, data=payload,
-                    verify=self._is_verify_cert,
-                    headers=headers)
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.delete, req, data=payload,
-                    verify=self._is_verify_cert,
-                    headers=headers,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
             )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "DELETE", request_call),
+        )
 
     def read_api_respond(
             self,
@@ -1838,8 +1865,15 @@ class RedfishManagerBase(RedfishManager):
                 "blocked": blocked_reason,
             }, actions, None, None)
 
-        result, _ = self.base_post(target, payload=body, do_async=do_async,
-                                   expected_status=expected_status)
+        span_attributes = {
+            "redfish.action.name": action_name,
+            "redfish.action.type": full,
+            "redfish.action.target": target,
+            "redfish.action.level": level.value,
+        }
+        with tracing.client_span_attributes(span_attributes):
+            result, _ = self.base_post(target, payload=body, do_async=do_async,
+                                       expected_status=expected_status)
         data = result.data if isinstance(result.data, dict) else {"result": result.data}
         data.setdefault("executed", True)
         data.setdefault("action", full)
