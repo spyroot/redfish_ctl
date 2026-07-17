@@ -20,10 +20,11 @@ from typing import Optional
 
 import requests
 
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
+from ..telemetry import tracing
 
 
 class FirmwareUpdate(RedfishManagerBase,
@@ -162,6 +163,12 @@ class FirmwareUpdate(RedfishManagerBase,
             auth = (self._username, self._password)
 
         url = f"{self._default_method}{self.redfish_ip}{target}"
+        span_attributes = {
+            "redfish.action.name": "FirmwareUpload",
+            "redfish.action.type": method,
+            "redfish.action.target": target,
+            "redfish.action.level": "destructive",
+        }
         with image_path.open("rb") as image:
             if method == "MultipartHttpPushUri":
                 files = {
@@ -171,20 +178,30 @@ class FirmwareUpdate(RedfishManagerBase,
                         "application/octet-stream",
                     )
                 }
-                return requests.post(
+                return tracing.traced_request(
                     url,
-                    files=files,
+                    "POST",
+                    lambda: requests.post(
+                        url,
+                        files=files,
+                        verify=self._is_verify_cert,
+                        headers=headers,
+                        auth=auth,
+                    ),
+                    attributes=span_attributes,
+                )
+            headers["Content-Type"] = "application/octet-stream"
+            return tracing.traced_request(
+                url,
+                "POST",
+                lambda: requests.post(
+                    url,
+                    data=image,
                     verify=self._is_verify_cert,
                     headers=headers,
                     auth=auth,
-                )
-            headers["Content-Type"] = "application/octet-stream"
-            return requests.post(
-                url,
-                data=image,
-                verify=self._is_verify_cert,
-                headers=headers,
-                auth=auth,
+                ),
+                attributes=span_attributes,
             )
 
     def _push_result(self, target, method, image_file, dry_run, confirm):

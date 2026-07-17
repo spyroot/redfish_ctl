@@ -20,7 +20,8 @@ Author Mus <spyroot@gmail.com>
 from __future__ import annotations
 
 import contextlib
-from typing import Any, Iterator, Optional
+from contextvars import ContextVar
+from typing import Any, Callable, Iterator, Optional
 from urllib.parse import urlsplit
 
 # Set by enable_tracing(); None means tracing is off and every helper no-ops.
@@ -30,6 +31,9 @@ _TRACER: Any = None
 # server.address) is what makes an APM backend render one inferred "bmc" node
 # instead of one node per BMC IP.
 BMC_PEER_SERVICE = "bmc"
+_CLIENT_ATTRIBUTES: ContextVar[dict[str, Any]] = ContextVar(
+    "redfish_client_span_attributes", default={}
+)
 
 
 def enable_tracing(tracer: Any) -> None:
@@ -115,13 +119,18 @@ def operation_span(name: str) -> Iterator[Any]:
 
 
 @contextlib.contextmanager
-def client_span(url: str, method: str) -> Iterator[Any]:
+def client_span(
+    url: str,
+    method: str,
+    attributes: Optional[dict[str, Any]] = None,
+) -> Iterator[Any]:
     """CLIENT span for one BMC HTTP call. No-op when tracing is off.
 
     The BMC becomes an inferred downstream service via ``peer.service``.
 
     :param url: BMC request URL; its hostname becomes ``server.address``.
     :param method: HTTP method for the call (``http.request.method``).
+    :param attributes: optional extra attributes to add to the client span.
     """
     if _TRACER is None:
         yield None
@@ -129,6 +138,9 @@ def client_span(url: str, method: str) -> Iterator[Any]:
     from opentelemetry.trace import SpanKind
 
     host = urlsplit(url).hostname or ""
+    span_attributes = dict(_CLIENT_ATTRIBUTES.get())
+    if attributes:
+        span_attributes.update(attributes)
     with _TRACER.start_as_current_span(
         "redfish.bmc.request", kind=SpanKind.CLIENT
     ) as span:
@@ -136,7 +148,93 @@ def client_span(url: str, method: str) -> Iterator[Any]:
         if host:
             span.set_attribute("server.address", host)
         span.set_attribute("http.request.method", method)
+        for key, value in span_attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
         yield span
+
+
+@contextlib.contextmanager
+def client_span_attributes(attributes: dict[str, Any]) -> Iterator[None]:
+    """Temporarily attach extra attributes to nested BMC client spans.
+
+    :param attributes: attributes to merge into each nested ``client_span``.
+    :return: context manager yielding None.
+    """
+    current = dict(_CLIENT_ATTRIBUTES.get())
+    current.update(attributes)
+    token = _CLIENT_ATTRIBUTES.set(current)
+    try:
+        yield None
+    finally:
+        _CLIENT_ATTRIBUTES.reset(token)
+
+
+def traced_request(
+    url: str,
+    method: str,
+    request_call: Callable[[], Any],
+    attributes: Optional[dict[str, Any]] = None,
+) -> Any:
+    """Run a request callable inside a BMC client span.
+
+    :param url: BMC request URL used for span attributes.
+    :param method: HTTP method name.
+    :param request_call: zero-argument callable that performs the request.
+    :param attributes: optional extra attributes for the span.
+    :return: the response returned by ``request_call``.
+    """
+    with client_span(url, method, attributes=attributes) as span:
+        try:
+            response = request_call()
+        except Exception as exc:
+            record_exception(span, exc)
+            raise
+        record_response(span, getattr(response, "status_code", None))
+        return response
+
+
+def traced_request_callable(
+    url: str,
+    method: str,
+    request_call: Callable[[], Any],
+    attributes: Optional[dict[str, Any]] = None,
+) -> Callable[[], Any]:
+    """Wrap a request callable for executor use while preserving trace context.
+
+    :param url: BMC request URL used for span attributes.
+    :param method: HTTP method name.
+    :param request_call: zero-argument callable that performs the request.
+    :param attributes: optional extra attributes for the span.
+    :return: callable suitable for ``run_in_executor``.
+    """
+    span_attributes = dict(_CLIENT_ATTRIBUTES.get())
+    if attributes:
+        span_attributes.update(attributes)
+    if _TRACER is None:
+        return request_call
+
+    from opentelemetry import context
+
+    parent_context = context.get_current()
+
+    def _wrapped() -> Any:
+        """Run the request with the parent trace context attached.
+
+        :return: the response returned by ``request_call``.
+        """
+        token = context.attach(parent_context)
+        try:
+            return traced_request(
+                url,
+                method,
+                request_call,
+                attributes=span_attributes,
+            )
+        finally:
+            context.detach(token)
+
+    return _wrapped
 
 
 def record_response(span: Any, status_code: Optional[int]) -> None:
