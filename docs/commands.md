@@ -179,6 +179,7 @@ Safety labels:
 | `serial-console` | Report host serial redirection + BMC SOL; `--enable --confirm` sets both. | Guarded |
 | `service-api-rs-status` | Read remote service API status. | Read |
 | `service-api-status` | Read service API status. | Read |
+| `spdm-measurements` | Fetch signed measurements from SPDM ComponentIntegrity resources. | Read |
 | `storage-controllers` | Read storage controller information. | Read |
 | `storage-convert-noraid` | Convert RAID disks under a controller to non-RAID. | Write |
 | `storage-convert-raid` | Convert non-RAID disks under a controller to RAID. | Write |

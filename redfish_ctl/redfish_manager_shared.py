@@ -100,6 +100,7 @@ class ApiRequestType(Enum):
     MetricReports = auto()
     MetricReportDefinitions = auto()
     ComponentIntegrity = auto()
+    SpdmMeasurements = auto()
     NetworkAdapters = auto()
     NicFirmware = auto()
     NvLinkPorts = auto()

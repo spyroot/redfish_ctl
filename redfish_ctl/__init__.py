@@ -98,6 +98,7 @@ from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
+from .component_integrity.cmd_spdm_measurements import *
 from .network.cmd_network_adapters import *
 from .network.cmd_nic_firmware import *
 from .ports.cmd_nvlink_ports import *
