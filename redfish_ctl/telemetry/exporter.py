@@ -110,6 +110,15 @@ SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
 # datapoint endpoint (…/v2/datapoint), never a bare host.
+# Redfish enum -> numeric mappings so state/health strings become alertable
+# gauges instead of being dropped (P0: health was previously 100% unexported).
+# Status.Health per DMTF is exactly OK/Warning/Critical.
+HEALTH_VALUES = {"ok": 1.0, "warning": 0.5, "critical": 0.0}
+
+# Power-integrity readings where anything but a clear/normal state is an
+# event worth a 1.0 sample (same fail-visible posture as hw.leak.state).
+POWER_STATE_CLEAR_VALUES = {"normal", "ok", "none", "disabled", "notapplicable", "na"}
+
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
 
@@ -419,9 +428,13 @@ def samples_from_metric_report_rows(
     """Map every TelemetryService MetricReport row into a metric sample.
 
     Fabric properties get curated ``hw.fabric.*`` names and fabric dimensions;
-    every other property (GPU FP16/FP32 activity, thermal, power, memory, …) is
-    emitted under a generic ``hw.gb300.*`` name so the FULL telemetry surface
-    reaches OTel/Prometheus, not just the fabric subset.
+    every other numeric property (GPU FP16/FP32 activity, thermal, power,
+    memory, …) is emitted under a generic ``hw.gb300.*`` name so the FULL
+    telemetry surface reaches OTel/Prometheus, not just the fabric subset.
+    Known state/health enum strings (Health, HealthRollup, State,
+    LinkDownReasonCode, EDPViolationState, PowerBreakPerformanceState) are
+    mapped to numeric gauges by :func:`_state_enum_sample` instead of being
+    dropped.
 
     :param rows: TelemetryService MetricReport rows to map.
     :param identity: fixed join dimensions applied to every sample.
@@ -441,6 +454,9 @@ def samples_from_metric_report_rows(
 
         value = _as_float(row.get("MetricValue"))
         if value is None:
+            state_sample = _state_enum_sample(prop_info, row, identity)
+            if state_sample is not None:
+                samples.append(state_sample)
             continue
         if prop_name in FABRIC_PROPERTY_METRICS:
             metric = FABRIC_PROPERTY_METRICS[prop_name]
@@ -457,6 +473,69 @@ def samples_from_metric_report_rows(
         dims["report"] = str(row.get("Report") or "unknown")
         samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
     return samples
+
+
+def _state_enum_sample(
+        prop_info: Mapping[str, str],
+        row: Mapping,
+        identity: Mapping[str, str]) -> Optional[MetricSample]:
+    """Map a non-numeric state/health MetricReport row to a gauge sample.
+
+    Covers the enum-string rows the numeric path drops: ``Health`` and
+    ``HealthRollup`` become ``hw.health`` / ``hw.health_rollup`` (OK=1,
+    Warning=0.5, Critical=0, raw string kept in the ``health_state``
+    dimension); ``State`` becomes ``hw.state.enabled`` (1 only for Enabled,
+    raw string in the ``state`` dimension); ``LinkDownReasonCode`` becomes a
+    constant-1 ``hw.fabric.link_down_reason`` sample whose ``reason``
+    dimension carries the cause (count by reason answers WHY links dropped);
+    ``EDPViolationState`` / ``PowerBreakPerformanceState`` become 0/1
+    ``hw.power.edp_violation`` / ``hw.power.break_state`` events.
+
+    :param prop_info: parsed MetricProperty fields (property, system, gpu, port, …).
+    :param row: the raw MetricReport row.
+    :param identity: fixed join dimensions applied to the sample.
+    :return: the mapped MetricSample, or None when the row is not a known
+        state/health enum (unknown enum text stays unexported rather than
+        guessing a value).
+    """
+    prop_name = prop_info["property"]
+    text = str(row.get("MetricValue") or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    dims = _with_dims(identity, source="metric-report",
+                      property=_dim_value(prop_name))
+    for key in ("system", "gpu", "port", "chassis", "memory", "index"):
+        if prop_info.get(key):
+            dims[key] = str(prop_info[key])
+    dims["report"] = str(row.get("Report") or "unknown")
+
+    metric = None
+    value = None
+    if prop_name in ("Health", "HealthRollup"):
+        value = HEALTH_VALUES.get(lowered)
+        if value is None:
+            return None
+        metric = "hw.health" if prop_name == "Health" else "hw.health_rollup"
+        dims["health_state"] = _dim_value(text)
+    elif prop_name == "State":
+        metric = "hw.state.enabled"
+        value = 1.0 if lowered == "enabled" else 0.0
+        dims["state"] = _dim_value(text)
+    elif prop_name == "LinkDownReasonCode":
+        metric = "hw.fabric.link_down_reason"
+        value = 1.0
+        dims["reason"] = _dim_value(text)
+        dims["fabric"] = ("ib" if str(prop_info.get("port", "")).lower().startswith("ib")
+                          else "nvlink")
+    elif prop_name in ("EDPViolationState", "PowerBreakPerformanceState"):
+        metric = ("hw.power.edp_violation" if prop_name == "EDPViolationState"
+                  else "hw.power.break_state")
+        value = 0.0 if lowered in POWER_STATE_CLEAR_VALUES else 1.0
+        dims["state"] = _dim_value(text)
+    if metric is None:
+        return None
+    return _sample(metric, value, dims, None, row.get("Timestamp"))
 
 
 def _gpu_metric_report_sample(

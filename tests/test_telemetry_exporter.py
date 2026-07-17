@@ -715,3 +715,120 @@ def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypat
     monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
     with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
         resolve_signalfx_ingest_url()
+
+
+def test_metric_report_mapper_exports_health_and_rollup_enums():
+    """Health/HealthRollup enum rows become hw.health gauges (P0: were dropped).
+
+    This edge exists because HGX_HealthMetrics rows carry Status.Health enum
+    strings, which the numeric-only path silently skipped — leaving no
+    component-health signal to alert on.
+    """
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    base = "/redfish/v1/Chassis/HGX_GPU_0#/Status"
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[
+            {"Report": "HGX_HealthMetrics_0",
+             "MetricProperty": f"{base}/Health", "MetricValue": "OK"},
+            {"Report": "HGX_HealthMetrics_0",
+             "MetricProperty": f"{base}/HealthRollup", "MetricValue": "Warning"},
+            {"Report": "HGX_HealthMetrics_0",
+             "MetricProperty": f"{base}/Health", "MetricValue": "Critical"},
+        ],
+    )
+    health = [s for s in samples if s.metric == "hw.health"]
+    rollup = [s for s in samples if s.metric == "hw.health_rollup"]
+    assert sorted(s.value for s in health) == [0.0, 1.0]
+    assert rollup[0].value == 0.5
+    assert rollup[0].dimensions["health_state"] == "Warning"
+    assert health[0].dimensions["report"] == "HGX_HealthMetrics_0"
+
+
+def test_metric_report_mapper_exports_link_down_reason():
+    """LinkDownReasonCode becomes a constant-1 sample with the reason dimension.
+
+    The exporter already counted link_down events but never WHY — the reason
+    enum row was dropped by the numeric path.
+    """
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[{
+            "Report": "HGX_ProcessorPortMetrics_0",
+            "MetricProperty": (
+                "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/"
+                "Ports/NVLink_3/Metrics#/Oem/Nvidia/LinkDownReasonCode"
+            ),
+            "MetricValue": "PeerResetEvent",
+        }],
+    )
+    reason = [s for s in samples if s.metric == "hw.fabric.link_down_reason"]
+    assert len(reason) == 1
+    assert reason[0].value == 1.0
+    assert reason[0].dimensions["reason"] == "PeerResetEvent"
+    assert reason[0].dimensions["fabric"] == "nvlink"
+    assert reason[0].dimensions["port"] == "NVLink_3"
+
+
+def test_metric_report_mapper_exports_state_and_power_integrity_enums():
+    """State and EDP/PowerBreak enum rows become 0/1 gauges with raw-state dims."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    base = "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0"
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[
+            {"Report": "HGX_CpuProcessorMetrics_0",
+             "MetricProperty": f"{base}#/Status/State", "MetricValue": "Enabled"},
+            {"Report": "HGX_CpuProcessorMetrics_0",
+             "MetricProperty": f"{base}#/Status/State", "MetricValue": "Absent"},
+            {"Report": "HGX_CpuProcessorMetrics_0",
+             "MetricProperty": f"{base}#/Oem/Nvidia/EDPViolationState",
+             "MetricValue": "Normal"},
+            {"Report": "HGX_CpuProcessorMetrics_0",
+             "MetricProperty": f"{base}#/Oem/Nvidia/PowerBreakPerformanceState",
+             "MetricValue": "Throttled"},
+        ],
+    )
+    states = [s for s in samples if s.metric == "hw.state.enabled"]
+    assert sorted(s.value for s in states) == [0.0, 1.0]
+    assert {s.dimensions["state"] for s in states} == {"Enabled", "Absent"}
+    edp = [s for s in samples if s.metric == "hw.power.edp_violation"]
+    assert edp[0].value == 0.0
+    brk = [s for s in samples if s.metric == "hw.power.break_state"]
+    assert brk[0].value == 1.0
+    assert brk[0].dimensions["state"] == "Throttled"
+
+
+def test_metric_report_mapper_skips_unknown_enum_strings():
+    """Unknown enum text stays unexported instead of guessing a numeric value.
+
+    A vendor could ship a new Health value; exporting a made-up number would
+    corrupt alerts, so the fail-safe is to drop only that row.
+    """
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[
+            {"Report": "HGX_HealthMetrics_0",
+             "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0#/Status/Health",
+             "MetricValue": "SomethingNew"},
+            {"Report": "HGX_CpuProcessorMetrics_0",
+             "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0#/PCIeType",
+             "MetricValue": "Gen5"},
+        ],
+    )
+    assert [s for s in samples if s.metric.startswith("hw.health")] == []
+    assert all(s.metric.startswith("hw.scrape") for s in samples)
