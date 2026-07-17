@@ -74,6 +74,7 @@ ACTION_POLICY = {
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
     # secure-erase / RoT-key / factory-reset class actions).
     "#LogService.ClearLog": Destructiveness.DESTRUCTIVE,
+    "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,

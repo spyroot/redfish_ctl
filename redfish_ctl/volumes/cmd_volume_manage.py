@@ -4,14 +4,17 @@ Both commands preview by default and require ``--confirm`` to mutate.
 
     redfish_ctl volume-create --controller RAID.Integrated.1-1 --name vol0 --raid_type RAID1 --drive Disk.Bay.0 --drive Disk.Bay.1 --confirm
     redfish_ctl volume-delete --controller RAID.Integrated.1-1 --volume_id Volume-1 --confirm --confirm_volume_id Volume-1
+    redfish_ctl volume-check-consistency --controller RAID.Integrated.1-1 --volume_id Volume-1 --confirm
 """
 from abc import abstractmethod
 from typing import Iterable, Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+
+_CHECK_CONSISTENCY_ACTION = "#Volume.CheckConsistency"
 
 
 def _last_segment(uri: str) -> str:
@@ -388,4 +391,77 @@ class VolumeDelete(
             None,
             None,
             result.error,
+        )
+
+
+class VolumeCheckConsistency(
+    _VolumeMutationBase,
+    scm_type=ApiRequestType.VolumeCheckConsistency,
+    name="volume-check-consistency",
+    metaclass=Singleton,
+):
+    """Run a guarded Redfish Volume.CheckConsistency action."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the volume-check-consistency command."""
+        super(VolumeCheckConsistency, self).__init__(*args, **kwargs)
+
+    @staticmethod
+    @abstractmethod
+    def register_subcommand(cls):
+        """Register the volume-check-consistency command and its flags.
+
+        :param cls: the CLI manager class providing the base parser.
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
+        cmd_parser = cls.base_parser()
+        cmd_parser.add_argument(
+            "--controller", required=True, type=str,
+            help="Storage controller id, for example RAID.Integrated.1-1")
+        cmd_parser.add_argument(
+            "--volume_id", required=True, type=str,
+            help="Volume id or Redfish Volume URI")
+        cmd_parser.add_argument(
+            "--confirm", action="store_true", dest="confirm", default=False,
+            help="actually start the consistency check; otherwise preview only")
+        cmd_parser.add_argument(
+            "--dry_run", action="store_true", dest="dry_run", default=False,
+            help="force a preview even when --confirm is present")
+        return (
+            cmd_parser,
+            "volume-check-consistency",
+            "run a Redfish volume consistency check (guarded)",
+        )
+
+    def execute(self,
+                controller: str,
+                volume_id: str,
+                confirm: Optional[bool] = False,
+                dry_run: Optional[bool] = False,
+                do_async: Optional[bool] = False,
+                **kwargs) -> CommandResult:
+        """Run Volume.CheckConsistency, previewing unless explicitly confirmed.
+
+        :param controller: storage controller id owning the volume.
+        :param volume_id: volume id or Redfish Volume URI to check.
+        :param confirm: if set (and not dry_run), actually start the check.
+        :param dry_run: force a preview even when confirm is present.
+        :param do_async: note async will subscribe to an event loop.
+        :return: CommandResult with the preview or the action result.
+        :raises InvalidArgument: if volume_id is empty or not found.
+        """
+        uri, _, _ = self._resolve_volume_uri(
+            controller,
+            volume_id,
+            do_async=bool(do_async),
+        )
+        return self.invoke_action(
+            uri,
+            "CheckConsistency",
+            payload={},
+            full_action_type=_CHECK_CONSISTENCY_ACTION,
+            do_async=do_async,
+            expected_status=202,
+            dry_run=bool(dry_run),
+            confirm=bool(confirm),
         )
