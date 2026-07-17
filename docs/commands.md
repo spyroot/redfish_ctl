@@ -158,6 +158,7 @@ Safety labels:
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
 | `ntp-set` | Set or clear Manager NTP servers through standard ManagerNetworkProtocol or legacy Manager NTP resources; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
+| `nvidia-debug-token` | List or invoke NVIDIA debug-token generate, disable, and install actions; previews by default and install token material is read from env/file. | Guarded |
 | `nvlink-ports` | Read GPU NVLink port resources where the BMC exposes them. | Read |
 | `oem-actions` | Read supported Dell OEM OS deployment actions. | Read |
 | `oem-attach` | Attach a network ISO through a Dell OEM action. | Write |
