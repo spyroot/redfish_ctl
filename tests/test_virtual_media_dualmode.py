@@ -1,12 +1,32 @@
 """Dual-mode tests for virtual-media commands."""
+
 import json
 
 import pytest
+import requests
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
+
+_X10_VM_UNSUPPORTED = "standard VirtualMedia endpoint is not implemented on this BMC"
+
+
+def _force_x10_standard_vm_501(monkeypatch):
+    """Make only the resolved X10 standard VirtualMedia collection return 501."""
+    original_get = RedfishManagerBase.api_get_call
+
+    def x10_vm_501(self, request_uri, headers=None, **kwargs):
+        if "/redfish/v1/Managers/1/VM1?" in request_uri:
+            response = requests.Response()
+            response.status_code = 501
+            response._content = b"VirtualMedia not implemented"
+            response.headers["Content-Type"] = "text/plain"
+            return response
+        return original_get(self, request_uri, headers, **kwargs)
+
+    monkeypatch.setattr(RedfishManagerBase, "api_get_call", x10_vm_501)
 
 
 def test_virtual_media_query_returns_collection(redfish_api):
@@ -125,6 +145,58 @@ def test_virtual_media_query_hydrates_manager_members(redfish_mock_factory):
         "/redfish/v1/Managers/BMC_0/VirtualMedia/USB1/"
         "Actions/VirtualMedia.InsertMedia"
     )
+
+
+def test_virtual_media_query_reports_x10_standard_vm_501(
+    redfish_mock_factory, monkeypatch
+):
+    """X10 standard VirtualMedia 501 returns a command error, not a traceback."""
+    manager, _service = redfish_mock_factory("supermicro_x10")
+    _force_x10_standard_vm_501(monkeypatch)
+
+    result = manager.sync_invoke(
+        ApiRequestType.VirtualMediaGet,
+        "virtual_disk_query",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == _X10_VM_UNSUPPORTED
+    assert result.data == {
+        "error": _X10_VM_UNSUPPORTED,
+        "status_code": 501,
+        "target": "/redfish/v1/Managers/1/VM1",
+        "suggested_command": "vm-mount --status",
+    }
+
+
+@pytest.mark.parametrize(
+    ("api_call", "name", "kwargs"),
+    [
+        (
+            ApiRequestType.VirtualMediaInsert,
+            "virtual_disk_insert",
+            {"uri_path": "http://example.test/x10.iso", "device_id": "1"},
+        ),
+        (
+            ApiRequestType.VirtualMediaEject,
+            "virtual_disk_eject",
+            {"device_id": "1"},
+        ),
+    ],
+)
+def test_virtual_media_mutations_propagate_x10_standard_vm_501(
+    redfish_mock_factory, monkeypatch, api_call, name, kwargs
+):
+    """insert_vm and eject_vm surface X10 standard VirtualMedia 501 before POST."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+    _force_x10_standard_vm_501(monkeypatch)
+
+    result = manager.sync_invoke(api_call, name, **kwargs)
+
+    assert isinstance(result, CommandResult)
+    assert result.error == _X10_VM_UNSUPPORTED
+    assert result.data["suggested_command"] == "vm-mount --status"
+    assert all(request.method == "GET" for request in service.requests)
 
 
 def test_virtual_media_discovery_reports_missing_roots(redfish_mock, monkeypatch):
