@@ -22,6 +22,7 @@ mandatory_ids:
   - repo.format
   - repo.yaml
   - repo.schemas
+  - repo.no-agent-names
   - unit.all
   - kubernetes.render
   - kubernetes.schema
@@ -46,6 +47,7 @@ gates:
   - {id: repo.format,          profile: merge, command: scripts/gates/repository/format.sh,      required: true, mutates: false}
   - {id: repo.yaml,            profile: merge, command: scripts/gates/repository/yaml.sh,         required: true, mutates: false}
   - {id: repo.schemas,         profile: merge, command: scripts/gates/repository/schemas.sh,      required: true, mutates: false}
+  - {id: repo.no-agent-names,  profile: merge, command: scripts/gates/repository/no-agent-names.sh, required: true, mutates: false}
   # --- unit: the offline suite ---
   - {id: unit.all,             profile: merge, command: scripts/gates/unit/all.sh,               required: true, mutates: false}
   # --- kubernetes: render + validate manifests ---

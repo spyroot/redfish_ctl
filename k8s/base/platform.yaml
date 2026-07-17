@@ -1,0 +1,110 @@
+# Home-lab platform base: namespaces, ServiceAccounts, lightweight namespaced RBAC (NO cluster-admin),
+# resource guardrails, and a default-deny egress posture. Applied once by the operator/bootstrap
+# (agents do not apply this — they submit Jobs under these identities). Kept lightweight by design.
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: rfctl-ci}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: rfctl-system}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: rfctl-runners}
+---
+# --- ServiceAccounts (one identity each; none is cluster-admin) ---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: home-lab-ci, namespace: rfctl-ci}          # read-only CI validation
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: home-lab-agent, namespace: rfctl-ci}       # repository-editing agent Jobs (agent-runner)
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: home-lab-integration, namespace: rfctl-ci} # namespace-scoped integration testing
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: home-lab-apply, namespace: rfctl-system}   # protected live apply (explicitly selected)
+---
+# --- RBAC: read-only by default; Job control scoped to rfctl-ci; apply scoped to rfctl-system ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: rfctl-ci-jobs, namespace: rfctl-ci}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: home-lab-ci-jobs, namespace: rfctl-ci}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: rfctl-ci-jobs}
+subjects:
+  - {kind: ServiceAccount, name: home-lab-ci, namespace: rfctl-ci}
+  - {kind: ServiceAccount, name: home-lab-integration, namespace: rfctl-ci}
+  - {kind: ServiceAccount, name: home-lab-agent, namespace: rfctl-ci}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: rfctl-apply, namespace: rfctl-system}
+rules:
+  - apiGroups: ["apps", "batch", ""]
+    resources: ["deployments", "jobs", "configmaps", "services"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["redfish.io"]
+    resources: ["redfishendpoints", "redfishnodeprofiles"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: home-lab-apply, namespace: rfctl-system}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: rfctl-apply}
+subjects:
+  - {kind: ServiceAccount, name: home-lab-apply, namespace: rfctl-system}
+---
+# --- Resource guardrails so CI cannot starve the live controllers ---
+apiVersion: v1
+kind: ResourceQuota
+metadata: {name: rfctl-ci-quota, namespace: rfctl-ci}
+spec:
+  hard:
+    pods: "20"
+    count/jobs.batch: "20"
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata: {name: rfctl-ci-limits, namespace: rfctl-ci}
+spec:
+  limits:
+    - type: Container
+      default: {cpu: "2", memory: 2Gi}
+      defaultRequest: {cpu: "500m", memory: 512Mi}
+---
+# --- Default-deny egress; allow DNS + the cluster CIDR (BMC LAN reach is granted per-workload). ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-egress, namespace: rfctl-ci}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: []
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0, except: [169.254.0.0/16]}
+      ports:
+        - {protocol: TCP, port: 443}   # GitHub/GHCR/PyPI over TLS for CI clone+install

@@ -3,8 +3,8 @@
 cmd_boot_source_registry joined ``{idrac_manage_servers}/{BootSourcesRegistryQuery}``,
 but BootSourcesRegistryQuery already starts with ``/`` — producing
 ``/redfish/v1/Systems/System.Embedded.1//BootSources/BootSourcesRegistry``, which
-404s. Found by the Codex worker. The constant is an absolute suffix, so callers
-must join WITHOUT an extra slash.
+404s. The constant is an absolute suffix, so callers must join WITHOUT an extra
+slash.
 """
 from redfish_ctl.redfish_manager_shared import REDFISH_API
 

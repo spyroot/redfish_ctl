@@ -4,6 +4,7 @@
 !/scripts/k8s_ci.sh
 !/scripts/check.sh
 !/scripts/gates/
+!/scripts/hooks/
 build_push.sh
 env_test.sh
 
@@ -31,6 +32,7 @@ NV72_OTEL_BRIEF.md
 .claude/
 .agent-review/
 .internal/
+tools/sync_claude_agents.py
 
 # Internal-only documentation (team/dev notes; external docs live in docs/)
 docs/internal/
