@@ -1,0 +1,55 @@
+# Fixture-to-signal mapping for the M2 gap-closure gate (see gates.md).
+# The gate computes (expected signals - emitted signals) over these rows and
+# requires the difference to be empty. State metrics follow the M1 model:
+# one-hot value 1 with a normalized, allowlisted lowercase label; unknown
+# vendor values map to "unknown", never dropped, never free-form.
+signals:
+  - source_property: Status.Health
+    input: "OK"
+    expected: {metric: hw.component.health, labels: {health: ok}, value: 1}
+  - source_property: Status.Health
+    input: "Warning"
+    expected: {metric: hw.component.health, labels: {health: warning}, value: 1}
+  - source_property: Status.Health
+    input: "Critical"
+    expected: {metric: hw.component.health, labels: {health: critical}, value: 1}
+  - source_property: Status.Health
+    input: "SomeVendorValue"
+    expected: {metric: hw.component.health, labels: {health: unknown}, value: 1}
+  - source_property: Status.HealthRollup
+    input: "Warning"
+    expected: {metric: hw.component.health_rollup, labels: {health: warning}, value: 1}
+  - source_property: Status.State
+    input: "Enabled"
+    expected: {metric: hw.component.state, labels: {state: enabled}, value: 1}
+  - source_property: Status.State
+    input: "Absent"
+    expected: {metric: hw.component.state, labels: {state: absent}, value: 1}
+  - source_property: Status.State
+    input: "StandbyOffline"
+    expected: {metric: hw.component.state, labels: {state: standby_offline}, value: 1}
+  - source_property: LinkDownReasonCode
+    input: "PeerResetEvent"
+    expected: {metric: hw.fabric.link_down_reason, labels: {reason: peer_reset_event}, value: 1}
+  - source_property: EDPViolationState
+    input: "Normal"
+    expected: {metric: hw.power.edp_violation_state, labels: {state: normal}, value: 1}
+  - source_property: EDPViolationState
+    input: "Asserted"
+    expected: {metric: hw.power.edp_violation_state, labels: {state: asserted}, value: 1}
+  - source_property: PowerBreakPerformanceState
+    input: "Active"
+    expected: {metric: hw.power.break_performance_state, labels: {state: active}, value: 1}
+  - source_property: LastResetType
+    input: "PF_FLR"
+    expected: {metric: hw.component.last_reset_type, labels: {reset_type: pf_flr}, value: 1}
+
+allowlists:
+  health: [ok, warning, critical, unknown]
+  state: [enabled, disabled, standby_offline, standby_spare, in_test, starting,
+          absent, unavailable_offline, deferring, quiesced, updating, qualified,
+          unknown]
+  # reason/reset_type allowlists grow via PR when a corpus shows a new vendor
+  # value; anything outside the list maps to "other".
+  reason: [peer_reset_event, other]
+  reset_type: [pf_flr, conventional, fundamental, other]
