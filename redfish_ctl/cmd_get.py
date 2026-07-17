@@ -5,10 +5,43 @@
 """
 from abc import abstractmethod
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
+from .cmd_exceptions import InvalidArgument
 from .redfish_manager_base import RedfishManagerBase
 from .redfish_manager_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
+
+
+def _normalize_redfish_uri(uri: str) -> str:
+    """Validate and normalize a caller-provided Redfish resource URI.
+
+    :param uri: resource URI supplied to the ``get`` command.
+    :return: normalized path, with a query string preserved when present.
+    :raises InvalidArgument: when the value is not a local ``/redfish/v1`` path.
+    """
+    if not isinstance(uri, str) or not uri.strip():
+        raise InvalidArgument("get requires a /redfish/v1 resource URI")
+
+    raw_uri = uri.strip()
+    if "\\" in raw_uri:
+        raise InvalidArgument("get URI must use forward slashes")
+
+    parsed = urlsplit(raw_uri)
+    if parsed.scheme or parsed.netloc:
+        raise InvalidArgument("get accepts Redfish resource paths, not absolute URLs")
+    if parsed.fragment:
+        raise InvalidArgument("get URI must not include a fragment")
+
+    path = parsed.path
+    if path != "/redfish/v1" and not path.startswith("/redfish/v1/"):
+        raise InvalidArgument("get URI must start with /redfish/v1")
+
+    for segment in path.split("/"):
+        if segment in {".", ".."}:
+            raise InvalidArgument("get URI must not contain path traversal segments")
+
+    return urlunsplit(("", "", path, parsed.query, ""))
 
 
 class RawGet(
@@ -59,8 +92,9 @@ class RawGet(
         :param do_expanded: issue an expanded ($expand) Redfish query.
         :return: CommandResult with the fetched resource data.
         """
+        resource_uri = _normalize_redfish_uri(uri)
         return self.base_query(
-            uri,
+            resource_uri,
             filename=filename,
             do_async=do_async,
             do_expanded=do_expanded,
