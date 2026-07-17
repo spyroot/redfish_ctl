@@ -70,6 +70,7 @@ ACTION_POLICY = {
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
+    "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
@@ -86,6 +87,7 @@ ACTION_POLICY = {
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
+    "#HpeServerChassis.FactoryResetMCTP": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
 }

@@ -20,6 +20,8 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#ComputerSystem.Reset") is Destructiveness.DESTRUCTIVE
     assert classify("#Drive.SecureErase") is Destructiveness.IRREVERSIBLE
     assert classify("#EventService.SubmitTestEvent") is Destructiveness.REVERSIBLE
+    assert classify("#HpeServerChassis.DisableMCTPOnServer") is Destructiveness.DESTRUCTIVE
+    assert classify("#HpeServerChassis.FactoryResetMCTP") is Destructiveness.IRREVERSIBLE
     hpe_reversible_actions = (
         "#HpeDirectoryTest.StartTest",
         "#HpeDirectoryTest.StopTest",
