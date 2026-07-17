@@ -35,10 +35,14 @@ def test_request_log_payload_redacts_sensitive_fields():
         "Nested": {
             "OldPassword": "old-secret",
             "NewPassword": "new-secret",
+            "ClientSecret": "client-secret",
+            "RefreshToken": "refresh-token",
             "PasswordName": "Administrator",
         },
         "Links": [
             {"token": "bearer-value"},
+            {"ApiKey": "api-key-value"},
+            {"AccessKey": "access-key-value"},
             {"Label": "public"},
         ],
     }
@@ -48,9 +52,13 @@ def test_request_log_payload_redacts_sensitive_fields():
     assert redacted["Password"] == "********"
     assert redacted["Nested"]["OldPassword"] == "********"
     assert redacted["Nested"]["NewPassword"] == "********"
+    assert redacted["Nested"]["ClientSecret"] == "********"
+    assert redacted["Nested"]["RefreshToken"] == "********"
     assert redacted["Nested"]["PasswordName"] == "Administrator"
     assert redacted["Links"][0]["token"] == "********"
-    assert redacted["Links"][1]["Label"] == "public"
+    assert redacted["Links"][1]["ApiKey"] == "********"
+    assert redacted["Links"][2]["AccessKey"] == "********"
+    assert redacted["Links"][3]["Label"] == "public"
     assert payload["Password"] == "secret-value"
     assert payload["Nested"]["OldPassword"] == "old-secret"
 

@@ -1373,13 +1373,14 @@ class RedfishManagerBase(RedfishManager):
         :param payload: JSON-compatible request payload.
         :return: payload copy safe for debug logging.
         """
-        sensitive = {"apikey", "api_key", "secret", "token"}
+        sensitive_exact = {"apikey", "api_key", "accesskey", "access_key"}
+        sensitive_suffixes = ("password", "secret", "token")
 
         if isinstance(payload, dict):
             redacted = {}
             for key, value in payload.items():
                 key_text = str(key).lower()
-                if key_text.endswith("password") or key_text in sensitive:
+                if key_text in sensitive_exact or key_text.endswith(sensitive_suffixes):
                     redacted[key] = "********"
                 else:
                     redacted[key] = RedfishManagerBase._redact_sensitive_payload(value)
