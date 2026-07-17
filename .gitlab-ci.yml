@@ -1,0 +1,54 @@
+# GitLab pipeline for the homelab platform. Every job runs on the self-managed `homelab-k8s` runner
+# (Kubernetes executor: one disposable pod per job — the execution authority). Gates are driven from
+# gates/manifest.yaml via scripts/gates/run.sh <profile>. The meta-gate (tools/gate_meta.py) enforces
+# that the required jobs exist, none uses allow_failure, every job carries the homelab-k8s tag, and no
+# live-apply job is reachable from a merge-request pipeline.
+#
+# Four pipeline shapes:
+#   merge-request  -> gate-merge (static + unit + render; NO cluster mutation, NO production creds)
+#   default-branch -> gate-merge + gate-integration
+#   scheduled      -> gate-integration (cluster smoke)
+#   manual protected deploy -> deploy-apply (protected branch only, manual, serialized)
+stages: [validate, integration, deploy]
+
+default:
+  image: ghcr.io/spyroot/redfish-ctl-ci:latest    # gate toolchain (built by the CI image workflow)
+  tags: [homelab-k8s]
+
+variables:
+  KUBE_CONTEXT: home-lab-k8s
+
+gate-merge:
+  stage: validate
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - ./scripts/check.sh --list
+    - ./scripts/gates/run.sh merge
+
+gate-integration:
+  stage: integration
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - ./scripts/gates/run.sh integration
+
+# Live apply: protected branch ONLY, manual, serialized (resource_group), never from a merge request.
+deploy-apply:
+  stage: deploy
+  tags: [homelab-k8s]
+  environment:
+    name: production
+  resource_group: homelab-apply
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+  variables:
+    ALLOW_PROTECTED_APPLY: "1"
+    MUTATION_LOCK: "$CI_JOB_ID"
+  script:
+    - ./scripts/gates/run.sh deploy

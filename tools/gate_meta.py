@@ -27,19 +27,37 @@ LIFECYCLE = ("validate", "plan", "apply", "verify", "rollback")
 
 
 def _load_registry() -> dict:
-    """Load and minimally validate ``gates.yaml``.
+    """Load ``gates/manifest.yaml`` and validate it against its JSON schema.
 
     :return: the parsed registry mapping.
-    :raises ValueError: when the file is missing or not a mapping with ``gates``.
+    :raises ValueError: when the file is missing, unparseable, or schema-invalid.
     """
+    import json
+
     import yaml
 
-    path = REPO_ROOT / "gates.yaml"
+    path = REPO_ROOT / "gates" / "manifest.yaml"
     if not path.is_file():
-        raise ValueError("gates.yaml is missing")
+        raise ValueError("gates/manifest.yaml is missing")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not isinstance(data.get("gates"), list):
-        raise ValueError("gates.yaml must be a mapping with a 'gates' list")
+        raise ValueError("gates/manifest.yaml must be a mapping with a 'gates' list")
+    schema_path = REPO_ROOT / "schemas" / "gates.schema.json"
+    if schema_path.is_file():
+        try:
+            import jsonschema
+        except ImportError:
+            jsonschema = None  # schema check also runs as the repo.schemas gate
+        if jsonschema is not None:
+            try:
+                jsonschema.validate(data, json.loads(schema_path.read_text(encoding="utf-8")))
+            except jsonschema.ValidationError as exc:
+                raise ValueError(
+                    f"gates/manifest.yaml fails gates.schema.json: {exc.message}") from exc
+    ids = [g.get("id") for g in data["gates"]]
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    if dupes:
+        raise ValueError(f"duplicate gate ids: {dupes}")
     return data
 
 
@@ -67,14 +85,39 @@ def _check_commands(registry: dict) -> list[str]:
 
 
 def _check_mandatory_ids(registry: dict) -> list[str]:
-    """Check 3: every mandatory ID appears in the registry.
+    """Check 3: every mandatory ID appears in the registry AND is required (not optional).
 
     :param registry: the parsed gate registry.
     :return: list of failure messages.
     """
-    present = {g.get("id") for g in registry["gates"]}
-    return [f"mandatory gate ID absent from registry: {mid}"
-            for mid in registry.get("mandatory_ids", []) if mid not in present]
+    by_id = {g.get("id"): g for g in registry["gates"]}
+    failures = []
+    for mid in registry.get("mandatory_ids", []):
+        if mid not in by_id:
+            failures.append(f"mandatory gate ID absent from registry: {mid}")
+        elif not by_id[mid].get("required", False):
+            failures.append(f"mandatory gate {mid} is registered as optional (required:false)")
+    return failures
+
+
+def _check_no_unregistered_scripts(registry: dict) -> list[str]:
+    """Every gate script under scripts/gates/ must be registered (no orphan/unregistered gate).
+
+    :param registry: the parsed gate registry.
+    :return: list of failure messages.
+    """
+    registered = {g.get("command") for g in registry["gates"]}
+    gates_dir = REPO_ROOT / "scripts" / "gates"
+    if not gates_dir.is_dir():
+        return []
+    failures = []
+    for script in sorted(gates_dir.rglob("*.sh")):
+        rel = script.relative_to(REPO_ROOT).as_posix()
+        if rel == "scripts/gates/run.sh":
+            continue  # the runner is infrastructure, not a gate
+        if rel not in registered:
+            failures.append(f"unregistered gate script (not in the registry): {rel}")
+    return failures
 
 
 def _check_modules() -> tuple[list[str], bool]:
@@ -111,18 +154,23 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
     failures: list[str] = []
+    real_jobs = {}
     for name, job in ci.items():
         if not isinstance(job, dict) or name.startswith(".") or "script" not in job:
             continue  # not a real job (global keys, templates, hidden jobs)
+        real_jobs[name] = job
         if job.get("allow_failure") is True:
             failures.append(f"gitlab job {name}: allow_failure:true is forbidden")
         if runner_tag not in (job.get("tags") or []):
             failures.append(f"gitlab job {name}: missing runner tag '{runner_tag}'")
-        # Check 8: a live-apply/deploy job must not run in an MR pipeline.
+        # A live-apply/deploy job must not run in a merge-request pipeline.
         text = repr(job.get("rules")) + repr(job.get("only"))
         looks_apply = ("apply" in name or "deploy" in name or job.get("mutates") is True)
         if looks_apply and "merge_request" in text:
             failures.append(f"gitlab job {name}: live-apply reachable in a merge-request pipeline")
+    for required in registry.get("required_jobs", []):
+        if required not in real_jobs:
+            failures.append(f"required GitLab job missing: {required}")
     return failures, True
 
 
@@ -132,7 +180,8 @@ def run() -> tuple[bool, list[str], list[str]]:
     :return: (ok, failures, skipped) — ok is True when there are no failures.
     """
     registry = _load_registry()
-    failures = _check_commands(registry) + _check_mandatory_ids(registry)
+    failures = (_check_commands(registry) + _check_mandatory_ids(registry)
+                + _check_no_unregistered_scripts(registry))
     skipped: list[str] = []
     mod_fail, mod_ran = _check_modules()
     failures += mod_fail
