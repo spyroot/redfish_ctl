@@ -46,7 +46,18 @@ Notes that are part of the contract:
   identifier leakage into etcd).
 * `currentStep.state` (`pending → request_sent → task_running → confirmed |
   failed`) is persisted **before** the side effect it announces, the same
-  write-ahead rule that closes the #255 replay window.
+  write-ahead rule that closes the #255 replay window. Steps whose command
+  returns no BMC task (see the catalog's task-follow column) skip
+  `task_running` and go `request_sent → confirmed | failed` directly; the
+  transition table is therefore per-kind, derived from that column.
+* **Recovery from `request_sent` never re-sends.** A reconcile that finds a
+  step in `request_sent` (crash after the request, before the outcome was
+  recorded) must VERIFY instead of re-issuing: correlate via
+  `requestFingerprint` and the BMC task list, or read the target resource
+  back, then transition to `confirmed`/`failed` — or to `unknown_outcome`
+  when verification cannot decide. Crash-injection tests exercise this
+  boundary explicitly (kill between send and outcome persistence, assert
+  the second reconcile issues zero mutating requests).
 * Conditions are projections of `phase` + step state, never an independent
   source of truth.
 
@@ -93,7 +104,9 @@ raw BMC URI/address fields in status  == 0
 ### K8S-G02 — Request/admission safety (merge)
 
 An ordinary in-cluster caller can reference only an existing allowed
-`RedfishEndpoint` and an approved profile. It cannot supply a raw BMC
+`RedfishEndpoint` and an approved profile ("approved" = the plan-hash
+mechanism: `spec.approvedPlanHash` matches the computed plan, per the CRD —
+the deprecated `approve` flag does not count). It cannot supply a raw BMC
 address, an arbitrary Secret, an unbounded deadline, or an arbitrary
 mutation payload. Enforced by admission tests for allowed and denied
 callers, namespaces, endpoints, profiles, and CIDRs.
@@ -101,10 +114,13 @@ callers, namespaces, endpoints, profiles, and CIDRs.
 Pass conditions:
 
 ```
-raw BMC address accepted           == 0
-unreferenced/foreign Secret usable == 0
-unbounded deadline accepted        == 0
-free-form mutation payload accepted == 0
-forbidden step kind accepted       == 0
-cross-namespace endpoint reference == 0 (unless explicitly allowlisted)
+raw BMC address accepted                       == 0
+unapproved profile accepted                    == 0
+Secret referenced from a disallowed namespace  == 0
+unbounded deadline accepted                    == 0
+free-form mutation payload accepted            == 0
+forbidden step kind accepted                   == 0
+cross-namespace endpoint reference             == 0 (unless named in the
+                                                     controller's explicit
+                                                     allowlist config)
 ```
