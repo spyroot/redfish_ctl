@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import threading
@@ -45,6 +46,22 @@ def _load_controller_module():
 def _fixture_for_path(path: str) -> Path | None:
     name = "_" + path.strip("/").replace("/", "_") + ".json"
     return GB300_INDEX.get(name.lower())
+
+
+class FakeSpan:
+    """Small span double that records attributes set by controller handlers."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.attributes: dict[str, object] = {}
+
+    def set_attribute(self, key: str, value: object) -> None:
+        """Record a span attribute assignment.
+
+        :param key: span attribute key.
+        :param value: span attribute value.
+        """
+        self.attributes[key] = value
 
 
 def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
@@ -273,6 +290,65 @@ def test_kopf_handler_patches_status_only(monkeypatch) -> None:
             {},
         )
     ]
+
+
+def test_controller_tracing_setup_is_env_gated(monkeypatch) -> None:
+    """Controller OTLP setup runs only when the deployment env flag is true."""
+    module = _load_controller_module()
+    calls: list[str] = []
+    monkeypatch.setattr(
+        module.tracing,
+        "setup_otlp",
+        lambda service_name: calls.append(service_name),
+    )
+
+    module.setup_controller_tracing({})
+    module.setup_controller_tracing({module.OTLP_TRACES_ENV: "yes"})
+
+    assert calls == ["redfish-controller"]
+
+
+def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
+    """Each endpoint reconcile gets a bounded root span with BMC identity."""
+    module = _load_controller_module()
+    spans: list[FakeSpan] = []
+
+    @contextlib.contextmanager
+    def fake_operation_span(name: str):
+        span = FakeSpan(name)
+        spans.append(span)
+        yield span
+
+    def fake_poll_endpoint(spec, credentials=None, manager_factory=None, polled_at=None):
+        return {
+            "powerState": "On",
+            "health": "OK",
+            "temperature": {"count": 1, "maxCelsius": 24.4},
+            "lastPolled": "2026-07-10T14:50:00Z",
+        }
+
+    monkeypatch.setattr(module.tracing, "operation_span", fake_operation_span)
+    monkeypatch.setattr(module, "poll_endpoint", fake_poll_endpoint)
+
+    patch: dict = {}
+    module.poll_redfish_endpoint(
+        spec={"address": "https://mock-bmc:8443"},
+        body={},
+        namespace="default",
+        name="node-a",
+        logger=None,
+        patch=patch,
+        force=True,
+    )
+
+    assert len(spans) == 1
+    assert spans[0].name == "k8s.redfish_endpoint.reconcile"
+    assert spans[0].attributes == {
+        "server.address": "mock-bmc",
+        "k8s.namespace.name": "default",
+        "k8s.resource.name": "node-a",
+        "k8s.resource.kind": "RedfishEndpoint",
+    }
 
 
 def test_sensor_health_falls_back_when_system_health_absent() -> None:

@@ -118,6 +118,22 @@ cross-node parentage         == 0
 unexpected orphan roots      == 0
 ```
 
+Kubernetes controllers:
+
+```
+k8s.redfish_endpoint.reconcile ROOT
+└── redfish.bmc.request CLIENT
+
+k8s.redfish_node_profile.reconcile ROOT
+├── dry-run plan operation
+└── approved apply operation
+```
+
+Controller root spans carry the bounded Kubernetes identity fields
+`k8s.namespace.name`, `k8s.resource.name`, and `k8s.resource.kind`, plus
+`server.address`. They do not record Secret data, request bodies, response
+bodies, raw URLs, or query strings.
+
 ## Lifecycle gate (G6 details)
 
 Required scenarios: successful command exit; command raising an exception;

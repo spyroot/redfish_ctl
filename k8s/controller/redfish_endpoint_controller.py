@@ -37,6 +37,7 @@ from redfish_ctl.redfish_exceptions import (
     RedfishUnauthorized,
 )
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.telemetry import tracing
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -256,6 +257,8 @@ def parse_interval_seconds(text: Any, default: float) -> float:
 #: retune the controller's base timer cadence. The old handler hard-coded
 #: ``interval=30`` and never read it, so this knob was wired but dead.
 POLL_INTERVAL_ENV = "REDFISH_CONTROLLER_POLL_INTERVAL"
+OTLP_TRACES_ENV = "REDFISH_CONTROLLER_OTLP_TRACES"
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 def base_interval_seconds() -> float:
@@ -273,6 +276,77 @@ def base_interval_seconds() -> float:
         os.environ.get(POLL_INTERVAL_ENV),
         DEFAULT_POLL_INTERVAL_SECONDS,
     )
+
+
+def _controller_otlp_traces_enabled(
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return whether controller OTLP tracing is enabled by env.
+
+    The ``REDFISH_CONTROLLER_OTLP_TRACES`` env var, rendered by the deployment
+    and Helm chart, enables the controller's OTLP span pipeline when set to a
+    true-like value.
+
+    :param environ: environment mapping to read; defaults to ``os.environ``.
+    :return: True when controller tracing should be set up.
+    """
+    values = os.environ if environ is None else environ
+    return str(values.get(OTLP_TRACES_ENV, "")).strip().lower() in _TRUE_ENV_VALUES
+
+
+def setup_controller_tracing(environ: Mapping[str, str] | None = None) -> None:
+    """Set up the controller OTLP span pipeline when enabled by env.
+
+    :param environ: environment mapping to read; defaults to ``os.environ``.
+    """
+    if _controller_otlp_traces_enabled(environ):
+        tracing.setup_otlp("redfish-controller")
+
+
+def _server_address(spec: Mapping[str, Any]) -> str:
+    """Return the BMC host value used on controller root spans.
+
+    :param spec: RedfishEndpoint spec.
+    :return: host from ``spec.address``, with URL schemes stripped when present.
+    """
+    raw_address = str(spec.get("address") or "").strip()
+    parsed = urlsplit(raw_address)
+    if parsed.scheme in {"http", "https"}:
+        return parsed.hostname or parsed.netloc or raw_address
+    return raw_address
+
+
+def _set_span_attribute(span: Any, key: str, value: Any) -> None:
+    """Set a span attribute when tracing is enabled and a value is present.
+
+    :param span: current span, or None when tracing is disabled.
+    :param key: span attribute key.
+    :param value: span attribute value.
+    """
+    if span is not None and value not in (None, ""):
+        span.set_attribute(key, value)
+
+
+def _set_controller_span_attributes(
+    span: Any,
+    spec: Mapping[str, Any],
+    *,
+    namespace: str | None,
+    name: str | None,
+    resource_kind: str,
+) -> None:
+    """Attach bounded Kubernetes/BMC identity to a controller root span.
+
+    :param span: current operation span, or None when tracing is disabled.
+    :param spec: resource spec containing the endpoint address.
+    :param namespace: Kubernetes namespace.
+    :param name: Kubernetes object name.
+    :param resource_kind: Kubernetes custom resource kind.
+    """
+    _set_span_attribute(span, "server.address", _server_address(spec))
+    _set_span_attribute(span, "k8s.namespace.name", namespace)
+    _set_span_attribute(span, "k8s.resource.name", name)
+    _set_span_attribute(span, "k8s.resource.kind", resource_kind)
 
 
 def _parse_rfc3339(text: Any) -> datetime | None:
@@ -689,40 +763,49 @@ def poll_redfish_endpoint(
         ``body`` when ``None``.
     :param force: when ``True``, poll immediately and bypass the cadence gate.
     """
-    current_status = status if status is not None else _mapping(body).get("status")
-    current_status = _mapping(current_status)
-    now = _utc_now()
-    if not force and not poll_due(spec, current_status, now):
-        return None
-
-    credentials = load_secret_credentials(namespace, spec.get("secretRef"))
-    base = base_interval_seconds()
-    try:
-        readings = poll_endpoint(
+    with tracing.operation_span("k8s.redfish_endpoint.reconcile") as span:
+        _set_controller_span_attributes(
+            span,
             spec,
-            credentials=credentials,
-            manager_factory=MANAGER_FACTORY,
-            polled_at=now,
+            namespace=namespace,
+            name=name,
+            resource_kind="RedfishEndpoint",
         )
-    except POLL_ERRORS as exc:
-        new_status = build_error_status(
-            current_status, exc, now=now, base_interval=base
-        )
-        if logger is not None:
-            logger.warning(
-                "RedfishEndpoint %s/%s poll failed (%s): %s",
-                namespace or "",
-                name or "",
-                new_status["consecutiveFailures"],
-                new_status["lastError"],
-            )
-    else:
-        new_status = build_success_status(readings, now=now)
-        if logger is not None:
-            logger.info("polled RedfishEndpoint %s/%s", namespace or "", name or "")
+        current_status = status if status is not None else _mapping(body).get("status")
+        current_status = _mapping(current_status)
+        now = _utc_now()
+        if not force and not poll_due(spec, current_status, now):
+            return None
 
-    if patch is not None:
-        patch.setdefault("status", {}).update(new_status)
+        credentials = load_secret_credentials(namespace, spec.get("secretRef"))
+        base = base_interval_seconds()
+        try:
+            readings = poll_endpoint(
+                spec,
+                credentials=credentials,
+                manager_factory=MANAGER_FACTORY,
+                polled_at=now,
+            )
+        except POLL_ERRORS as exc:
+            tracing.record_exception(span, exc)
+            new_status = build_error_status(
+                current_status, exc, now=now, base_interval=base
+            )
+            if logger is not None:
+                logger.warning(
+                    "RedfishEndpoint %s/%s poll failed (%s): %s",
+                    namespace or "",
+                    name or "",
+                    new_status["consecutiveFailures"],
+                    new_status["lastError"],
+                )
+        else:
+            new_status = build_success_status(readings, now=now)
+            if logger is not None:
+                logger.info("polled RedfishEndpoint %s/%s", namespace or "", name or "")
+
+        if patch is not None:
+            patch.setdefault("status", {}).update(new_status)
     return None
 
 
@@ -735,6 +818,7 @@ def poll_on_change(**kwargs: Any) -> None:  # pragma: no cover - runtime kopf wi
 
 
 if kopf is not None:  # pragma: no cover - decorator wiring is runtime-only.
+    setup_controller_tracing()
     # Lifecycle events poll now (force=True); the timer polls on the per-CR
     # cadence via poll_due. Distinct functions so kopf registers distinct
     # handler ids for the change causes vs the timer.

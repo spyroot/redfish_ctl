@@ -45,6 +45,10 @@ spec:
             # (Helm renders the same var from .Values.controller.pollInterval.)
             - name: REDFISH_CONTROLLER_POLL_INTERVAL
               value: "30s"
+            # Opt-in controller reconcile spans. OTLP endpoint and protocol are
+            # supplied through the standard OTEL_EXPORTER_OTLP_* env vars.
+            - name: REDFISH_CONTROLLER_OTLP_TRACES
+              value: "false"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

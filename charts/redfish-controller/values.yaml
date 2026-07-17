@@ -5,6 +5,7 @@ image:
 
 controller:
   pollInterval: 30s
+  otlpTraces: false
   resources:
     requests:
       cpu: 25m

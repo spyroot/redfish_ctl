@@ -278,3 +278,13 @@ def test_helpers_are_noop_without_a_tracer():
     tracing.record_response(None, 500)
     tracing.record_exception(None, RuntimeError("x"))
     tracing.record_result(None, CommandResult(None, None, None, "err"))
+
+
+def test_setup_otlp_is_idempotent_when_already_configured(monkeypatch):
+    """A second controller module import must not rebuild the OTLP pipeline."""
+    tracing.enable_tracing(object())
+    monkeypatch.setattr(tracing, "_OTLP_SETUP_SERVICE_NAME", "redfish-controller")
+    try:
+        tracing.setup_otlp("redfish-controller")
+    finally:
+        tracing.disable_tracing()

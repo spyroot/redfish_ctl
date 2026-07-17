@@ -61,6 +61,7 @@ def test_chart_metadata_and_default_values_are_pinned() -> None:
     assert values["mockBmc"]["image"]["repository"] == "spyroot/redfish-ctl-mock-bmc"
     assert values["mockBmc"]["enabled"] is False
     assert values["controller"]["pollInterval"] == "30s"
+    assert values["controller"]["otlpTraces"] is False
     assert values["rbac"]["create"] is True
     assert values["serviceAccount"]["create"] is True
 
@@ -107,6 +108,16 @@ def test_default_template_renders_controller_rbac_and_no_mock_bmc() -> None:
         "--standalone",
         "/app/k8s/controller/redfish_endpoint_controller.py",
         "/app/k8s/controller/redfish_node_profile_controller.py",
+    ]
+    assert container["env"] == [
+        {
+            "name": "REDFISH_CONTROLLER_POLL_INTERVAL",
+            "value": "30s",
+        },
+        {
+            "name": "REDFISH_CONTROLLER_OTLP_TRACES",
+            "value": "false",
+        },
     ]
     assert deployment["spec"]["template"]["spec"]["serviceAccountName"] == "redfish-controller"
     assert deployment["spec"]["template"]["spec"]["securityContext"]["runAsNonRoot"] is True

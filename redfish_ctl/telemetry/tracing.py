@@ -26,6 +26,7 @@ from urllib.parse import urlsplit
 
 # Set by enable_tracing(); None means tracing is off and every helper no-ops.
 _TRACER: Any = None
+_OTLP_SETUP_SERVICE_NAME: str | None = None
 
 # The single downstream node name for every BMC. Setting peer.service (not just
 # server.address) is what makes an APM backend render one inferred "bmc" node
@@ -61,6 +62,9 @@ def setup_otlp(service_name: str = "redfish-ctl") -> None:
         service-map node name).
     :raises RuntimeError: when the OpenTelemetry SDK or an OTLP exporter is not installed.
     """
+    global _OTLP_SETUP_SERVICE_NAME
+    if _TRACER is not None and _OTLP_SETUP_SERVICE_NAME == service_name:
+        return
     try:
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -87,12 +91,14 @@ def setup_otlp(service_name: str = "redfish-ctl") -> None:
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     enable_tracing(provider.get_tracer("redfish_ctl"))
+    _OTLP_SETUP_SERVICE_NAME = service_name
 
 
 def disable_tracing() -> None:
     """Turn tracing off (used by tests to restore the default no-op state)."""
-    global _TRACER
+    global _TRACER, _OTLP_SETUP_SERVICE_NAME
     _TRACER = None
+    _OTLP_SETUP_SERVICE_NAME = None
 
 
 def is_enabled() -> bool:

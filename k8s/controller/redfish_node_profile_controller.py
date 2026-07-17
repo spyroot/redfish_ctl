@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, MutableMapping
 from urllib.parse import urlsplit
@@ -17,15 +18,89 @@ except ImportError:  # pragma: no cover - unit tests call the handler directly.
 
 from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.telemetry import tracing
 
 REDFISH_GROUP = "redfish.ctl.dev"
 REDFISH_VERSION = "v1alpha1"
 REDFISH_PLURAL = "redfishnodeprofiles"
 DEFAULT_PORT = 443
 DEFAULT_USERNAME = "root"
+OTLP_TRACES_ENV = "REDFISH_CONTROLLER_OTLP_TRACES"
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 ManagerFactory = Callable[..., Any]
 ReconcileFunc = Callable[..., Any]
+
+
+def _controller_otlp_traces_enabled(
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return whether controller OTLP tracing is enabled by env.
+
+    The ``REDFISH_CONTROLLER_OTLP_TRACES`` env var, rendered by the deployment
+    and Helm chart, enables the controller's OTLP span pipeline when set to a
+    true-like value.
+
+    :param environ: environment mapping to read; defaults to ``os.environ``.
+    :return: True when controller tracing should be set up.
+    """
+    values = os.environ if environ is None else environ
+    return str(values.get(OTLP_TRACES_ENV, "")).strip().lower() in _TRUE_ENV_VALUES
+
+
+def setup_controller_tracing(environ: Mapping[str, str] | None = None) -> None:
+    """Set up the controller OTLP span pipeline when enabled by env.
+
+    :param environ: environment mapping to read; defaults to ``os.environ``.
+    """
+    if _controller_otlp_traces_enabled(environ):
+        tracing.setup_otlp("redfish-controller")
+
+
+def _server_address(endpoint: Mapping[str, Any]) -> str:
+    """Return the BMC host value used on controller root spans.
+
+    :param endpoint: RedfishNodeProfile ``spec.endpoint`` mapping.
+    :return: host from ``endpoint.address``, with URL schemes stripped when present.
+    """
+    raw_address = str(endpoint.get("address") or "").strip()
+    parsed = urlsplit(raw_address)
+    if parsed.scheme in {"http", "https"}:
+        return parsed.hostname or parsed.netloc or raw_address
+    return raw_address
+
+
+def _set_span_attribute(span: Any, key: str, value: Any) -> None:
+    """Set a span attribute when tracing is enabled and a value is present.
+
+    :param span: current span, or None when tracing is disabled.
+    :param key: span attribute key.
+    :param value: span attribute value.
+    """
+    if span is not None and value not in (None, ""):
+        span.set_attribute(key, value)
+
+
+def _set_controller_span_attributes(
+    span: Any,
+    endpoint: Mapping[str, Any],
+    *,
+    namespace: str | None,
+    name: str | None,
+    resource_kind: str,
+) -> None:
+    """Attach bounded Kubernetes/BMC identity to a controller root span.
+
+    :param span: current operation span, or None when tracing is disabled.
+    :param endpoint: endpoint mapping from the resource spec.
+    :param namespace: Kubernetes namespace.
+    :param name: Kubernetes object name.
+    :param resource_kind: Kubernetes custom resource kind.
+    """
+    _set_span_attribute(span, "server.address", _server_address(endpoint))
+    _set_span_attribute(span, "k8s.namespace.name", namespace)
+    _set_span_attribute(span, "k8s.resource.name", name)
+    _set_span_attribute(span, "k8s.resource.kind", resource_kind)
 
 
 def _utc_now() -> datetime:
@@ -507,22 +582,32 @@ def reconcile_redfish_node_profile(
     :param patch: kopf patch object the new ``.status`` is written into.
     """
     endpoint = _mapping(spec.get("endpoint"))
-    credentials = load_secret_credentials(namespace, endpoint.get("secretRef"))
-    try:
-        status = reconcile_profile(
-            spec,
-            credentials=credentials,
-            current_status=_mapping(_mapping(body).get("status")),
+    with tracing.operation_span("k8s.redfish_node_profile.reconcile") as span:
+        _set_controller_span_attributes(
+            span,
+            endpoint,
+            namespace=namespace,
+            name=name,
+            resource_kind="RedfishNodeProfile",
         )
-    except Exception as exc:
-        status = build_error_status(str(exc))
-    if patch is not None:
-        patch.setdefault("status", {}).update(status)
-    if logger is not None:
-        logger.info("reconciled RedfishNodeProfile %s/%s", namespace or "", name or "")
+        credentials = load_secret_credentials(namespace, endpoint.get("secretRef"))
+        try:
+            status = reconcile_profile(
+                spec,
+                credentials=credentials,
+                current_status=_mapping(_mapping(body).get("status")),
+            )
+        except Exception as exc:
+            tracing.record_exception(span, exc)
+            status = build_error_status(str(exc))
+        if patch is not None:
+            patch.setdefault("status", {}).update(status)
+        if logger is not None:
+            logger.info("reconciled RedfishNodeProfile %s/%s", namespace or "", name or "")
 
 
 if kopf is not None:  # pragma: no cover - decorator wiring is runtime-only.
+    setup_controller_tracing()
     reconcile_redfish_node_profile = kopf.on.create(
         REDFISH_GROUP,
         REDFISH_VERSION,
