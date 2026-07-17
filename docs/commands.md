@@ -156,6 +156,7 @@ Safety labels:
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
+| `network-adapter-reset` | Reset a discovered NetworkAdapter through `NetworkAdapter.Reset`; lists reset-capable adapters when no target is given, requires `--confirm` to write. | Guarded |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
 | `ntp-set` | Set or clear Manager NTP servers through standard ManagerNetworkProtocol or legacy Manager NTP resources; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
 | `nvlink-ports` | Read GPU NVLink port resources where the BMC exposes them. | Read |
