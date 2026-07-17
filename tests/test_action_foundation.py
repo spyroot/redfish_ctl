@@ -30,6 +30,9 @@ def test_policy_classifies_known_and_unknown():
     for action in hpe_reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
+    assert classify("#DellRaidService.GetAvailableDisks") is Destructiveness.READ_ONLY
+    assert classify("#DellRaidService.GetDHSDisks") is Destructiveness.READ_ONLY
+    assert classify("#DellRaidService.GetRAIDLevels") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
