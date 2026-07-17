@@ -7,9 +7,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _COLLECTIONS = {
@@ -180,14 +180,23 @@ class AssetTagSet(RedfishManagerBase,
             payload=payload,
             do_async=do_async,
         )
+        applied = {
+            "target": target["target"],
+            "status": str(status),
+            "error": result.error,
+        }
+        if result.error is not None:
+            return CommandResult({
+                **target,
+                "payload": payload,
+                "applied": applied,
+                "observed": None,
+            }, None, None, result.error)
+
         observed = self._get(target["target"], do_async).get("AssetTag")
         return CommandResult({
             **target,
             "payload": payload,
-            "applied": {
-                "target": target["target"],
-                "status": str(status),
-                "error": result.error,
-            },
+            "applied": applied,
             "observed": observed,
         }, None, None, None)
