@@ -187,6 +187,25 @@ _EXPORTER_CRED_KEYS = frozenset({
     "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
     "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
 })
+_EXPORTER_CONFIG_FILE_ENVS = (
+    "REDFISH_EXPORTER_CONFIG_FILE",
+    "IDRAC_EXPORTER_CONFIG_FILE",
+)
+_IDENTITY_ENV_KEYS = {
+    "host_prefix": ("REDFISH_EXPORTER_HOST_PREFIX", "IDRAC_EXPORTER_HOST_PREFIX"),
+    "bmc_octet_base": (
+        "REDFISH_EXPORTER_BMC_OCTET_BASE",
+        "IDRAC_EXPORTER_BMC_OCTET_BASE",
+    ),
+    "server_octet_base": (
+        "REDFISH_EXPORTER_SERVER_OCTET_BASE",
+        "IDRAC_EXPORTER_SERVER_OCTET_BASE",
+    ),
+    "server_subnet": (
+        "REDFISH_EXPORTER_SERVER_SUBNET",
+        "IDRAC_EXPORTER_SERVER_SUBNET",
+    ),
+}
 
 
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
@@ -207,6 +226,136 @@ def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
         if key in _EXPORTER_CRED_KEYS:
             values[key] = value.strip().strip("'\"")
     return values
+
+
+def _non_empty(value):
+    """Return ``value`` with blank strings collapsed to None.
+
+    :param value: candidate config value.
+    :return: stripped value, original non-string value, or None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return value
+
+
+def _first_non_empty(*values):
+    """Return the first non-empty value from ``values``.
+
+    :param values: candidate values in precedence order.
+    :return: the first non-empty value, or None.
+    """
+    for value in values:
+        cleaned = _non_empty(value)
+        if cleaned is not None:
+            return cleaned
+    return None
+
+
+def _coerce_int(value, field_name: str) -> int:
+    """Coerce an integer config field with a targeted error message.
+
+    :param value: value to coerce.
+    :param field_name: field name included in validation errors.
+    :return: coerced integer value.
+    :raises ValueError: when the value cannot be parsed as an integer.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer; got {value!r}") from exc
+
+
+def _config_path(path: Optional[str] = None) -> Optional[str]:
+    """Return the explicit or environment-provided exporter config path.
+
+    :param path: explicit config path.
+    :return: config path from argument or environment, or None.
+    """
+    return _first_non_empty(
+        path,
+        *(os.environ.get(name) for name in _EXPORTER_CONFIG_FILE_ENVS),
+    )
+
+
+def load_exporter_config_file(path: os.PathLike[str] | str) -> dict:
+    """Read an exporter JSON config spec.
+
+    :param path: JSON config file path.
+    :return: parsed config mapping.
+    :raises ValueError: when the config root is not a JSON object.
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("exporter config root must be a JSON object")
+    return data
+
+
+def _section(config: Mapping, key: str) -> Mapping:
+    """Return a nested config section mapping, or an empty mapping.
+
+    :param config: exporter config mapping.
+    :param key: nested section name.
+    :return: nested section mapping, or an empty mapping.
+    """
+    value = config.get(key)
+    return value if isinstance(value, Mapping) else {}
+
+
+def _config_value(config: Mapping, section: str, top_key: str, section_key: str):
+    """Return a top-level or nested config value.
+
+    :param config: exporter config mapping.
+    :param section: nested section name to inspect first.
+    :param top_key: top-level fallback key.
+    :param section_key: key inside the nested section.
+    :return: configured value, or None.
+    """
+    nested = _section(config, section)
+    if section_key in nested:
+        return nested[section_key]
+    return config.get(top_key)
+
+
+def exporter_config_options(path: Optional[str] = None) -> dict:
+    """Return flattened exporter options from an optional JSON spec file.
+
+    The spec may use nested ``signalfx`` and ``identity`` objects or the flat
+    CLI-style keys used by tests and programmatic callers.
+
+    :param path: explicit config file path; falls back to exporter config env vars.
+    :return: flattened option names understood by ``Exporter.execute``.
+    """
+    file_path = _config_path(path)
+    if not file_path:
+        return {}
+    config = load_exporter_config_file(file_path)
+    candidates = {
+        "signalfx_ingest_url": _config_value(
+            config, "signalfx", "signalfx_ingest_url", "ingest_url"),
+        "signalfx_token_env": _config_value(
+            config, "signalfx", "signalfx_token_env", "token_env"),
+        "signalfx_token_file": _config_value(
+            config, "signalfx", "signalfx_token_file", "token_file"),
+        "signalfx_token": _config_value(
+            config, "signalfx", "signalfx_token", "token"),
+        "identity_host_prefix": _config_value(
+            config, "identity", "identity_host_prefix", "host_prefix"),
+        "identity_bmc_octet_base": _config_value(
+            config, "identity", "identity_bmc_octet_base", "bmc_octet_base"),
+        "identity_server_octet_base": _config_value(
+            config, "identity", "identity_server_octet_base", "server_octet_base"),
+        "identity_server_subnet": _config_value(
+            config, "identity", "identity_server_subnet", "server_subnet"),
+    }
+    return {
+        key: value
+        for key, value in candidates.items()
+        if _non_empty(value) is not None
+    }
 
 
 def exporter_argv_uses_secret(argv: Iterable[str]) -> bool:
@@ -255,6 +404,51 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         if current in ("", None, "root") or is_password:
             value = values[key]
             setattr(args, attr, int(value) if attr == "idrac_port" else value)
+
+
+def resolve_identity_options(
+        host_prefix: Optional[str] = None,
+        bmc_octet_base: Optional[int] = None,
+        server_octet_base: Optional[int] = None,
+        server_subnet: Optional[str] = None) -> dict:
+    """Resolve exporter identity dimension options from args, env, and defaults.
+
+    :param host_prefix: explicit ``host.name`` prefix override.
+    :param bmc_octet_base: explicit BMC last-octet base used to derive slot.
+    :param server_octet_base: explicit server last-octet base used to derive host IP.
+    :param server_subnet: explicit server subnet for ``server.address``.
+    :return: keyword arguments for :func:`build_identity_dimensions`.
+    """
+    resolved_host_prefix = _first_non_empty(
+        host_prefix,
+        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["host_prefix"]),
+        "gb300-poc1",
+    )
+    resolved_bmc_octet_base = _first_non_empty(
+        bmc_octet_base,
+        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["bmc_octet_base"]),
+        20,
+    )
+    resolved_server_octet_base = _first_non_empty(
+        server_octet_base,
+        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_octet_base"]),
+        40,
+    )
+    resolved_server_subnet = _first_non_empty(
+        server_subnet,
+        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_subnet"]),
+    )
+    return {
+        "host_prefix": str(resolved_host_prefix),
+        "bmc_octet_base": _coerce_int(resolved_bmc_octet_base, "bmc_octet_base"),
+        "server_octet_base": _coerce_int(
+            resolved_server_octet_base, "server_octet_base"),
+        "server_subnet": (
+            str(resolved_server_subnet)
+            if resolved_server_subnet is not None
+            else None
+        ),
+    }
 
 
 def build_metric_samples(
@@ -843,13 +1037,27 @@ def _require_datapoint_url(ingest_url: str) -> str:
     return ingest_url
 
 
-def resolve_signalfx_token(token_env: Optional[str] = None) -> str:
-    """Return the SignalFx ingest token from ``token_env`` (default SPLUNK_ACCESS_TOKEN).
+def resolve_signalfx_token(
+        token_env: Optional[str] = None,
+        token: Optional[str] = None,
+        token_file: Optional[str] = None) -> str:
+    """Return the SignalFx ingest token from direct, file, or env source.
 
     :param token_env: env var name to read the token from; defaults to ``SPLUNK_ACCESS_TOKEN``.
+    :param token: direct token value.
+    :param token_file: path to a file containing the token.
     :return: the ingest token value.
-    :raises ValueError: if the environment variable is unset or empty.
+    :raises ValueError: if the chosen source is unset or empty.
     """
+    direct_token = _non_empty(token)
+    if direct_token is not None:
+        return str(direct_token)
+    file_path = _non_empty(token_file)
+    if file_path is not None:
+        value = Path(str(file_path)).expanduser().read_text(encoding="utf-8").strip()
+        if not value:
+            raise ValueError(f"{file_path} is empty")
+        return value
     name = token_env or "SPLUNK_ACCESS_TOKEN"
     token = os.environ.get(name, "")
     if not token:

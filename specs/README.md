@@ -32,6 +32,7 @@ Use these files with the command's `--from_spec` option unless the table says ot
 | `change_boot_order_spec02.json` | `change-boot-order` | Dell/iDRAC | Write | Move virtual media earlier. |
 | `change_boot_order_spec03.json` | `change-boot-order` | Dell/iDRAC | Write | Put NIC entries first. |
 | `change_boot_source_spec01.json` | `boot-source-update` | Dell/iDRAC | Write | Enable/disable Dell boot entries. |
+| `exporter_signalfx_spec.json` | `exporter --exporter-config` | generic/vendor-neutral | Read | Sample SignalFx ingest URL, token-file path, and identity label math. |
 | `fastboot.spec.json` | `bios-change` | CPU/platform | Write | Faster POST BIOS attributes. |
 | `realtime.opt.spec.json` | `bios-change` | CPU/platform | Write | Low-latency BIOS attributes. |
 | `set_profile_example.json` | `bios-change` | Dell/iDRAC, CPU/platform | Write | Select a Dell `WorkloadProfile`. |

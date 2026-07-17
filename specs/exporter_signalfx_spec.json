@@ -1,0 +1,12 @@
+{
+  "signalfx": {
+    "ingest_url": "https://ingest.example.signalfx.com/v2/datapoint",
+    "token_file": "/etc/redfish-exporter/signalfx-token"
+  },
+  "identity": {
+    "host_prefix": "rack-a",
+    "bmc_octet_base": 20,
+    "server_octet_base": 40,
+    "server_subnet": "192.0.2"
+  }
+}
