@@ -80,6 +80,11 @@ ACTION_POLICY = {
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.ClearHotKeys": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.ClearRestApiState": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.DisableCloudConnect": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.EnableCloudConnect": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.RetryCloudConnect": Destructiveness.DESTRUCTIVE,
     "#UpdateService.SimpleUpdate": Destructiveness.DESTRUCTIVE,
     "#UpdateService.StartUpdate": Destructiveness.DESTRUCTIVE,
 

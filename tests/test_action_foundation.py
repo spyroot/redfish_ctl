@@ -29,6 +29,15 @@ def test_policy_classifies_known_and_unknown():
     )
     for action in hpe_reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
+    hpe_manager_actions = (
+        "#HpeiLO.ClearHotKeys",
+        "#HpeiLO.ClearRestApiState",
+        "#HpeiLO.DisableCloudConnect",
+        "#HpeiLO.EnableCloudConnect",
+        "#HpeiLO.RetryCloudConnect",
+    )
+    for action in hpe_manager_actions:
+        assert classify(action) is Destructiveness.DESTRUCTIVE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE

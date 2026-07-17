@@ -112,6 +112,7 @@ class ApiRequestType(Enum):
     ActionList = auto()
     EventSubmitTest = auto()
     HpeTestActions = auto()
+    HpeManagerActions = auto()
     NvidiaDebugToken = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
