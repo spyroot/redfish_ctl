@@ -17,10 +17,42 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, BootSourceOverrideMode, RedfishApiRespond, Singleton
+import requests
+
+from ..cmd_exceptions import (
+    FailedDiscoverAction,
+    InvalidArgument,
+    UnexpectedResponse,
+    UnsupportedAction,
+)
+from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
+from ..redfish_manager_base import RedfishManagerBase
+from ..redfish_manager_shared import (
+    ApiRequestType,
+    BootSourceOverrideMode,
+    RedfishApiRespond,
+    Singleton,
+)
+
+_BOOT_TARGET_ALIASES = {
+    "Cd": ("Cd", "CD/DVD", "UsbCd", "UefiCd", "UefiUsbCd"),
+}
+_LEGACY_FLAT_BOOT_TARGETS = {
+    "CD/DVD",
+    "FloppyRemovableMedia",
+    "UsbKey",
+    "UsbHdd",
+    "UsbFloppy",
+}
+_RESET_ERRORS = (
+    FailedDiscoverAction,
+    InvalidArgument,
+    RedfishException,
+    requests.exceptions.RequestException,
+    UnexpectedResponse,
+    UnsupportedAction,
+)
 
 
 class BootOneShot(RedfishManagerBase,
@@ -34,6 +66,112 @@ class BootOneShot(RedfishManagerBase,
     def __init__(self, *args, **kwargs):
         """Initialize the boot-one-shot command."""
         super(BootOneShot, self).__init__(*args, **kwargs)
+
+    @staticmethod
+    def _resolve_boot_device(device: str, boot_devices: list[str]) -> str:
+        """Resolve a requested boot target against live-advertised values.
+
+        :param device: requested BootSourceOverrideTarget value.
+        :param boot_devices: values advertised by the ComputerSystem Boot object.
+        :return: the target value to send to the BMC.
+        :raises InvalidArgument: when the target is unsupported.
+        """
+        if device in boot_devices:
+            return device
+        for candidate in _BOOT_TARGET_ALIASES.get(device, ()):
+            if candidate in boot_devices:
+                return candidate
+        raise InvalidArgument(
+            f"Invalid boot device {device}, "
+            f"supported device {boot_devices}"
+        )
+
+    @staticmethod
+    def _computer_system_version_at_most(
+        system: Optional[dict],
+        major: int,
+        minor: int,
+    ) -> bool:
+        """Return whether a ComputerSystem @odata.type is at or below a version.
+
+        :param system: full ComputerSystem resource body.
+        :param major: maximum Redfish ComputerSystem major version.
+        :param minor: maximum Redfish ComputerSystem minor version.
+        :return: True when ``system`` declares a version at or below the limit.
+        """
+        if not isinstance(system, dict):
+            return False
+        type_name = str(system.get("@odata.type", ""))
+        marker = "#ComputerSystem.v"
+        if marker not in type_name:
+            return False
+        version = type_name.split(marker, 1)[1].split(".", 1)[0]
+        parts = version.split("_")
+        if len(parts) < 2:
+            return False
+        try:
+            parsed = (int(parts[0]), int(parts[1]))
+        except ValueError:
+            return False
+        return parsed <= (major, minor)
+
+    @staticmethod
+    def _use_legacy_flat_payload(
+        boot_devices: list[str],
+        system: Optional[dict],
+    ) -> bool:
+        """Return whether the endpoint expects top-level Boot fields.
+
+        Older Supermicro X10 Redfish 1.0.1 systems advertise legacy-only boot
+        target names such as ``CD/DVD`` and reject the newer nested
+        ``{"Boot": ...}`` PATCH shape. Standard UEFI target names alone are not
+        enough to identify this older shape.
+
+        :param boot_devices: values advertised by the ComputerSystem Boot object.
+        :param system: full ComputerSystem resource body.
+        :return: True when the flat legacy PATCH shape should be used.
+        """
+        if not bool(set(boot_devices) & _LEGACY_FLAT_BOOT_TARGETS):
+            return False
+        if not isinstance(system, dict):
+            return False
+        manufacturer = str(system.get("Manufacturer", "")).lower()
+        if "supermicro" not in manufacturer:
+            return False
+        return BootOneShot._computer_system_version_at_most(system, 1, 3)
+
+    @staticmethod
+    def _boot_payload(
+        device: str,
+        mode: Optional[str],
+        uefi_target: Optional[str],
+        boot_devices: list[str],
+        system: Optional[dict],
+    ) -> dict:
+        """Build the one-shot boot PATCH payload for the endpoint generation.
+
+        :param device: resolved BootSourceOverrideTarget value.
+        :param mode: optional BootSourceOverrideMode value.
+        :param uefi_target: optional UefiTargetBootSourceOverride value.
+        :param boot_devices: live-advertised target values.
+        :param system: full ComputerSystem resource body.
+        :return: PATCH payload accepted by the endpoint generation.
+        """
+        override_enabled = "Disabled" if device == "None" else "Once"
+        boot = {
+            "BootSourceOverrideEnabled": override_enabled,
+            "BootSourceOverrideTarget": device,
+            "BootSourceOverrideMode": mode,
+            "UefiTargetBootSourceOverride": uefi_target
+        }
+        for key, value in dict(boot).items():
+            if value is None:
+                del boot[key]
+        if BootOneShot._use_legacy_flat_payload(boot_devices, system):
+            boot.pop("BootSourceOverrideMode", None)
+            boot.pop("UefiTargetBootSourceOverride", None)
+            return boot
+        return {"Boot": boot}
 
     @staticmethod
     @abstractmethod
@@ -121,19 +259,18 @@ class BootOneShot(RedfishManagerBase,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        # query for a power state
-        current_boot = self.sync_invoke(
-            ApiRequestType.CurrentBoot,
-            "current_boot_query"
+        system_result = self.base_query(
+            self.idrac_manage_servers,
+            data_type=data_type,
+            do_async=do_async,
+            verbose=verbose,
         )
-        boot_device = current_boot.data[
+        system = system_result.data if isinstance(system_result.data, dict) else {}
+        boot = system.get("Boot", system)
+        boot_device = boot[
             'BootSourceOverrideTarget@Redfish.AllowableValues'
         ]
-        if device not in boot_device:
-            raise InvalidArgument(
-                f"Invalid boot device {device}, "
-                f"supported device {boot_device}"
-            )
+        device = self._resolve_boot_device(device, boot_device)
 
         # validate the requested boot mode (UEFI vs Legacy) before mutating
         valid_modes = [m.value for m in BootSourceOverrideMode]
@@ -162,24 +299,13 @@ class BootOneShot(RedfishManagerBase,
             uefi_target if uefi_target is not None else "(none)",
         )
 
-        # One-time boot must ARM the override, not just name a target: Redfish
-        # ignores BootSourceOverrideTarget unless BootSourceOverrideEnabled is set.
-        # "None" clears the override (Disabled); any real device arms it once.
-        override_enabled = "Disabled" if device == "None" else "Once"
-
-        payload = {
-            "Boot": {
-                "BootSourceOverrideEnabled": override_enabled,
-                "BootSourceOverrideTarget": device,
-                "BootSourceOverrideMode": mode,
-                "UefiTargetBootSourceOverride": uefi_target
-            }
-        }
-
-        # r = f"{self._default_method}{self.idrac_ip}/{self.idrac_manage_servers}"
-        for key, value in dict(payload['Boot']).items():
-            if value is None:
-                del payload['Boot'][key]
+        payload = self._boot_payload(
+            device,
+            mode,
+            uefi_target,
+            boot_device,
+            system,
+        )
 
         if dry_run or not confirm:
             return CommandResult(
@@ -196,10 +322,20 @@ class BootOneShot(RedfishManagerBase,
 
         # power on first if a client requested and this is a confirmed write.
         if do_power_on:
-            self.sync_invoke(
-                ApiRequestType.ChassisReset, "reboot",
-                reset_type="On"
-            )
+            try:
+                power_result = self.sync_invoke(
+                    ApiRequestType.ChassisReset, "reboot",
+                    reset_type="On"
+                )
+            except _RESET_ERRORS as exc:
+                return CommandResult(
+                    {"target": self.idrac_manage_servers, "payload": payload},
+                    None,
+                    None,
+                    f"power-on pre-step failed: {exc}",
+                )
+            if power_result.error is not None:
+                return power_result
 
         cmd_result, api_resp = self.base_patch(
             self.idrac_manage_servers, payload=payload,
@@ -213,7 +349,26 @@ class BootOneShot(RedfishManagerBase,
             cmd_result.data['task_state'] = task_state
 
         if do_reboot:
-            reboot_result = self.reboot(do_watch=True)
+            try:
+                reboot_result = self.reboot(do_watch=True)
+            except _RESET_ERRORS as exc:
+                data = cmd_result.data if isinstance(cmd_result.data, dict) else {}
+                data["reboot_error"] = str(exc)
+                return CommandResult(
+                    data,
+                    cmd_result.discovered,
+                    cmd_result.extra,
+                    f"reboot post-step failed: {exc}",
+                )
+            if reboot_result.error is not None:
+                data = cmd_result.data if isinstance(cmd_result.data, dict) else {}
+                data["reboot"] = reboot_result.data
+                return CommandResult(
+                    data,
+                    cmd_result.discovered,
+                    cmd_result.extra,
+                    reboot_result.error,
+                )
             cmd_result.data["reboot"] = reboot_result.data
 
         return cmd_result
