@@ -11,9 +11,9 @@ observability demo.
 from abc import abstractmethod
 from typing import Optional
 
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 from . import exporter
 from .exporter import (
     build_identity_dimensions,
@@ -72,14 +72,42 @@ class Exporter(RedfishManagerBase,
             help="gitignored KEY=VALUE runtime file for "
                  "REDFISH_IP/USERNAME/PASSWORD/PORT (legacy IDRAC_* also accepted)")
         cmd_parser.add_argument(
+            "--exporter-config", dest="exporter_config_file", default=None, type=str,
+            help="JSON exporter config spec for SignalFx ingest/token source and "
+                 "identity dimension overrides")
+        cmd_parser.add_argument(
             "--push-signalfx", action="store_true", default=False,
             help="push SignalFx datapoints instead of returning/serving Prometheus output")
         cmd_parser.add_argument(
             "--signalfx-ingest-url", dest="signalfx_ingest_url", default=None, type=str,
             help="SignalFx ingest URL; defaults to SPLUNK_INGEST_URL when pushing")
         cmd_parser.add_argument(
-            "--signalfx-token-env", dest="signalfx_token_env", default="SPLUNK_ACCESS_TOKEN",
+            "--signalfx-token-env", dest="signalfx_token_env", default=None,
             type=str, help="environment variable that holds the SignalFx ingest token")
+        token_group = cmd_parser.add_mutually_exclusive_group(required=False)
+        token_group.add_argument(
+            "--signalfx-token", dest="signalfx_token", default=None, type=str,
+            help="SignalFx ingest token value; prefer --signalfx-token-file or env "
+                 "for unattended runs")
+        token_group.add_argument(
+            "--signalfx-token-file", dest="signalfx_token_file", default=None, type=str,
+            help="file containing the SignalFx ingest token")
+        cmd_parser.add_argument(
+            "--identity-host-prefix", dest="identity_host_prefix",
+            default=None, type=str,
+            help="host.name prefix for derived exporter identity dimensions")
+        cmd_parser.add_argument(
+            "--identity-bmc-octet-base", dest="identity_bmc_octet_base",
+            default=None, type=int,
+            help="BMC last-octet base subtracted to derive the node slot")
+        cmd_parser.add_argument(
+            "--identity-server-octet-base", dest="identity_server_octet_base",
+            default=None, type=int,
+            help="server last-octet base added to the derived node slot")
+        cmd_parser.add_argument(
+            "--identity-server-subnet", dest="identity_server_subnet",
+            default=None, type=str,
+            help="server.address subnet override for derived identity dimensions")
         cmd_parser.add_argument(
             "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
             help="OTLP collector endpoint for --output otlp; defaults to "
@@ -234,7 +262,11 @@ class Exporter(RedfishManagerBase,
                         label_bmc_ip: Optional[str] = None,
                         vendor: Optional[str] = None,
                         do_async: bool = False,
-                        do_expanded: bool = False) -> list:
+                        do_expanded: bool = False,
+                        identity_host_prefix: Optional[str] = None,
+                        identity_bmc_octet_base: Optional[int] = None,
+                        identity_server_octet_base: Optional[int] = None,
+                        identity_server_subnet: Optional[str] = None) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -242,12 +274,23 @@ class Exporter(RedfishManagerBase,
         :param vendor: vendor dimension override; auto-detected when None.
         :param do_async: when True, issue the Redfish queries asynchronously.
         :param do_expanded: when True, issue expanded ($expand) queries.
+        :param identity_host_prefix: host.name prefix override.
+        :param identity_bmc_octet_base: BMC last-octet base override for slot math.
+        :param identity_server_octet_base: server last-octet base override.
+        :param identity_server_subnet: server.address subnet override.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
+        identity_options = exporter.resolve_identity_options(
+            host_prefix=identity_host_prefix,
+            bmc_octet_base=identity_bmc_octet_base,
+            server_octet_base=identity_server_octet_base,
+            server_subnet=identity_server_subnet,
+        )
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor),
+            **identity_options,
         )
         environment_rows = self._environment_command_rows(do_async=do_async)
         thermal_rows = self._thermal_rows(do_async=do_async, do_expanded=do_expanded)
@@ -293,9 +336,16 @@ class Exporter(RedfishManagerBase,
                 exporter_output: Optional[str] = "prometheus",
                 label_bmc_ip: Optional[str] = None,
                 vendor: Optional[str] = None,
+                exporter_config_file: Optional[str] = None,
                 push_signalfx: Optional[bool] = False,
                 signalfx_ingest_url: Optional[str] = None,
-                signalfx_token_env: Optional[str] = "SPLUNK_ACCESS_TOKEN",
+                signalfx_token_env: Optional[str] = None,
+                signalfx_token: Optional[str] = None,
+                signalfx_token_file: Optional[str] = None,
+                identity_host_prefix: Optional[str] = None,
+                identity_bmc_octet_base: Optional[int] = None,
+                identity_server_octet_base: Optional[int] = None,
+                identity_server_subnet: Optional[str] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
@@ -314,9 +364,16 @@ class Exporter(RedfishManagerBase,
         :param label_bmc_ip: BMC IP used only for metric dimensions when it differs from the
             configured address.
         :param vendor: vendor dimension override; auto-detected when None.
+        :param exporter_config_file: JSON config spec for SignalFx and identity settings.
         :param push_signalfx: when True, push SignalFx datapoints instead of serving Prometheus.
         :param signalfx_ingest_url: SignalFx ingest URL; resolved from the environment when None.
         :param signalfx_token_env: environment variable holding the SignalFx ingest token.
+        :param signalfx_token: direct SignalFx ingest token value.
+        :param signalfx_token_file: file containing the SignalFx ingest token.
+        :param identity_host_prefix: host.name prefix override.
+        :param identity_bmc_octet_base: BMC last-octet base override for slot math.
+        :param identity_server_octet_base: server last-octet base override.
+        :param identity_server_subnet: server.address subnet override.
         :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
@@ -325,10 +382,49 @@ class Exporter(RedfishManagerBase,
             sample-count summary; a CommandResult with empty payload when serving or looping
             forever.
         """
+        config_options = exporter.exporter_config_options(exporter_config_file)
+
+        def option(name, value):
+            """Return the explicit value or the config value for ``name``.
+
+            :param name: flattened exporter config option name.
+            :param value: explicit CLI or programmatic value.
+            :return: explicit value when set, else the config value.
+            """
+            return value if value not in (None, "") else config_options.get(name)
+
+        signalfx_ingest_url = option("signalfx_ingest_url", signalfx_ingest_url)
+        signalfx_token_env = option("signalfx_token_env", signalfx_token_env)
+        signalfx_token = option("signalfx_token", signalfx_token)
+        signalfx_token_file = option("signalfx_token_file", signalfx_token_file)
+        identity_host_prefix = option("identity_host_prefix", identity_host_prefix)
+        identity_bmc_octet_base = option(
+            "identity_bmc_octet_base", identity_bmc_octet_base)
+        identity_server_octet_base = option(
+            "identity_server_octet_base", identity_server_octet_base)
+        identity_server_subnet = option(
+            "identity_server_subnet", identity_server_subnet)
+
+        def collect_current_samples():
+            """Collect samples with the resolved exporter identity options.
+
+            :return: list of MetricSample objects for the current scrape.
+            """
+            return self.collect_samples(
+                label_bmc_ip,
+                vendor,
+                do_async,
+                do_expanded,
+                identity_host_prefix=identity_host_prefix,
+                identity_bmc_octet_base=identity_bmc_octet_base,
+                identity_server_octet_base=identity_server_octet_base,
+                identity_server_subnet=identity_server_subnet,
+            )
+
         if exporter_output == "otlp":
             from . import otlp
             if once:
-                samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                samples = collect_current_samples()
                 result = otlp.push_otlp(
                     samples, endpoint=otlp_endpoint, protocol=otlp_protocol)
                 return CommandResult(
@@ -340,7 +436,7 @@ class Exporter(RedfishManagerBase,
 
                 :return: list of MetricSample objects for the current scrape.
                 """
-                return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                return collect_current_samples()
 
             otlp.run_otlp_loop(
                 scrape_samples, float(interval or 30.0),
@@ -351,9 +447,13 @@ class Exporter(RedfishManagerBase,
             # Resolve and validate the push target BEFORE scraping so a missing
             # token or a bare (non-/v2/datapoint) ingest URL fails fast.
             if exporter_output == "signalfx" and push_signalfx:
-                token = resolve_signalfx_token(signalfx_token_env)
+                token = resolve_signalfx_token(
+                    signalfx_token_env,
+                    token=signalfx_token,
+                    token_file=signalfx_token_file,
+                )
                 ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
-                samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                samples = collect_current_samples()
                 body = to_signalfx_body(samples)
                 status = exporter.push_signalfx(body, token, ingest_url)
                 return CommandResult(
@@ -363,13 +463,17 @@ class Exporter(RedfishManagerBase,
                      "ingest_url": ingest_url},
                     None,
                 )
-            samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+            samples = collect_current_samples()
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"
                     else render_prometheus_text(samples))
             return CommandResult(data, None, {"sample_count": len(samples)}, None)
 
         if push_signalfx or exporter_output == "signalfx":
-            token = resolve_signalfx_token(signalfx_token_env)
+            token = resolve_signalfx_token(
+                signalfx_token_env,
+                token=signalfx_token,
+                token_file=signalfx_token_file,
+            )
             ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
 
             def scrape_samples():
@@ -377,7 +481,7 @@ class Exporter(RedfishManagerBase,
 
                 :return: list of MetricSample objects for the current scrape.
                 """
-                return self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+                return collect_current_samples()
 
             run_signalfx_loop(scrape_samples, token, ingest_url, float(interval or 30.0))
             return CommandResult(None, None, None, None)
@@ -387,7 +491,7 @@ class Exporter(RedfishManagerBase,
 
             :return: the rendered Prometheus /metrics text for the current scrape.
             """
-            samples = self.collect_samples(label_bmc_ip, vendor, do_async, do_expanded)
+            samples = collect_current_samples()
             return render_prometheus_text(samples)
 
         serve_prometheus(scrape_text, listen or "0.0.0.0", int(port or 9109))

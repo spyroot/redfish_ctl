@@ -19,6 +19,7 @@ from redfish_ctl.telemetry.exporter import (
     load_exporter_env_file,
     render_prometheus_text,
     resolve_signalfx_ingest_url,
+    resolve_signalfx_token,
     to_signalfx_body,
 )
 
@@ -71,6 +72,28 @@ def test_identity_dimensions_follow_nv72_slot_contract():
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "supermicro",
+    }
+
+
+def test_identity_options_resolve_from_environment(monkeypatch):
+    """Exporter identity math can be moved out of the GB300 default contract."""
+    monkeypatch.setenv("REDFISH_EXPORTER_HOST_PREFIX", "rack-a")
+    monkeypatch.setenv("REDFISH_EXPORTER_BMC_OCTET_BASE", "10")
+    monkeypatch.setenv("REDFISH_EXPORTER_SERVER_OCTET_BASE", "100")
+    monkeypatch.setenv("REDFISH_EXPORTER_SERVER_SUBNET", "198.51.100")
+
+    dims = build_identity_dimensions(
+        "203.0.113.29",
+        vendor="dell",
+        **exporter_mod.resolve_identity_options(),
+    )
+
+    assert dims == {
+        "host.name": "rack-a-slot19",
+        "node": "slot19",
+        "server.address": "198.51.100.119",
+        "bmc.ip": "203.0.113.29",
+        "vendor": "dell",
     }
 
 
@@ -481,6 +504,44 @@ def test_exporter_env_file_prefers_redfish_over_idrac(tmp_path):
     assert args2.idrac_ip == "198.51.100.5"  # legacy fallback still honored
 
 
+def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
+    """The exporter config spec carries SignalFx and identity settings."""
+    token_file = tmp_path / "token"
+    spec = tmp_path / "exporter.json"
+    spec.write_text(json.dumps({
+        "signalfx": {
+            "ingest_url": "https://ingest.example.test/v2/datapoint",
+            "token_file": str(token_file),
+        },
+        "identity": {
+            "host_prefix": "rack-a",
+            "bmc_octet_base": 20,
+            "server_octet_base": 100,
+            "server_subnet": "198.51.100",
+        },
+    }), encoding="utf-8")
+
+    assert exporter_mod.exporter_config_options(str(spec)) == {
+        "signalfx_ingest_url": "https://ingest.example.test/v2/datapoint",
+        "signalfx_token_file": str(token_file),
+        "identity_host_prefix": "rack-a",
+        "identity_bmc_octet_base": 20,
+        "identity_server_octet_base": 100,
+        "identity_server_subnet": "198.51.100",
+    }
+
+
+def test_signalfx_token_resolves_direct_file_and_env(tmp_path, monkeypatch):
+    """SignalFx token plumbing supports direct, file, and env sources."""
+    token_file = tmp_path / "token"
+    token_file.write_text("file-token\n", encoding="utf-8")
+    monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", "env-token")
+
+    assert resolve_signalfx_token(token="direct-token") == "direct-token"
+    assert resolve_signalfx_token(token_file=str(token_file)) == "file-token"
+    assert resolve_signalfx_token() == "env-token"
+
+
 def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_factory):
     """The exporter scrapes the GB300 corpus offline and emits SignalFx datapoints."""
     mgr, service = redfish_mock_factory("supermicro")
@@ -536,6 +597,58 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     assert thermal_points
     assert {"chassis", "sensor", "zone"} <= set(thermal_points[0]["dimensions"])
     assert all(recorded.method != "POST" for recorded in service.requests)
+
+
+def test_exporter_command_uses_config_file_for_signalfx_and_identity(
+    redfish_mock_factory,
+    tmp_path,
+    monkeypatch,
+):
+    """A config spec supplies SignalFx token source and identity overrides."""
+    mgr, _service = redfish_mock_factory("supermicro")
+    token_file = tmp_path / "signalfx-token"
+    token_file.write_text("file-token\n", encoding="utf-8")
+    spec = tmp_path / "exporter.json"
+    spec.write_text(json.dumps({
+        "signalfx": {
+            "ingest_url": "https://ingest.example.test/v2/datapoint",
+            "token_file": str(token_file),
+        },
+        "identity": {
+            "host_prefix": "rack-a",
+            "bmc_octet_base": 20,
+            "server_octet_base": 100,
+            "server_subnet": "198.51.100",
+        },
+    }), encoding="utf-8")
+
+    calls = []
+
+    def fake_push(body, token, ingest_url, timeout=20.0):
+        calls.append({"body": body, "token": token, "ingest_url": ingest_url})
+        return 202
+
+    monkeypatch.delenv("SPLUNK_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
+    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+
+    result = mgr.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        push_signalfx=True,
+        exporter_config_file=str(spec),
+        label_bmc_ip="172.25.230.29",
+        vendor="supermicro",
+    )
+
+    assert result.extra["push_status"] == 202
+    assert calls[0]["token"] == "file-token"
+    assert calls[0]["ingest_url"] == "https://ingest.example.test/v2/datapoint"
+    first_dims = calls[0]["body"]["gauge"][0]["dimensions"]
+    assert first_dims["host.name"] == "rack-a-slot9"
+    assert first_dims["server.address"] == "198.51.100.109"
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):

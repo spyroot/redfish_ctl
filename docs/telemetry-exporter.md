@@ -168,6 +168,14 @@ series as `host.name=gb300-poc1-slot9`, `node=slot9`, and `server.address=192.0.
 Use `--label-bmc-ip` only when the connection address is not the BMC address you want in the metric
 labels.
 
+Override the identity math with `--identity-host-prefix`, `--identity-bmc-octet-base`,
+`--identity-server-octet-base`, and `--identity-server-subnet`. The same settings can come from
+`REDFISH_EXPORTER_HOST_PREFIX`, `REDFISH_EXPORTER_BMC_OCTET_BASE`,
+`REDFISH_EXPORTER_SERVER_OCTET_BASE`, and `REDFISH_EXPORTER_SERVER_SUBNET`, which the exporter reads
+from the process environment. A config spec can also carry them; the sample
+`specs/exporter_signalfx_spec.json`, defined in this repository's `specs/` directory, uses the
+`identity` object for these fields.
+
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
 falls back to the reported sensor name.
@@ -181,11 +189,18 @@ full SignalFx datapoint endpoint ending in `/v2/datapoint` (for example
 as `https://ingest.us1.observability.splunkcloud.com` is rejected because it would accept the request
 but silently drop every datapoint. Override the default with `--signalfx-ingest-url`.
 
+For non-environment token sources, use `--signalfx-token-file` or `--signalfx-token`. The
+`--signalfx-token-file` option reads the token from a local file created by the deployment step. A
+config spec passed with `--exporter-config` can set `signalfx.ingest_url`, `signalfx.token_env`,
+`signalfx.token_file`, or `signalfx.token`; explicit CLI values win over the spec, and the spec wins
+over the default environment fallback.
+
 Without `--once`, push mode scrapes and pushes on a loop every `--interval` seconds:
 
 ```bash
 redfish_ctl exporter \
   --credential-file .internal/idrac_exporter.env \
+  --exporter-config specs/exporter_signalfx_spec.json \
   --vendor supermicro \
   --output signalfx \
   --push-signalfx
