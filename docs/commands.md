@@ -143,6 +143,7 @@ Safety labels:
 | `jobs-dell-service` | Read Dell JobService. | Read |
 | `jobs-service` | Read standard Redfish JobService. | Read |
 | `leak-detectors` | Read chassis LeakDetection detector states and linked leak policy data. | Read |
+| `license-install` | Install a license file through `LicenseService.Install`; lists the discovered action target when no URI is given, requires `--confirm` to write. | Guarded |
 | `logs` | Read system and manager log entries. | Read |
 | `log-clear` | Clear a discovered LogService (LogService.ClearLog); lists clearable services when no target is given, requires `--confirm` to write. | Guarded |
 | `log-collect-diag` | Collect diagnostic data from a discovered LogService (LogService.CollectDiagnosticData); lists capable services when no target is given, requires `--confirm` to write. | Guarded |
