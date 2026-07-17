@@ -101,6 +101,7 @@ class ApiRequestType(Enum):
     GpuMetrics = auto()
     MetricReports = auto()
     MetricReportDefinitions = auto()
+    TelemetryClearReports = auto()
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
     NetworkAdapters = auto()
