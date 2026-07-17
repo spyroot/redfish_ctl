@@ -29,6 +29,7 @@ from .bios.cmd_bios_profile import *
 from .bios.cmd_change_bios import *
 from .bios.cmd_bios_snapshot import *
 from .bios.cmd_bios_reset_default import *
+from .bios.cmd_bios_change_password import *
 #
 from .attribute.cmd_attribute import *
 from .attribute.cmd_attribute_clear_pending import *

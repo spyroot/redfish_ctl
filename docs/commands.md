@@ -87,6 +87,7 @@ Safety labels:
 | `attr-update` | Stage manager attribute changes. | Write |
 | `bios` | Read BIOS attributes. | Read |
 | `bios-change` | Stage BIOS attributes from a spec or attribute pair. | Write |
+| `bios-change-password` | Change a BIOS password through `Bios.ChangePassword`; lists the discovered target when no password sources are given, requires `--confirm` to write. | Guarded |
 | `bios-clear-pending` | Clear pending BIOS values. | Write |
 | `bios-pending` | Read pending BIOS values. | Read |
 | `bios-profile` | List/show committed BIOS tuning profiles, diff against current BIOS attributes, or preview/apply a profile with `--confirm`. | Guarded |

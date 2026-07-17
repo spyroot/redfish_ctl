@@ -53,6 +53,7 @@ class ApiRequestType(Enum):
     BootOptions = auto()
     SystemConfigQuery = auto()
     IDracQuery = auto()
+    BiosChangePassword = auto()
 
     # firmware
     FirmwareQuery = auto()
