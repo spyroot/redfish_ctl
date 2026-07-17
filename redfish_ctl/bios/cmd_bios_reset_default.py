@@ -1,7 +1,8 @@
 """Reset BIOS settings to defaults through the Redfish BIOS resource's ResetBios action.
 
-    redfish_ctl bios-reset              # dry-run preview
-    redfish_ctl bios-reset --confirm    # POST the ResetBios action
+    redfish_ctl bios-reset                         # dry-run preview
+    redfish_ctl bios-reset --confirm               # POST the ResetBios action
+    redfish_ctl bios-reset --reset-type ResetAll   # preview with payload
 
 The command discovers the host ComputerSystem's ``Bios`` resource and invokes
 its own ``#Bios.ResetBios`` action. Resetting BIOS settings rewrites platform
@@ -54,6 +55,15 @@ class BiosResetDefault(RedfishManagerBase,
             default=False,
             help="resolve the target and show it without POSTing",
         )
+        cmd_parser.add_argument(
+            "--reset-type",
+            "--reset_type",
+            required=False,
+            dest="reset_type",
+            type=str,
+            default=None,
+            help="optional Redfish ResetType value to include in the action payload",
+        )
         return cmd_parser, "bios-reset", "command reset BIOS settings to defaults"
 
     def _bios_uri(self, do_async: bool) -> str:
@@ -81,6 +91,7 @@ class BiosResetDefault(RedfishManagerBase,
     def execute(self,
                 confirm: Optional[bool] = False,
                 dry_run: Optional[bool] = False,
+                reset_type: Optional[str] = None,
                 filename: Optional[str] = None,
                 data_type: Optional[str] = "json",
                 verbose: Optional[bool] = False,
@@ -90,16 +101,19 @@ class BiosResetDefault(RedfishManagerBase,
 
         :param confirm: authorize the DESTRUCTIVE ResetBios POST to run.
         :param dry_run: force a dry-run preview even when ``confirm`` is true.
+        :param reset_type: optional Redfish ``ResetType`` value to include in
+            the ResetBios payload for services that require one.
         :param filename: accepted for CLI compatibility; not used by this command.
         :param data_type: accepted for CLI compatibility; not used by this command.
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: issue the underlying query and POST on the async path.
         :return: a CommandResult with a dry-run preview or POST result.
         """
+        payload = {"ResetType": reset_type} if reset_type else {}
         return self.invoke_action(
             self._bios_uri(bool(do_async)),
             "ResetBios",
-            payload={},
+            payload=payload,
             full_action_type=_RESET_BIOS_ACTION,
             do_async=do_async,
             dry_run=bool(dry_run),

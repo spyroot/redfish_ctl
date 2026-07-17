@@ -1,5 +1,7 @@
 """Dual-mode-style coverage for the guarded BIOS reset command."""
 
+import copy
+
 import pytest
 
 from redfish_ctl.bios.cmd_bios_reset_default import BiosResetDefault
@@ -55,6 +57,29 @@ def test_bios_reset_confirm_posts_to_dell_discovered_target(
         "/redfish/v1/systems/system.embedded.1/bios/settings/actions/bios.resetbios"
     )
     assert posts[0].json() == {}
+
+
+def test_bios_reset_confirm_posts_optional_reset_type(
+    redfish_mock,
+    redfish_service,
+) -> None:
+    """bios-reset includes ResetType only when requested."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BiosResetDefault,
+        "bios_reset",
+        confirm=True,
+        reset_type="ResetAll",
+    )
+
+    posts = _post_requests(redfish_service)
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["executed"] is True
+    assert len(posts) == 1
+    assert posts[0].path.lower() == (
+        "/redfish/v1/systems/system.embedded.1/bios/settings/actions/bios.resetbios"
+    )
+    assert posts[0].json() == {"ResetType": "ResetAll"}
 
 
 def test_bios_reset_confirm_dry_run_still_does_not_post(
@@ -135,3 +160,31 @@ def test_bios_reset_system_query_failure_is_not_hidden(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="system read failed"):
         command._bios_uri(do_async=False)
+
+
+def test_bios_reset_missing_action_reports_available_without_post(
+    redfish_mock_factory,
+) -> None:
+    """A BIOS resource without ResetBios returns an error and never POSTs."""
+    manager, service = redfish_mock_factory("supermicro")
+    bios_path = "/redfish/v1/Systems/System_0/Bios"
+    bios = copy.deepcopy(service._state(bios_path))
+    bios["Actions"].pop("#Bios.ResetBios")
+    service._overlay[bios_path] = bios
+    service._overlay[bios_path.lower()] = bios
+
+    result = manager.sync_invoke(
+        ApiRequestType.BiosResetDefault,
+        "bios_reset",
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "action '#Bios.ResetBios' not found on "
+        "/redfish/v1/Systems/System_0/Bios"
+    )
+    assert result.data["action"] == "#Bios.ResetBios"
+    assert "ResetBios" not in result.data["available"]
+    assert "#Bios.ResetBios" not in result.data["available"]
+    assert _post_requests(service) == []
