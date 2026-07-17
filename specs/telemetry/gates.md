@@ -23,7 +23,9 @@ checks run against all three metric outputs.
 
 ## Mutating-call span gates (G3 details)
 
-Pass conditions for all mutations:
+"Mutating" refers to the BMC HTTP writes (POST/PATCH/DELETE, Actions, firmware upload) —
+span schemas themselves are static; forbidden keys are forbidden at all times, in every
+scenario. Pass conditions for all mutating calls:
 
 ```
 missing mutating spans       == 0
@@ -193,6 +195,10 @@ hw.scrape.sources_succeeded
 hw.scrape.sources_failed
 hw.scrape.bmc_requests_total{method="GET", source="thermal", status_class="2xx"}
 ```
+
+Gate: every listed self-signal is emitted each scrape cycle and covered by the same
+fixture-driven expected-signal check as M2; a per-source failure changes
+`hw.scrape.source.ok` for that source only.
 
 ### R2 — Push-loop survival
 
