@@ -21,6 +21,9 @@ def _env(monkeypatch, realm="us1", token="tok"):
         monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", token)
     else:
         monkeypatch.delenv("SPLUNK_ACCESS_TOKEN", raising=False)
+    # Containers bake an API-scoped token too; tests control it explicitly so
+    # the config-error paths stay deterministic on the fleet.
+    monkeypatch.delenv("SPLUNK_API_TOKEN", raising=False)
 
 
 def test_gate_passes_when_all_metrics_fresh(monkeypatch, capsys):
@@ -119,6 +122,33 @@ def test_metrics_file_loading(tmp_path, monkeypatch, capsys):
     rc = gate.run_gate(["--metrics-file", str(spec)])
     assert rc == 0
     assert seen == ["hw.health", "hw.power"]
+
+
+def test_gate_prefers_api_token_for_queries(monkeypatch, capsys):
+    """With the default token env, SPLUNK_API_TOKEN wins over the ingest token.
+
+    Splunk separates token scopes; querying with an ingest-scoped token gets
+    401s, so the gate must pick the API token when both are present.
+    """
+    _env(monkeypatch)
+    monkeypatch.setenv("SPLUNK_API_TOKEN", "api-tok")
+    seen = {}
+
+    def record(realm, token, metric, timeout):
+        """Record the token used and return a fresh series.
+
+        :param realm: ignored.
+        :param token: captured for the assertion.
+        :param metric: ignored.
+        :param timeout: ignored.
+        :return: a fresh single-series result.
+        """
+        seen["token"] = token
+        return {"count": 1, "newest_ms": int(time.time() * 1000)}
+
+    monkeypatch.setattr(gate, "query_metric", record)
+    assert gate.run_gate(["hw.component.health"]) == 0
+    assert seen["token"] == "api-tok"
 
 
 def test_default_metric_set_includes_p0_signals(monkeypatch):
