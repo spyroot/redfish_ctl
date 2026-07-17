@@ -2,9 +2,10 @@
 
 import pytest
 
+from redfish_ctl.chassis.cmd_asset_tag_set import AssetTagSet
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
 
 
 def _request_type():
@@ -98,6 +99,50 @@ def test_asset_tag_set_confirm_patches_and_rereads_chassis_tag(
         "error": None,
     }
     assert result.data["observed"] == "restored-tag"
+
+
+def test_asset_tag_set_patch_error_does_not_reread_target(
+    redfish_mock_factory,
+    monkeypatch,
+):
+    """A failed PATCH is returned immediately instead of masking it with a GET."""
+    manager, _service = redfish_mock_factory("supermicro")
+    original_get = AssetTagSet._get
+    state = {"get_count": 0, "patch_failed": False}
+
+    def fail_patch(self, *args, **kwargs):
+        state["patch_failed"] = True
+        return (
+            CommandResult({}, None, None, "PATCH failed"),
+            RedfishApiRespond.Error,
+        )
+
+    def counted_get(self, uri, do_async):
+        if state["patch_failed"]:
+            raise AssertionError("unexpected re-read after failed PATCH")
+        state["get_count"] += 1
+        return original_get(self, uri, do_async)
+
+    monkeypatch.setattr(AssetTagSet, "base_patch", fail_patch)
+    monkeypatch.setattr(AssetTagSet, "_get", counted_get)
+
+    result = manager.sync_invoke(
+        _request_type(),
+        "asset-tag-set",
+        resource="chassis",
+        target_id="Chassis_0",
+        asset_tag="restored-tag",
+        confirm=True,
+    )
+
+    assert result.error == "PATCH failed"
+    assert result.data["applied"] == {
+        "target": "/redfish/v1/Chassis/Chassis_0",
+        "status": "RedfishApiRespond.Error",
+        "error": "PATCH failed",
+    }
+    assert result.data["observed"] is None
+    assert state["get_count"] > 0
 
 
 def test_asset_tag_set_allows_empty_restore_value(redfish_mock_factory):
