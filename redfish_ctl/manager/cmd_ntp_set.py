@@ -9,11 +9,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 
 _MAX_NTP_SERVERS = 4
+_MAX_LEGACY_NTP_SERVERS = 2
+_LEGACY_NTP_SERVER_LIMIT_REASON = (
+    "legacy Manager NTP resources support at most 2 servers"
+)
 _HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
@@ -121,6 +125,78 @@ class NtpSet(RedfishManagerBase,
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
+    @staticmethod
+    def _nested_link(data, *keys):
+        """Return the ``@odata.id`` below a nested mapping path.
+
+        :param data: the resource body to read the link from.
+        :param keys: mapping keys that lead to the linked resource.
+        :return: the linked resource URI, or None when the path is absent.
+        """
+        current = data or {}
+        for key in keys:
+            if not isinstance(current, dict):
+                return None
+            current = current.get(key)
+        return current.get("@odata.id") if isinstance(current, dict) else None
+
+    @staticmethod
+    def _legacy_ntp_payload(servers):
+        """Build a legacy Manager ``NTP`` resource PATCH body.
+
+        :param servers: normalized NTP server list from the command arguments.
+        :return: PATCH payload for ``NTPEnable`` and primary/secondary servers.
+        :raises InvalidArgument: when more servers are provided than the legacy
+            resource shape can represent.
+        """
+        if len(servers) > _MAX_LEGACY_NTP_SERVERS:
+            raise InvalidArgument(_LEGACY_NTP_SERVER_LIMIT_REASON)
+        return {
+            "NTPEnable": bool(servers),
+            "PrimaryNTPServer": servers[0] if servers else "",
+            "SecondaryNTPServer": servers[1] if len(servers) > 1 else "",
+        }
+
+    @staticmethod
+    def _legacy_ntp_skip_reason(servers):
+        """Return why a legacy Manager ``NTP`` resource cannot be patched.
+
+        :param servers: normalized NTP server list from the command arguments.
+        :return: skip reason string, or None when the resource can be patched.
+        """
+        if len(servers) > _MAX_LEGACY_NTP_SERVERS:
+            return _LEGACY_NTP_SERVER_LIMIT_REASON
+        return None
+
+    @staticmethod
+    def _is_legacy_ntp_resource(data):
+        """Return whether a payload looks like a legacy Manager ``NTP`` resource.
+
+        :param data: parsed resource payload from a candidate Manager NTP URI.
+        :return: True when the payload exposes legacy NTP fields.
+        """
+        if not isinstance(data, dict):
+            return False
+        return any(
+            key in data
+            for key in ("NTPEnable", "PrimaryNTPServer", "SecondaryNTPServer")
+        )
+
+    def _legacy_ntp_uri(self, manager, manager_uri):
+        """Discover the legacy Manager ``NTP`` resource URI for a manager.
+
+        :param manager: parsed Manager resource payload.
+        :param manager_uri: Manager resource URI.
+        :return: discovered or conventional Supermicro NTP URI, or None.
+        """
+        supermicro_ntp_uri = self._nested_link(manager, "Oem", "Supermicro", "NTP")
+        if supermicro_ntp_uri:
+            return supermicro_ntp_uri
+        oem = (manager or {}).get("Oem")
+        if isinstance(oem, dict) and "Supermicro" in oem:
+            return f"{manager_uri.rstrip('/')}/NTP"
+        return None
+
     def _get(self, uri, do_async):
         """GET a resource body, returning {} on any failure.
 
@@ -128,10 +204,22 @@ class NtpSet(RedfishManagerBase,
         :param do_async: run the query asynchronously (subscribes to the event loop).
         :return: the resource body dict, or {} on any failure.
         """
+        data, _readable = self._try_get(uri, do_async)
+        return data
+
+    def _try_get(self, uri, do_async):
+        """GET a resource body and report whether the read succeeded.
+
+        :param uri: Redfish resource URI to query.
+        :param do_async: run the query asynchronously (subscribes to the event loop).
+        :return: tuple of (resource body dict or {}, True when the GET succeeded).
+        """
+        if not uri:
+            return {}, False
         try:
-            return self.base_query(uri, do_async=do_async).data or {}
+            return self.base_query(uri, do_async=do_async).data or {}, True
         except Exception:
-            return {}
+            return {}, False
 
     def _ntp_plan(self, servers, manager_id, do_async):
         """Build the per-manager PATCH plan for the requested NTP servers.
@@ -156,31 +244,71 @@ class NtpSet(RedfishManagerBase,
             network_uri = self._link(manager, "NetworkProtocol")
             if manager_id and current_manager_id != manager_id:
                 continue
-            if not network_uri:
+            network, network_readable = (
+                self._try_get(network_uri, do_async)
+                if network_uri else ({}, False)
+            )
+            if network_uri and not network_readable:
                 skipped.append({
                     "Manager": current_manager_id,
-                    "target": None,
-                    "reason": "NetworkProtocol link is not available",
+                    "target": network_uri,
+                    "reason": "NetworkProtocol resource is not readable",
                 })
                 continue
-            network = self._get(network_uri, do_async)
-            if not isinstance(network.get("NTP"), dict):
+            if isinstance(network.get("NTP"), dict):
+                plan.append({
+                    "Manager": current_manager_id,
+                    "target": network_uri,
+                    "payload": payload,
+                })
+                continue
+
+            legacy_uri = self._legacy_ntp_uri(manager, manager_uri)
+            legacy = self._get(legacy_uri, do_async) if legacy_uri else {}
+            if self._is_legacy_ntp_resource(legacy):
+                legacy_skip_reason = self._legacy_ntp_skip_reason(servers)
+                if legacy_skip_reason:
+                    skipped.append({
+                        "Manager": current_manager_id,
+                        "target": legacy_uri,
+                        "reason": legacy_skip_reason,
+                    })
+                    continue
+                plan.append({
+                    "Manager": current_manager_id,
+                    "target": legacy_uri,
+                    "payload": self._legacy_ntp_payload(servers),
+                })
+                continue
+
+            if network_uri:
                 skipped.append({
                     "Manager": current_manager_id,
                     "target": network_uri,
                     "reason": "NTP block is not available",
                 })
                 continue
-            plan.append({
+
+            skipped.append({
                 "Manager": current_manager_id,
-                "target": network_uri,
-                "payload": payload,
+                "target": legacy_uri,
+                "reason": "NTP resource is not available",
             })
 
         if manager_id and not plan:
-            raise InvalidArgument(f"Manager {manager_id!r} has no NTP-capable NetworkProtocol")
+            raise InvalidArgument(f"Manager {manager_id!r} has no NTP-capable resource")
         if not plan:
-            raise InvalidArgument("no NTP-capable ManagerNetworkProtocol resources found")
+            legacy_limit_reason = next(
+                (
+                    item["reason"]
+                    for item in skipped
+                    if item.get("reason") == _LEGACY_NTP_SERVER_LIMIT_REASON
+                ),
+                None,
+            )
+            if legacy_limit_reason:
+                raise InvalidArgument(legacy_limit_reason)
+            raise InvalidArgument("no NTP-capable Manager resources found")
         return plan, skipped
 
     def execute(self,
