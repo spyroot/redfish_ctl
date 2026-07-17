@@ -49,6 +49,7 @@ from .jobs.cmd_job_apply import *
 from .firmware.cmd_firmware import *
 from .firmware.cmd_firmware_inv import *
 from .firmware.cmd_update_service import *
+from .firmware.cmd_update_start import *
 
 from .pci.cmd_pci import *
 
