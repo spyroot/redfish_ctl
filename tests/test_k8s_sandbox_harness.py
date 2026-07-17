@@ -154,6 +154,16 @@ def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
         "/app/k8s/controller/redfish_endpoint_controller.py",
         "/app/k8s/controller/redfish_node_profile_controller.py",
     ]
+    assert container["env"] == [
+        {
+            "name": "REDFISH_CONTROLLER_POLL_INTERVAL",
+            "value": "30s",
+        },
+        {
+            "name": "REDFISH_CONTROLLER_OTLP_TRACES",
+            "value": "false",
+        },
+    ]
 
     cluster_role = next(doc for doc in docs if doc["kind"] == "ClusterRole")
     cluster_verbs = set().union(
@@ -194,6 +204,7 @@ def test_controller_image_runs_kopf_without_credentials() -> None:
 
     assert "FROM python:3.12-slim" in dockerfile
     assert "redfish_ctl" in dockerfile
+    assert '".[otlp]"' in dockerfile
     assert "kopf" in dockerfile
     assert "kubernetes" in dockerfile
     assert "USER redfish" in dockerfile

@@ -34,6 +34,8 @@ spec:
           env:
             - name: REDFISH_CONTROLLER_POLL_INTERVAL
               value: {{ .Values.controller.pollInterval | quote }}
+            - name: REDFISH_CONTROLLER_OTLP_TRACES
+              value: {{ .Values.controller.otlpTraces | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

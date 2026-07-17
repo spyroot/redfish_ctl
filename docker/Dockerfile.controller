@@ -28,7 +28,7 @@ COPY redfish_ctl ./redfish_ctl
 COPY k8s/controller ./k8s/controller
 
 RUN python -m pip install --upgrade pip \
-    && python -m pip install --no-cache-dir . "kopf>=1.37" "kubernetes>=29" \
+    && python -m pip install --no-cache-dir ".[otlp]" "kopf>=1.37" "kubernetes>=29" \
     && python -m pip check
 
 USER redfish

@@ -12,6 +12,17 @@ operation_span:
     - server.address
   forbidden: same as request_span
 
+controller_operation_span:
+  kind: INTERNAL
+  name: k8s.redfish_endpoint.reconcile or k8s.redfish_node_profile.reconcile
+  status: ERROR when the reconcile handler records a failure, else OK
+  required:
+    - server.address
+    - k8s.namespace.name
+    - k8s.resource.name
+    - k8s.resource.kind
+  forbidden: same as request_span
+
 request_span:
   kind: CLIENT
   required:

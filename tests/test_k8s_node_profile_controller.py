@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +54,22 @@ def _load_controller_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+class FakeSpan:
+    """Small span double that records attributes set by controller handlers."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.attributes: dict[str, object] = {}
+
+    def set_attribute(self, key: str, value: object) -> None:
+        """Record a span attribute assignment.
+
+        :param key: span attribute key.
+        :param value: span attribute value.
+        """
+        self.attributes[key] = value
 
 
 def test_crd_schema_pins_profile_spec_and_status_shape() -> None:
@@ -168,6 +185,72 @@ def test_reconcile_profile_requires_approval_before_confirming() -> None:
     ]
     assert status["dryRun"] is True
     assert {item["type"]: item["status"] for item in status["conditions"]}["Approved"] == "False"
+
+
+def test_controller_tracing_setup_is_env_gated(monkeypatch) -> None:
+    """Controller OTLP setup runs only when the deployment env flag is true."""
+    module = _load_controller_module()
+    calls: list[str] = []
+    monkeypatch.setattr(
+        module.tracing,
+        "setup_otlp",
+        lambda service_name: calls.append(service_name),
+    )
+
+    module.setup_controller_tracing({})
+    module.setup_controller_tracing({module.OTLP_TRACES_ENV: "true"})
+
+    assert calls == ["redfish-controller"]
+
+
+def test_kopf_handler_wraps_node_profile_reconcile_in_controller_span(
+    monkeypatch,
+) -> None:
+    """Each node-profile reconcile gets a root span with BMC identity."""
+    module = _load_controller_module()
+    spans: list[FakeSpan] = []
+
+    @contextlib.contextmanager
+    def fake_operation_span(name: str):
+        span = FakeSpan(name)
+        spans.append(span)
+        yield span
+
+    monkeypatch.setattr(module.tracing, "operation_span", fake_operation_span)
+    monkeypatch.setattr(module, "load_secret_credentials", lambda namespace, secret_ref: {})
+    monkeypatch.setattr(
+        module,
+        "reconcile_profile",
+        lambda *args, **kwargs: {
+            "dryRun": True,
+            "drift": False,
+            "plannedSteps": [],
+            "appliedChanges": [],
+        },
+    )
+
+    patch: dict = {}
+    module.reconcile_redfish_node_profile(
+        spec={
+            "endpoint": {"address": "https://mock-bmc:8443"},
+            "desiredState": {"biosProfile": "balanced"},
+        },
+        body={},
+        namespace="default",
+        name="profile-a",
+        logger=None,
+        patch=patch,
+    )
+
+    assert patch["status"]["dryRun"] is True
+    assert len(spans) == 1
+    assert spans[0].name == "k8s.redfish_node_profile.reconcile"
+    assert spans[0].attributes == {
+        "server.address": "mock-bmc",
+        "k8s.namespace.name": "default",
+        "k8s.resource.name": "profile-a",
+        "k8s.resource.kind": "RedfishNodeProfile",
+    }
 
 
 def test_reconcile_profile_confirms_only_for_matching_plan_hash() -> None:
