@@ -26,6 +26,20 @@ if [ -f /secrets/gh_token ]; then
     GH_TOKEN="$(tr -d '[:space:]' < /secrets/gh_token)"
     export GH_TOKEN
 fi
+# Observability ingest credentials (optional): the telemetry exporter reads
+# SPLUNK_ACCESS_TOKEN / SPLUNK_INGEST_URL, so a container can push and
+# live-verify metrics without any per-run token plumbing. An explicit
+# SPLUNK_INGEST_URL from the caller wins over the realm-derived default.
+if [ -f /secrets/splunk_token ]; then
+    SPLUNK_ACCESS_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_token)"
+    export SPLUNK_ACCESS_TOKEN
+fi
+if [ -f /secrets/splunk_realm ] && [ -z "${SPLUNK_INGEST_URL:-}" ]; then
+    _realm="$(tr -d '[:space:]' < /secrets/splunk_realm)"
+    if [ -n "$_realm" ]; then
+        export SPLUNK_INGEST_URL="https://ingest.${_realm}.signalfx.com/v2/datapoint"
+    fi
+fi
 
 source /opt/conda/etc/profile.d/conda.sh
 conda activate redfish_ctl
