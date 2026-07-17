@@ -3,7 +3,6 @@ import io
 import json
 import time
 
-import pytest
 
 from tools import splunk_metric_gate as gate
 
