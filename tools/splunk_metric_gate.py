@@ -162,7 +162,13 @@ def run_gate(argv: list[str] | None = None) -> int:
         if info["count"] <= 0:
             print(f"FAIL {metric}: no time series found")
             failures += 1
-        elif info["newest_ms"] and info["newest_ms"] < cutoff_ms:
+        elif info["newest_ms"] <= 0:
+            # A hard gate must never pass on existence alone: no timestamp in
+            # the response means freshness cannot be verified, so fail loud.
+            print(f"FAIL {metric}: {info['count']} time series but no update "
+                  f"timestamp in the response — freshness unverifiable")
+            failures += 1
+        elif info["newest_ms"] < cutoff_ms:
             age_min = (time.time() * 1000.0 - info["newest_ms"]) / 60000.0
             print(f"FAIL {metric}: stale — newest update {age_min:.0f} min ago "
                   f"(window {args.since_minutes:.0f} min)")

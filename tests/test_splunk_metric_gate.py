@@ -61,6 +61,21 @@ def test_gate_fails_on_stale_metric(monkeypatch, capsys):
     assert "stale" in capsys.readouterr().out
 
 
+def test_gate_fails_when_freshness_unverifiable(monkeypatch, capsys):
+    """Series without any update timestamp fail instead of passing on count.
+
+    This edge occurs when the API returns MTS metadata without timestamp
+    fields; a hard gate must not report PASS when it cannot verify the push
+    actually landed inside the window.
+    """
+    _env(monkeypatch)
+    monkeypatch.setattr(gate, "query_metric",
+                        lambda realm, token, metric, timeout: {"count": 4, "newest_ms": 0})
+    rc = gate.run_gate(["hw.health"])
+    assert rc == 1
+    assert "freshness unverifiable" in capsys.readouterr().out
+
+
 def test_gate_configuration_errors(monkeypatch, capsys):
     """Missing token or realm is a loud exit-2 configuration error."""
     _env(monkeypatch, token="")
