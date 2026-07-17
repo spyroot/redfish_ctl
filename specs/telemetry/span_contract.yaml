@@ -1,0 +1,50 @@
+# Machine-readable span attribute contract (see gates.md, G3).
+# Contract tests validate every exported span against this schema:
+#   missing required keys == 0, unknown attribute keys == 0,
+#   forbidden keys == 0, secret-pattern matches == 0.
+request_span:
+  required:
+    - server.address
+    - peer.service
+    - http.request.method
+    - redfish.path_family
+  optional:
+    - http.response.status_code
+    - redfish.action
+    - redfish.vendor
+    - redfish.task.state
+    - bmc.ip
+  forbidden:
+    - authorization
+    - password
+    - token
+    - session_key
+    - request.body
+    - response.body
+    - raw_url
+    - query_string
+
+poll_task_span:
+  required:
+    - redfish.task.state
+    - poll.count
+    - poll.interval_ms
+    - poll.elapsed_ms
+    - poll.terminal_state
+  links:
+    initiating_request: required
+
+discovery_summary_span:
+  required:
+    - requests.count
+    - resources.discovered
+    - resources.failed
+    - duration_ms
+    - status_class.2xx_count
+    - status_class.4xx_count
+    - status_class.5xx_count
+  optional:
+    - resources.read_only_count
+    - resources.patchable_count
+    - resources.deletable_count
+    - resources.action_count
