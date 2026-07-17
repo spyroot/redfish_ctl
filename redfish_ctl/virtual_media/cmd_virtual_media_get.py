@@ -26,9 +26,9 @@ from typing import Optional
 
 from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
@@ -100,6 +100,19 @@ class VirtualMediaGet(RedfishManagerBase,
         r = f"{self._default_method}{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)
+        if response.status_code == 501:
+            status = "standard VirtualMedia endpoint is not implemented on this BMC"
+            return CommandResult(
+                {
+                    "error": status,
+                    "status_code": 501,
+                    "target": vm_uri,
+                    "suggested_command": "vm-mount --status",
+                },
+                None,
+                None,
+                status,
+            )
         self.default_error_handler(response)
         data = response.json()
         data["Members"] = self._hydrate_member_links(
