@@ -2,6 +2,7 @@
 !/scripts/live_sanity_check/
 !/scripts/gb300.sh
 !/scripts/k8s_ci.sh
+!/scripts/gates/
 build_push.sh
 env_test.sh
 
@@ -32,6 +33,7 @@ NV72_OTEL_BRIEF.md
 
 # Internal-only documentation (team/dev notes; external docs live in docs/)
 docs/internal/
+inventory/
 
 # macOS / stray test output
 .DS_Store
