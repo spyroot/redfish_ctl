@@ -1664,6 +1664,17 @@ class RedfishManagerBase(RedfishManager):
                         out[ok] = ov["target"]
             elif isinstance(val, dict) and val.get("target"):
                 out[key] = val["target"]
+        oem = (resource or {}).get("Oem") or {}
+        if isinstance(oem, dict):
+            for vendor_ext in oem.values():
+                vendor_actions = (
+                    vendor_ext.get("Actions") if isinstance(vendor_ext, dict) else None
+                )
+                if not isinstance(vendor_actions, dict):
+                    continue
+                for key, val in vendor_actions.items():
+                    if isinstance(val, dict) and val.get("target"):
+                        out[key] = val["target"]
         return out
 
     @staticmethod
