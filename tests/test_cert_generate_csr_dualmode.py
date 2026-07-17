@@ -1,5 +1,8 @@
 """Dual-mode tests for the CertificateService.GenerateCSR command."""
 
+import pytest
+
+from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 
@@ -33,9 +36,7 @@ def test_cert_gen_csr_posts_payload_to_generic_certificate_service(
         key_curve_id="TPM_ECC_NIST_P256",
         key_usage=["DigitalSignature", "KeyEncipherment"],
         alternative_names=["bmc-alt.example.test,192.0.2.10"],
-        certificate_collection=(
-            "/redfish/v1/Managers/BMC/NetworkProtocol/HTTPS/Certificates"
-        ),
+        certificate_collection="/redfish/v1/Systems/437XR1138R2/Certificates",
         contact_person="Ops Team",
         email="ops@example.test",
         given_name="Platform",
@@ -58,7 +59,7 @@ def test_cert_gen_csr_posts_payload_to_generic_certificate_service(
     )
     assert posts[0].json() == {
         "CertificateCollection": {
-            "@odata.id": "/redfish/v1/Managers/BMC/NetworkProtocol/HTTPS/Certificates"
+            "@odata.id": "/redfish/v1/Systems/437XR1138R2/Certificates"
         },
         "City": "San Francisco",
         "CommonName": "bmc.example.test",
@@ -200,4 +201,78 @@ def test_cert_gen_csr_rejects_invalid_hpe_key_usage_without_post(
             ],
         }
     ]
+    assert _post_requests(service) == []
+
+
+def test_cert_gen_csr_missing_certificate_collection_stops_before_post(
+    redfish_mock_factory,
+):
+    """A missing CertificateCollection URI returns an error without POSTing."""
+    manager, service = redfish_mock_factory("generic")
+
+    result = manager.sync_invoke(
+        ApiRequestType.CertificateGenerateCSR,
+        "cert_gen_csr",
+        common_name="bmc.example.test",
+        certificate_collection="/redfish/v1/Systems/437XR1138R2/Certificates/Missing",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "certificate collection not found: "
+        "/redfish/v1/Systems/437XR1138R2/Certificates/Missing"
+    )
+    assert result.data == {
+        "CertificateCollection": {
+            "@odata.id": "/redfish/v1/Systems/437XR1138R2/Certificates/Missing"
+        }
+    }
+    assert _post_requests(service) == []
+
+
+def test_cert_gen_csr_rejects_certificate_member_uri_without_post(
+    redfish_mock_factory,
+):
+    """A Certificate member URI is not accepted as a collection target."""
+    manager, service = redfish_mock_factory("generic")
+
+    result = manager.sync_invoke(
+        ApiRequestType.CertificateGenerateCSR,
+        "cert_gen_csr",
+        common_name="bmc.example.test",
+        certificate_collection=(
+            "/redfish/v1/Systems/437XR1138R2/Certificates/contoso-root"
+        ),
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "certificate collection URI is not a CertificateCollection: "
+        "/redfish/v1/Systems/437XR1138R2/Certificates/contoso-root"
+    )
+    assert result.data == {
+        "CertificateCollection": {
+            "@odata.id": (
+                "/redfish/v1/Systems/437XR1138R2/Certificates/contoso-root"
+            )
+        },
+        "resource_type": "#Certificate.v1_8_1.Certificate",
+    }
+    assert _post_requests(service) == []
+
+
+def test_cert_gen_csr_rejects_relative_certificate_collection_uri(
+    redfish_mock_factory,
+):
+    """CertificateCollection links must be absolute Redfish resource URIs."""
+    manager, service = redfish_mock_factory("generic")
+
+    with pytest.raises(InvalidArgument, match="absolute Redfish URI"):
+        manager.sync_invoke(
+            ApiRequestType.CertificateGenerateCSR,
+            "cert_gen_csr",
+            common_name="bmc.example.test",
+            certificate_collection="Systems/437XR1138R2/Certificates",
+        )
+
     assert _post_requests(service) == []

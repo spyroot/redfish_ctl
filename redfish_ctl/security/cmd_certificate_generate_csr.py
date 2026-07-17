@@ -14,6 +14,7 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
@@ -211,10 +212,90 @@ class CertificateGenerateCSR(RedfishManagerBase,
         return [item for item in items if item] or None
 
     @staticmethod
-    def _certificate_collection_link(uri):
-        """Build a Redfish link object from a certificate collection URI.
+    def _normalize_certificate_collection_uri(uri):
+        """Normalize and validate a CertificateCollection URI.
 
         :param uri: Redfish certificate collection URI, or None.
+        :return: stripped absolute Redfish URI, or None when absent.
+        :raises InvalidArgument: when the URI is not absolute under /redfish/v1.
+        """
+        if uri is None:
+            return None
+        normalized = str(uri).strip().rstrip("/")
+        if not normalized:
+            return None
+        if not normalized.startswith(f"{RedfishApi.Version}/"):
+            raise InvalidArgument(
+                "certificate collection URI must be an absolute Redfish URI "
+                f"under {RedfishApi.Version}/"
+            )
+        return normalized
+
+    @staticmethod
+    def _is_certificate_collection(data):
+        """Return whether a resource body is a certificate collection.
+
+        :param data: decoded Redfish resource.
+        :return: True when it looks like a CertificateCollection.
+        """
+        if not isinstance(data, dict):
+            return False
+        resource_type = data.get("@odata.type")
+        if isinstance(resource_type, str):
+            return resource_type.startswith("#CertificateCollection.")
+        resource_uri = data.get("@odata.id")
+        return (
+            isinstance(data.get("Members"), list)
+            and isinstance(resource_uri, str)
+            and resource_uri.rstrip("/").endswith("/Certificates")
+        )
+
+    def _validate_certificate_collection(self, uri, do_async):
+        """Validate that an optional certificate collection URI exists.
+
+        :param uri: optional CertificateCollection URI from the CLI.
+        :param do_async: issue the validation read over the async path when True.
+        :return: tuple of (normalized URI or None, CommandResult error or None).
+        """
+        normalized = self._normalize_certificate_collection_uri(uri)
+        if normalized is None:
+            return None, None
+        try:
+            data = self.base_query(normalized, do_async=do_async).data or {}
+        except ResourceNotFound:
+            return normalized, CommandResult(
+                {"CertificateCollection": {"@odata.id": normalized}},
+                None,
+                None,
+                f"certificate collection not found: {normalized}",
+            )
+        except Exception as exc:
+            return normalized, CommandResult(
+                {"CertificateCollection": {"@odata.id": normalized}},
+                None,
+                None,
+                f"failed to read certificate collection {normalized}: {exc}",
+            )
+        if not self._is_certificate_collection(data):
+            return normalized, CommandResult(
+                {
+                    "CertificateCollection": {"@odata.id": normalized},
+                    "resource_type": data.get("@odata.type")
+                    if isinstance(data, dict)
+                    else None,
+                },
+                None,
+                None,
+                "certificate collection URI is not a CertificateCollection: "
+                f"{normalized}",
+            )
+        return normalized, None
+
+    @staticmethod
+    def _certificate_collection_link(uri):
+        """Build a Redfish link object from a validated collection URI.
+
+        :param uri: normalized Redfish certificate collection URI, or None.
         :return: ``{"@odata.id": uri}`` when set, otherwise None.
         """
         if not uri:
@@ -353,6 +434,13 @@ class CertificateGenerateCSR(RedfishManagerBase,
         :param do_async: issue the underlying query and POST on the async path.
         :return: a CommandResult with the GenerateCSR result or dry-run preview.
         """
+        collection_uri, collection_error = self._validate_certificate_collection(
+            certificate_collection,
+            do_async,
+        )
+        if collection_error is not None:
+            return collection_error
+
         return self.invoke_action(
             self._certificate_service_uri(do_async),
             "GenerateCSR",
@@ -374,7 +462,7 @@ class CertificateGenerateCSR(RedfishManagerBase,
                 key_curve_id=key_curve_id,
                 key_usage=key_usage,
                 alternative_names=alternative_names,
-                certificate_collection=certificate_collection,
+                certificate_collection=collection_uri,
             ),
             full_action_type=_GENERATE_CSR_ACTION,
             do_async=do_async,
