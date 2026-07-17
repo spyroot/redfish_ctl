@@ -213,6 +213,18 @@ class LicenseInstall(RedfishManagerBase,
         return None
 
     @staticmethod
+    def _optional_payload_value(value):
+        """Strip optional string payload values and drop empty values.
+
+        :param value: optional Redfish action payload value.
+        :return: stripped string, original non-string value, or None.
+        """
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+    @staticmethod
     def _payload(license_file_uri,
                  transfer_protocol=None,
                  license_username=None,
@@ -231,9 +243,9 @@ class LicenseInstall(RedfishManagerBase,
             raise InvalidArgument("license file URI cannot be empty")
         payload = {
             "LicenseFileURI": uri,
-            "TransferProtocol": transfer_protocol,
-            "Username": license_username,
-            "Password": license_password,
+            "TransferProtocol": LicenseInstall._optional_payload_value(transfer_protocol),
+            "Username": LicenseInstall._optional_payload_value(license_username),
+            "Password": LicenseInstall._optional_payload_value(license_password),
         }
         return {key: value for key, value in payload.items() if value is not None}
 

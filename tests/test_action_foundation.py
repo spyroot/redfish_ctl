@@ -7,6 +7,7 @@ against tests/supermicro_fixtures/ through the real requests path; the mock
 records every POST so we can assert exactly what did (or did not) fire.
 """
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 
 
 def _post_count(svc):
@@ -24,6 +25,34 @@ def test_policy_classifies_known_and_unknown():
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE
+
+
+def test_request_log_payload_redacts_sensitive_fields():
+    """Debug request logging masks secrets without mutating the real payload."""
+    payload = {
+        "UserName": "root",
+        "Password": "secret-value",
+        "Nested": {
+            "OldPassword": "old-secret",
+            "NewPassword": "new-secret",
+            "PasswordName": "Administrator",
+        },
+        "Links": [
+            {"token": "bearer-value"},
+            {"Label": "public"},
+        ],
+    }
+
+    redacted = RedfishManagerBase._redact_sensitive_payload(payload)
+
+    assert redacted["Password"] == "********"
+    assert redacted["Nested"]["OldPassword"] == "********"
+    assert redacted["Nested"]["NewPassword"] == "********"
+    assert redacted["Nested"]["PasswordName"] == "Administrator"
+    assert redacted["Links"][0]["token"] == "********"
+    assert redacted["Links"][1]["Label"] == "public"
+    assert payload["Password"] == "secret-value"
+    assert payload["Nested"]["OldPassword"] == "old-secret"
 
 
 def test_invoke_resolves_target_from_actions_block(redfish_mock_factory):

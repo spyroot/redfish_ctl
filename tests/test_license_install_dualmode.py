@@ -193,6 +193,28 @@ def test_license_install_rejects_invalid_transfer_protocol(dell_license_manager)
     assert _post_requests(requests) == []
 
 
+def test_license_install_strips_and_omits_empty_optional_fields(dell_license_manager):
+    """Optional strings are stripped, and blank values are omitted from payloads."""
+    manager, requests = dell_license_manager
+
+    result = manager.sync_invoke(
+        ApiRequestType.LicenseInstall,
+        "license-install",
+        license_file_uri="https://repo.example.test/license.xml",
+        transfer_protocol=" HTTPS ",
+        license_username="  ",
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["payload"] == {
+        "LicenseFileURI": "https://repo.example.test/license.xml",
+        "TransferProtocol": "HTTPS",
+    }
+    assert _post_requests(requests) == []
+
+
 def test_license_install_masks_password_from_env_in_dry_run(
     dell_license_manager,
     monkeypatch,

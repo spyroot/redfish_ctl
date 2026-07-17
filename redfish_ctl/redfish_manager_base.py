@@ -1366,6 +1366,31 @@ class RedfishManagerBase(RedfishManager):
         """
         return f"?$expand=*($levels={level})"
 
+    @staticmethod
+    def _redact_sensitive_payload(payload):
+        """Return a copy of a request payload with secret-like fields masked.
+
+        :param payload: JSON-compatible request payload.
+        :return: payload copy safe for debug logging.
+        """
+        sensitive = {"apikey", "api_key", "secret", "token"}
+
+        if isinstance(payload, dict):
+            redacted = {}
+            for key, value in payload.items():
+                key_text = str(key).lower()
+                if key_text.endswith("password") or key_text in sensitive:
+                    redacted[key] = "********"
+                else:
+                    redacted[key] = RedfishManagerBase._redact_sensitive_payload(value)
+            return redacted
+        if isinstance(payload, list):
+            return [
+                RedfishManagerBase._redact_sensitive_payload(value)
+                for value in payload
+            ]
+        return payload
+
     def base_request_respond(
             self,
             resource: str,
@@ -1396,10 +1421,11 @@ class RedfishManagerBase(RedfishManager):
             headers.update(self.json_content_type)
 
         pd = payload if payload is not None else {}
+        log_payload = self._redact_sensitive_payload(pd)
 
         self.logger.debug(f"Issuing {method} request to "
                           f"resource: {resource}, "
-                          f"payload: {json.dumps(pd)}")
+                          f"payload: {json.dumps(log_payload)}")
 
         err = None
         response = None
