@@ -98,6 +98,7 @@ from .metrics.cmd_gpu_metrics import *
 from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_telemetry_clear_reports import *
+from .telemetry.cmd_telemetry_submit_test import *
 from .telemetry.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
 from .component_integrity.cmd_spdm_measurements import *

@@ -200,6 +200,7 @@ Safety labels:
 | `task-watch` | Watch task progress. | Read |
 | `tasks` | Read the task collection. | Read |
 | `telemetry-clear-reports` | Clear generated TelemetryService MetricReports; dry-run by default and `--confirm` posts. | Guarded |
+| `telemetry-submit-test` | Preview or submit TelemetryService.SubmitTestMetricReport; dry-run by default and `--confirm` sends it. | Guarded |
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
 | `thermal` | Read Chassis `ThermalSubsystem` links, ThermalMetrics temperature readings, and fan collection counts from `redfish_ctl/thermal/cmd_thermal.py`. | Read |
 | `update-start` | Start updates staged for `UpdateService.StartUpdate`, the action advertised by UpdateService; previews unless `--confirm` is given. | Guarded |

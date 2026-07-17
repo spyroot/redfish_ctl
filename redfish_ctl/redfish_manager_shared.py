@@ -103,6 +103,7 @@ class ApiRequestType(Enum):
     MetricReports = auto()
     MetricReportDefinitions = auto()
     TelemetryClearReports = auto()
+    TelemetrySubmitTest = auto()
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
     NetworkAdapters = auto()

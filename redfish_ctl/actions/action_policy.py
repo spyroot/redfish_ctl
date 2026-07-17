@@ -50,6 +50,7 @@ ACTION_POLICY = {
     "#HpeiLOSnmpService.SendSNMPTestAlert": Destructiveness.REVERSIBLE,
     "#HpeiLOManagerNetworkService.SendTestAlertMail": Destructiveness.REVERSIBLE,
     "#HpeiLOManagerNetworkService.SendTestSyslog": Destructiveness.REVERSIBLE,
+    "#TelemetryService.SubmitTestMetricReport": Destructiveness.REVERSIBLE,
     "#VirtualMedia.InsertMedia": Destructiveness.REVERSIBLE,
     "#VirtualMedia.EjectMedia": Destructiveness.REVERSIBLE,
     "#CertificateService.GenerateCSR": Destructiveness.REVERSIBLE,
