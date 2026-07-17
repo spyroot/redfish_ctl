@@ -13,7 +13,7 @@ Three pieces cooperate, each doing one job:
 | Piece | Kind | Job |
 | --- | --- | --- |
 | `RedfishEndpoint` + controller (`redfish_endpoint_controller.py`) | CRD + read-only controller | keeps each BMC's live state (power, health, temperature) on the object's `.status` |
-| `RedfishNodeProfile` + operator (`redfish_node_profile_controller.py`) | CRD + operator | computes drift between a node and its desired state; applies **only** when the object says `approve: true` |
+| `RedfishNodeProfile` + operator (`redfish_node_profile_controller.py`) | CRD + operator | computes drift between a node and its desired state; applies **only** when `spec.approvedPlanHash` matches the current `.status.planHash` |
 | exporter pods (one per BMC) | Deployment(s) | stream each BMC's metrics to the cluster's OpenTelemetry Collector — see the [deployment model](../docs/telemetry-exporter.md#deployment-model-one-exporter-per-bmc) |
 
 Credentials always come from a namespaced Secret via `secretRef` — never from
@@ -92,24 +92,30 @@ spec:
       name: rack7-node3-bmc
   desiredState:
     biosProfile: dell-cstates-off   # a named profile from specs/profiles/
-  approve: false                    # plan only — nothing is written
+  # Omit approvedPlanHash until the reported plan hash has been reviewed.
 ```
 
 The operator diffs the node's live BIOS attributes against the named profile
 (catalogued with purpose and risk notes in [BIOS profiles](../docs/bios-profiles.md))
 and writes the drift plan into `.status`. Nothing has touched the BMC beyond
-reads. When the plan looks right:
+reads. When the plan looks right, copy the reported hash into the spec:
 
 ```bash
+PLAN_HASH="$(
+  kubectl get redfishnodeprofile rack7-node3-lowlat \
+    -o jsonpath='{.status.planHash}'
+)"
 kubectl patch redfishnodeprofile rack7-node3-lowlat \
-  --type merge -p '{"spec":{"approve":true}}'
+  --type merge -p "{\"spec\":{\"approvedPlanHash\":\"${PLAN_HASH}\"}}"
 ```
 
 The apply path stages the change through the same guarded machinery the CLI
 uses — a rollback snapshot of the current values is captured first, the
-change stages as pending, and it takes effect on the next reset. Set
-`waitForReboot: true` to have the operator confirm the BMC answers again
-after an approved reboot step.
+change stages as pending, and it takes effect on the next reset. The hash is a
+one-shot approval: after apply, `.status.consumedPlanHash` records it, and any
+changed plan produces a new `.status.planHash` that must be reviewed and
+approved separately. Set `waitForReboot: true` to have the operator confirm
+the BMC answers again after an approved reboot step.
 
 ## Scenario: point the fleet at the right clocks
 
@@ -124,8 +130,9 @@ profile object carries time configuration:
 
 The reconciler validates each server, refuses more than four, touches only the
 NTP block of the manager's network protocol settings, and — like everything
-else — previews by default and applies only under `approve: true`. This change
-is non-disruptive: no host reboot, no BMC session drop.
+else — previews by default and applies only when `spec.approvedPlanHash`
+matches the current plan. This change is non-disruptive: no host reboot, no
+BMC session drop.
 
 ## Scenario: controlled boot and restart
 
@@ -208,8 +215,8 @@ what ships today.
 - **Reads are always safe** and need no approval: status polling, telemetry,
   inventory.
 - **Every write previews by default** — profile applies, NTP, boot, reboot,
-  firmware all show their plan first and act only on `--confirm` (CLI) or
-  `approve: true` (operator).
+  firmware all show their plan first and act only on `--confirm` (CLI) or when
+  `spec.approvedPlanHash` equals the current `.status.planHash` (operator).
 - **Failed writes never cascade** — an error response stops a sequence
   instead of proceeding to commit or reboot, and regression tests plus an
   AST-level check in CI enforce this shape.
