@@ -10,7 +10,9 @@ action is DESTRUCTIVE: without ``--confirm`` the command only previews the POST.
 
 Author Mus spyroot@gmail.com
 """
+import os
 from abc import abstractmethod
+from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
@@ -66,13 +68,22 @@ class LicenseInstall(RedfishManagerBase,
             default=None,
             help="optional username for the license file URI",
         )
-        cmd_parser.add_argument(
-            "--password",
+        password_group = cmd_parser.add_mutually_exclusive_group(required=False)
+        password_group.add_argument(
+            "--password-env",
             required=False,
-            dest="license_password",
+            dest="license_password_env",
             type=str,
             default=None,
-            help="optional password for the license file URI",
+            help="environment variable containing the license file URI password",
+        )
+        password_group.add_argument(
+            "--password-file",
+            required=False,
+            dest="license_password_file",
+            type=str,
+            default=None,
+            help="file containing the license file URI password",
         )
         cmd_parser.add_argument(
             "--confirm",
@@ -171,6 +182,37 @@ class LicenseInstall(RedfishManagerBase,
         )
 
     @staticmethod
+    def _password_from_source(password_env=None, password_file=None):
+        """Read a license URI password from a named environment variable or file.
+
+        :param password_env: name of the environment variable to read.
+        :param password_file: path to a file containing the password.
+        :return: the password string, or None when no source was provided.
+        :raises InvalidArgument: when both sources are provided, a source name is
+            empty, the environment variable is absent, or the file cannot be read.
+        """
+        if password_env and password_file:
+            raise InvalidArgument(
+                "use only one of --password-env or --password-file"
+            )
+        if password_env is not None:
+            env_name = password_env.strip()
+            if not env_name:
+                raise InvalidArgument("password environment variable name cannot be empty")
+            if env_name not in os.environ:
+                raise InvalidArgument(f"password environment variable '{env_name}' is not set")
+            return os.environ[env_name]
+        if password_file is not None:
+            path = Path(password_file).expanduser()
+            try:
+                return path.read_text(encoding="utf-8").rstrip("\r\n")
+            except OSError as exc:
+                raise InvalidArgument(
+                    f"failed to read password file '{path}': {exc}"
+                ) from exc
+        return None
+
+    @staticmethod
     def _payload(license_file_uri,
                  transfer_protocol=None,
                  license_username=None,
@@ -180,7 +222,7 @@ class LicenseInstall(RedfishManagerBase,
         :param license_file_uri: URI of the license file to install.
         :param transfer_protocol: optional TransferProtocol value.
         :param license_username: optional username for the URI.
-        :param license_password: optional password for the URI.
+        :param license_password: optional password read from an env var or file.
         :return: JSON-serializable action payload.
         :raises InvalidArgument: when ``license_file_uri`` is empty.
         """
@@ -215,7 +257,8 @@ class LicenseInstall(RedfishManagerBase,
                 license_file_uri: Optional[str] = None,
                 transfer_protocol: Optional[str] = None,
                 license_username: Optional[str] = None,
-                license_password: Optional[str] = None,
+                license_password_env: Optional[str] = None,
+                license_password_file: Optional[str] = None,
                 confirm: Optional[bool] = False,
                 dry_run: Optional[bool] = False,
                 filename: Optional[str] = None,
@@ -235,7 +278,10 @@ class LicenseInstall(RedfishManagerBase,
             target metadata.
         :param transfer_protocol: optional TransferProtocol value.
         :param license_username: optional username for the license file URI.
-        :param license_password: optional password for the license file URI.
+        :param license_password_env: environment variable containing the optional
+            password for the license file URI.
+        :param license_password_file: file containing the optional password for
+            the license file URI.
         :param confirm: authorize the LicenseService.Install POST to actually fire.
         :param dry_run: resolve the target and show the payload without POSTing.
         :param filename: accepted for CLI compatibility; not used by this command.
@@ -256,7 +302,10 @@ class LicenseInstall(RedfishManagerBase,
                 license_file_uri,
                 transfer_protocol=transfer_protocol,
                 license_username=license_username,
-                license_password=license_password,
+                license_password=self._password_from_source(
+                    license_password_env,
+                    license_password_file,
+                ),
             ),
             full_action_type=_LICENSE_INSTALL_ACTION,
             do_async=do_async,

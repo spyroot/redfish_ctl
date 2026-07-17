@@ -193,16 +193,20 @@ def test_license_install_rejects_invalid_transfer_protocol(dell_license_manager)
     assert _post_requests(requests) == []
 
 
-def test_license_install_masks_password_in_dry_run(dell_license_manager):
-    """Dry-run output does not echo a URI credential password."""
+def test_license_install_masks_password_from_env_in_dry_run(
+    dell_license_manager,
+    monkeypatch,
+):
+    """Dry-run output does not echo a URI credential password read from env."""
     manager, requests = dell_license_manager
+    monkeypatch.setenv("LICENSE_INSTALL_PASSWORD", "placeholder-value")
 
     result = manager.sync_invoke(
         ApiRequestType.LicenseInstall,
         "license-install",
         license_file_uri="https://repo.example.test/license.xml",
         license_username="license-reader",
-        license_password="placeholder-value",
+        license_password_env="LICENSE_INSTALL_PASSWORD",
         dry_run=True,
     )
 
@@ -210,6 +214,48 @@ def test_license_install_masks_password_in_dry_run(dell_license_manager):
     assert result.error is None
     assert result.data["payload"]["Username"] == "license-reader"
     assert result.data["payload"]["Password"] == "********"
+    assert _post_requests(requests) == []
+
+
+def test_license_install_reads_password_file_and_redacts_dry_run(
+    dell_license_manager,
+    tmp_path,
+):
+    """A password file source is supported without echoing the file content."""
+    manager, requests = dell_license_manager
+    password_file = tmp_path / "license-password"
+    password_file.write_text("placeholder-value\n", encoding="utf-8")
+
+    result = manager.sync_invoke(
+        ApiRequestType.LicenseInstall,
+        "license-install",
+        license_file_uri="https://repo.example.test/license.xml",
+        license_password_file=str(password_file),
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["payload"]["Password"] == "********"
+    assert _post_requests(requests) == []
+
+
+def test_license_install_rejects_missing_password_env(dell_license_manager):
+    """Missing password environment variables fail before any POST."""
+    manager, requests = dell_license_manager
+
+    with pytest.raises(
+        InvalidArgument,
+        match="environment variable 'MISSING_LICENSE_PASSWORD'",
+    ):
+        manager.sync_invoke(
+            ApiRequestType.LicenseInstall,
+            "license-install",
+            license_file_uri="https://repo.example.test/license.xml",
+            license_password_env="MISSING_LICENSE_PASSWORD",
+            confirm=True,
+        )
+
     assert _post_requests(requests) == []
 
 
