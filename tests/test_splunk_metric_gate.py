@@ -123,7 +123,8 @@ def test_metrics_file_loading(tmp_path, monkeypatch, capsys):
 
 def test_default_metric_set_includes_p0_signals(monkeypatch):
     """The built-in list carries the P0 health/state and link-down-reason names."""
-    for name in ("hw.health", "hw.fabric.link_down_reason", "hw.power.edp_violation"):
+    for name in ("hw.component.health", "hw.fabric.link_down_reason",
+                 "hw.power.edp_violation_state"):
         assert name in gate.DEFAULT_METRICS
 
 

@@ -717,118 +717,102 @@ def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypat
         resolve_signalfx_ingest_url()
 
 
-def test_metric_report_mapper_exports_health_and_rollup_enums():
-    """Health/HealthRollup enum rows become hw.health gauges (P0: were dropped).
+def _report_row(source_property, value, report="HGX_HealthMetrics_0"):
+    """Build a MetricReport row whose property path ends in source_property.
 
-    This edge exists because HGX_HealthMetrics rows carry Status.Health enum
-    strings, which the numeric-only path silently skipped — leaving no
-    component-health signal to alert on.
+    :param source_property: dotted property (for example ``Status.Health``).
+    :param value: the MetricValue string to carry.
+    :param report: report name for the ``report`` dimension.
+    :return: a MetricReport row dict.
+    """
+    suffix = source_property.replace(".", "/")
+    return {"Report": report,
+            "MetricProperty": f"/redfish/v1/Chassis/HGX_GPU_0#/{suffix}",
+            "MetricValue": value}
+
+
+def _enum_samples(rows):
+    """Run MetricReport rows through the mapper with a fixed identity.
+
+    :param rows: MetricReport rows to map.
+    :return: the emitted MetricSample list.
     """
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
-    base = "/redfish/v1/Chassis/HGX_GPU_0#/Status"
-    samples = build_metric_samples(
-        identity=dims,
-        environment_rows=[],
-        sensor_rows=[],
-        nvlink_rows=[],
-        metric_report_rows=[
-            {"Report": "HGX_HealthMetrics_0",
-             "MetricProperty": f"{base}/Health", "MetricValue": "OK"},
-            {"Report": "HGX_HealthMetrics_0",
-             "MetricProperty": f"{base}/HealthRollup", "MetricValue": "Warning"},
-            {"Report": "HGX_HealthMetrics_0",
-             "MetricProperty": f"{base}/Health", "MetricValue": "Critical"},
-        ],
-    )
-    health = [s for s in samples if s.metric == "hw.health"]
-    rollup = [s for s in samples if s.metric == "hw.health_rollup"]
-    assert sorted(s.value for s in health) == [0.0, 1.0]
-    assert rollup[0].value == 0.5
-    assert rollup[0].dimensions["health_state"] == "Warning"
-    assert health[0].dimensions["report"] == "HGX_HealthMetrics_0"
+    return build_metric_samples(identity=dims, environment_rows=[], sensor_rows=[],
+                                nvlink_rows=[], metric_report_rows=rows)
 
 
-def test_metric_report_mapper_exports_link_down_reason():
-    """LinkDownReasonCode becomes a constant-1 sample with the reason dimension.
+def test_expected_signals_contract():
+    """Every fixture row in specs/telemetry/expected_signals.yaml is emitted.
 
-    The exporter already counted link_down events but never WHY — the reason
-    enum row was dropped by the numeric path.
+    This is the M2 gap-closure gate: expected signals minus emitted signals
+    must be empty, so the code can never silently drift from the contract.
     """
-    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
-    samples = build_metric_samples(
-        identity=dims,
-        environment_rows=[],
-        sensor_rows=[],
-        nvlink_rows=[],
-        metric_report_rows=[{
-            "Report": "HGX_ProcessorPortMetrics_0",
-            "MetricProperty": (
-                "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/"
-                "Ports/NVLink_3/Metrics#/Oem/Nvidia/LinkDownReasonCode"
-            ),
-            "MetricValue": "PeerResetEvent",
-        }],
-    )
-    reason = [s for s in samples if s.metric == "hw.fabric.link_down_reason"]
-    assert len(reason) == 1
-    assert reason[0].value == 1.0
-    assert reason[0].dimensions["reason"] == "PeerResetEvent"
-    assert reason[0].dimensions["fabric"] == "nvlink"
-    assert reason[0].dimensions["port"] == "NVLink_3"
+    import yaml
+    spec = yaml.safe_load(
+        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        .read_text(encoding="utf-8"))
+    missing = []
+    for row in spec["signals"]:
+        samples = _enum_samples([_report_row(row["source_property"], row["input"])])
+        want = row["expected"]
+        hit = [s for s in samples
+               if s.metric == want["metric"] and s.value == float(want["value"])
+               and all(s.dimensions.get(k) == v for k, v in want["labels"].items())]
+        if not hit:
+            missing.append(f'{row["source_property"]}={row["input"]} -> {want["metric"]}')
+    assert missing == []
 
 
-def test_metric_report_mapper_exports_state_and_power_integrity_enums():
-    """State and EDP/PowerBreak enum rows become 0/1 gauges with raw-state dims."""
-    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
-    base = "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0"
-    samples = build_metric_samples(
-        identity=dims,
-        environment_rows=[],
-        sensor_rows=[],
-        nvlink_rows=[],
-        metric_report_rows=[
-            {"Report": "HGX_CpuProcessorMetrics_0",
-             "MetricProperty": f"{base}#/Status/State", "MetricValue": "Enabled"},
-            {"Report": "HGX_CpuProcessorMetrics_0",
-             "MetricProperty": f"{base}#/Status/State", "MetricValue": "Absent"},
-            {"Report": "HGX_CpuProcessorMetrics_0",
-             "MetricProperty": f"{base}#/Oem/Nvidia/EDPViolationState",
-             "MetricValue": "Normal"},
-            {"Report": "HGX_CpuProcessorMetrics_0",
-             "MetricProperty": f"{base}#/Oem/Nvidia/PowerBreakPerformanceState",
-             "MetricValue": "Throttled"},
-        ],
-    )
-    states = [s for s in samples if s.metric == "hw.state.enabled"]
-    assert sorted(s.value for s in states) == [0.0, 1.0]
-    assert {s.dimensions["state"] for s in states} == {"Enabled", "Absent"}
-    edp = [s for s in samples if s.metric == "hw.power.edp_violation"]
-    assert edp[0].value == 0.0
-    brk = [s for s in samples if s.metric == "hw.power.break_state"]
-    assert brk[0].value == 1.0
-    assert brk[0].dimensions["state"] == "Throttled"
+def test_state_allowlists_match_contract_spec():
+    """Code allowlists equal the spec allowlists (G0 documentation truth)."""
+    import yaml
+    spec = yaml.safe_load(
+        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        .read_text(encoding="utf-8"))
+    allow = spec["allowlists"]
+    assert set(allow["health"]) == exporter_mod.HEALTH_LABELS | {"unknown"}
+    assert set(allow["state"]) == exporter_mod.STATE_LABELS | {"unknown"}
+    assert set(allow["reason"]) == exporter_mod.LINK_DOWN_REASONS | {"other"}
+    assert set(allow["reset_type"]) == exporter_mod.RESET_TYPES | {"other"}
 
 
-def test_metric_report_mapper_skips_unknown_enum_strings():
-    """Unknown enum text stays unexported instead of guessing a numeric value.
+def test_one_hot_state_samples_shape():
+    """State rows emit value 1 with normalized labels and full join dims."""
+    samples = _enum_samples([
+        _report_row("Status.Health", "Warning"),
+        _report_row("Status.State", "StandbyOffline"),
+        _report_row("Oem.Nvidia.LinkDownReasonCode", "PeerResetEvent",
+                    report="HGX_ProcessorPortMetrics_0"),
+    ])
+    by_metric = {s.metric: s for s in samples if s.metric.startswith(("hw.component", "hw.fabric"))}
+    health = by_metric["hw.component.health"]
+    assert health.value == 1.0
+    assert health.dimensions["health"] == "warning"
+    assert health.dimensions["report"] == "HGX_HealthMetrics_0"
+    state = by_metric["hw.component.state"]
+    assert state.value == 1.0
+    assert state.dimensions["state"] == "standby_offline"
+    reason = by_metric["hw.fabric.link_down_reason"]
+    assert reason.value == 1.0
+    assert reason.dimensions["reason"] == "peer_reset_event"
+    assert reason.dimensions["fabric"] == "nvlink"
 
-    A vendor could ship a new Health value; exporting a made-up number would
-    corrupt alerts, so the fail-safe is to drop only that row.
+
+def test_unknown_enum_values_map_to_unknown_or_other():
+    """Vendor surprises become bounded labels — never dropped, never free-form.
+
+    This edge occurs whenever a firmware update introduces a new enum value;
+    the M1 gate requires it to surface as unknown/other so dashboards see the
+    component instead of losing it.
     """
-    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
-    samples = build_metric_samples(
-        identity=dims,
-        environment_rows=[],
-        sensor_rows=[],
-        nvlink_rows=[],
-        metric_report_rows=[
-            {"Report": "HGX_HealthMetrics_0",
-             "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0#/Status/Health",
-             "MetricValue": "SomethingNew"},
-            {"Report": "HGX_CpuProcessorMetrics_0",
-             "MetricProperty": "/redfish/v1/Chassis/HGX_GPU_0#/PCIeType",
-             "MetricValue": "Gen5"},
-        ],
-    )
-    assert [s for s in samples if s.metric.startswith("hw.health")] == []
-    assert all(s.metric.startswith("hw.scrape") for s in samples)
+    samples = _enum_samples([
+        _report_row("Status.Health", "VendorSpecialState"),
+        _report_row("Oem.Nvidia.LinkDownReasonCode", "BrandNewReason!!"),
+        _report_row("Oem.Nvidia.LastResetType", "WeirdReset"),
+    ])
+    by_metric = {s.metric: s for s in samples if not s.metric.startswith("hw.scrape")}
+    assert by_metric["hw.component.health"].dimensions["health"] == "unknown"
+    assert by_metric["hw.fabric.link_down_reason"].dimensions["reason"] == "other"
+    assert by_metric["hw.component.last_reset_type"].dimensions["reset_type"] == "other"
+    assert all(s.value == 1.0 for s in by_metric.values())

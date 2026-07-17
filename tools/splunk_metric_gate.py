@@ -35,12 +35,12 @@ import urllib.request
 # The P0 telemetry set: health/state enums plus a core signal from each
 # long-standing family, so a green gate means the whole pipeline is live.
 DEFAULT_METRICS = [
-    "hw.health",
-    "hw.health_rollup",
-    "hw.state.enabled",
+    "hw.component.health",
+    "hw.component.health_rollup",
+    "hw.component.state",
     "hw.fabric.link_down_reason",
-    "hw.power.edp_violation",
-    "hw.power.break_state",
+    "hw.power.edp_violation_state",
+    "hw.power.break_performance_state",
     "hw.temperature",
     "hw.power",
     "hw.scrape.ok",
