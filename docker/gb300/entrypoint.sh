@@ -26,11 +26,20 @@ if [ -f /secrets/gh_token ]; then
     GH_TOKEN="$(tr -d '[:space:]' < /secrets/gh_token)"
     export GH_TOKEN
 fi
-# Observability ingest credentials (optional): the telemetry exporter reads
-# SPLUNK_ACCESS_TOKEN / SPLUNK_INGEST_URL, so a container can push and
-# live-verify metrics without any per-run token plumbing. An explicit
+# Observability credentials (optional). Splunk separates token scopes:
+# ingest tokens can write datapoints, API tokens can query them — so the
+# exporter's SPLUNK_ACCESS_TOKEN comes from splunk_ingest_token (falling
+# back to splunk_token for single-token orgs) while the metric gate's
+# SPLUNK_API_TOKEN always comes from splunk_token. An explicit
 # SPLUNK_INGEST_URL from the caller wins over the realm-derived default.
 if [ -f /secrets/splunk_token ]; then
+    SPLUNK_API_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_token)"
+    export SPLUNK_API_TOKEN
+fi
+if [ -f /secrets/splunk_ingest_token ]; then
+    SPLUNK_ACCESS_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_ingest_token)"
+    export SPLUNK_ACCESS_TOKEN
+elif [ -f /secrets/splunk_token ]; then
     SPLUNK_ACCESS_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_token)"
     export SPLUNK_ACCESS_TOKEN
 fi

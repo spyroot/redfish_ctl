@@ -137,7 +137,12 @@ def run_gate(argv: list[str] | None = None) -> int:
     """
     args = build_parser().parse_args(argv)
     realm = args.realm or os.environ.get("SPLUNK_O11Y_REALM", "")
+    # Query needs an API-scoped token; ingest-scoped tokens get 401s from
+    # the metrics API, so prefer SPLUNK_API_TOKEN when the caller kept the
+    # default env name and it is set.
     token = os.environ.get(args.token_env, "")
+    if not token or args.token_env == "SPLUNK_ACCESS_TOKEN":
+        token = os.environ.get("SPLUNK_API_TOKEN", "") or token
     if not realm:
         print("splunk-gate: realm is not set (--realm or SPLUNK_O11Y_REALM)", file=sys.stderr)
         return 2
