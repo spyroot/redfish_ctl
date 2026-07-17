@@ -3,7 +3,6 @@ import io
 import json
 import time
 
-
 from tools import splunk_metric_gate as gate
 
 
