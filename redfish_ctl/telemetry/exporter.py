@@ -110,14 +110,19 @@ SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
 # datapoint endpoint (…/v2/datapoint), never a bare host.
-# Redfish enum -> numeric mappings so state/health strings become alertable
-# gauges instead of being dropped (P0: health was previously 100% unexported).
-# Status.Health per DMTF is exactly OK/Warning/Critical.
-HEALTH_VALUES = {"ok": 1.0, "warning": 0.5, "critical": 0.0}
-
-# Power-integrity readings where anything but a clear/normal state is an
-# event worth a 1.0 sample (same fail-visible posture as hw.leak.state).
-POWER_STATE_CLEAR_VALUES = {"normal", "ok", "none", "disabled", "notapplicable", "na"}
+# One-hot state-metric label allowlists (specs/telemetry/gates.md, M1): each
+# categorical row emits value 1 with a normalized lowercase label; values
+# outside the allowlist map to "unknown" (health/state) or "other"
+# (reason/reset_type) — never dropped, never free-form. A contract test
+# asserts these sets match specs/telemetry/expected_signals.yaml.
+HEALTH_LABELS = {"ok", "warning", "critical"}
+STATE_LABELS = {"enabled", "disabled", "standby_offline", "standby_spare",
+                "in_test", "starting", "absent", "unavailable_offline",
+                "deferring", "quiesced", "updating", "qualified"}
+LINK_DOWN_REASONS = {"peer_reset_event"}
+RESET_TYPES = {"pf_flr", "conventional", "fundamental"}
+EDP_STATES = {"normal", "asserted"}
+POWER_BREAK_STATES = {"normal", "active"}
 
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
@@ -431,10 +436,10 @@ def samples_from_metric_report_rows(
     every other numeric property (GPU FP16/FP32 activity, thermal, power,
     memory, …) is emitted under a generic ``hw.gb300.*`` name so the FULL
     telemetry surface reaches OTel/Prometheus, not just the fabric subset.
-    Known state/health enum strings (Health, HealthRollup, State,
-    LinkDownReasonCode, EDPViolationState, PowerBreakPerformanceState) are
-    mapped to numeric gauges by :func:`_state_enum_sample` instead of being
-    dropped.
+    Categorical rows (Health, HealthRollup, State, LinkDownReasonCode,
+    EDPViolationState, PowerBreakPerformanceState, LastResetType) are mapped
+    to one-hot state samples by :func:`_state_enum_sample` per the M1 model
+    in ``specs/telemetry/gates.md`` instead of being dropped.
 
     :param rows: TelemetryService MetricReport rows to map.
     :param identity: fixed join dimensions applied to every sample.
@@ -475,34 +480,48 @@ def samples_from_metric_report_rows(
     return samples
 
 
+def _state_label(text: str) -> str:
+    """Normalize an enum string to a lowercase snake_case label value.
+
+    :param text: raw vendor enum text (for example ``PeerResetEvent``).
+    :return: normalized label (for example ``peer_reset_event``).
+    """
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+    snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
+    return snake or "unknown"
+
+
 def _state_enum_sample(
         prop_info: Mapping[str, str],
         row: Mapping,
         identity: Mapping[str, str]) -> Optional[MetricSample]:
-    """Map a non-numeric state/health MetricReport row to a gauge sample.
+    """Map a categorical MetricReport row to a one-hot state sample.
 
-    Covers the enum-string rows the numeric path drops: ``Health`` and
-    ``HealthRollup`` become ``hw.health`` / ``hw.health_rollup`` (OK=1,
-    Warning=0.5, Critical=0, raw string kept in the ``health_state``
-    dimension); ``State`` becomes ``hw.state.enabled`` (1 only for Enabled,
-    raw string in the ``state`` dimension); ``LinkDownReasonCode`` becomes a
-    constant-1 ``hw.fabric.link_down_reason`` sample whose ``reason``
-    dimension carries the cause (count by reason answers WHY links dropped);
-    ``EDPViolationState`` / ``PowerBreakPerformanceState`` become 0/1
-    ``hw.power.edp_violation`` / ``hw.power.break_state`` events.
+    Implements the M1 model from ``specs/telemetry/gates.md``: every known
+    state/health enum row emits value 1 with a normalized, allowlisted
+    lowercase label — ``Health``/``HealthRollup`` → ``hw.component.health`` /
+    ``hw.component.health_rollup`` (``health`` label), ``State`` →
+    ``hw.component.state`` (``state`` label), ``LinkDownReasonCode`` →
+    ``hw.fabric.link_down_reason`` (``reason`` label — the WHY behind
+    link-down counters), ``EDPViolationState`` →
+    ``hw.power.edp_violation_state``, ``PowerBreakPerformanceState`` →
+    ``hw.power.break_performance_state``, ``LastResetType`` →
+    ``hw.component.last_reset_type`` (``reset_type`` label). Values outside
+    an allowlist map to ``unknown`` (health/state) or ``other``
+    (reason/reset_type/power states) so no vendor string is ever dropped and
+    no free-form text ever becomes a label.
 
     :param prop_info: parsed MetricProperty fields (property, system, gpu, port, …).
     :param row: the raw MetricReport row.
     :param identity: fixed join dimensions applied to the sample.
     :return: the mapped MetricSample, or None when the row is not a known
-        state/health enum (unknown enum text stays unexported rather than
-        guessing a value).
+        categorical property (or its value is empty).
     """
     prop_name = prop_info["property"]
     text = str(row.get("MetricValue") or "").strip()
     if not text:
         return None
-    lowered = text.lower()
+    label = _state_label(text)
     dims = _with_dims(identity, source="metric-report",
                       property=_dim_value(prop_name))
     for key in ("system", "gpu", "port", "chassis", "memory", "index"):
@@ -510,32 +529,30 @@ def _state_enum_sample(
             dims[key] = str(prop_info[key])
     dims["report"] = str(row.get("Report") or "unknown")
 
-    metric = None
-    value = None
     if prop_name in ("Health", "HealthRollup"):
-        value = HEALTH_VALUES.get(lowered)
-        if value is None:
-            return None
-        metric = "hw.health" if prop_name == "Health" else "hw.health_rollup"
-        dims["health_state"] = _dim_value(text)
+        metric = ("hw.component.health" if prop_name == "Health"
+                  else "hw.component.health_rollup")
+        dims["health"] = label if label in HEALTH_LABELS else "unknown"
     elif prop_name == "State":
-        metric = "hw.state.enabled"
-        value = 1.0 if lowered == "enabled" else 0.0
-        dims["state"] = _dim_value(text)
+        metric = "hw.component.state"
+        dims["state"] = label if label in STATE_LABELS else "unknown"
     elif prop_name == "LinkDownReasonCode":
         metric = "hw.fabric.link_down_reason"
-        value = 1.0
-        dims["reason"] = _dim_value(text)
+        dims["reason"] = label if label in LINK_DOWN_REASONS else "other"
         dims["fabric"] = ("ib" if str(prop_info.get("port", "")).lower().startswith("ib")
                           else "nvlink")
-    elif prop_name in ("EDPViolationState", "PowerBreakPerformanceState"):
-        metric = ("hw.power.edp_violation" if prop_name == "EDPViolationState"
-                  else "hw.power.break_state")
-        value = 0.0 if lowered in POWER_STATE_CLEAR_VALUES else 1.0
-        dims["state"] = _dim_value(text)
-    if metric is None:
+    elif prop_name == "EDPViolationState":
+        metric = "hw.power.edp_violation_state"
+        dims["state"] = label if label in EDP_STATES else "other"
+    elif prop_name == "PowerBreakPerformanceState":
+        metric = "hw.power.break_performance_state"
+        dims["state"] = label if label in POWER_BREAK_STATES else "other"
+    elif prop_name == "LastResetType":
+        metric = "hw.component.last_reset_type"
+        dims["reset_type"] = label if label in RESET_TYPES else "other"
+    else:
         return None
-    return _sample(metric, value, dims, None, row.get("Timestamp"))
+    return _sample(metric, 1.0, dims, None, row.get("Timestamp"))
 
 
 def _gpu_metric_report_sample(
