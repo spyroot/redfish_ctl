@@ -171,6 +171,7 @@ Safety labels:
 | `pci` | Read PCI device or function data. | Read |
 | `power` | Read chassis PowerSubsystem, PowerSupplies, and Batteries resources. | Read |
 | `power-smoothing` | Read NVIDIA GPU PowerSmoothing current state, preset profiles, and admin override profile setpoints. | Read |
+| `power-smoothing-action` | Activate a NVIDIA GPU PowerSmoothing preset profile or apply admin overrides; dry-run by default and `--confirm` posts. | Guarded |
 | `privilege-registry` | Read the privilege registry. | Read |
 | `processor-metrics` | Read ProcessorMetrics resources linked from ComputerSystem processor members. | Read |
 | `query` | Read an arbitrary Redfish resource path. | Read |

@@ -1,6 +1,8 @@
-"""Read NVIDIA PowerSmoothing resources exposed through GPU processors.
+"""Read and apply NVIDIA PowerSmoothing resources exposed through GPU processors.
 
     redfish_ctl power-smoothing
+    redfish_ctl power-smoothing-action --gpu GPU_0 --mode apply-admin --dry_run
+    redfish_ctl power-smoothing-action --gpu GPU_0 --mode activate-preset --preset-profile 0
 
 Walks ``/redfish/v1/Systems`` -> each system ``Processors`` -> GPU
 processors -> ``Oem/Nvidia/PowerSmoothing``, aggregating smoothing state,
@@ -10,10 +12,16 @@ preset profiles, and admin override profiles.
 from abc import abstractmethod
 from typing import Optional
 
+from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
+
+_ACTION_TYPES = {
+    "activate-preset": "#NvidiaPowerSmoothing.ActivatePresetProfile",
+    "apply-admin": "#NvidiaPowerSmoothing.ApplyAdminOverrides",
+}
 
 
 class PowerSmoothing(RedfishManagerBase,
@@ -142,6 +150,61 @@ class PowerSmoothing(RedfishManagerBase,
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
             return {}
+
+    def _power_smoothing_resources(self, do_async=False):
+        """Discover GPU PowerSmoothing resources across all systems.
+
+        :param do_async: when True, issue queries on the async event loop.
+        :return: list of dicts with System, GPU, and Uri.
+        """
+        resources = []
+        systems = self._query_optional(RedfishApi.Systems, do_async=do_async)
+        for system_uri in self._members(systems):
+            system = self._query_optional(system_uri, do_async=do_async)
+            processors_uri = self._link(system, "Processors")
+            if not processors_uri:
+                continue
+            processors = self._query_optional(
+                processors_uri,
+                do_async=do_async,
+            )
+            for processor_uri in self._members(processors):
+                processor = self._query_optional(
+                    processor_uri,
+                    do_async=do_async,
+                )
+                if processor.get("ProcessorType") != "GPU":
+                    continue
+                smoothing_uri = self._nested_link(
+                    processor,
+                    "Oem",
+                    "Nvidia",
+                    "PowerSmoothing",
+                )
+                if smoothing_uri:
+                    resources.append({
+                        "System": self._resource_id(system_uri),
+                        "GPU": processor.get("Id") or self._resource_id(
+                            processor_uri),
+                        "Uri": smoothing_uri,
+                    })
+        return resources
+
+    def _select_power_smoothing(self, gpu_id, do_async=False):
+        """Select the PowerSmoothing resource for one GPU id.
+
+        :param gpu_id: GPU processor id to match.
+        :param do_async: when True, issue queries on the async event loop.
+        :return: dict with System, GPU, and Uri.
+        :raises InvalidArgument: when the id is missing or not found.
+        """
+        if not gpu_id:
+            raise InvalidArgument("GPU id is required")
+        for resource in self._power_smoothing_resources(do_async=do_async):
+            if resource["GPU"] == gpu_id:
+                return resource
+        raise InvalidArgument(
+            f"GPU {gpu_id!r} has no NVIDIA PowerSmoothing resource")
 
     def _read_profile(self, system_id, gpu_id, profile_uri, do_async=False):
         """Read a single PowerSmoothing profile and flatten it.
@@ -364,3 +427,141 @@ class PowerSmoothing(RedfishManagerBase,
             "admin_override_profiles": len(data["admin_override_profiles"]),
         }
         return CommandResult(data, None, None, None)
+
+
+class PowerSmoothingAction(PowerSmoothing,
+                           scm_type=ApiRequestType.PowerSmoothingAction,
+                           name="power-smoothing-action",
+                           metaclass=Singleton):
+    """Preview or apply NVIDIA PowerSmoothing profile actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the power-smoothing-action command."""
+        super(PowerSmoothingAction, self).__init__(*args, **kwargs)
+
+    @staticmethod
+    @abstractmethod
+    def register_subcommand(cls):
+        """Register the guarded ``power-smoothing-action`` subcommand.
+
+        :return: tuple of (ArgumentParser, command name, command help).
+        """
+        cmd_parser = cls.base_parser()
+        cmd_parser.add_argument(
+            "--gpu", dest="gpu_id", required=True, metavar="ID",
+            help="GPU processor id exposing the PowerSmoothing resource")
+        cmd_parser.add_argument(
+            "--mode", choices=sorted(_ACTION_TYPES), required=True,
+            help="choose the PowerSmoothing action to preview or apply")
+        cmd_parser.add_argument(
+            "--preset-profile", dest="preset_profile", metavar="ID_OR_URI",
+            help="preset profile id or URI required for activate-preset")
+        cmd_parser.add_argument(
+            "--confirm", action="store_true", dest="confirm", default=False,
+            help="POST the action; without it the command only previews")
+        cmd_parser.add_argument(
+            "--dry_run", action="store_true", dest="dry_run", default=False,
+            help="force preview mode even when --confirm is present")
+        help_text = "activate or apply NVIDIA PowerSmoothing profiles"
+        return cmd_parser, "power-smoothing-action", help_text
+
+    @staticmethod
+    def _preset_profile_uri(resource_uri, preset_profile):
+        """Resolve a preset profile id or URI into a Redfish link URI.
+
+        :param resource_uri: PowerSmoothing resource URI.
+        :param preset_profile: user-supplied profile id or URI.
+        :return: full preset-profile URI.
+        :raises InvalidArgument: when the profile selector is empty.
+        """
+        profile = str(preset_profile or "").strip()
+        if not profile:
+            raise InvalidArgument(
+                "activate-preset requires --preset-profile")
+        if profile.startswith("/redfish/v1/"):
+            return profile
+        return f"{resource_uri.rstrip('/')}/PresetProfiles/{profile}"
+
+    @staticmethod
+    def _payload(resource_uri, mode, preset_profile):
+        """Build the request payload for a PowerSmoothing action.
+
+        :param resource_uri: PowerSmoothing resource URI.
+        :param mode: action mode.
+        :param preset_profile: preset id or URI for activate-preset.
+        :return: action payload dict.
+        :raises InvalidArgument: when the mode or required profile is invalid.
+        """
+        if mode == "apply-admin":
+            return {}
+        if mode == "activate-preset":
+            return {
+                "PresetProfile": {
+                    "@odata.id": PowerSmoothingAction._preset_profile_uri(
+                        resource_uri,
+                        preset_profile,
+                    )
+                }
+            }
+        raise InvalidArgument(
+            "mode must be 'activate-preset' or 'apply-admin'")
+
+    def execute(self,
+                filename: Optional[str] = None,
+                data_type: Optional[str] = "json",
+                verbose: Optional[bool] = False,
+                do_async: Optional[bool] = False,
+                do_expanded: Optional[bool] = False,
+                gpu_id: Optional[str] = None,
+                mode: Optional[str] = None,
+                preset_profile: Optional[str] = None,
+                confirm: Optional[bool] = False,
+                dry_run: Optional[bool] = False,
+                **kwargs) -> CommandResult:
+        """Preview or POST one NVIDIA PowerSmoothing action.
+
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this
+            command.
+        :param do_async: when True, run Redfish queries on the async event
+            loop.
+        :param do_expanded: accepted for CLI compatibility; not used by this
+            command.
+        :param gpu_id: GPU processor id whose PowerSmoothing resource is targeted.
+        :param mode: ``activate-preset`` or ``apply-admin``.
+        :param preset_profile: preset id or URI for ``activate-preset``.
+        :param confirm: when True, POST the action; otherwise only preview it.
+        :param dry_run: when True, force preview mode even when ``confirm`` is
+            set.
+        :return: CommandResult with the action outcome and target GPU context.
+        :raises InvalidArgument: when ``mode`` is invalid or target discovery
+            fails.
+        """
+        if mode not in _ACTION_TYPES:
+            raise InvalidArgument(
+                "mode must be 'activate-preset' or 'apply-admin'")
+
+        resource = self._select_power_smoothing(gpu_id, do_async=do_async)
+        full_action_type = _ACTION_TYPES[mode]
+        action_name = full_action_type.rsplit(".", 1)[-1]
+        payload = self._payload(resource["Uri"], mode, preset_profile)
+        result = self.invoke_action(
+            resource["Uri"],
+            action_name,
+            payload=payload,
+            full_action_type=full_action_type,
+            do_async=do_async,
+            expected_status=202,
+            dry_run=bool(dry_run) or not bool(confirm),
+            confirm=bool(confirm),
+        )
+
+        data = result.data if isinstance(result.data, dict) else {}
+        data.update({
+            "gpu": resource["GPU"],
+            "system": resource["System"],
+            "resource": resource["Uri"],
+            "mode": mode,
+        })
+        return CommandResult(data, result.discovered, result.extra, result.error)

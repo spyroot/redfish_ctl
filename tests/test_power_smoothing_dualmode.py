@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
+from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 
@@ -18,6 +19,13 @@ GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
 def _fixture_for_path(path):
     name = "_" + path.strip("/").replace("/", "_") + ".json"
     return GB300_INDEX.get(name.lower())
+
+
+def _mutating_requests(service):
+    return [
+        request for request in service.requests
+        if request.method in {"POST", "PATCH", "DELETE"}
+    ]
 
 
 @pytest.fixture
@@ -181,3 +189,82 @@ def test_power_smoothing_reads_gb300_gpu_profiles_and_setpoints(
         for request in requests
         if request.method in {"POST", "PATCH", "DELETE"}
     } == set()
+
+
+def test_power_smoothing_action_apply_admin_dry_run_resolves_without_post(
+        redfish_mock_factory):
+    """power-smoothing-action previews ApplyAdminOverrides by default."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.PowerSmoothingAction,
+        "power-smoothing-action",
+        gpu_id="GPU_0",
+        mode="apply-admin",
+    )
+
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["action"] == "#NvidiaPowerSmoothing.ApplyAdminOverrides"
+    assert result.data["gpu"] == "GPU_0"
+    assert result.data["resource"] == (
+        "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/"
+        "Nvidia/PowerSmoothing"
+    )
+    assert result.data["target"] == (
+        "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/Nvidia/"
+        "PowerSmoothing/Actions/NvidiaPowerSmoothing.ApplyAdminOverrides"
+    )
+    assert result.data["payload"] == {}
+    assert _mutating_requests(service) == []
+
+
+def test_power_smoothing_action_activate_confirm_posts_preset_link(
+        redfish_mock_factory):
+    """power-smoothing-action --confirm activates the requested preset profile."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    result = manager.sync_invoke(
+        ApiRequestType.PowerSmoothingAction,
+        "power-smoothing-action",
+        gpu_id="GPU_0",
+        mode="activate-preset",
+        preset_profile="0",
+        confirm=True,
+    )
+
+    posts = [request for request in service.requests if request.method == "POST"]
+    assert result.error is None
+    assert result.data["executed"] is True
+    assert result.data["action"] == "#NvidiaPowerSmoothing.ActivatePresetProfile"
+    assert result.data["mode"] == "activate-preset"
+    assert len(posts) == 1
+    assert posts[0].path == (
+        "/redfish/v1/systems/hgx_baseboard_0/processors/gpu_0/oem/nvidia/"
+        "powersmoothing/actions/nvidiapowersmoothing.activatepresetprofile"
+    )
+    assert posts[0].json() == {
+        "PresetProfile": {
+            "@odata.id": (
+                "/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0/Oem/"
+                "Nvidia/PowerSmoothing/PresetProfiles/0"
+            )
+        }
+    }
+
+
+def test_power_smoothing_action_requires_preset_before_post(
+        redfish_mock_factory):
+    """activate-preset refuses to run without an explicit profile selector."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    with pytest.raises(InvalidArgument):
+        manager.sync_invoke(
+            ApiRequestType.PowerSmoothingAction,
+            "power-smoothing-action",
+            gpu_id="GPU_0",
+            mode="activate-preset",
+            confirm=True,
+        )
+
+    assert _mutating_requests(service) == []
