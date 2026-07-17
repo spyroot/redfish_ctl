@@ -1,9 +1,14 @@
 """Dual-mode tests for boot option and boot-source commands."""
 import json
 
+import pytest
+import requests
+
 from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_boot_options_list_returns_member_uris(redfish_api):
@@ -20,6 +25,36 @@ def test_boot_options_list_returns_member_uris(redfish_api):
         "/redfish/v1/Systems/System.Embedded.1/BootOptions/NIC.PxeDevice.1-1",
     ]
     assert result.extra["Members@odata.count"] == 2
+
+
+def test_boot_options_list_404_non_json_raises_resource_not_found(
+        redfish_api, monkeypatch):
+    """Plain-text 404 BootOptions responses raise cleanly without JSON traceback."""
+    original_api_get_call = RedfishManagerBase.api_get_call
+
+    def api_get_call(self, request, headers=None):
+        """Return the X10-style non-JSON BootOptions failure.
+
+        :param self: command instance issuing the GET.
+        :param request: BootOptions collection request URL.
+        :param headers: optional HTTP headers sent by the command.
+        :return: a plain-text 404 response.
+        """
+        if "/BootOptions" not in request:
+            return original_api_get_call(self, request, headers)
+        response = requests.Response()
+        response.status_code = 404
+        response._content = b"BootOptions not available"
+        response.headers["Content-Type"] = "text/plain"
+        return response
+
+    monkeypatch.setattr(RedfishManagerBase, "api_get_call", api_get_call)
+
+    with pytest.raises(ResourceNotFound):
+        redfish_api.sync_invoke(
+            ApiRequestType.BootOptions,
+            "boot_sources_query",
+        )
 
 
 def test_boot_options_query_returns_collection(redfish_api):
