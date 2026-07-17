@@ -34,6 +34,16 @@ if [ -f /secrets/splunk_token ]; then
     SPLUNK_ACCESS_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_token)"
     export SPLUNK_ACCESS_TOKEN
 fi
+# BMC endpoint credentials (optional, operator-staged env file with
+# REDFISH_IP/REDFISH_USERNAME/REDFISH_PASSWORD): lets a container run the
+# read-only telemetry push gate without per-run credential plumbing. A
+# caller-provided REDFISH_IP wins — the file only fills an empty environment.
+if [ -f /secrets/bmc_env ] && [ -z "${REDFISH_IP:-}" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . /secrets/bmc_env
+    set +a
+fi
 if [ -f /secrets/splunk_realm ]; then
     _realm="$(tr -d '[:space:]' < /secrets/splunk_realm)"
     if [ -n "$_realm" ]; then
