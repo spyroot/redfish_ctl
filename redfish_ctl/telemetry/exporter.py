@@ -7,6 +7,7 @@ import math
 import os
 import random
 import re
+import sys
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -898,6 +899,14 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
         return response.status
 
 
+def _report_signalfx_loop_error(exc: Exception) -> None:
+    """Report a failed SignalFx push without stopping the exporter loop.
+
+    :param exc: exception raised while scraping or pushing a SignalFx datapoint batch.
+    """
+    print(f"SignalFx push failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+
+
 def serve_prometheus(
         scrape: Callable[[], str],
         bind: str = "0.0.0.0",
@@ -946,7 +955,8 @@ def run_signalfx_loop(
         token: str,
         ingest_url: str,
         interval: float,
-        timeout: float = 20.0) -> None:
+        timeout: float = 20.0,
+        on_error: Optional[Callable[[Exception], None]] = None) -> None:
     """Push SignalFx datapoints forever at ``interval`` seconds.
 
     :param scrape_samples: callable returning the samples to push each cycle.
@@ -954,10 +964,20 @@ def run_signalfx_loop(
     :param ingest_url: full SignalFx datapoint endpoint.
     :param interval: base seconds between pushes (jittered per cycle).
     :param timeout: per-push request timeout in seconds.
+    :param on_error: optional callback for transient scrape or push failures.
     """
+    report_error = on_error or _report_signalfx_loop_error
     while True:
         start = time.monotonic()
-        push_signalfx(to_signalfx_body(scrape_samples()), token, ingest_url, timeout=timeout)
+        try:
+            push_signalfx(
+                to_signalfx_body(scrape_samples()),
+                token,
+                ingest_url,
+                timeout=timeout,
+            )
+        except Exception as exc:  # noqa: BLE001 - exporter must survive transient push failures
+            report_error(exc)
         elapsed = time.monotonic() - start
         time.sleep(max(1.0, jittered_interval(interval) - elapsed))
 
