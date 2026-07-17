@@ -7,14 +7,16 @@ through sync_invoke and assert the CommandResult shape.
 
 Author Mus spyroot@gmail.com
 """
+import copy
 import json
 
 import pytest
 
+from redfish_ctl.boot_source.cmd_boot_one_shot import BootOneShot
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.compute.cmd_power_state import RebootHost
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_boot_query(redfish_api):
@@ -265,6 +267,207 @@ def test_boot_one_shot_rejects_invalid_target_before_patch_in_mock_mode(
         )
 
     assert all(request.method != "PATCH" for request in redfish_service.requests)
+
+
+def test_boot_one_shot_maps_cd_to_x10_advertised_target(redfish_mock_factory):
+    """boot_one_shot maps generic Cd to X10 CD/DVD and sends a flat payload."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+
+    result = manager.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="Cd",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    request = service.last_request
+    assert request.method == "PATCH"
+    assert request.path.lower() == "/redfish/v1/systems/1"
+    assert request.json() == {
+        "BootSourceOverrideEnabled": "Once",
+        "BootSourceOverrideTarget": "CD/DVD",
+    }
+
+
+def test_boot_one_shot_x10_uefi_cd_uses_flat_payload_without_mode(
+    redfish_mock_factory,
+):
+    """boot_one_shot sends X10 UefiCd without nested Boot or override mode."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+
+    result = manager.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="UefiCd",
+        mode="UEFI",
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data == {
+        "dry_run": True,
+        "target": "/redfish/v1/Systems/1",
+        "payload": {
+            "BootSourceOverrideEnabled": "Once",
+            "BootSourceOverrideTarget": "UefiCd",
+        },
+        "blocked": None,
+    }
+    assert all(request.method != "PATCH" for request in service.requests)
+
+
+def test_boot_one_shot_legacy_payload_strips_unsupported_uefi_fields():
+    """X10 flat payloads omit fields unsupported by the legacy shape."""
+    payload = BootOneShot._boot_payload(
+        "UefiCd",
+        "UEFI",
+        "Boot0001",
+        ["None", "CD/DVD", "UefiCd"],
+        {
+            "@odata.type": "#ComputerSystem.v1_3_0.ComputerSystem",
+            "Manufacturer": "Supermicro",
+        },
+    )
+
+    assert payload == {
+        "BootSourceOverrideEnabled": "Once",
+        "BootSourceOverrideTarget": "UefiCd",
+    }
+
+
+def test_boot_one_shot_non_legacy_cd_dvd_keeps_nested_payload(
+    redfish_mock,
+    redfish_service,
+):
+    """boot_one_shot keeps nested payloads when CD/DVD is not legacy X10."""
+    system_path = "/redfish/v1/systems/system.embedded.1"
+    system = copy.deepcopy(redfish_service._state(system_path))
+    system["@odata.type"] = "#ComputerSystem.v1_18_0.ComputerSystem"
+    system["Manufacturer"] = "Example Systems"
+    system["Boot"]["BootSourceOverrideTarget@Redfish.AllowableValues"].append(
+        "CD/DVD"
+    )
+    redfish_service._overlay[system_path] = system
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="CD/DVD",
+        mode="UEFI",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    assert redfish_service.last_request.json() == {
+        "Boot": {
+            "BootSourceOverrideEnabled": "Once",
+            "BootSourceOverrideTarget": "CD/DVD",
+            "BootSourceOverrideMode": "UEFI",
+        }
+    }
+
+
+def test_boot_one_shot_modern_uefi_cd_keeps_nested_payload(
+    redfish_mock,
+    redfish_service,
+):
+    """boot_one_shot keeps nested Boot payloads for modern UefiCd targets."""
+    system_path = "/redfish/v1/systems/system.embedded.1"
+    system = copy.deepcopy(redfish_service._state(system_path))
+    system["Boot"]["BootSourceOverrideTarget@Redfish.AllowableValues"].append(
+        "UefiCd"
+    )
+    redfish_service._overlay[system_path] = system
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="UefiCd",
+        mode="UEFI",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["Status"] == "ok"
+    request = redfish_service.last_request
+    assert request.method == "PATCH"
+    assert request.path.lower() == "/redfish/v1/systems/system.embedded.1"
+    assert request.json() == {
+        "Boot": {
+            "BootSourceOverrideEnabled": "Once",
+            "BootSourceOverrideTarget": "UefiCd",
+            "BootSourceOverrideMode": "UEFI",
+        }
+    }
+
+
+def test_boot_one_shot_x10_power_on_failure_returns_error_before_patch(
+    redfish_mock_factory,
+):
+    """boot_one_shot reports missing X10 chassis reset action before PATCHing."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+
+    result = manager.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="UefiCd",
+        do_power_on=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "power-on pre-step failed: Failed to discover the reset chassis action"
+    )
+    assert result.data == {
+        "target": "/redfish/v1/Systems/1",
+        "payload": {
+            "BootSourceOverrideEnabled": "Once",
+            "BootSourceOverrideTarget": "UefiCd",
+        },
+    }
+    assert all(request.method != "PATCH" for request in service.requests)
+
+
+def test_boot_one_shot_x10_reboot_501_returns_error_after_patch(
+    redfish_mock_factory,
+):
+    """boot_one_shot -r reports a chassis read failure instead of tracebacks."""
+    requests_mock = pytest.importorskip("requests_mock")
+    manager, service = redfish_mock_factory("supermicro_x10")
+    original_get = service.get_cb
+
+    def get_cb(request, context):
+        if request.path.lower() == "/redfish/v1/chassis":
+            service.requests.append(request)
+            context.status_code = 501
+            return "{}"
+        return original_get(request, context)
+
+    service.mocker.get(requests_mock.ANY, text=get_cb)
+
+    result = manager.sync_invoke(
+        ApiRequestType.BootOneShot,
+        "boot_one_shot",
+        device="UefiCd",
+        do_reboot=True,
+    )
+
+    patches = [request for request in service.requests if request.method == "PATCH"]
+    posts = [request for request in service.requests if request.method == "POST"]
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "reboot post-step failed: Failed acquire result. Status code 501"
+    )
+    assert result.data["Status"] == "ok"
+    assert result.data["reboot_error"] == "Failed acquire result. Status code 501"
+    assert len(patches) == 1
+    assert patches[0].path.lower() == "/redfish/v1/systems/1"
+    assert patches[0].json() == {
+        "BootSourceOverrideEnabled": "Once",
+        "BootSourceOverrideTarget": "UefiCd",
+    }
+    assert posts == []
 
 
 def test_boot_one_shot_none_disarms_override_in_mock_mode(

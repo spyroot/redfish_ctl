@@ -307,6 +307,11 @@ redfish_ctl get_vm
 redfish_ctl boot-one-shot --device Cd --dry_run
 ```
 
+On older Supermicro X10 Redfish endpoints, `boot-one-shot` maps `Cd` to the
+advertised `CD/DVD` target and uses that generation's top-level boot override
+fields. Optional power-on or `-r` follow-up failures are returned as command
+errors instead of being hidden.
+
 After approval for live media and next-boot changes:
 
 ```bash
