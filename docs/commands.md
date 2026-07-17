@@ -179,6 +179,7 @@ Safety labels:
 | `raid` | Read RAID service data. | Read |
 | `reboot` | Reset the host ComputerSystem; `--dry_run` previews, but the command writes by default. | Write |
 | `secure-boot` | Read SecureBoot state and key databases. | Read |
+| `secure-boot-reset-keys` | Reset SecureBoot keys through `SecureBoot.ResetKeys` or `SecureBootDatabase.ResetKeys`; lists discovered targets when no reset type is supplied and requires `--confirm` to write. | Guarded |
 | `sensors` | Read Chassis Sensor collections across vendors (auto `$expand`, per-sensor fallback). | Read |
 | `serial-console` | Report host serial redirection + BMC SOL; `--enable --confirm` sets both. | Guarded |
 | `service-api-rs-status` | Read remote service API status. | Read |
