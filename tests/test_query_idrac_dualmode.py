@@ -3,6 +3,9 @@ import argparse
 import json
 from urllib.parse import unquote, urlsplit
 
+import pytest
+
+from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.redfish_main import create_cmd_tree
 from redfish_ctl.redfish_manager import CommandResult
@@ -61,6 +64,57 @@ def test_raw_get_returns_requested_resource(redfish_api):
     )
 
     _assert_system_resource(result)
+
+
+def test_raw_get_trims_requested_redfish_resource(redfish_api):
+    """raw_get trims whitespace before issuing a Redfish resource read."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.RawGet,
+        "raw_get",
+        uri=f"  {MANAGERS_RESOURCE}  ",
+    )
+
+    _assert_manager_collection(result)
+
+
+def test_raw_get_preserves_safe_query_string(redfish_mock, redfish_service):
+    """raw_get keeps an inline Redfish query string on the requested path."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.RawGet,
+        "raw_get",
+        uri=f"{MANAGERS_RESOURCE}?$top=1",
+    )
+
+    _assert_manager_collection(result)
+    request = redfish_service.last_request
+    assert request.method == "GET"
+    assert request.path.lower() == MANAGERS_RESOURCE.lower()
+
+    raw_query = request.query or urlsplit(request.url).query
+    assert unquote(raw_query) == "$top=1"
+
+
+@pytest.mark.parametrize(
+    ("uri", "message"),
+    [
+        ("", "requires a /redfish/v1 resource URI"),
+        ("https://example.invalid/redfish/v1/Managers", "not absolute URLs"),
+        ("//example.invalid/redfish/v1/Managers", "not absolute URLs"),
+        ("/redfish/v1/../Managers", "path traversal"),
+        ("/redfish/v1/Managers#top", "must not include a fragment"),
+        ("/api/v1/Managers", "must start with /redfish/v1"),
+        ("redfish/v1/Managers", "must start with /redfish/v1"),
+        (r"/redfish/v1\\Managers", "forward slashes"),
+    ],
+)
+def test_raw_get_rejects_non_resource_paths(redfish_api, uri, message):
+    """raw_get fails closed before querying non-resource paths."""
+    with pytest.raises(InvalidArgument, match=message):
+        redfish_api.sync_invoke(
+            ApiRequestType.RawGet,
+            "raw_get",
+            uri=uri,
+        )
 
 
 def test_query_idrac_returns_manager_collection(redfish_api):
