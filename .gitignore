@@ -1,6 +1,7 @@
 /scripts/*
 !/scripts/live_sanity_check/
 !/scripts/gb300.sh
+!/scripts/k8s_ci.sh
 build_push.sh
 env_test.sh
 

@@ -1,0 +1,65 @@
+# In-cluster offline gate: runs the redfish_ctl unit suite + changed-files ruff
+# + whole-tree docstring gate as a Kubernetes Job on the home cluster, so the
+# gate never touches an operator workstation and stays independent of the GB300
+# fleet. scripts/k8s_ci.sh substitutes the __PLACEHOLDER__ tokens and applies it.
+#
+# No StorageClass is required: the repo is cloned into an emptyDir. The Job runs
+# to completion once (restartPolicy Never, no retries) and self-cleans after the
+# TTL. The clone is public https, so no credentials are needed for a public ref.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: __JOB_NAME__
+  namespace: __NAMESPACE__
+  labels:
+    app.kubernetes.io/name: redfish-ctl-ci
+    redfish-ctl.io/ref: __REF_LABEL__
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redfish-ctl-ci
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: gate
+          image: python:3.12-slim
+          workingDir: /work
+          env:
+            - name: REDFISH_CTL_REF
+              value: "__REF__"
+            - name: PIP_DISABLE_PIP_VERSION_CHECK
+              value: "1"
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          command: ["bash", "-euo", "pipefail", "-c"]
+          args:
+            - |
+              apt-get update >/dev/null && apt-get install -y --no-install-recommends git git-lfs make >/dev/null
+              git lfs install >/dev/null
+              git clone --quiet https://github.com/spyroot/redfish_ctl.git /work
+              git fetch --quiet origin "$REDFISH_CTL_REF"
+              git checkout --quiet FETCH_HEAD
+              # Corpus tarballs are Git LFS; the suite opens them with tarfile,
+              # so the real objects (not pointers) must be fetched before tests.
+              git lfs pull --include='tests/*_corpus.tar.gz'
+              git fetch --quiet origin main
+              pip install --quiet -e ".[dev]"
+              echo "=== pytest ==="
+              pytest -q
+              echo "=== ruff (changed files vs origin/main) ==="
+              changed="$(git diff --name-only origin/main...HEAD -- '*.py')"
+              if [ -n "$changed" ]; then printf '%s\n' "$changed" | xargs ruff check; else echo "no changed .py files"; fi
+              echo "=== docstring gate (whole tree) ==="
+              python tools/docstring_gate.py --all
+              echo "=== GATE PASSED ==="
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi

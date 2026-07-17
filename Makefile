@@ -22,7 +22,7 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-agent-image gb300-provision gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-agent-image gb300-provision gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key k8s-check k8s-ci k8s-ci-clean
 
 DOCSTRING_BASE ?= origin/main
 
@@ -85,6 +85,17 @@ docker-clean: ## Reclaim local docker space: sandbox cluster, exited redfish con
 	@ids="$$(docker ps -aq --filter status=exited --filter name=redfish)"; \
 	 if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi
 	docker image prune -f
+
+K8S_CI := ./scripts/k8s_ci.sh
+
+k8s-check: ## Home-cluster health: nodes, redfish CRDs, CI jobs (uses current kubectl context).
+	@$(K8S_CI) check
+
+k8s-ci: ## Run the offline gate as a Job on the home cluster. REF=<branch> (default main).
+	$(K8S_CI) run $(REF) $(NS)
+
+k8s-ci-clean: ## Delete finished redfish-ctl CI Jobs on the home cluster. [NS=rfctl-ci]
+	@$(K8S_CI) clean $(NS)
 
 k8s-consumer: ## Build and deploy the fleet-status consumer into the sandbox.
 	./k8s/consumer/deploy.sh
