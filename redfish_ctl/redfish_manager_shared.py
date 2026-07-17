@@ -107,6 +107,7 @@ class ApiRequestType(Enum):
     Exporter = auto()
     ActionList = auto()
     EventSubmitTest = auto()
+    HpeTestActions = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
     SubscriptionDelete = auto()

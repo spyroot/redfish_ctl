@@ -132,6 +132,7 @@ Safety labels:
 | `get` | Read an arbitrary Redfish resource URI. | Read |
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
+| `hpe-test-actions` | List or send HPE iLO directory, SNMP, mail, and syslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `identify-led` | Read or set a chassis/system identify LED; requires `--confirm` to write. | Guarded |
 | `insert_vm` | Insert virtual media from a URI. | Write |
 | `job` | Read one Dell job. | Read |

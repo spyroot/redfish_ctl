@@ -45,6 +45,11 @@ ACTION_POLICY = {
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
+    "#HpeDirectoryTest.StartTest": Destructiveness.REVERSIBLE,
+    "#HpeDirectoryTest.StopTest": Destructiveness.REVERSIBLE,
+    "#HpeiLOSnmpService.SendSNMPTestAlert": Destructiveness.REVERSIBLE,
+    "#HpeiLOManagerNetworkService.SendTestAlertMail": Destructiveness.REVERSIBLE,
+    "#HpeiLOManagerNetworkService.SendTestSyslog": Destructiveness.REVERSIBLE,
     "#VirtualMedia.InsertMedia": Destructiveness.REVERSIBLE,
     "#VirtualMedia.EjectMedia": Destructiveness.REVERSIBLE,
     "#CertificateService.GenerateCSR": Destructiveness.REVERSIBLE,
