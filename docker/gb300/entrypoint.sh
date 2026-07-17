@@ -34,10 +34,17 @@ if [ -f /secrets/splunk_token ]; then
     SPLUNK_ACCESS_TOKEN="$(tr -d '[:space:]' < /secrets/splunk_token)"
     export SPLUNK_ACCESS_TOKEN
 fi
-if [ -f /secrets/splunk_realm ] && [ -z "${SPLUNK_INGEST_URL:-}" ]; then
+if [ -f /secrets/splunk_realm ]; then
     _realm="$(tr -d '[:space:]' < /secrets/splunk_realm)"
     if [ -n "$_realm" ]; then
-        export SPLUNK_INGEST_URL="https://ingest.${_realm}.signalfx.com/v2/datapoint"
+        # Realm feeds both the ingest URL default and the API host used by
+        # tools/splunk_metric_gate.py; caller-provided values win.
+        if [ -z "${SPLUNK_O11Y_REALM:-}" ]; then
+            export SPLUNK_O11Y_REALM="$_realm"
+        fi
+        if [ -z "${SPLUNK_INGEST_URL:-}" ]; then
+            export SPLUNK_INGEST_URL="https://ingest.${_realm}.signalfx.com/v2/datapoint"
+        fi
     fi
 fi
 
