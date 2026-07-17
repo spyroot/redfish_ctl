@@ -186,6 +186,7 @@ Safety labels:
 | `spdm-measurements` | Fetch signed measurements from SPDM ComponentIntegrity resources. | Read |
 | `storage-controllers` | Read storage controller information. | Read |
 | `storage-convert-noraid` | Convert RAID disks under a controller to non-RAID. | Write |
+| `smc-clear-policies` | Clear all Supermicro X10 Node Manager policies; previews unless `--confirm` is given. | Guarded |
 | `storage-convert-raid` | Convert non-RAID disks under a controller to RAID. | Write |
 | `storage-drives` | Read storage drive members. | Read |
 | `storage-get` | Read one storage controller with optional `--filter Drives,Volumes`. | Read |

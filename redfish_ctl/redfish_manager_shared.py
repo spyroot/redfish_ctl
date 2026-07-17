@@ -129,6 +129,7 @@ class ApiRequestType(Enum):
     Triggers = auto()
     NetworkPorts = auto()
     OemInfo = auto()
+    SmcNodeManagerClearPolicies = auto()
     ConsoleInfo = auto()
     SerialConsoleConfig = auto()
     BiosSnapshot = auto()
