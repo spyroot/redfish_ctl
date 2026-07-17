@@ -579,6 +579,54 @@ def test_signalfx_push_loop_jitters_sleep(monkeypatch):
     assert sleep_calls == [pytest.approx(28.0)]
 
 
+def test_signalfx_push_loop_continues_after_transient_push_error(monkeypatch):
+    """A transient SignalFx push failure is reported but does not kill the loop."""
+    samples = [
+        MetricSample(
+            metric="hw.scrape.ok",
+            value=1,
+            dimensions=build_identity_dimensions("172.25.230.29", vendor="supermicro")
+            | {"source": "exporter"},
+        )
+    ]
+    push_calls = []
+
+    def fake_push(body, token, ingest_url, timeout=20.0):
+        push_calls.append((body, token, ingest_url, timeout))
+        if len(push_calls) == 1:
+            raise TimeoutError("temporary ingest timeout")
+        return 200
+
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+        if len(sleep_calls) == 2:
+            raise RuntimeError("stop loop")
+
+    errors = []
+    monotonic_values = iter([100.0, 101.0, 130.0, 132.0])
+    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(exporter_mod.random, "random", lambda: 0.5)
+    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+
+    with pytest.raises(RuntimeError, match="stop loop"):
+        exporter_mod.run_signalfx_loop(
+            lambda: samples,
+            "token",
+            "https://ingest.us1.signalfx.com/v2/datapoint",
+            interval=30.0,
+            timeout=1.0,
+            on_error=errors.append,
+        )
+
+    assert len(push_calls) == 2
+    assert len(errors) == 1
+    assert isinstance(errors[0], TimeoutError)
+    assert sleep_calls == [pytest.approx(29.0), pytest.approx(28.0)]
+
+
 def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manager):
     """Exporter output includes EnvironmentMetrics rows for every GB300 resource."""
     manager, requests = gb300_exporter_manager
