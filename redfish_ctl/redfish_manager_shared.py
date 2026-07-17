@@ -58,6 +58,7 @@ class ApiRequestType(Enum):
     FirmwareQuery = auto()
     FirmwareInventoryQuery = auto()
     UpdateServiceQuery = auto()
+    UpdateStart = auto()
     PciDeviceQuery = auto()
     SystemQuery = auto()
     VirtualDiskQuery = auto()

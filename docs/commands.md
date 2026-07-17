@@ -199,6 +199,7 @@ Safety labels:
 | `tasks` | Read the task collection. | Read |
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
 | `thermal` | Read Chassis `ThermalSubsystem` links, ThermalMetrics temperature readings, and fan collection counts from `redfish_ctl/thermal/cmd_thermal.py`. | Read |
+| `update-start` | Start updates staged for `UpdateService.StartUpdate`, the action advertised by UpdateService; previews unless `--confirm` is given. | Guarded |
 | `update_service` | Read UpdateService inventory links, push URIs, and advertised actions. | Read |
 | `vm-mount` | Mount/unmount an ISO via Supermicro OEM virtual media (CfgCD). | Write |
 | `volume-check-consistency` | Start a Redfish Volume.CheckConsistency action; previews unless `--confirm` is given. | Guarded |
