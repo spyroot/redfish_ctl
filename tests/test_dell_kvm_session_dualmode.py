@@ -50,7 +50,8 @@ def _mock_dell_kvm(card_service_transform=None):
             context.status_code = 404
             return json.dumps({"error": f"no fixture for {request.path}"})
         data = json.loads(fixture.read_text())
-        if request.path.rstrip("/") == CARD_SERVICE and card_service_transform:
+        is_card_service = request.path.rstrip("/").lower() == CARD_SERVICE.lower()
+        if is_card_service and card_service_transform:
             data = card_service_transform(data)
         context.status_code = 200
         return json.dumps(data)
@@ -158,8 +159,11 @@ def test_dell_kvm_session_reports_missing_action_without_posting():
     """A card-service resource without GetKVMSession reports available actions."""
 
     def without_kvm_action(data):
-        actions = data.get("Actions", {})
-        actions.pop(KVM_ACTION, None)
+        for actions in (
+            data.get("Actions", {}),
+            data.get("Oem", {}).get("Dell", {}).get("Actions", {}),
+        ):
+            actions.pop(KVM_ACTION, None)
         return data
 
     with _mock_dell_kvm(without_kvm_action) as (manager, requests):
