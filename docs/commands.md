@@ -118,6 +118,7 @@ Safety labels:
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
 | `current_boot` | Read current boot source details. | Read |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
+| `dell-raid-spare` | Assign or unassign Dell RAID hot spare disks through DellRaidService, the Dell OEM service linked from ComputerSystem resources; lists targets/candidates by default and requires `--confirm` to write. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
