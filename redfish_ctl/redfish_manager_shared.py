@@ -193,6 +193,7 @@ class ApiRequestType(Enum):
 
     #  dell services
     JobRmDellServices = auto()
+    DellJobReboot = auto()
     JobDellServices = auto()
 
     Discovery = auto()

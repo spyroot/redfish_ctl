@@ -43,6 +43,7 @@ from .jobs.cmd_job_watch import *
 from .jobs.cmd_job_del import *
 from .jobs.cmd_job_dell_services import *
 from .jobs.cmd_job_delete_all import *
+from .jobs.cmd_dell_job_reboot import *
 from .jobs.cmd_job_apply import *
 #
 # # firmwares cmds

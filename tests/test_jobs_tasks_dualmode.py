@@ -115,6 +115,89 @@ def test_dell_job_service_returns_delete_queue_action(redfish_api):
     )
 
 
+def test_dell_job_reboot_lists_target_without_post(redfish_mock, redfish_service):
+    """dell-job-reboot lists CreateRebootJob metadata without POSTing."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobReboot,
+        "dell-job-reboot",
+    )
+
+    assert isinstance(result, CommandResult)
+    targets = result.data["dell_job_reboot_targets"]
+    assert targets == [{
+        "Action": "#DellJobService.CreateRebootJob",
+        "Resource": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService",
+        "Target": (
+            "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
+            "Actions/DellJobService.CreateRebootJob"
+        ),
+        "AllowableRebootJobTypes": [
+            "PowerCycle",
+            "GracefulReboot",
+            "ForcedReboot",
+        ],
+    }]
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
+def test_dell_job_reboot_previews_by_default(redfish_mock, redfish_service):
+    """dell-job-reboot resolves payloads but does not POST without confirm."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobReboot,
+        "dell-job-reboot",
+        reboot_job_type="GracefulReboot",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["dry_run"] is True
+    assert result.data["requires_confirm"] is True
+    assert result.data["level"] == "destructive"
+    assert result.data["action"] == "#DellJobService.CreateRebootJob"
+    assert result.data["payload"] == {"RebootJobType": "GracefulReboot"}
+    assert result.data["target"] == (
+        "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
+        "Actions/DellJobService.CreateRebootJob"
+    )
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
+def test_dell_job_reboot_confirm_posts_payload(redfish_mock, redfish_service):
+    """dell-job-reboot --confirm POSTs the selected RebootJobType."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobReboot,
+        "dell-job-reboot",
+        reboot_job_type="ForcedReboot",
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data["task_id"] == redfish_service.JOB_ID
+    assert result.data["executed"] is True
+    assert redfish_service.last_request.method == "POST"
+    assert redfish_service.last_request.path.lower() == (
+        "/redfish/v1/managers/idrac.embedded.1/oem/dell/delljobservice/"
+        "actions/delljobservice.createrebootjob"
+    )
+    assert redfish_service.last_request.json() == {"RebootJobType": "ForcedReboot"}
+
+
+def test_dell_job_reboot_rejects_unknown_reboot_type(redfish_mock, redfish_service):
+    """Invalid RebootJobType values fail before POSTing."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobReboot,
+        "dell-job-reboot",
+        reboot_job_type="WarmReset",
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error == (
+        "invalid value for DellJobService.CreateRebootJob RebootJobType: "
+        "WarmReset; allowed: ForcedReboot, GracefulReboot, PowerCycle"
+    )
+    assert all(request.method == "GET" for request in redfish_service.requests)
+
+
 def test_task_service_root_query_returns_task_links(redfish_api):
     """task_svc_query returns the TaskService root resource."""
     result = redfish_api.sync_invoke(
