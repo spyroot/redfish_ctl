@@ -113,6 +113,7 @@ from .logs.cmd_logs import *
 from .logs.cmd_log_clear import *
 from .logs.cmd_log_collect_diag import *
 from .licenses.cmd_license_install import *
+from .licenses.cmd_dell_license_queries import *
 from .network.cmd_ethernet_interfaces import *
 from .security.cmd_secure_boot import *
 from .security.cmd_certificates import *
