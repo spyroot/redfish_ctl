@@ -9,6 +9,7 @@ from .system.cmd_system_import import *
 #
 from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
+from .dell_lc.cmd_dell_lc_export import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
 #
