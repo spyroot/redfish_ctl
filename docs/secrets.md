@@ -86,6 +86,29 @@ kubectl create secret generic arc-github-app \
   --from-file=github_app_private_key='<path-to-app-private-key.pem>'
 ```
 
+## GitLab runner (self-managed, in-cluster)
+
+The self-managed GitLab Runner (chart values in `platform/gitlab-runner/values.yaml`) registers with a
+**runner authentication token** the GitLab project or group issues under Settings → CI/CD → Runners.
+Store it as a `Secret`; the chart references it by name, never inline:
+
+```bash
+kubectl create secret generic gitlab-runner-token \
+  --namespace rfctl-runners \
+  --from-literal=runner-token='<runner-authentication-token>'
+```
+
+Install the runner against that Secret (URL is set by the operator, not committed):
+
+```bash
+helm repo add gitlab https://charts.gitlab.io
+helm install gitlab-runner gitlab/gitlab-runner \
+  --namespace rfctl-runners \
+  -f platform/gitlab-runner/values.yaml \
+  --set gitlabUrl='<internal-gitlab-url>' \
+  --set runners.secret=gitlab-runner-token
+```
+
 ## Kubeconfig
 
 Cluster access comes from the operator's kubeconfig (`~/.kube/config`). The tooling targets a single
