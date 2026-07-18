@@ -39,6 +39,8 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
 | `repo.schemas` | merge | no | schema-backed docs validate (registry vs its JSON schema) | a schema violation |
+| `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
+| `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
 | `unit.all` | merge | no | the offline unit suite | any test fails |
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |

@@ -17,12 +17,27 @@ Historical commit messages already on the base branch are accepted (only ``BASE.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Agent instruction/artifact files that must NEVER be tracked in a repo that publishes to GitHub.
+# On the internal GitLab side they live (committed, version-controlled) in the private context repo;
+# this list is what the public mainline is gated against. Basenames match anywhere in the tree.
+_AGENT_FILE_GLOBS = [
+    "CLAUDE.md", "CLAUDE_*.md", "CLAUDE_PATCH.diff", "CLAUDE_REVIEW*",
+    "AGENTS.md", "AGENTS.private.md", "AGENT_BOOTSTRAP.md", "AGENT_HANDOFF.md",
+    "CODEX_HANDOFF.md", "CODEX_TASKS.md", "CODEX_*.md",
+    "TEAM_GUIDE.md", "IMPROVEMENT_PLAN.md", "ROADMAP*.md", "COORDINATION.md",
+    "FLASH_BRAIN.md", "*_BRIEF.md",
+]
+# Directory prefixes whose entire contents are agent/internal-only.
+_AGENT_DIR_PREFIXES = (".codex/", ".claude/", ".agent-review/", ".internal/",
+                       "docs/internal/", "inventory/")
 
 # Agent-tool names (word-bounded) plus specialist-agent role names (either separator).
 _IDENTITIES = [
@@ -45,7 +60,9 @@ _EXCLUDE = [
     "tools/agent_name_guard.py",
     "scripts/hooks/commit-msg",
     "scripts/gates/repository/no-agent-names.sh",
+    "scripts/gates/repository/no-agent-files.sh",
     "tests/gates/test_no_agent_names.py",
+    "tests/gates/test_no_agent_files.py",
 ]
 
 
@@ -91,16 +108,38 @@ def _range_findings(rng: str) -> list[str]:
     return findings
 
 
+def is_agent_file(path: str) -> bool:
+    """Return whether a repo-relative path is an agent instruction/artifact file.
+
+    :param path: a repo-relative file path (forward slashes).
+    :return: True if it matches an agent-file glob or lives under an agent-only directory.
+    """
+    if path.startswith(_AGENT_DIR_PREFIXES):
+        return True
+    base = path.rsplit("/", 1)[-1]
+    return any(fnmatch.fnmatch(base, g) for g in _AGENT_FILE_GLOBS)
+
+
+def _agent_file_findings() -> list[str]:
+    """List tracked files that are agent instruction/artifact files.
+
+    :return: the tracked agent-file paths (empty when the mainline is clean).
+    """
+    res = subprocess.run(["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True)
+    return [p for p in res.stdout.splitlines() if p and is_agent_file(p)]
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry: scan the requested surfaces and fail if any identity is found.
 
     :param argv: optional argument vector (defaults to ``sys.argv``).
     :return: 0 when clean, 1 when any agent identity is found.
     """
-    ap = argparse.ArgumentParser(description="Reject agent identities in git surfaces.")
-    ap.add_argument("--tracked", action="store_true", help="scan tracked file content")
-    ap.add_argument("--range", help="scan commit messages in BASE..HEAD")
-    ap.add_argument("--message", help="scan a single commit-message file")
+    ap = argparse.ArgumentParser(description="Reject agent identities/files in git surfaces.")
+    ap.add_argument("--tracked", action="store_true", help="scan tracked file content for identities")
+    ap.add_argument("--range", help="scan commit messages in BASE..HEAD for identities")
+    ap.add_argument("--message", help="scan a single commit-message file for identities")
+    ap.add_argument("--files", action="store_true", help="fail if any agent instruction/artifact file is tracked")
     args = ap.parse_args(argv)
 
     findings: list[str] = []
@@ -112,14 +151,17 @@ def main(argv: list[str] | None = None) -> int:
         text = Path(args.message).read_text()
         if scan_text(text):
             findings.append(f"commit message: {text.splitlines()[0] if text.strip() else ''}")
+    if args.files:
+        findings += [f"tracked agent file: {p}" for p in _agent_file_findings()]
 
     if findings:
-        sys.stderr.write("agent-name-guard: agent identity found in a git surface:\n")
+        sys.stderr.write("agent-name-guard: agent identity/file found in a git surface:\n")
         for f in findings:
             sys.stderr.write(f"  {f}\n")
-        sys.stderr.write("Neutralize the identity (agent/runner/automation) before committing.\n")
+        sys.stderr.write("Keep agent files in the private context repo; neutralize identities "
+                         "(agent/runner/automation) before publishing to GitHub.\n")
         return 1
-    print("agent-name-guard: OK — no agent identities in scanned surfaces.")
+    print("agent-name-guard: OK — no agent identities/files in scanned surfaces.")
     return 0
 
 
