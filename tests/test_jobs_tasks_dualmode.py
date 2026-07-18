@@ -4,7 +4,11 @@ import json
 import pytest
 
 import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
-from redfish_ctl.cmd_exceptions import AuthenticationFailed, InvalidArgumentFormat
+from redfish_ctl.cmd_exceptions import (
+    AuthenticationFailed,
+    InvalidArgument,
+    InvalidArgumentFormat,
+)
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.jobs.cmd_jobs import JobList
@@ -113,6 +117,107 @@ def test_dell_job_service_returns_delete_queue_action(redfish_api):
         "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
         "Actions/DellJobService.DeleteJobQueue"
     )
+
+
+def _job_timeout_post_count(service):
+    """Return the number of Dell timeout action POSTs sent to the mock."""
+    return sum(
+        1 for request in service.requests
+        if request.method == "POST"
+        and request.path.lower().endswith(
+            "/actions/delljobservice.setdeleteoncompletiontimeout"
+        )
+    )
+
+
+def test_job_delete_timeout_lists_discovered_target(redfish_api):
+    """job-delete-timeout lists DellJobService timeout metadata by default."""
+    result = redfish_api.sync_invoke(
+        ApiRequestType.JobDeleteTimeout,
+        "job-delete-timeout",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["job_service"] == (
+        "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
+    )
+    assert result.data["action"] == "#DellJobService.SetDeleteOnCompletionTimeout"
+    assert result.data["target"] == (
+        "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
+        "Actions/DellJobService.SetDeleteOnCompletionTimeout"
+    )
+    assert result.data["current_minutes"] == 2880
+    assert result.data["maximum_jobs"] == 256
+
+
+def test_job_delete_timeout_previews_without_confirm(redfish_mock, redfish_service):
+    """job-delete-timeout does not POST a timeout update without --confirm."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.JobDeleteTimeout,
+        "job-delete-timeout",
+        minutes=1440,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["blocked"] == "destructive action requires --confirm"
+    assert result.data["payload"] == {"DeleteOnCompletionTimeoutMinutes": 1440}
+    assert result.data["target"].endswith(
+        "/Actions/DellJobService.SetDeleteOnCompletionTimeout"
+    )
+    assert _job_timeout_post_count(redfish_service) == 0
+
+
+def test_job_delete_timeout_posts_when_confirmed(redfish_mock, redfish_service):
+    """job-delete-timeout POSTs the timeout payload only with --confirm."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.JobDeleteTimeout,
+        "job-delete-timeout",
+        minutes=1440,
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["executed"] is True
+    assert result.data["action"] == "#DellJobService.SetDeleteOnCompletionTimeout"
+    assert _job_timeout_post_count(redfish_service) == 1
+    assert redfish_service.last_request.json() == {
+        "DeleteOnCompletionTimeoutMinutes": 1440,
+    }
+
+
+def test_job_delete_timeout_dry_run_overrides_confirm(redfish_mock, redfish_service):
+    """Explicit dry-run prevents POST even if --confirm is also supplied."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.JobDeleteTimeout,
+        "job-delete-timeout",
+        minutes=1440,
+        confirm=True,
+        dry_run=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert _job_timeout_post_count(redfish_service) == 0
+
+
+def test_job_delete_timeout_rejects_negative_minutes(
+    redfish_mock, redfish_service
+):
+    """Negative cleanup timeouts are rejected before any Redfish POST."""
+    with pytest.raises(InvalidArgument, match="minutes must be zero or greater"):
+        redfish_mock.sync_invoke(
+            ApiRequestType.JobDeleteTimeout,
+            "job-delete-timeout",
+            minutes=-1,
+            confirm=True,
+        )
+
+    assert _job_timeout_post_count(redfish_service) == 0
 
 
 def test_task_service_root_query_returns_task_links(redfish_api):

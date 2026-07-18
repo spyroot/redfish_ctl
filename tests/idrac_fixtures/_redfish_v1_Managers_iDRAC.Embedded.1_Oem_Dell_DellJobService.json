@@ -6,6 +6,9 @@
   "Name": "Dell Job Service",
   "Description": "Dell OEM job queue service",
   "ServiceEnabled": true,
+  "CurrentNumberOfJobs": 106,
+  "DeleteOnCompletionTimeoutMinutes": 2880,
+  "MaximumNumberOfJobs": 256,
   "Jobs": {
     "@odata.id": "/redfish/v1/Managers/iDRAC.Embedded.1/Jobs"
   },
@@ -24,6 +27,9 @@
         "JID_CLEARALL",
         "JID_CLEARALL_FORCE"
       ]
+    },
+    "#DellJobService.SetDeleteOnCompletionTimeout": {
+      "target": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/Actions/DellJobService.SetDeleteOnCompletionTimeout"
     }
   }
 }

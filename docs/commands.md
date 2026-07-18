@@ -137,6 +137,7 @@ Safety labels:
 | `insert_vm` | Insert virtual media from a URI. | Write |
 | `job` | Read one Dell job. | Read |
 | `job-apply` | Apply pending jobs. | Write |
+| `job-delete-timeout` | Set Dell JobService completed-job cleanup timeout; lists the target when no timeout is supplied and requires `--confirm` to write. | Guarded |
 | `job-rm` | Delete one job. | Write |
 | `job-rm-all` | Delete all jobs. | Write |
 | `job-watch` | Watch a job until it reaches a terminal state. | Read |
