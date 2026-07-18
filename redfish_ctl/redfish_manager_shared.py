@@ -105,6 +105,7 @@ class ApiRequestType(Enum):
     TelemetryClearReports = auto()
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
+    DellSystemLcdErrors = auto()
     NetworkAdapters = auto()
     NicFirmware = auto()
     NvLinkPorts = auto()

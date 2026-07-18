@@ -6,6 +6,7 @@ from .redfish_shared import *
 from .system.cmd_system import *
 from .system.cmd_system_config import *
 from .system.cmd_system_import import *
+from .system.cmd_dell_system_lcd_errors import *
 #
 from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
