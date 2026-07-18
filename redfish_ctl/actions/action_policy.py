@@ -8,8 +8,8 @@ dry-run unless ``--confirm`` is given, or additionally needs an explicit
 
 Fail-safe by construction: an action not in the table is treated as DESTRUCTIVE,
 so a newly exposed (unclassified) action can never POST without an explicit
-confirm. This module is product-neutral — it names standard DMTF + NVIDIA OEM
-action types only and imports nothing from the Redfish manager layer.
+confirm. This module is product-neutral — it names standard DMTF actions and
+selected vendor OEM action types without importing the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
@@ -69,6 +69,7 @@ ACTION_POLICY = {
     "#Control.ResetToDefaults": Destructiveness.DESTRUCTIVE,
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.VFlashStateChange": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
