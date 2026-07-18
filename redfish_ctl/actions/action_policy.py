@@ -70,6 +70,10 @@ ACTION_POLICY = {
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
+    "#DellOSDeploymentService.ConfigurableBootToNetworkISO": Destructiveness.DESTRUCTIVE,
+    "#DellOSDeploymentService.DownloadISOToVFlash": Destructiveness.DESTRUCTIVE,
+    "#DellOSDeploymentService.UnpackAndAttach": Destructiveness.DESTRUCTIVE,
+    "#DellOSDeploymentService.UnpackAndShare": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for

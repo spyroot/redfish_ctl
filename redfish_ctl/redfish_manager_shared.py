@@ -146,6 +146,7 @@ class ApiRequestType(Enum):
 
     GetAttachStatus = auto()
     DellOemNetIsoBoot = auto()
+    DellOsNetworkIsoActions = auto()
     DellOemDetach = auto()
     TaskGet = auto()
 
