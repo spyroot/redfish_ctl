@@ -102,6 +102,7 @@ from .telemetry.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
 from .component_integrity.cmd_spdm_measurements import *
 from .network.cmd_network_adapters import *
+from .network.cmd_dell_network_attributes import *
 from .network.cmd_nic_firmware import *
 from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *

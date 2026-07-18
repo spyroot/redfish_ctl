@@ -106,6 +106,7 @@ class ApiRequestType(Enum):
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
     NetworkAdapters = auto()
+    DellNetworkAttributes = auto()
     NicFirmware = auto()
     NvLinkPorts = auto()
     Exporter = auto()
