@@ -117,6 +117,7 @@ Safety labels:
 | `compute-query` | Read ComputerSystem settings. | Read |
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
 | `current_boot` | Read current boot source details. | Read |
+| `dell-kvm-session` | Fetch Dell iDRAC KVM session state through the DelliDRACCardService `GetKVMSession` action. | Read |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |

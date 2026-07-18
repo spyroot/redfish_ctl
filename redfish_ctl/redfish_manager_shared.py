@@ -129,6 +129,7 @@ class ApiRequestType(Enum):
     Triggers = auto()
     NetworkPorts = auto()
     OemInfo = auto()
+    DellKvmSession = auto()
     ConsoleInfo = auto()
     SerialConsoleConfig = auto()
     BiosSnapshot = auto()

@@ -121,6 +121,7 @@ from .firmware.cmd_firmware_update import *
 from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
 from .oem.cmd_oem_info import *
+from .oem.cmd_dell_kvm_session import *
 from .oem.cmd_hpe_test_actions import *
 from .oem.cmd_nvidia_debug_token import *
 from .manager.cmd_console_info import *
