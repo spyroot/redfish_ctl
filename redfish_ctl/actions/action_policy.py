@@ -42,6 +42,11 @@ ACTION_POLICY = {
     # read-only: a signed-measurement fetch carried over POST
     "#ComponentIntegrity.SPDMGetSignedMeasurements": Destructiveness.READ_ONLY,
     "#ComponentIntegrity.TPMGetSignedMeasurements": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.ExportCertificate": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.ExportSSLCertificate": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.FactoryIdentityExportCertificate": (
+        Destructiveness.READ_ONLY
+    ),
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
