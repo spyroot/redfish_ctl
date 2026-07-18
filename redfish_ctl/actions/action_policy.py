@@ -8,8 +8,8 @@ dry-run unless ``--confirm`` is given, or additionally needs an explicit
 
 Fail-safe by construction: an action not in the table is treated as DESTRUCTIVE,
 so a newly exposed (unclassified) action can never POST without an explicit
-confirm. This module is product-neutral — it names standard DMTF + NVIDIA OEM
-action types only and imports nothing from the Redfish manager layer.
+confirm. This module is product-neutral — it names standard DMTF and vendor OEM
+action types and imports nothing from the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
@@ -36,8 +36,7 @@ class Destructiveness(Enum):
 
 
 # Keyed by the full Redfish action type "#Type.Action" (as discover_redfish_actions
-# reports it in RedfishAction.full_redfish_name). Covers the 25 action types the
-# GB300 NVL exposes plus a couple of standard siblings.
+# reports it in RedfishAction.full_redfish_name).
 ACTION_POLICY = {
     # read-only: a signed-measurement fetch carried over POST
     "#ComponentIntegrity.SPDMGetSignedMeasurements": Destructiveness.READ_ONLY,
@@ -70,6 +69,12 @@ ACTION_POLICY = {
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.AttachPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.CreatePartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.CreatePartitionUsingImage": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.DetachPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.ExportDataFromPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.ModifyPartition": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
@@ -88,6 +93,9 @@ ACTION_POLICY = {
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.DeletePartition": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.FormatPartition": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.InitializeMedia": Destructiveness.IRREVERSIBLE,
 }
 
 # An unclassified action is treated as DESTRUCTIVE: it can never POST without an
