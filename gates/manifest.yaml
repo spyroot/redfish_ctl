@@ -29,6 +29,10 @@ mandatory_ids:
   - kubernetes.schema
   - kubernetes.policy
   - integration.namespace
+  - gitlab.project-token.exists
+  - gitlab.project-token.project-bound
+  - gitlab.project-token.api-access
+  - gitlab.project-token.no-cross-project-access
   - mutation.plan-required
   - mutation.protected-apply
   - mutation.same-commit
@@ -58,6 +62,11 @@ gates:
   - {id: kubernetes.policy,    profile: merge, command: scripts/gates/kubernetes/policy.sh,      required: true, mutates: false}
   # --- integration: needs the cluster, no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
+  # --- gitlab.project-token: the CI token is least-privilege and usable (shared, needs live GitLab) ---
+  - {id: gitlab.project-token.exists,                profile: integration, command: scripts/gates/gitlab/project-token-exists.sh,                required: true, mutates: false}
+  - {id: gitlab.project-token.project-bound,         profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh,         required: true, mutates: false}
+  - {id: gitlab.project-token.api-access,            profile: integration, command: scripts/gates/gitlab/project-token-api-access.sh,            required: true, mutates: false}
+  - {id: gitlab.project-token.no-cross-project-access, profile: integration, command: scripts/gates/gitlab/project-token-no-cross-project-access.sh, required: true, mutates: false}
   # --- mutation protection: govern live applies (deploy profile) ---
   - {id: mutation.plan-required,     profile: deploy, command: scripts/gates/mutation/plan-required.sh,     required: true, mutates: false}
   - {id: mutation.protected-apply,   profile: deploy, command: scripts/gates/mutation/protected-apply.sh,   required: true, mutates: true}

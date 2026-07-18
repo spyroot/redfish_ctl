@@ -46,6 +46,10 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
 | `integration.namespace` | integration | no | the home cluster is reachable (fail-closed smoke) | cluster unreachable |
+| `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
+| `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
+| `gitlab.project-token.api-access` | integration | no | the token carries API scope | `/version` returns 403 (no api scope) |
+| `gitlab.project-token.no-cross-project-access` | integration | no | the token sees only its own project (least privilege) | it can reach other projects |
 | `mutation.plan-required` | deploy | no | a plan artifact exists before apply | no plan produced |
 | `mutation.protected-apply` | deploy | **yes** | apply runs only from a protected pipeline | not protected / an MR pipeline |
 | `mutation.same-commit` | deploy | no | apply commit == plan commit | plan/apply commits differ |

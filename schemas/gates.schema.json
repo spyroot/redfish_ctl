@@ -13,7 +13,7 @@
     "mandatory_ids": {
       "type": "array",
       "minItems": 1,
-      "items": {"type": "string", "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"}
+      "items": {"type": "string", "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"}
     },
     "gates": {
       "type": "array",
@@ -23,7 +23,7 @@
         "required": ["id", "profile", "command", "required", "mutates"],
         "additionalProperties": false,
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"},
+          "id": {"type": "string", "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"},
           "profile": {"type": "string", "enum": ["merge", "integration", "deploy"]},
           "command": {"type": "string", "pattern": "^scripts/gates/.+\\.sh$"},
           "required": {"type": "boolean"},
