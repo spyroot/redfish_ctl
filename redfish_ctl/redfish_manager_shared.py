@@ -128,6 +128,7 @@ class ApiRequestType(Enum):
     FirmwareUpdate = auto()
     Triggers = auto()
     NetworkPorts = auto()
+    DellSwitchPortRefresh = auto()
     OemInfo = auto()
     ConsoleInfo = auto()
     SerialConsoleConfig = auto()

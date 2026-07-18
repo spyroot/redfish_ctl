@@ -120,6 +120,7 @@ from .security.cmd_certificate_generate_csr import *
 from .firmware.cmd_firmware_update import *
 from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
+from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *
 from .oem.cmd_hpe_test_actions import *
 from .oem.cmd_nvidia_debug_token import *
