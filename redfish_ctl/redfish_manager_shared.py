@@ -135,6 +135,7 @@ class ApiRequestType(Enum):
     BootState = auto()
     BmcScan = auto()
     ManagerTime = auto()
+    DellTimeManage = auto()
     WaitReady = auto()
 
     # boot sources

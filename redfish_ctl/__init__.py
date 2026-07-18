@@ -126,6 +126,7 @@ from .oem.cmd_nvidia_debug_token import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *
+from .manager.cmd_dell_time_manage import *
 from .chassis.cmd_chassis_query import *
 
 # dell oem attach
