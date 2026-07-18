@@ -53,6 +53,8 @@ ACTION_POLICY = {
     "#VirtualMedia.InsertMedia": Destructiveness.REVERSIBLE,
     "#VirtualMedia.EjectMedia": Destructiveness.REVERSIBLE,
     "#CertificateService.GenerateCSR": Destructiveness.REVERSIBLE,
+    "#DelliDRACCardService.FactoryIdentityCertificateGenerateCSR": Destructiveness.REVERSIBLE,
+    "#DelliDRACCardService.GenerateSEKMCSR": Destructiveness.REVERSIBLE,
     "#LogService.CollectDiagnosticData": Destructiveness.REVERSIBLE,
     "#NvidiaPowerSmoothing.ActivatePresetProfile": Destructiveness.REVERSIBLE,
     "#NvidiaPowerSmoothing.ApplyAdminOverrides": Destructiveness.REVERSIBLE,
