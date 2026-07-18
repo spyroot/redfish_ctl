@@ -5,6 +5,7 @@
 !/scripts/check.sh
 !/scripts/gates/
 !/scripts/hooks/
+!/scripts/publish_github.sh
 build_push.sh
 env_test.sh
 

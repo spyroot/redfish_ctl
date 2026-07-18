@@ -9,7 +9,9 @@
 #   default-branch -> gate-merge + gate-integration
 #   scheduled      -> gate-integration (cluster smoke)
 #   manual protected deploy -> deploy-apply (protected branch only, manual, serialized)
-stages: [validate, integration, deploy]
+#   protected default branch -> publish-github (GATED outbound mirror: agent files/names/secrets
+#                               must pass the boundary gates before anything reaches public GitHub)
+stages: [validate, integration, deploy, publish]
 
 default:
   image: ghcr.io/spyroot/redfish-ctl-ci:latest    # gate toolchain (built by the CI image workflow)
@@ -52,3 +54,17 @@ deploy-apply:
     MUTATION_LOCK: "$CI_JOB_ID"
   script:
     - ./scripts/gates/run.sh deploy
+
+# Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
+# Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
+# branch only — never a merge request (an MR must never push to the public mirror).
+publish-github:
+  stage: publish
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+  script:
+    - ./scripts/gates/repository/no-agent-files.sh
+    - ./scripts/gates/repository/no-agent-names.sh
+    - ./scripts/gates/repository/no-secrets.sh
+    - ./scripts/publish_github.sh
