@@ -3,7 +3,7 @@
     redfish_ctl asset-tag-set --resource chassis --target-id Chassis_0 --asset-tag lab-01 --confirm
 """
 
-from abc import abstractmethod
+import argparse
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
@@ -18,6 +18,19 @@ _COLLECTIONS = {
 }
 
 
+def _target_id_arg(value: str) -> str:
+    """Normalize and validate the CLI target identifier.
+
+    :param value: raw ``--target-id`` argument value from argparse.
+    :return: stripped resource Id or ``@odata.id`` URI.
+    :raises argparse.ArgumentTypeError: when the value is empty after trimming.
+    """
+    target_id = str(value).strip()
+    if not target_id:
+        raise argparse.ArgumentTypeError("target id cannot be empty")
+    return target_id
+
+
 class AssetTagSet(RedfishManagerBase,
                   scm_type=ApiRequestType.AssetTagSet,
                   name="asset-tag-set",
@@ -29,7 +42,6 @@ class AssetTagSet(RedfishManagerBase,
         super(AssetTagSet, self).__init__(*args, **kwargs)
 
     @staticmethod
-    @abstractmethod
     def register_subcommand(cls):
         """Register the guarded ``asset-tag-set`` subcommand.
 
@@ -46,6 +58,7 @@ class AssetTagSet(RedfishManagerBase,
             "--target-id",
             required=True,
             dest="target_id",
+            type=_target_id_arg,
             help="resource Id or @odata.id URI to read or patch",
         )
         cmd_parser.add_argument(
@@ -116,6 +129,7 @@ class AssetTagSet(RedfishManagerBase,
         """
         if resource not in _COLLECTIONS:
             raise InvalidArgument(f"unsupported AssetTag resource {resource!r}")
+        target_id = str(target_id).strip() if target_id is not None else ""
         if not target_id:
             raise InvalidArgument("target_id is required")
 
