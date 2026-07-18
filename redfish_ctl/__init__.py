@@ -44,6 +44,7 @@ from .jobs.cmd_job_del import *
 from .jobs.cmd_job_dell_services import *
 from .jobs.cmd_job_delete_all import *
 from .jobs.cmd_job_apply import *
+from .jobs.cmd_job_queue_setup import *
 #
 # # firmwares cmds
 from .firmware.cmd_firmware import *
