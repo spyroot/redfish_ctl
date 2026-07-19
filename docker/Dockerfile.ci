@@ -1,0 +1,55 @@
+# CI toolchain image for the gate `merge` profile. Bakes the tools the tool-dependent gates shell out
+# to — gitleaks (repo.no-secrets), shellcheck (repo.shellcheck), helm (kubernetes.render), kubeconform
+# (kubernetes.schema), kube-linter (kubernetes.policy) — on top of python + git/git-lfs/make, so
+# `scripts/gates/run.sh merge` runs green. Project deps are pip-installed at run time
+# (clone -> pip install .[dev] -> run gates), matching k8s/ci/test-job.yaml.
+#
+# Target arch: linux/amd64 (the CI arch — GitHub runners + the home k8s cluster). The GB300 fleet uses
+# its own docker/Dockerfile.gb300-dev image; this one is for the GitLab/GitHub/k8s gate lane.
+# Build + push to ghcr.io/spyroot/redfish-ctl-ci in CI/docker (see .github/workflows/ci-image.yml),
+# NEVER on the operator laptop.
+#
+# Tool versions are pinned ARG defaults — bump them in one place. The final sanity RUN fails the build
+# fast if any download/version is wrong, so a bad pin can never ship a half-equipped image.
+FROM python:3.12-slim
+
+ARG GITLEAKS_VERSION=8.18.4
+ARG HELM_VERSION=3.15.4
+ARG KUBECONFORM_VERSION=0.6.7
+ARG KUBELINTER_VERSION=0.7.1
+
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# System toolchain: git/lfs/make + shellcheck (Debian package) + fetch helpers.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      git git-lfs make curl ca-certificates tar shellcheck \
+ && git lfs install --system \
+ && rm -rf /var/lib/apt/lists/*
+
+# gitleaks  -> repo.no-secrets   (asset arch token is x64, not amd64)
+RUN curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+      | tar -xz -C /usr/local/bin gitleaks
+
+# helm      -> kubernetes.render
+RUN curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" \
+      | tar -xz --strip-components=1 -C /usr/local/bin linux-amd64/helm
+
+# kubeconform -> kubernetes.schema
+RUN curl -fsSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+      | tar -xz -C /usr/local/bin kubeconform
+
+# kube-linter -> kubernetes.policy
+RUN curl -fsSL "https://github.com/stackrox/kube-linter/releases/download/v${KUBELINTER_VERSION}/kube-linter-linux.tar.gz" \
+      | tar -xz -C /usr/local/bin kube-linter
+
+# Gate/test python tooling (the project's own deps come from `pip install .[dev]` at run time).
+RUN pip install --no-cache-dir pytest ruff pyyaml jsonschema
+
+# Sanity gate: every tool the merge profile needs must resolve, or the build fails here.
+RUN for t in git git-lfs make shellcheck gitleaks helm kubeconform kube-linter python3 pytest ruff; do \
+      command -v "$t" >/dev/null || { echo "CI image missing required tool: $t" >&2; exit 1; }; \
+    done \
+ && echo "redfish-ctl-ci: all gate tools present"
+
+WORKDIR /work
