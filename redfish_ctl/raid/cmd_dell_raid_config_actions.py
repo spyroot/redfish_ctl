@@ -107,20 +107,34 @@ class DellRaidConfigActions(RedfishManagerBase,
 
     @staticmethod
     def _link(data, key):
-        """Return a Redfish link target from a ``{key: {@odata.id}}`` property."""
+        """Return a Redfish link target from a linked property.
+
+        :param data: Redfish resource body.
+        :param key: link property name.
+        :return: linked URI, or None when absent or malformed.
+        """
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
     @staticmethod
     def _dell_links(resource):
-        """Return ``Links.Oem.Dell`` from a Redfish resource."""
+        """Return ``Links.Oem.Dell`` from a Redfish resource.
+
+        :param resource: Redfish resource body.
+        :return: Dell OEM links block, or an empty dict.
+        """
         links = resource.get("Links") if isinstance(resource, dict) else None
         oem = links.get("Oem") if isinstance(links, dict) else None
         dell = oem.get("Dell") if isinstance(oem, dict) else None
         return dell if isinstance(dell, dict) else {}
 
     def _get(self, uri, do_async):
-        """GET a Redfish resource body, returning an empty dict on read failure."""
+        """GET a Redfish resource body, tolerating optional resource gaps.
+
+        :param uri: Redfish resource URI.
+        :param do_async: issue the query on the async path when True.
+        :return: parsed resource body, or an empty dict on read failure.
+        """
         try:
             data = self.base_query(uri, do_async=do_async).data or {}
         except Exception:
@@ -128,7 +142,11 @@ class DellRaidConfigActions(RedfishManagerBase,
         return data if isinstance(data, dict) else {}
 
     def _raid_service_uri(self, do_async):
-        """Resolve DellRaidService from the selected ComputerSystem OEM links."""
+        """Resolve DellRaidService from the selected ComputerSystem OEM links.
+
+        :param do_async: issue the query on the async path when True.
+        :return: DellRaidService URI.
+        """
         system_uri = self.idrac_manage_servers
         system = self._get(system_uri, do_async)
         linked = self._link(self._dell_links(system), "DellRaidService")
@@ -138,7 +156,11 @@ class DellRaidConfigActions(RedfishManagerBase,
         return f"{RedfishApi.Version}/Dell/Systems/{system_id}/DellRaidService"
 
     def _discover_rows(self, do_async):
-        """Discover the configured DellRaidService actions."""
+        """Discover the configured DellRaidService actions.
+
+        :param do_async: issue underlying Redfish queries on the async path when True.
+        :return: tuple of (DellRaidService URI, action metadata, action rows).
+        """
         service_uri = self._raid_service_uri(do_async)
         service = self._get(service_uri, do_async)
         actions = self.discover_redfish_actions(self, service)
@@ -160,7 +182,13 @@ class DellRaidConfigActions(RedfishManagerBase,
 
     @staticmethod
     def _payload(spec, target_fqdd, asset_name):
-        """Build and validate the payload for one selected action."""
+        """Build and validate the payload for one selected action.
+
+        :param spec: DellRaidService action selector metadata.
+        :param target_fqdd: TargetFQDD payload value for virtual disk actions.
+        :param asset_name: AssetName payload value for enclosure metadata actions.
+        :return: payload dict accepted by the selected action.
+        """
         values = {
             "AssetName": asset_name,
             "TargetFQDD": target_fqdd,
@@ -188,7 +216,19 @@ class DellRaidConfigActions(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """List, preview, or run selected DellRaidService configuration actions."""
+        """List, preview, or run selected DellRaidService configuration actions.
+
+        :param action: selector from ``_ACTION_SPECS``; omit to list targets.
+        :param target_fqdd: TargetFQDD payload value for ``set-boot-vd``.
+        :param asset_name: AssetName payload value for ``set-asset-name``.
+        :param confirm: send the selected POST when True.
+        :param dry_run: force preview mode even when ``confirm`` is True.
+        :param filename: accepted for CLI compatibility; not used by this command.
+        :param data_type: accepted for CLI compatibility; not used by this command.
+        :param verbose: accepted for CLI compatibility; not used by this command.
+        :param do_async: issue the underlying queries/POST on the async path when True.
+        :return: CommandResult with a listing, preview, execution result, or error.
+        """
         service_uri, actions, rows = self._discover_rows(bool(do_async))
         if action is None:
             return CommandResult(rows, actions, None, None)
