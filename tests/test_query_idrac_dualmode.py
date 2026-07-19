@@ -101,10 +101,14 @@ def test_raw_get_preserves_safe_query_string(redfish_mock, redfish_service):
         ("https://example.invalid/redfish/v1/Managers", "not absolute URLs"),
         ("//example.invalid/redfish/v1/Managers", "not absolute URLs"),
         ("/redfish/v1/../Managers", "path traversal"),
+        ("/redfish/v1/%2e%2e/Managers", "path traversal"),
+        ("/redfish/v1/%252e%252e/Managers", "path traversal"),
+        ("/redfish/v1/Managers%2f..%2fSystems", "path traversal"),
         ("/redfish/v1/Managers#top", "must not include a fragment"),
         ("/api/v1/Managers", "must start with /redfish/v1"),
         ("redfish/v1/Managers", "must start with /redfish/v1"),
         (r"/redfish/v1\\Managers", "forward slashes"),
+        ("/redfish/v1/Managers%5cSystem", "forward slashes"),
     ],
 )
 def test_raw_get_rejects_non_resource_paths(redfish_api, uri, message):

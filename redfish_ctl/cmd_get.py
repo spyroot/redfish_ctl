@@ -5,12 +5,23 @@
 """
 from abc import abstractmethod
 from typing import Optional
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from .cmd_exceptions import InvalidArgument
 from .redfish_manager_base import RedfishManagerBase
 from .redfish_manager_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
+
+
+def _decode_path_for_validation(path: str) -> str:
+    """Decode path escapes enough to catch encoded traversal controls."""
+    decoded = path
+    for _ in range(3):
+        next_decoded = unquote(decoded)
+        if next_decoded == decoded:
+            return decoded
+        decoded = next_decoded
+    return decoded
 
 
 def _normalize_redfish_uri(uri: str) -> str:
@@ -37,7 +48,11 @@ def _normalize_redfish_uri(uri: str) -> str:
     if path != "/redfish/v1" and not path.startswith("/redfish/v1/"):
         raise InvalidArgument("get URI must start with /redfish/v1")
 
-    for segment in path.split("/"):
+    decoded_path = _decode_path_for_validation(path)
+    if "\\" in decoded_path:
+        raise InvalidArgument("get URI must use forward slashes")
+
+    for segment in decoded_path.split("/"):
         if segment in {".", ".."}:
             raise InvalidArgument("get URI must not contain path traversal segments")
 
