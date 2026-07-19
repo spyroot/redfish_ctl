@@ -4,12 +4,16 @@
   "title": "Gate registry",
   "description": "Canonical registry of every mandatory gate (gates/manifest.yaml).",
   "type": "object",
-  "required": ["version", "runner_tag", "mandatory_ids", "gates"],
+  "required": ["version", "runner_tag", "required_jobs", "mandatory_ids", "gates"],
   "additionalProperties": false,
   "properties": {
     "version": {"type": "integer", "minimum": 1},
     "runner_tag": {"type": "string", "minLength": 1},
-    "required_jobs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "required_jobs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
     "mandatory_ids": {
       "type": "array",
       "minItems": 1,

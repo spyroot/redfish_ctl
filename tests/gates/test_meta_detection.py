@@ -108,6 +108,85 @@ def test_detects_live_apply_in_merge_request(tmp_path, monkeypatch):
     assert any("merge-request" in f for f in failures)
 
 
+def test_detects_job_using_extends(tmp_path, monkeypatch):
+    """A job defined via extends is a failure, not a silent skip.
+
+    The job loop used to skip anything without an inline script, so a job could inherit its tags,
+    allow_failure and rules from a template and escape every pipeline check. Resolving extends needs a
+    full GitLab resolver, so an unanalyzable job must fail rather than pass unexamined.
+    """
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          extends: .base
+          tags: [homelab-k8s]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures, _ = gate_meta._check_gitlab(_valid_registry())
+    assert any("extends" in f for f in failures)
+
+
+def test_detects_job_using_trigger(tmp_path, monkeypatch):
+    """A job that only triggers a child pipeline is a failure rather than an unchecked job."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          trigger:
+            include: child.yml
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures, _ = gate_meta._check_gitlab(_valid_registry())
+    assert any("trigger" in f for f in failures)
+
+
+def test_detects_top_level_include(tmp_path, monkeypatch):
+    """A top-level include makes the pipeline unanalyzable, so the meta-gate fails.
+
+    Jobs defined in an included file are invisible here, meaning allow_failure or a missing runner tag
+    could live entirely outside the file this gate reads.
+    """
+    _write_gitlab(tmp_path, """
+        include:
+          - local: other.yml
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [true]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures, _ = gate_meta._check_gitlab(_valid_registry())
+    assert any("include" in f for f in failures)
+
+
+def test_detects_registry_without_required_jobs(tmp_path, monkeypatch):
+    """An empty required_jobs list fails instead of silently disabling the required-job check."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [true]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    reg = _valid_registry()
+    reg["required_jobs"] = []
+    failures, _ = gate_meta._check_gitlab(reg)
+    assert any("required_jobs" in f for f in failures)
+
+
+def test_default_tags_satisfy_the_runner_tag(tmp_path, monkeypatch):
+    """A job inheriting tags from `default:` is not reported as missing the runner tag.
+
+    Treating every top-level key as a job would otherwise flag jobs that legitimately inherit tags,
+    which is GitLab's own inheritance and resolvable without a resolver.
+    """
+    _write_gitlab(tmp_path, """
+        default:
+          tags: [homelab-k8s]
+        gate-merge:
+          script: [true]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures, _ = gate_meta._check_gitlab(_valid_registry())
+    assert not any("runner tag" in f for f in failures), failures
+
+
 def test_detects_missing_required_job(tmp_path, monkeypatch):
     """A required GitLab job that is absent is a failure."""
     _write_gitlab(tmp_path, """

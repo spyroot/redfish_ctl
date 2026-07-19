@@ -25,6 +25,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LIFECYCLE = ("validate", "plan", "apply", "verify", "rollback")
 
+# GitLab's reserved top-level keywords. Everything else at the top level of .gitlab-ci.yml is a job,
+# whether or not it declares an inline ``script`` — so the job checks must exclude these by NAME and
+# never by the presence of a job keyword.
+GITLAB_GLOBAL_KEYS = frozenset({
+    "default", "include", "stages", "variables", "workflow", "spec",
+    "image", "services", "before_script", "after_script", "cache", "types",
+})
+
 
 def _load_registry() -> dict:
     """Load ``gates/manifest.yaml`` and validate it against its JSON schema.
@@ -62,15 +70,16 @@ def _load_registry() -> dict:
 
 
 def _check_commands(registry: dict) -> list[str]:
-    """Checks 1 & 2: required gate commands exist and are executable.
+    """Checks 1 & 2: every gate command exists and is executable.
+
+    Optional gates are checked too. ``required: false`` used to skip the check, so a registry row could
+    name a missing or non-executable path that only blew up when the profile actually ran in CI.
 
     :param registry: the parsed gate registry.
     :return: list of failure messages.
     """
     failures: list[str] = []
     for gate in registry["gates"]:
-        if not gate.get("required", False):
-            continue
         gate_id = gate.get("id", "<no-id>")
         command = gate.get("command")
         if not command:
@@ -154,21 +163,40 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
     failures: list[str] = []
+    if "include" in ci:
+        failures.append(
+            "gitlab: top-level 'include:' makes the pipeline unanalyzable by the meta-gate — jobs "
+            "can be defined outside .gitlab-ci.yml; inline them or teach the meta-gate to resolve it")
+    default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = {}
     for name, job in ci.items():
-        if not isinstance(job, dict) or name.startswith(".") or "script" not in job:
-            continue  # not a real job (global keys, templates, hidden jobs)
+        if name in GITLAB_GLOBAL_KEYS or not isinstance(job, dict) or name.startswith("."):
+            continue  # reserved global keyword or hidden template, not a job
         real_jobs[name] = job
         if job.get("allow_failure") is True:
             failures.append(f"gitlab job {name}: allow_failure:true is forbidden")
-        if runner_tag not in (job.get("tags") or []):
+        tags = job["tags"] if "tags" in job else default_tags
+        if runner_tag not in (tags or []):
             failures.append(f"gitlab job {name}: missing runner tag '{runner_tag}'")
         # A live-apply/deploy job must not run in a merge-request pipeline.
         text = repr(job.get("rules")) + repr(job.get("only"))
         looks_apply = ("apply" in name or "deploy" in name or job.get("mutates") is True)
         if looks_apply and "merge_request" in text:
             failures.append(f"gitlab job {name}: live-apply reachable in a merge-request pipeline")
-    for required in registry.get("required_jobs", []):
+        # Fail closed on a job whose effective body this gate cannot resolve.
+        unresolved = [key for key in ("extends", "trigger") if key in job]
+        if unresolved:
+            failures.append(
+                f"gitlab job {name}: uses {'/'.join(unresolved)} — the meta-gate cannot resolve its "
+                f"effective tags/allow_failure/rules; inline the job body")
+        elif "script" not in job:
+            failures.append(f"gitlab job {name}: no script — not analyzable, inline the job body")
+    required_jobs = registry.get("required_jobs") or []
+    if not required_jobs:
+        failures.append(
+            "registry declares no required_jobs while .gitlab-ci.yml exists — the required-jobs "
+            "check would silently pass")
+    for required in required_jobs:
         if required not in real_jobs:
             failures.append(f"required GitLab job missing: {required}")
     return failures, True

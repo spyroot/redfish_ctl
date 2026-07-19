@@ -5,7 +5,8 @@ Four independent checks confirm the CI token is least-privilege and usable:
 - ``exists``               — the token authenticates (``GET /user`` → 200 with a username).
 - ``api-access``           — it carries API scope (``GET /version`` → 200, not 403).
 - ``project-bound``        — its identity is the project bot (``bot: true`` and username ``project_<id>_bot…``).
-- ``no-cross-project-access`` — it sees ONLY its own project (membership list is just ``GITLAB_PROJECT_ID``).
+- ``no-cross-project-access`` — it sees EXACTLY its own project (the paginated membership list is
+  exactly ``GITLAB_PROJECT_ID``; an empty list is inconclusive and fails).
 
 Config comes from the environment (``GITLAB_URL``, ``GITLAB_PROJECT_TOKEN``, ``GITLAB_PROJECT_ID``); the
 token value is never printed. Live checks hit the GitLab REST API over stdlib urllib; unit tests inject a
@@ -85,26 +86,62 @@ def check_project_bound(cfg: dict, get=_http_get):
     :param get: HTTP getter (injected in tests).
     :return: ``(ok, detail)``.
     """
+    if not cfg["project_id"]:
+        return False, "GITLAB_PROJECT_ID not set - bot identity cannot be verified"
     status, body = get(f"{cfg['api']}/user", cfg["token"])
     b = body or {}
+    prefix = f"project_{cfg['project_id']}_bot"
     ok = (status == 200 and b.get("bot") is True
-          and f"project_{cfg['project_id']}_bot" in (b.get("username") or ""))
-    return ok, f"user bot={b.get('bot')} name~project_{cfg['project_id']}_bot"
+          and (b.get("username") or "").startswith(prefix))
+    return ok, f"user bot={b.get('bot')} name^={prefix}"
+
+
+def _paged_get(url: str, cfg: dict, get, per_page: int = 100, max_pages: int = 50):
+    """Fetch every page of a paginated GitLab list endpoint until it is exhausted.
+
+    GitLab caps ``per_page`` at 100, so a short page is the last page; the ``max_pages`` cap keeps a
+    misbehaving API from looping forever.
+
+    :param url: API URL without pagination parameters (may already carry a query string).
+    :param cfg: gate config from :func:`_config`.
+    :param get: HTTP getter (injected in tests).
+    :param per_page: page size requested from the API.
+    :param max_pages: hard cap on the number of pages fetched.
+    :return: ``(status, items)``; ``items`` is ``None`` when a page fails or is not a list.
+    """
+    sep = "&" if "?" in url else "?"
+    items: list = []
+    for page in range(1, max_pages + 1):
+        status, body = get(f"{url}{sep}per_page={per_page}&page={page}", cfg["token"])
+        if status != 200 or not isinstance(body, list):
+            return status, None
+        items.extend(body)
+        if len(body) < per_page:
+            break
+    return 200, items
 
 
 def check_no_cross_project_access(cfg: dict, get=_http_get):
-    """Token sees only its own project (least privilege).
+    """Token sees exactly its own project - no more, and no fewer.
+
+    An EMPTY membership list is not least privilege, it is an unverified claim: the token cannot see
+    even the project it is bound to, so the gate reports FAIL rather than treating a blank answer as
+    maximal compliance. Pagination is followed to exhaustion so a membership on a later page counts.
 
     :param cfg: gate config from :func:`_config`.
     :param get: HTTP getter (injected in tests).
     :return: ``(ok, detail)``.
     """
-    status, body = get(f"{cfg['api']}/projects?membership=true&per_page=100", cfg["token"])
-    if status != 200 or not isinstance(body, list):
+    if not cfg["project_id"]:
+        return False, "GITLAB_PROJECT_ID not set - membership cannot be verified"
+    status, body = _paged_get(f"{cfg['api']}/projects?membership=true", cfg, get)
+    if body is None:
         return False, f"/projects -> {status}"
     ids = {str(p.get("id")) for p in body}
-    return (ids in ({str(cfg["project_id"])}, set())), \
-        f"visible ids={sorted(ids)} expected only {cfg['project_id']}"
+    if not ids:
+        return False, "/projects -> 200 but empty membership list (inconclusive, not a pass)"
+    return (ids == {str(cfg["project_id"])}), \
+        f"visible ids={sorted(ids)} expected exactly {cfg['project_id']}"
 
 
 CHECKS = {

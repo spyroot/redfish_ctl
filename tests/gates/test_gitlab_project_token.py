@@ -45,6 +45,50 @@ def test_project_bound_requires_bot_identity():
     assert not bad
 
 
+def test_empty_membership_list_is_not_least_privilege():
+    """An empty membership list fails instead of reading as maximal least privilege.
+
+    A token that cannot see even its own project has not proven anything. The gate previously accepted
+    the empty set, so a scope change that hides memberships — exactly the case worth catching — was
+    indistinguishable from a perfectly-scoped token.
+    """
+    ok, detail = g.check_no_cross_project_access(CFG, _fake([("/projects", 200, [])]))
+    assert not ok
+    assert "inconclusive" in detail
+
+
+def test_membership_pagination_is_followed_to_exhaustion():
+    """A cross-project membership on a later page is still detected.
+
+    The gate previously fetched one page of 100; a token with more than 100 memberships could hide the
+    leaking project past the page boundary and pass.
+    """
+    page1 = [{"id": 5}] * 100
+    calls = {"n": 0}
+
+    def get(url, token, timeout=10):
+        """Return a full first page, then a short second page carrying a foreign project."""
+        calls["n"] += 1
+        return (200, page1) if "page=1" in url else (200, [{"id": 9}])
+
+    ok, detail = g.check_no_cross_project_access(CFG, get)
+    assert calls["n"] >= 2, "pagination stopped at the first page"
+    assert not ok
+    assert "9" in detail
+
+
+def test_project_bound_rejects_a_lookalike_username():
+    """The bot username is matched as an anchored prefix, not a substring.
+
+    An account merely containing the expected name (``svc_project_5_bot``) is a different identity and
+    must not satisfy a least-privilege gate.
+    """
+    ok, _ = g.check_project_bound(
+        CFG, _fake([("/user", 200, {"bot": True, "username": "svc_project_5_bot"})])
+    )
+    assert not ok
+
+
 def test_no_cross_project_access_least_privilege():
     """`no-cross-project-access` passes when only the own project is visible, fails otherwise."""
     own = g.check_no_cross_project_access(CFG, _fake([("/projects", 200, [{"id": 5}])]))
