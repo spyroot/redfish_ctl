@@ -201,6 +201,17 @@ class SmcVirtualMediaMount(RedfishManagerBase,
             },
         }
 
+    def _resolve_cfgcd_path(self, manager_id: str) -> str:
+        """Resolve the Supermicro CfgCD target used for mount and unmount.
+
+        :param manager_id: BMC manager id.
+        :return: advertised CfgCD path, or the conventional X10 path.
+        """
+        vm1_path = self._vm1(manager_id)
+        vm1_read = self._read_json(vm1_path)
+        vm1 = self._data_or_none(vm1_read) or {}
+        return self._cfgcd_path(vm1, vm1_path + "/CfgCD")
+
     def execute(self,
                 host: Optional[str] = None,
                 path: Optional[str] = None,
@@ -227,12 +238,11 @@ class SmcVirtualMediaMount(RedfishManagerBase,
         :param do_async: accepted for CLI compatibility; not used by this command.
         :return: CommandResult.
         """
-        cfgcd = self._vm1(manager_id) + "/CfgCD"
-
         if do_status:
             return CommandResult({"status": self._status(manager_id)}, None, None, None)
 
         if do_unmount:
+            cfgcd = self._resolve_cfgcd_path(manager_id)
             r, _ = self.base_post(cfgcd + "/Actions/IsoConfig.UnMount",
                                   payload={}, expected_status=200)
             if r.error is not None:
@@ -246,6 +256,7 @@ class SmcVirtualMediaMount(RedfishManagerBase,
                           "(or use --status / --unmount)"}, None, None, None)
 
         # 1) configure the share (CfgCD), 2) mount it (IsoConfig.Mount)
+        cfgcd = self._resolve_cfgcd_path(manager_id)
         cfg, _ = self.base_patch(
             cfgcd,
             payload={"Host": host, "Path": path,

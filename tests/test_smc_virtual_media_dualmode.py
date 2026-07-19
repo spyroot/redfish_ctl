@@ -153,6 +153,46 @@ def test_vm_mount_patches_cfgcd_then_posts_mount_action(redfish_mock_factory):
     assert result.data["status"]["reads"]["CD1"]["error"] == "HTTP 404"
 
 
+def test_vm_mount_uses_advertised_cfgcd_path(redfish_mock_factory):
+    """vm-mount writes to the CfgCD link advertised by the VM1 resource."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+    service._overlay["/redfish/v1/managers/1/vm1"] = {
+        "Oem": {
+            "Supermicro": {
+                "VirtualMediaConfig": {
+                    "@odata.id": "/redfish/v1/Managers/1/VM1/ConfigCD"
+                }
+            }
+        }
+    }
+    service._overlay["/redfish/v1/managers/1/vm1/configcd"] = {
+        "Host": "192.0.2.10",
+        "Path": "/isos/installer.iso",
+        "Username": "iso-user",
+    }
+
+    result = manager.sync_invoke(
+        ApiRequestType.SmcVirtualMediaMount,
+        "vm-mount",
+        host="192.0.2.10",
+        path="/isos/installer.iso",
+        share_user="iso-user",
+        share_pass="iso-pass",
+    )
+
+    patches = _requests(service, "PATCH")
+    posts = _requests(service, "POST")
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert patches[0].path.lower() == "/redfish/v1/managers/1/vm1/configcd"
+    assert posts[0].path.lower() == (
+        "/redfish/v1/managers/1/vm1/configcd/actions/isoconfig.mount"
+    )
+    assert result.data["status"]["VirtualMediaConfig"] == (
+        "/redfish/v1/Managers/1/VM1/ConfigCD"
+    )
+
+
 def test_vm_mount_unmount_posts_unmount_action(redfish_mock_factory):
     """vm-mount --unmount posts the Supermicro unmount action."""
     manager, service = redfish_mock_factory("supermicro_x10")
@@ -173,3 +213,31 @@ def test_vm_mount_unmount_posts_unmount_action(redfish_mock_factory):
     )
     assert posts[0].json() == {}
     assert result.data["status"]["CD1"] is None
+
+
+def test_vm_mount_unmount_uses_advertised_cfgcd_path(redfish_mock_factory):
+    """vm-mount --unmount follows the advertised CfgCD action path."""
+    manager, service = redfish_mock_factory("supermicro_x10")
+    service._overlay["/redfish/v1/managers/1/vm1"] = {
+        "Oem": {
+            "Supermicro": {
+                "VirtualMediaConfig": {
+                    "@odata.id": "/redfish/v1/Managers/1/VM1/ConfigCD"
+                }
+            }
+        }
+    }
+    service._overlay["/redfish/v1/managers/1/vm1/configcd"] = {}
+
+    result = manager.sync_invoke(
+        ApiRequestType.SmcVirtualMediaMount,
+        "vm-mount",
+        do_unmount=True,
+    )
+
+    posts = _requests(service, "POST")
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert posts[0].path.lower() == (
+        "/redfish/v1/managers/1/vm1/configcd/actions/isoconfig.unmount"
+    )
