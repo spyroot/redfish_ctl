@@ -1,9 +1,9 @@
-"""CI enforcement of the gate registry and meta-gate (tools/gate_meta.py, gates.yaml)."""
+"""CI enforcement of the gate registry and meta-gate (tools/gate_meta.py, gates/manifest.yaml)."""
 from tools import gate_meta
 
 
 def test_meta_gate_passes():
-    """gates.yaml and the pipeline are internally consistent (the meta-gate is green).
+    """gates/manifest.yaml and the pipeline are internally consistent (the meta-gate is green).
 
     This is the ``repo.meta`` gate run inside the offline suite, so a registry
     that references a missing/non-executable command, omits a mandatory ID, or

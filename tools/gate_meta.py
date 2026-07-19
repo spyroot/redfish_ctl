@@ -1,6 +1,6 @@
 """Meta-gate: enforce that the gate registry and pipeline stay internally consistent.
 
-Reads ``gates.yaml`` (the single registry of every mandatory gate) and fails the
+Reads ``gates/manifest.yaml`` (the single registry of every mandatory gate) and fails the
 build when the pipeline could silently skip, misroute, or mis-classify a gate.
 It is itself registered as the ``repo.meta`` gate and is run in CI via
 ``tests/test_gate_meta.py``. Checks (a check whose inputs do not exist yet — no

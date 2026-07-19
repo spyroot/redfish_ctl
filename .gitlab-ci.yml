@@ -50,7 +50,6 @@ deploy-apply:
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
   variables:
-    ALLOW_PROTECTED_APPLY: "1"
     MUTATION_LOCK: "$CI_JOB_ID"
   script:
     - ./scripts/gates/run.sh deploy
