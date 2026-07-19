@@ -3,6 +3,8 @@
 Each check is exercised on both a well-scoped token (passes) and a mis-scoped one (fails), matching the
 four gitlab.project-token.* gates.
 """
+import re
+
 from tools import gitlab_project_token_gate as g
 
 CFG = {"api": "https://gl/api/v4", "url": "https://gl", "token": "x", "project_id": "5"}
@@ -67,9 +69,15 @@ def test_membership_pagination_is_followed_to_exhaustion():
     calls = {"n": 0}
 
     def get(url, token, timeout=10):
-        """Return a full first page, then a short second page carrying a foreign project."""
+        """Return a full first page, then a short second page carrying a foreign project.
+
+        The page number is parsed rather than substring-matched: the query also carries
+        ``per_page=100``, whose tail reads as ``page=100``, so a naive ``"page=1" in url`` matches
+        every request and the fake would serve page 1 forever.
+        """
         calls["n"] += 1
-        return (200, page1) if "page=1" in url else (200, [{"id": 9}])
+        page = int(re.search(r"[?&]page=(\d+)", url).group(1))
+        return (200, page1) if page == 1 else (200, [{"id": 9}])
 
     ok, detail = g.check_no_cross_project_access(CFG, get)
     assert calls["n"] >= 2, "pagination stopped at the first page"
