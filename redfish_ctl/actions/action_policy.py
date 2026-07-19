@@ -8,8 +8,8 @@ dry-run unless ``--confirm`` is given, or additionally needs an explicit
 
 Fail-safe by construction: an action not in the table is treated as DESTRUCTIVE,
 so a newly exposed (unclassified) action can never POST without an explicit
-confirm. This module is product-neutral — it names standard DMTF + NVIDIA OEM
-action types only and imports nothing from the Redfish manager layer.
+confirm. This module is product-neutral — it names standard DMTF and vendor OEM
+action types and imports nothing from the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
@@ -60,6 +60,8 @@ ACTION_POLICY = {
     "#NvidiaWorkloadPower.DisableProfiles": Destructiveness.REVERSIBLE,
     "#NvidiaDebugToken.GenerateToken": Destructiveness.REVERSIBLE,
     "#NvidiaDebugToken.DisableToken": Destructiveness.REVERSIBLE,
+    "#DellRaidService.StartPatrolRead": Destructiveness.REVERSIBLE,
+    "#DellRaidService.StopPatrolRead": Destructiveness.REVERSIBLE,
 
     # destructive: service disruption / config rewrite — dry-run unless --confirm
     "#ComputerSystem.Reset": Destructiveness.DESTRUCTIVE,
