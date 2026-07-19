@@ -7,6 +7,8 @@
 The command discovers supported HPE OEM actions from each Manager resource's
 ``Oem.Hpe.Actions`` block. Factory reset, manager reset, NVRAM clear, firmware
 recovery, and iLO disable actions are deliberately not exposed by this command.
+``clear-rest-api-state`` can require an iLO reset to complete; the command
+reports that consequence in previews and listings.
 
 Author Mus spyroot@gmail.com
 """
@@ -27,6 +29,7 @@ class _HpeManagerActionSpec:
     full_type: str
     action_name: str
     description: str
+    note: Optional[str] = None
 
 
 _ACTION_SPECS = {
@@ -41,6 +44,7 @@ _ACTION_SPECS = {
         full_type="#HpeiLO.ClearRestApiState",
         action_name="ClearRestApiState",
         description="clear iLO REST API state data",
+        note="HPE reports this action can require an iLO reset to complete",
     ),
     "disable-cloud-connect": _HpeManagerActionSpec(
         selector="disable-cloud-connect",
@@ -53,12 +57,14 @@ _ACTION_SPECS = {
         full_type="#HpeiLO.EnableCloudConnect",
         action_name="EnableCloudConnect",
         description="enable HPE cloud-connect integration",
+        note="may contact HPE cloud services from the BMC",
     ),
     "retry-cloud-connect": _HpeManagerActionSpec(
         selector="retry-cloud-connect",
         full_type="#HpeiLO.RetryCloudConnect",
         action_name="RetryCloudConnect",
         description="retry HPE cloud-connect registration",
+        note="may contact HPE cloud services from the BMC",
     ),
 }
 
@@ -130,36 +136,30 @@ class HpeManagerActions(RedfishManagerBase,
         uris = self.discover_manager_ids() or []
         return [uri for uri in uris if isinstance(uri, str) and uri]
 
-    def _target_for(self, manager_uri, spec, do_async):
-        """Return the advertised target URI for an HPE Manager OEM action.
-
-        :param manager_uri: candidate Manager resource URI.
-        :param spec: HPE manager-action selector metadata.
-        :param do_async: run the manager query asynchronously when True.
-        :return: action target URI, or None when absent.
-        """
-        manager = self._get(manager_uri, do_async)
-        targets = self._flatten_action_targets(manager)
-        return targets.get(spec.full_type)
-
-    def _discover_rows(self, do_async):
+    def _discover_rows(self, do_async, manager_uri=None):
         """Discover supported HPE Manager OEM action rows.
 
         :param do_async: run underlying queries asynchronously when True.
+        :param manager_uri: optional exact Manager URI to inspect.
         :return: list of available manager-action rows.
         """
         rows = []
-        for manager_uri in self._manager_uris():
+        manager_uris = [manager_uri.rstrip("/")] if manager_uri else self._manager_uris()
+        for manager_uri in manager_uris:
+            targets = self._flatten_action_targets(self._get(manager_uri, do_async))
             for spec in _ACTION_SPECS.values():
-                target = self._target_for(manager_uri, spec, do_async)
+                target = targets.get(spec.full_type)
                 if target:
-                    rows.append({
+                    row = {
                         "Action": spec.selector,
                         "FullType": spec.full_type,
                         "Resource": manager_uri,
                         "Target": target,
                         "Description": spec.description,
-                    })
+                    }
+                    if spec.note:
+                        row["Note"] = spec.note
+                    rows.append(row)
         return rows
 
     @staticmethod
@@ -202,7 +202,7 @@ class HpeManagerActions(RedfishManagerBase,
         :param do_async: issue the underlying queries/POST on the async path when True.
         :return: CommandResult with a listing, preview, execution result, or error.
         """
-        rows = self._discover_rows(bool(do_async))
+        rows = self._discover_rows(bool(do_async), manager_uri)
         if action is None:
             return CommandResult(rows, None, None, None)
 
@@ -233,7 +233,9 @@ class HpeManagerActions(RedfishManagerBase,
             dry_run=bool(dry_run) or not bool(confirm),
             confirm=bool(confirm),
         )
-        if not confirm and isinstance(result.data, dict):
+        if result.error is None and not confirm and isinstance(result.data, dict):
             result.data["requires_confirm"] = True
             result.data["blocked"] = "HPE manager action requires --confirm"
+        if result.error is None and spec.note and isinstance(result.data, dict):
+            result.data["note"] = spec.note
         return result

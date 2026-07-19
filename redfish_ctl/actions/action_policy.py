@@ -36,8 +36,8 @@ class Destructiveness(Enum):
 
 
 # Keyed by the full Redfish action type "#Type.Action" (as discover_redfish_actions
-# reports it in RedfishAction.full_redfish_name). Covers the 25 action types the
-# GB300 NVL exposes plus a couple of standard siblings.
+# reports it in RedfishAction.full_redfish_name). Covers the corpus-backed
+# standard, NVIDIA, Dell, and HPE action types this package exposes.
 ACTION_POLICY = {
     # read-only: a signed-measurement fetch carried over POST
     "#ComponentIntegrity.SPDMGetSignedMeasurements": Destructiveness.READ_ONLY,
@@ -85,12 +85,16 @@ ACTION_POLICY = {
     "#HpeiLO.DisableCloudConnect": Destructiveness.DESTRUCTIVE,
     "#HpeiLO.EnableCloudConnect": Destructiveness.DESTRUCTIVE,
     "#HpeiLO.RetryCloudConnect": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.ClearNVRAM": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.DisableiLOFunctionality": Destructiveness.DESTRUCTIVE,
+    "#HpeiLO.RequestFirmwareAndOsRecovery": Destructiveness.DESTRUCTIVE,
     "#UpdateService.SimpleUpdate": Destructiveness.DESTRUCTIVE,
     "#UpdateService.StartUpdate": Destructiveness.DESTRUCTIVE,
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
+    "#HpeiLO.ResetToFactoryDefaults": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
 }

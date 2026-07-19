@@ -35,9 +35,13 @@ def test_policy_classifies_known_and_unknown():
         "#HpeiLO.DisableCloudConnect",
         "#HpeiLO.EnableCloudConnect",
         "#HpeiLO.RetryCloudConnect",
+        "#HpeiLO.ClearNVRAM",
+        "#HpeiLO.DisableiLOFunctionality",
+        "#HpeiLO.RequestFirmwareAndOsRecovery",
     )
     for action in hpe_manager_actions:
         assert classify(action) is Destructiveness.DESTRUCTIVE
+    assert classify("#HpeiLO.ResetToFactoryDefaults") is Destructiveness.IRREVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
