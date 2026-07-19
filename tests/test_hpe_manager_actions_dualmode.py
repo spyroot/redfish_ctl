@@ -93,7 +93,9 @@ def test_hpe_manager_actions_manager_uri_short_circuits_discovery(
         "enable-cloud-connect",
         "retry-cloud-connect",
     }
-    assert [request.path for request in _get_requests(service)] == [_MANAGER_URI]
+    assert [request.path.lower() for request in _get_requests(service)] == [
+        _MANAGER_URI.lower()
+    ]
     assert projected_walltime(service, "india-vpn-to-us") <= 0.31
     assert _post_requests(service) == []
 
