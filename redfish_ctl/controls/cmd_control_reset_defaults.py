@@ -116,6 +116,18 @@ class ControlResetDefaults(RedfishManagerBase,
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
+    def _chassis_id_from_control(control_uri):
+        """Derive the owning chassis identifier from a Control URI.
+
+        :param control_uri: Redfish Control resource URI.
+        :return: chassis id string, or None when the URI is not chassis-scoped.
+        """
+        parts = control_uri.strip("/").split("/")
+        if len(parts) >= 6 and parts[0:3] == ["redfish", "v1", "Chassis"]:
+            return parts[3]
+        return None
+
+    @staticmethod
     def _action_target(control):
         """Return the Control.ResetToDefaults target from a Control body.
 
@@ -144,6 +156,31 @@ class ControlResetDefaults(RedfishManagerBase,
         except Exception:
             return {}
         return data if isinstance(data, dict) else {}
+
+    def _query_required(self, uri, do_async=False):
+        """Query a required URI.
+
+        :param uri: Redfish resource URI to query.
+        :param do_async: when True, issue the query asynchronously.
+        :return: response data dict.
+        :raises InvalidArgument: when the resource cannot be read as an object.
+        """
+        try:
+            result = self.base_query(uri, do_async=do_async)
+        except Exception as exc:
+            raise InvalidArgument(
+                f"failed to read Control resource {uri}: {exc}"
+            ) from exc
+        data = result.data or {}
+        if result.error:
+            raise InvalidArgument(
+                f"failed to read Control resource {uri}: {result.error}"
+            )
+        if not isinstance(data, dict):
+            raise InvalidArgument(
+                f"failed to read Control resource {uri}: expected object"
+            )
+        return data
 
     @staticmethod
     def _target_row(chassis_id, member_uri, control):
@@ -190,6 +227,43 @@ class ControlResetDefaults(RedfishManagerBase,
                 rows.append(self._target_row(chassis_id, member_uri, control))
         return rows
 
+    def _row_from_exact_selector(self, control, do_async=False):
+        """Resolve an exact Control resource or action URI without a full crawl.
+
+        :param control: exact Redfish Control resource URI or Control action URI.
+        :param do_async: when True, issue Redfish queries asynchronously.
+        :return: reset-capable Control row, or None when the Control has no action.
+        :raises InvalidArgument: when the URI is not a Control reset selector.
+        """
+        selector = control.rstrip("/")
+        action_suffix = "/Actions/Control.ResetToDefaults"
+        if "/Actions/" in selector:
+            if not selector.endswith(action_suffix):
+                raise InvalidArgument(
+                    "control-reset-defaults only accepts a Control resource URI "
+                    "or Control.ResetToDefaults action URI"
+                )
+            control_uri = selector[: -len(action_suffix)]
+        else:
+            control_uri = selector
+        if "/Controls/" not in control_uri:
+            raise InvalidArgument(
+                "control-reset-defaults requires a Redfish Control resource URI"
+            )
+        control_data = self._query_required(control_uri, do_async=do_async)
+        target = self._action_target(control_data)
+        if not target:
+            return None
+        if "/Actions/" in selector and selector != target.rstrip("/"):
+            raise InvalidArgument(
+                f"Control.ResetToDefaults action URI mismatch for {control_uri}"
+            )
+        return self._target_row(
+            self._chassis_id_from_control(control_uri),
+            control_uri,
+            control_data,
+        )
+
     @staticmethod
     def _matches(rows, control, chassis=None):
         """Filter reset-capable rows by selector and optional chassis.
@@ -229,6 +303,21 @@ class ControlResetDefaults(RedfishManagerBase,
             ]
         return matches
 
+    @staticmethod
+    def _with_selected_row(result, row):
+        """Return an action result annotated with the selected Control row.
+
+        :param result: invoke_action result.
+        :param row: selected Control row with rollback context.
+        :return: CommandResult with row metadata merged into ``data`` when possible.
+        """
+        if not isinstance(result.data, dict):
+            return result
+        data = dict(result.data)
+        for key, value in row.items():
+            data.setdefault(key, value)
+        return CommandResult(data, result.discovered, result.extra, result.error)
+
     def execute(self,
                 control: Optional[str] = None,
                 chassis: Optional[str] = None,
@@ -257,18 +346,35 @@ class ControlResetDefaults(RedfishManagerBase,
         :param do_async: issue the underlying query and POST on the async path.
         :return: CommandResult with targets, preview, execution result, or error.
         """
-        rows = self._discover_targets(do_async=bool(do_async))
         if control is None:
+            if chassis:
+                raise InvalidArgument("--chassis requires --control")
+            rows = self._discover_targets(do_async=bool(do_async))
             return CommandResult({"control_reset_targets": rows}, None, None, None)
 
-        matches = self._matches(rows, control, chassis=chassis)
-        if not matches:
-            return CommandResult(
-                {"available": rows},
-                None,
-                None,
-                f"Control.ResetToDefaults target not found: {control}",
+        if control.strip().startswith("/redfish/"):
+            row = self._row_from_exact_selector(
+                control.strip(),
+                do_async=bool(do_async),
             )
+            if not row:
+                return CommandResult(
+                    {"available": []},
+                    None,
+                    None,
+                    f"Control.ResetToDefaults target not found: {control}",
+                )
+            matches = [row]
+        else:
+            rows = self._discover_targets(do_async=bool(do_async))
+            matches = self._matches(rows, control, chassis=chassis)
+            if not matches:
+                return CommandResult(
+                    {"available": rows},
+                    None,
+                    None,
+                    f"Control.ResetToDefaults target not found: {control}",
+                )
         if len(matches) > 1:
             return CommandResult(
                 {"matches": matches},
@@ -279,7 +385,7 @@ class ControlResetDefaults(RedfishManagerBase,
             )
 
         row = matches[0]
-        return self.invoke_action(
+        result = self.invoke_action(
             row["Uri"],
             "ResetToDefaults",
             payload={},
@@ -288,3 +394,4 @@ class ControlResetDefaults(RedfishManagerBase,
             dry_run=bool(dry_run),
             confirm=bool(confirm),
         )
+        return self._with_selected_row(result, row)
