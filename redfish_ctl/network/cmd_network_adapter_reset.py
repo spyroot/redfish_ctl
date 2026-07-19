@@ -16,9 +16,14 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager_shared import REDFISH_API, ApiRequestType, ResetType, Singleton
 
 _NETWORK_ADAPTER_RESET_ACTION = "#NetworkAdapter.Reset"
+_RESET_TYPE_VALUES = frozenset(item.value for item in ResetType)
+
+
+class _DiscoveryError(RuntimeError):
+    """Raised when required reset discovery reads fail."""
 
 
 class NetworkAdapterReset(RedfishManagerBase,
@@ -128,18 +133,55 @@ class NetworkAdapterReset(RedfishManagerBase,
         )
         return [value for value in values or [] if isinstance(value, str)]
 
-    def _get(self, uri, do_async):
-        """GET a Redfish resource body, returning an empty dict on failure.
+    def _get(self, uri, do_async, required=False):
+        """GET a Redfish resource body.
 
         :param uri: Redfish resource URI.
         :param do_async: run the query through the async path when True.
-        :return: parsed resource body dict, or ``{}``.
+        :param required: raise when the read fails instead of returning ``{}``.
+        :return: parsed resource body dict, or ``{}`` for optional failures.
+        :raises _DiscoveryError: when a required resource cannot be read.
         """
         try:
-            data = self.base_query(uri, do_async=do_async).data or {}
-        except Exception:
+            result = self.base_query(uri, do_async=do_async)
+        except Exception as exc:
+            if required:
+                raise _DiscoveryError(f"failed to read {uri}: {exc}") from exc
             return {}
+        if result.error:
+            if required:
+                raise _DiscoveryError(f"failed to read {uri}: {result.error}")
+            return {}
+        data = result.data or {}
+        if required and not isinstance(data, dict):
+            raise _DiscoveryError(f"failed to read {uri}: expected a Redfish object")
         return data if isinstance(data, dict) else {}
+
+    def _row_from_adapter(self, adapter_uri, adapter):
+        """Build a resettable-adapter row from one adapter resource.
+
+        :param adapter_uri: Redfish NetworkAdapter URI.
+        :param adapter: parsed NetworkAdapter resource body.
+        :return: reset-capable adapter row, or None when no Reset action exists.
+        """
+        target = self._flatten_action_targets(adapter).get(
+            _NETWORK_ADAPTER_RESET_ACTION
+        )
+        if not target:
+            return None
+        status = adapter.get("Status") if isinstance(adapter, dict) else {}
+        return {
+            "Adapter": (
+                adapter.get("Id") or adapter_uri.rstrip("/").rsplit("/", 1)[-1]
+            ),
+            "Chassis": self._chassis_id(adapter_uri),
+            "Model": adapter.get("Model"),
+            "Manufacturer": adapter.get("Manufacturer"),
+            "Health": status.get("Health") if isinstance(status, dict) else None,
+            "Resource": adapter_uri,
+            "Target": target,
+            "ResetTypes": self._allowed_reset_types(adapter),
+        }
 
     def _resettable_adapters(self, do_async):
         """Discover adapters that advertise ``#NetworkAdapter.Reset``.
@@ -148,7 +190,7 @@ class NetworkAdapterReset(RedfishManagerBase,
         :return: list of reset-capable adapter rows.
         """
         rows = []
-        chassis = self._get(REDFISH_API.Chassis, do_async)
+        chassis = self._get(REDFISH_API.Chassis, do_async, required=True)
         for chassis_uri in self._members(chassis):
             adapters_uri = self._link(
                 self._get(chassis_uri, do_async),
@@ -158,22 +200,9 @@ class NetworkAdapterReset(RedfishManagerBase,
                 continue
             for adapter_uri in self._members(self._get(adapters_uri, do_async)):
                 adapter = self._get(adapter_uri, do_async)
-                target = self._flatten_action_targets(adapter).get(
-                    _NETWORK_ADAPTER_RESET_ACTION
-                )
-                if not target:
-                    continue
-                status = adapter.get("Status") if isinstance(adapter, dict) else {}
-                rows.append({
-                    "Adapter": adapter.get("Id") or adapter_uri.rsplit("/", 1)[-1],
-                    "Chassis": self._chassis_id(adapter_uri),
-                    "Model": adapter.get("Model"),
-                    "Manufacturer": adapter.get("Manufacturer"),
-                    "Health": status.get("Health") if isinstance(status, dict) else None,
-                    "Resource": adapter_uri,
-                    "Target": target,
-                    "ResetTypes": self._allowed_reset_types(adapter),
-                })
+                row = self._row_from_adapter(adapter_uri, adapter)
+                if row:
+                    rows.append(row)
         return rows
 
     @staticmethod
@@ -201,6 +230,17 @@ class NetworkAdapterReset(RedfishManagerBase,
         """
         if not (adapter or "").strip():
             raise InvalidArgument("network-adapter-reset requires --adapter")
+        selector = adapter.strip()
+        if selector.startswith("/redfish/"):
+            row = self._row_from_adapter(
+                selector.rstrip("/"),
+                self._get(selector.rstrip("/"), do_async, required=True),
+            )
+            if not row:
+                raise InvalidArgument(
+                    f"network adapter reset action not found on: {adapter}"
+                )
+            return row
         matches = [
             row for row in self._resettable_adapters(do_async)
             if self._matches(row, adapter)
@@ -227,11 +267,24 @@ class NetworkAdapterReset(RedfishManagerBase,
         :raises InvalidArgument: when the selected ResetType is not advertised.
         """
         allowed = row.get("ResetTypes") or []
-        selected = reset_type or (allowed[0] if len(allowed) == 1 else None)
-        if selected and allowed and selected not in allowed:
+        if reset_type and allowed and reset_type not in allowed:
             raise InvalidArgument(
-                f"invalid ResetType for {row['Adapter']}: {selected}; "
+                f"invalid ResetType for {row['Adapter']}: {reset_type}; "
                 f"allowed: {', '.join(allowed)}"
+            )
+        if reset_type and not allowed and reset_type not in _RESET_TYPE_VALUES:
+            raise InvalidArgument(
+                f"invalid ResetType for {row['Adapter']}: {reset_type}; "
+                f"allowed: {', '.join(sorted(_RESET_TYPE_VALUES))}"
+            )
+        if reset_type:
+            selected = reset_type
+        elif len(allowed) == 1:
+            selected = allowed[0]
+        else:
+            raise InvalidArgument(
+                f"network adapter {row['Adapter']} advertises "
+                f"{len(allowed)} ResetType values; pass --reset-type explicitly"
             )
         return {"ResetType": selected} if selected else {}
 
@@ -254,14 +307,16 @@ class NetworkAdapterReset(RedfishManagerBase,
             preview/result metadata.
         """
         if not adapter:
-            return CommandResult(
-                {"resettable_adapters": self._resettable_adapters(bool(do_async))},
-                None,
-                None,
-                None,
-            )
+            try:
+                rows = self._resettable_adapters(bool(do_async))
+            except _DiscoveryError as exc:
+                return CommandResult(None, None, None, str(exc))
+            return CommandResult({"resettable_adapters": rows}, None, None, None)
 
-        row = self._resolve_adapter(adapter, bool(do_async))
+        try:
+            row = self._resolve_adapter(adapter, bool(do_async))
+        except _DiscoveryError as exc:
+            return CommandResult(None, None, None, str(exc))
         result = self.invoke_action(
             row["Resource"],
             "Reset",
