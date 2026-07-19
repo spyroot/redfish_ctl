@@ -17,6 +17,17 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = REPO_ROOT / "gates" / "manifest.yaml"
+CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
+
+
+def _in_a_pod() -> bool:
+    """Report whether this test process is itself running inside a Kubernetes pod.
+
+    :return: True when the kubelet's own evidence is present, mirroring check.sh's guard.
+    """
+    if not (os.environ.get("KUBERNETES_SERVICE_HOST") and os.environ.get("KUBERNETES_SERVICE_PORT")):
+        return False
+    return Path("/proc/1/cgroup").is_file()
 
 
 def _registry() -> dict:
@@ -110,6 +121,46 @@ def test_kubernetes_schema_validates_a_non_empty_manifest_set() -> None:
     assert proc.returncode == 0, combined
     assert "no concrete manifests selected" not in combined, combined
     assert "kubernetes.schema: OK" in combined, combined
+
+
+def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
+    """check.sh refuses the profile path when a single Kubernetes variable is exported.
+
+    The guard previously read one variable, so `export KUBERNETES_SERVICE_HOST=...` on a workstation
+    ran the entire merge profile on the operator's laptop — the one thing this project forbids
+    everywhere. The edge is ordinary: a sourced env file, a devcontainer, or anyone trying to get past
+    the refusal sets exactly that variable. A deliberately unregistered profile is used so that if the
+    guard ever regresses, run.sh still rejects it before any real gate can execute.
+    """
+    env = {k: v for k, v in os.environ.items() if k != "KUBERNETES_SERVICE_PORT"}
+    env["KUBERNETES_SERVICE_HOST"] = "10.96.0.1"
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "no-such-profile"],
+        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 3, f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    assert "REFUSING" in combined, combined
+    assert "unknown profile" not in combined, f"the guard let the runner start: {combined}"
+
+
+@pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
+def test_check_sh_still_runs_in_cluster() -> None:
+    """check.sh accepts a real pod, so the hardened guard cannot break the in-cluster CI job.
+
+    The guard requires kubelet evidence, and some of that evidence is legitimately absent: a pod with
+    automountServiceAccountToken false has no service-account files, and a cgroup-v2 pod with a private
+    cgroup namespace reads only "0::/". An over-strict guard would refuse inside k8s/ci/test-job.yaml or
+    platform/agent-runner/job.yaml — a self-inflicted CI outage. Reaching the runner's own "unknown
+    profile" error proves the guard passed without executing any gate.
+    """
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "no-such-profile"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert "REFUSING" not in combined, f"the guard refused inside a real pod: {combined}"
+    assert "unknown profile" in combined, combined
 
 
 def test_protected_apply_refuses_without_a_protected_pipeline() -> None:
