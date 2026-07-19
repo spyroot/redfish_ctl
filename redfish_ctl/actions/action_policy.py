@@ -76,6 +76,8 @@ ACTION_POLICY = {
     # secure-erase / RoT-key / factory-reset class actions).
     "#LogService.ClearLog": Destructiveness.DESTRUCTIVE,
     "#TelemetryService.ClearMetricReports": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.SetAssetName": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.SetBootVD": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
