@@ -69,9 +69,9 @@ redfish_ctl --help             # every subcommand
 ```
 
 Reads are safe. Commands that change hardware are labeled **Guarded** or **Write** in the
-[command reference](docs/commands.md#registered-commands): Guarded commands require an explicit
-intent flag such as `--confirm`; Write commands can mutate immediately and require explicit target
-approval before live use. Preview with `--show` or `--dry_run` when the command supports it, then
+[command reference](docs/commands.md#registered-commands). Both labels mean live use requires an
+approved target and an explicit intent step, such as `--confirm`, `--commit`, or another
+command-specific apply flag. Preview with `--show` or `--dry_run` when the command supports it, then
 see [Mutating Commands](#mutating-commands) below before applying anything.
 
 > **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,

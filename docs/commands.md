@@ -241,9 +241,9 @@ covered by the Dell, Supermicro, HPE, or generic fixture corpora listed in [Vend
 
 ## Mutating Workflow Pattern
 
-Commands labeled **Guarded** block or preview writes by default and require an explicit intent flag,
-usually `--confirm`. Commands labeled **Write** can mutate as soon as they are invoked; do not run
-them live without explicit target approval, and use `--show` or `--dry_run` first when available.
+Commands labeled **Guarded** or **Write** are hardware-changing paths. Run them live only on an
+approved target and only with the command's explicit intent step, such as `--confirm`, `--commit`, or
+another action-specific apply flag. Use `--show` or `--dry_run` first when available.
 
 Before running either kind of write, use the same four phases:
 

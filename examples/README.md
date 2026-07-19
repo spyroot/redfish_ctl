@@ -32,7 +32,8 @@ Platform/vendor labels:
 
 Run **Read** examples from the repository root with `bash examples/<script>`. For **Guarded** and
 **Write** examples, inspect the script first, confirm each live step, and run only on an approved
-target.
+target. Hardware-changing steps must use the script's explicit intent flag, such as `--confirm`,
+`--commit`, `--dry_run`/apply, or the action-specific flag documented for that command.
 
 | Example | Platform/vendor | Safety | Purpose |
 |---|---|---|---|
