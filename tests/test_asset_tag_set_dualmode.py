@@ -145,6 +145,35 @@ def test_asset_tag_set_patch_error_does_not_reread_target(
     assert state["get_count"] > 0
 
 
+def test_asset_tag_set_rejects_blank_target_without_requests(
+    redfish_mock_factory,
+):
+    """A blank target id fails before any Redfish collection read."""
+    manager, service = redfish_mock_factory("supermicro")
+
+    with pytest.raises(InvalidArgument, match="target_id is required"):
+        manager.sync_invoke(
+            _request_type(),
+            "asset-tag-set",
+            resource="chassis",
+            target_id="   ",
+            asset_tag="restored-tag",
+            confirm=True,
+        )
+
+    assert service.requests == []
+
+
+def test_asset_tag_set_parser_rejects_blank_target_id():
+    """The CLI parser rejects whitespace-only --target-id values."""
+    parser, name, _help = AssetTagSet.register_subcommand(AssetTagSet)
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--target-id", "   "])
+
+    assert name == "asset-tag-set"
+
+
 def test_asset_tag_set_allows_empty_restore_value(redfish_mock_factory):
     """An empty AssetTag is a valid restore value for vendors that start blank."""
     manager, service = redfish_mock_factory("supermicro")
