@@ -14,7 +14,11 @@ from .redfish_manager import CommandResult
 
 
 def _decode_path_for_validation(path: str) -> str:
-    """Decode path escapes enough to catch encoded traversal controls."""
+    """Decode path escapes enough to catch encoded traversal controls.
+
+    :param path: parsed Redfish resource path.
+    :return: decoded path used only for validation.
+    """
     decoded = path
     for _ in range(3):
         next_decoded = unquote(decoded)
