@@ -237,7 +237,7 @@ def test_dell_raid_patrol_read_missing_action_reports_available(
     assert "#DellRaidService.StopPatrolRead" not in result.data["available"]
     assert result.error == (
         "action '#DellRaidService.StopPatrolRead' not found on "
-        RAID_SERVICE
+        + RAID_SERVICE
     )
     assert _post_requests(requests) == []
 
