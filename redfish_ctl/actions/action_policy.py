@@ -80,6 +80,9 @@ ACTION_POLICY = {
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.DeleteAutoDiscoveryClientCerts": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.DeleteAutoDiscoveryServerPublicKey": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.DownloadClientCerts": Destructiveness.DESTRUCTIVE,
     "#UpdateService.SimpleUpdate": Destructiveness.DESTRUCTIVE,
     "#UpdateService.StartUpdate": Destructiveness.DESTRUCTIVE,
 
