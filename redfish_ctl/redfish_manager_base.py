@@ -1419,6 +1419,25 @@ class RedfishManagerBase(RedfishManager):
             ]
         return payload
 
+    @staticmethod
+    def _event_loop() -> asyncio.AbstractEventLoop:
+        """Return a usable event loop for a synchronous caller.
+
+        ``asyncio.get_event_loop()`` used to create a loop implicitly when none existed. Python 3.12
+        deprecated that and 3.14 removed it, so on 3.14 it raises RuntimeError and every async path in
+        this client dies before sending anything. Creating the loop explicitly when there is none keeps
+        one behaviour across 3.10 through 3.14.
+
+        :return: the running loop when one exists, otherwise a new loop installed for this thread.
+        :raises RuntimeError: never — the no-loop case is handled by creating one.
+        """
+        try:
+            return asyncio.get_event_loop_policy().get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+
     def base_request_respond(
             self,
             resource: str,
@@ -1486,9 +1505,16 @@ class RedfishManagerBase(RedfishManager):
                         ignore_error_code=ignore_error_code
                     )
             else:
-                loop = asyncio.get_event_loop()
+                loop = self._event_loop()
+                # The api_async_*_until_complete helpers return
+                # (Response, RedfishApiRespond) - the same order the sync branch
+                # above binds. Unpacking them the other way round bound the enum
+                # to `response` and the Response object to `api_resp`, so on the
+                # async path parse_json_respond_msg() received an enum and
+                # api_success_msg() did a dict lookup with a Response as the key,
+                # raising KeyError AFTER the write had already been sent.
                 if method == HTTPMethod.PATCH:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_patch_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1496,7 +1522,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.POST:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_post_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1504,7 +1530,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.DELETE:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_delete_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
