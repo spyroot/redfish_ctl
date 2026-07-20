@@ -5,14 +5,19 @@ in exactly one file. That gap let a reversed tuple unpack ship in three places: 
 ``api_async_*_until_complete`` helpers return ``(Response, RedfishApiRespond)`` — the same order the
 synchronous branch binds — but the async branch unpacked them as ``api_resp, response``.
 
-The consequence was not a clean failure. The write was sent to the BMC first, and only then did
-``parse_json_respond_msg()`` receive an enum and ``api_success_msg()`` do a dict lookup keyed by a
-``Response`` object, raising ``KeyError`` outside any ``try``. So the mutation landed on real hardware
-and the caller got a traceback instead of the result.
+The consequence was not a clean failure. The write was sent to the BMC first, and only then did the
+result handling touch the mis-bound values, so the mutation landed on real hardware and the caller got
+a traceback instead of the result.
+
+The pre-fix behaviour is measured, not assumed: with the three unpacks reverted, every test in this
+module fails on Python 3.10 through 3.14 with
+``AttributeError: 'RedfishApiRespond' object has no attribute 'status_code'`` — the enum reaching code
+that expects a Response. That is a behavioural failure, not an import, collection or fixture error,
+which is what makes it usable as regression evidence.
 
 These tests pin the unpack order for all three mutating verbs by stubbing the async helper: the stub
 returns the documented ``(Response, RedfishApiRespond)`` shape, and each test asserts the values
-arrive bound to the right names. Under the old code every one of them raises.
+arrive bound to the right names.
 
 Author Mus spyroot@gmail.com
 """
@@ -75,9 +80,9 @@ def test_async_unpack_binds_response_and_status_correctly(
 ):
     """Each async verb must bind (Response, RedfishApiRespond) in that order.
 
-    Reversed, ``api_success_msg`` is called with a Response as a dict key and raises KeyError after
-    the request has already been sent. Asserting a clean CommandResult plus a real enum is what
-    proves the binding, and it fails loudly under the old code.
+    Reversed, the enum reaches code expecting a Response and raises AttributeError on ``.status_code``
+    after the request has already been sent (verified pre-fix on 3.10-3.14). Asserting a clean
+    CommandResult plus a real enum is what proves the binding.
     """
     _stub_async(monkeypatch, redfish_mock, helper,
                 _FakeResponse(200, {"Id": "1"}), RedfishApiRespond.Ok)
@@ -139,3 +144,51 @@ def test_async_and_sync_agree_on_the_return_contract(redfish_mock, monkeypatch):
 
     assert isinstance(async_result, CommandResult)
     assert isinstance(async_status, RedfishApiRespond)
+
+
+@pytest.mark.parametrize("status", [400, 401, 500])
+def test_async_non_2xx_is_reported_not_swallowed(redfish_mock, monkeypatch, status):
+    """do_async=True AND a non-2xx response — the trigger INTERSECTION, not either half alone.
+
+    The reversed unpack was a defect of the combination. ``do_async=True`` with 2xx, or
+    ``do_async=False`` with non-2xx, exercises neither broken line. Only the intersection reaches
+    ``parse_json_respond_msg(response)`` and ``api_success_msg(api_resp)`` with an error status still
+    bound to the wrong name.
+
+    Asserts externally visible behaviour: the caller gets a CommandResult and a real enum rather than
+    a traceback, and the failing status survives instead of being flattened into success. Under the
+    reversed unpack this raises AttributeError on .status_code — after the request was already sent.
+    """
+    body = {"error": {"code": "Base.1.0.GeneralError", "message": "rejected"}}
+    _stub_async(monkeypatch, redfish_mock, "api_async_post_until_complete",
+                _FakeResponse(status, body), RedfishApiRespond.Error)
+
+    result, resp_status = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1/Actions/Anything",
+        HTTPMethod.POST, payload={}, do_async=True, expected_status=200,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(resp_status, RedfishApiRespond), (
+        "a failing async call must still return the enum; binding a Response here is the defect"
+    )
+    assert resp_status is RedfishApiRespond.Error, "the failure must survive, not read as success"
+
+
+def test_async_non_2xx_does_not_report_success(redfish_mock, monkeypatch):
+    """A rejected async PATCH must not come back looking like it worked.
+
+    The operationally relevant invariant: someone scripting against this cannot distinguish a 503
+    from success if the status is flattened. Asserts the failing enum is what propagates, so a caller
+    branching on it takes the error path.
+    """
+    _stub_async(monkeypatch, redfish_mock, "api_async_patch_until_complete",
+                _FakeResponse(503, {}), RedfishApiRespond.Error)
+
+    _result, resp_status = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1",
+        HTTPMethod.PATCH, payload={"AssetTag": "x"}, do_async=True, expected_status=200,
+    )
+
+    assert resp_status is not RedfishApiRespond.Ok
+    assert resp_status is RedfishApiRespond.Error
