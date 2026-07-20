@@ -6,7 +6,7 @@ spec:
   source:
     localPath: /Users/spyroot/dev/standards
     repository: https://gitlab.rnd.embedings.ai/spyroot/standards.git
-    revision: edc1120073be0dc5e54917462f48f9f1ea37b335
+    revision: 033518d3f5aeda30e1d1a315382e0cedf2ca84cb
   requiredContracts:
     - ci
     - unit-testing
