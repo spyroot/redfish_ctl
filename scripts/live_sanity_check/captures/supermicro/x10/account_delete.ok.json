@@ -1,0 +1,9 @@
+{
+    "data": {
+        "action": "delete",
+        "error": null,
+        "status": "IdracApiRespond.Ok",
+        "target": "test_sim"
+    },
+    "idrac-data-description": "# idrac respond data for the command:"
+}
