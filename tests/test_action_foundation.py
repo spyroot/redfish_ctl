@@ -20,14 +20,15 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#ComputerSystem.Reset") is Destructiveness.DESTRUCTIVE
     assert classify("#Drive.SecureErase") is Destructiveness.IRREVERSIBLE
     assert classify("#EventService.SubmitTestEvent") is Destructiveness.REVERSIBLE
-    hpe_reversible_actions = (
+    reversible_actions = (
+        "#DellLCService.TestNetworkShare",
         "#HpeDirectoryTest.StartTest",
         "#HpeDirectoryTest.StopTest",
         "#HpeiLOSnmpService.SendSNMPTestAlert",
         "#HpeiLOManagerNetworkService.SendTestAlertMail",
         "#HpeiLOManagerNetworkService.SendTestSyslog",
     )
-    for action in hpe_reversible_actions:
+    for action in reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
