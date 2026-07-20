@@ -85,6 +85,8 @@ ACTION_POLICY = {
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,
+    "#DellRaidService.ImportForeignConfig": Destructiveness.IRREVERSIBLE,
+    "#DellRaidService.UnLockSecureForeignConfig": Destructiveness.IRREVERSIBLE,
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
