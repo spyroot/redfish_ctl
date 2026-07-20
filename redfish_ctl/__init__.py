@@ -11,6 +11,7 @@ from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
+from .dell_lc.cmd_dell_lc_ism_installer import *
 #
 # compute
 from .compute.cmd_power_state import *
