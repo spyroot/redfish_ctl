@@ -4,7 +4,7 @@
 #   run.sh merge | integration | deploy
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
-profile="${1:?usage: run.sh <merge|integration|deploy>}"
+profile="${1:?usage: run.sh <merge|integration|deploy|repository-export>}"
 exec python3 - "$profile" <<'PY'
 import pathlib
 import subprocess

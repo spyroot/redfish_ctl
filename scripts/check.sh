@@ -2,7 +2,8 @@
 # check.sh — the single entry point for the gate registry (gates/manifest.yaml).
 #
 #   check.sh --list                 enumerate every registered gate (id, profile, mutates)
-#   check.sh --profile <name>       run all mandatory gates of a profile (merge|integration|deploy)
+#   check.sh --profile <name>       run all mandatory gates of a profile
+#                                   (merge|integration|deploy|repository-export)
 #
 # EXECUTION AUTHORITY = Kubernetes. Outside a cluster pod, check.sh REFUSES to run tests locally and
 # prints the exact in-cluster dispatch command instead — it never runs a gate on the operator's laptop.
@@ -51,19 +52,20 @@ case "${1:-}" in
     _list
     ;;
   --profile)
-    profile="${2:?usage: check.sh --profile <merge|integration|deploy>}"
+    profile="${2:?usage: check.sh --profile <merge|integration|deploy|repository-export>}"
     if _in_cluster; then
       exec ./scripts/gates/run.sh "$profile"
     fi
     ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
     echo "check.sh: REFUSING to run gates locally — Kubernetes is the execution authority." >&2
-    echo "  Dispatch in-cluster instead:  make k8s-ci REF=$ref" >&2
+    echo "  Dispatch in-cluster instead: push $ref and let the GitLab pipeline run it on the" >&2
+    echo "  homelab-k8s runner. There is no workstation dispatch path." >&2
     echo "  (or run inside a homelab-k8s runner/Job — a pod is detected from the kubelet's own" >&2
     echo "   evidence, not from an environment variable, so exporting one cannot bypass this)" >&2
     exit 3
     ;;
   *)
-    echo "usage: check.sh {--list | --profile <merge|integration|deploy>}" >&2
+    echo "usage: check.sh {--list | --profile <merge|integration|deploy|repository-export>}" >&2
     exit 2
     ;;
 esac

@@ -3,7 +3,9 @@
 # Enforced by tools/gate_meta.py (the meta-gate) + tests/gates/. Run a profile with scripts/gates/run.sh.
 #
 # Profiles: merge (MR/pre-merge, no cluster mutation) | integration (needs cluster, no BMC mutation)
-#           | deploy (live apply, protected pipeline only). Runner tag: every CI job carries homelab-k8s.
+#           | deploy (live apply, protected pipeline only)
+#           | repository-export (public boundary: internal -> GitLab.com/GitHub).
+# Runner tag: every CI job carries homelab-k8s.
 version: 1
 runner_tag: homelab-k8s
 
@@ -24,6 +26,9 @@ mandatory_ids:
   - repo.schemas
   - repo.no-agent-names
   - repo.no-agent-files
+  - scm.exact-commit
+  - repo.no-agent-artifacts
+  - repo.large-artifact-policy
   - toolbox.consumer-smoke
   - unit.all
   - kubernetes.render
@@ -43,6 +48,11 @@ mandatory_ids:
   - evidence.sanitized
 
 gates:
+  # --- repository-export: the public boundary. Every gate here inspects the EXACT commit
+  #     being pushed, because an export ships history, not a snapshot. ---
+  - {id: scm.exact-commit,          profile: repository-export, command: scripts/gates/scm/exact-commit.sh,                 required: true, mutates: false}
+  - {id: repo.no-agent-artifacts,   profile: repository-export, command: scripts/gates/repository/no-agent-artifacts.sh,    required: true, mutates: false}
+  - {id: repo.large-artifact-policy,profile: repository-export, command: scripts/gates/repository/large-artifact-policy.sh, required: true, mutates: false}
   # --- toolbox: the shared image can still run this project ---
   - {id: toolbox.consumer-smoke, profile: merge, command: scripts/gates/toolbox/consumer-smoke.sh, required: true, mutates: false}
   # --- meta: validate the registry + pipeline themselves ---
