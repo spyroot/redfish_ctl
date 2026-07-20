@@ -1514,7 +1514,7 @@ class RedfishManagerBase(RedfishManager):
                 # api_success_msg() did a dict lookup with a Response as the key,
                 # raising KeyError AFTER the write had already been sent.
                 if method == HTTPMethod.PATCH:
-                    response, api_resp = loop.run_until_complete(
+                    api_resp, response = loop.run_until_complete(
                         self.api_async_patch_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1522,7 +1522,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.POST:
-                    response, api_resp = loop.run_until_complete(
+                    api_resp, response = loop.run_until_complete(
                         self.api_async_post_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1530,7 +1530,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.DELETE:
-                    response, api_resp = loop.run_until_complete(
+                    api_resp, response = loop.run_until_complete(
                         self.api_async_delete_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,

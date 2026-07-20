@@ -139,3 +139,51 @@ def test_async_and_sync_agree_on_the_return_contract(redfish_mock, monkeypatch):
 
     assert isinstance(async_result, CommandResult)
     assert isinstance(async_status, RedfishApiRespond)
+
+
+@pytest.mark.parametrize("status", [400, 401, 500])
+def test_async_non_2xx_is_reported_not_swallowed(redfish_mock, monkeypatch, status):
+    """do_async=True AND a non-2xx response — the trigger INTERSECTION, not either half alone.
+
+    The reversed unpack was a defect of the combination. ``do_async=True`` with 2xx, or
+    ``do_async=False`` with non-2xx, exercises neither broken line. Only the intersection reaches
+    ``parse_json_respond_msg(response)`` and ``api_success_msg(api_resp)`` with an error status still
+    bound to the wrong name.
+
+    Asserts externally visible behaviour: the caller gets a CommandResult and a real enum rather than
+    a traceback, and the failing status survives instead of being flattened into success. Under the
+    reversed unpack this raises KeyError inside api_success_msg — after the request was already sent.
+    """
+    body = {"error": {"code": "Base.1.0.GeneralError", "message": "rejected"}}
+    _stub_async(monkeypatch, redfish_mock, "api_async_post_until_complete",
+                _FakeResponse(status, body), RedfishApiRespond.Error)
+
+    result, resp_status = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1/Actions/Anything",
+        HTTPMethod.POST, payload={}, do_async=True, expected_status=200,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(resp_status, RedfishApiRespond), (
+        "a failing async call must still return the enum; binding a Response here is the defect"
+    )
+    assert resp_status is RedfishApiRespond.Error, "the failure must survive, not read as success"
+
+
+def test_async_non_2xx_does_not_report_success(redfish_mock, monkeypatch):
+    """A rejected async PATCH must not come back looking like it worked.
+
+    The operationally relevant invariant: someone scripting against this cannot distinguish a 503
+    from success if the status is flattened. Asserts the failing enum is what propagates, so a caller
+    branching on it takes the error path.
+    """
+    _stub_async(monkeypatch, redfish_mock, "api_async_patch_until_complete",
+                _FakeResponse(503, {}), RedfishApiRespond.Error)
+
+    _result, resp_status = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1",
+        HTTPMethod.PATCH, payload={"AssetTag": "x"}, do_async=True, expected_status=200,
+    )
+
+    assert resp_status is not RedfishApiRespond.Ok
+    assert resp_status is RedfishApiRespond.Error
