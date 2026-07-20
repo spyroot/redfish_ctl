@@ -119,6 +119,7 @@ Safety labels:
 | `current_boot` | Read current boot source details. | Read |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
+| `drive-secure-erase` | Preview or run `Drive.SecureErase`; requires `--confirm --i-understand-irreversible` before POSTing. | Guarded |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
 | `ethernet-interfaces` | Read host and manager EthernetInterfaces. | Read |

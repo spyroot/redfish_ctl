@@ -27,6 +27,7 @@ class ApiRequestType(Enum):
     ConvertToRaid = auto()
     ConvertNoneRaid = auto()
     Drives = auto()
+    DriveSecureErase = auto()
     VolumeInit = auto()
     VolumeQuery = auto()
     VolumeCreate = auto()

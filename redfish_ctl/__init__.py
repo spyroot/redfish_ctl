@@ -76,6 +76,7 @@ from .storage.cmd_storage_controllers import *
 from .storage.cmd_storage_list import *
 from .storage.cmd_storage_get import *
 from .storage.cmd_drives import *
+from .storage.cmd_drive_secure_erase import *
 from .storage.cmd_convert_none_raid import *
 from .storage.cmd_convert_to_raid import *
 
