@@ -2,7 +2,8 @@
 # one disposable pod per CI job, tagged homelab-k8s. No privileged mode, no Docker socket, no hostPath.
 #   helm repo add gitlab https://charts.gitlab.io
 #   helm install gitlab-runner gitlab/gitlab-runner -n rfctl-runners -f platform/gitlab-runner/values.yaml
-# The runner registration token is a k8s Secret (see .internal/SECRET_REGISTRY.md / docs/secrets.md);
+# The runner registration token is a k8s Secret (creation: docs/secrets.md; the credential index is
+# builder's shared inventory, scripts/shared_inventory_map.sh --validate);
 # never inline it here.
 gitlabUrl: "<your-gitlab-url>"           # operator-set
 runnerRegistrationToken: ""              # supplied via an existing Secret, not inline

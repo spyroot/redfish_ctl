@@ -24,6 +24,7 @@ mandatory_ids:
   - repo.schemas
   - repo.no-agent-names
   - repo.no-agent-files
+  - toolbox.consumer-smoke
   - unit.all
   - kubernetes.render
   - kubernetes.schema
@@ -42,6 +43,8 @@ mandatory_ids:
   - evidence.sanitized
 
 gates:
+  # --- toolbox: the shared image can still run this project ---
+  - {id: toolbox.consumer-smoke, profile: merge, command: scripts/gates/toolbox/consumer-smoke.sh, required: true, mutates: false}
   # --- meta: validate the registry + pipeline themselves ---
   - {id: meta.gate-registry,   profile: merge, command: scripts/gates/meta/gate-registry.sh,   required: true, mutates: false}
   - {id: meta.ci-runner-tags,  profile: merge, command: scripts/gates/meta/ci-runner-tags.sh,  required: true, mutates: false}

@@ -2,7 +2,7 @@
 # (the execution authority). Disposable, own ServiceAccount (home-lab-agent), no privilege, no Docker
 # socket, no hostPath, read-only root fs, resource limits, execution timeout, no automatic
 # production-secret access. Substitute __JOB_NAME__ / __REF__ / __TASK__ and apply into rfctl-ci.
-# Repo write happens over the git SSH key mounted from a k8s Secret (see .internal/SECRET_REGISTRY.md)
+# Repo write happens over the git SSH key mounted from a k8s Secret (creation: docs/secrets.md)
 # — never inline a credential here.
 apiVersion: batch/v1
 kind: Job

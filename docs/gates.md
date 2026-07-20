@@ -62,7 +62,7 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 
 merge/integration gates run under a **read-only** CI ServiceAccount with no production credentials.
 Live apply (deploy profile) runs under a **separate, explicitly selected** apply ServiceAccount, only
-from a protected pipeline. See `.internal/SECRET_REGISTRY.md` for credential homes and `k8s/base/` for
+from a protected pipeline. See `docs/secrets.md` for value-free credential creation and `k8s/base/` for
 the ServiceAccount definitions.
 
 ## Failure behavior
