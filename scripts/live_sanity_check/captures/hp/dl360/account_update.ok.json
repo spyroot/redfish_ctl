@@ -1,0 +1,9 @@
+{
+    "data": {
+        "action": "update",
+        "error": null,
+        "status": "IdracApiRespond.Ok",
+        "target": "backup_admin"
+    },
+    "idrac-data-description": "# idrac respond data for the command:"
+}

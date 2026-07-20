@@ -1,0 +1,10 @@
+{
+    "data": {
+        "action": "create",
+        "error": null,
+        "role": "Administrator",
+        "status": "IdracApiRespond.AcceptedTaskGenerated",
+        "username": "backup_admin"
+    },
+    "idrac-data-description": "# idrac respond data for the command:"
+}

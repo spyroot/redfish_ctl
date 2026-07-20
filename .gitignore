@@ -214,7 +214,4 @@ tests/popen_test.py
 tests/supermicro_gb300_corpus/json_responses/orig/
 bios_firmware/
 
-# live-sanity-check raw capture traces — local until sanitized (see RF-CORPUS pipeline)
-scripts/live_sanity_check/captures/**
-!scripts/live_sanity_check/captures/.gitkeep
 

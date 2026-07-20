@@ -1,0 +1,10 @@
+{
+    "data": {
+        "action": "create",
+        "error": null,
+        "role": "ReadOnly",
+        "status": "IdracApiRespond.AcceptedTaskGenerated",
+        "username": "test"
+    },
+    "idrac-data-description": "# idrac respond data for the command:"
+}

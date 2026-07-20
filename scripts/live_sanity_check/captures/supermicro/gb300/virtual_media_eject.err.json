@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/Users/spyroot/miniconda3/envs/idrac_ctl/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/Users/spyroot/miniconda3/envs/idrac_ctl/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "<repo>/redfish_ctl/__main__.py", line 3, in <module>
+    redfish_main_ctl()
+  File "<repo>/redfish_ctl/redfish_main.py", line 676, in redfish_main_ctl
+    main(args, cmd_dict)
+  File "<repo>/redfish_ctl/redfish_main.py", line 412, in main
+    command_result = redfish_api.sync_invoke(
+  File "<repo>/redfish_ctl/idrac_manager.py", line 444, in sync_invoke
+    result = self.invoke(api_call, name, **kwargs)
+  File "<repo>/redfish_ctl/idrac_manager.py", line 294, in invoke
+    return inst.execute(**kwargs)
+  File "<repo>/redfish_ctl/virtual_media/cmd_virtual_media_eject.py", line 86, in execute
+    inserted = {
+  File "<repo>/redfish_ctl/virtual_media/cmd_virtual_media_eject.py", line 87, in <dictcomp>
+    'image': m['Image'] for m
+KeyError: 'Image'
