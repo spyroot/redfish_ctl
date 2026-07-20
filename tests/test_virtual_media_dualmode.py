@@ -408,3 +408,49 @@ def test_virtual_media_eject_treats_missing_image_on_empty_slot_as_ejected(
     assert isinstance(result, CommandResult)
     assert result.data == {"Status": RedfishApiRespond.Ok}
     assert redfish_service.last_request.method == "GET"
+
+
+def test_virtual_media_eject_treats_missing_image_key_as_already_ejected(
+    redfish_mock, redfish_service
+):
+    """An empty slot on a real BMC omits the Image key entirely — eject must no-op.
+
+    A GB300 VirtualMedia member can report ``Inserted=False`` with **no** ``Image``
+    key at all. An earlier eject read ``m['Image']`` directly on the collection
+    member and raised ``KeyError: 'Image'`` before any POST; that crash is the
+    committed trace at
+    ``scripts/live_sanity_check/captures/supermicro/gb300/virtual_media_eject.err.json``.
+
+    The current implementation decides already-ejected from ``Inserted`` alone and
+    never touches ``Image``, so this is the regression guard: it fails the moment
+    anyone reintroduces an unguarded ``Image`` read on a collection member.
+
+    The eject flow reads members from the *collection* (``virtual_disk_query`` with
+    no device_id), so the empty slot is injected on the collection member — not a
+    per-member overlay, which the flow never fetches.
+    """
+    collection_path = "/redfish/v1/Systems/System.Embedded.1/VirtualMedia"
+    collection = dict(redfish_service._state(collection_path))
+    members = [dict(member) for member in collection["Members"]]
+    for member in members:
+        if member.get("Id") == "1":
+            member["Inserted"] = False
+            member.pop("Image", None)  # empty slot: no 'Image' key at all
+            member.pop("ImageName", None)
+    collection["Members"] = members
+    for key in (collection_path, collection_path.lower()):
+        redfish_service._overlay[key] = collection
+
+    # Guard the reproduction: the member under test truly has no Image key.
+    assert "Image" not in members[0]
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.VirtualMediaEject,
+        "virtual_disk_eject",
+        device_id="1",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data == {"Status": RedfishApiRespond.Ok}
+    # No eject POST was issued — the last call is the collection GET.
+    assert redfish_service.last_request.method == "GET"
