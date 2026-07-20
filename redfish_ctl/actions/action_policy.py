@@ -82,6 +82,9 @@ ACTION_POLICY = {
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
     "#UpdateService.SimpleUpdate": Destructiveness.DESTRUCTIVE,
     "#UpdateService.StartUpdate": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.DeleteGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.JoinGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.RemoveSelf": Destructiveness.DESTRUCTIVE,
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,

@@ -32,6 +32,13 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
+    card_group_actions = (
+        "#DelliDRACCardService.DeleteGroup",
+        "#DelliDRACCardService.JoinGroup",
+        "#DelliDRACCardService.RemoveSelf",
+    )
+    for action in card_group_actions:
+        assert classify(action) is Destructiveness.DESTRUCTIVE
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE
