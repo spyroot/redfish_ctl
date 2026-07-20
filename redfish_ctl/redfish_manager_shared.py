@@ -38,6 +38,7 @@ class ApiRequestType(Enum):
     DellOemTask = auto()
     DellLcQuery = auto()
     DellOemDisconnect = auto()
+    DellLcClearProvisioningServer = auto()
 
     RemoteServicesRssAPIStatus = auto()
     RemoteServicesAPIStatus = auto()

@@ -69,6 +69,7 @@ ACTION_POLICY = {
     "#Control.ResetToDefaults": Destructiveness.DESTRUCTIVE,
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ClearProvisioningServer": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
