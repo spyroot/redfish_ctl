@@ -47,6 +47,12 @@ def live_roundtrip(manager, resource: str, attr: str, new_value: Any,
     mutated. The final read-back must equal the captured pre-value, which is
     the property the gate exists to prove.
 
+    Restore is attempted whenever a PATCH has been dispatched, not only when it
+    returned cleanly. A networked PATCH can reach the BMC and be applied, then
+    raise while the client reads the response (timeout, reset); writing the
+    captured value back is idempotent if the write never landed and essential
+    if it did, so the safe posture is to always restore once dispatched.
+
     :param manager: RedfishManagerBase-derived instance issuing GET/PATCH.
     :param resource: Redfish resource path holding the attribute.
     :param attr: top-level attribute name to mutate.
@@ -57,16 +63,16 @@ def live_roundtrip(manager, resource: str, attr: str, new_value: Any,
         yields no JSON body.
     """
     pre_value = _read_attr(manager, resource, attr)
-    mutated = False
+    dispatched = False
     try:
+        dispatched = True
         manager.base_patch(resource, payload={attr: new_value}, **patch_kwargs)
-        mutated = True
         got = _read_attr(manager, resource, attr)
         if got != new_value:
             raise RoundTripError(
                 f"{resource}.{attr}: wrote {new_value!r}, read back {got!r}")
     finally:
-        if mutated:
+        if dispatched:
             manager.base_patch(resource, payload={attr: pre_value},
                                **patch_kwargs)
             back = _read_attr(manager, resource, attr)

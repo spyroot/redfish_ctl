@@ -20,7 +20,6 @@ import pathlib
 import sys
 
 MUTATING_CALLS = {"base_patch", "base_post", "base_delete", "invoke_action"}
-HELPER_MODULE = "live_utils.py"
 
 
 def find_violations(path: pathlib.Path) -> list[tuple[int, str]]:
@@ -53,9 +52,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     bad = 0
+    # The helper module needs no filename exemption: find_violations already
+    # skips any file without a pytest.mark.live marker, and live_utils.py has
+    # none. A name-based skip would instead let a live test named live_utils.py
+    # evade the scan, so it is deliberately absent.
     for path in sorted(pathlib.Path(args.tests_dir).rglob("*.py")):
-        if path.name == HELPER_MODULE:
-            continue
         for line, name in find_violations(path):
             print(f"{path}:{line}: live test calls {name}() directly — "
                   f"use tests/live_utils.live_roundtrip")

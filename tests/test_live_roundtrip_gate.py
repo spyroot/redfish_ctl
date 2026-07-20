@@ -86,17 +86,22 @@ def test_roundtrip_restore_mismatch_is_loud():
         live_roundtrip(bmc, "/redfish/v1/Systems/1", "AssetTag", "probe")
 
 
-def test_roundtrip_failed_first_patch_does_not_attempt_restore():
-    """A PATCH that raises before mutating must not trigger a restore PATCH —
-    restoring unwritten state would itself be a blind mutation."""
-    class _RefusingBmc(_FakeBmc):
+def test_roundtrip_restores_when_first_patch_lands_then_raises():
+    """The safety-critical case: a PATCH reaches the BMC and is applied, then
+    raises on the response read (timeout/reset). Restore MUST still run, or the
+    BMC is left modified. The original error propagates; the value is back."""
+    class _ApplyThenRaiseBmc(_FakeBmc):
         def base_patch(self, resource, payload=None, **kwargs):
-            raise RuntimeError("PATCH refused")
+            self.patches.append(dict(payload or {}))
+            self.data.update(payload or {})       # BMC applied the change...
+            if len(self.patches) == 1:
+                raise RuntimeError("timeout reading response after apply")
 
-    bmc = _RefusingBmc({"AssetTag": "orig"})
-    with pytest.raises(RuntimeError, match="refused"):
+    bmc = _ApplyThenRaiseBmc({"AssetTag": "orig"})
+    with pytest.raises(RuntimeError, match="timeout"):
         live_roundtrip(bmc, "/redfish/v1/Systems/1", "AssetTag", "probe")
-    assert bmc.patches == []
+    assert len(bmc.patches) == 2, "restore must run after a land-then-raise PATCH"
+    assert bmc.data["AssetTag"] == "orig", "BMC must be restored"
 
 
 def test_roundtrip_no_body_raises():
@@ -169,6 +174,18 @@ def test_gate_accepts_helper_usage(tmp_path):
             live_roundtrip(mgr, "/redfish/v1/Systems/1", "AssetTag", "probe")
         """)
     assert find_violations(p) == []
+
+
+def test_gate_scans_a_live_file_named_live_utils(tmp_path):
+    """A live test named live_utils.py must still be scanned — the helper is
+    exempt because it carries no live marker, not because of its name."""
+    p = _write(tmp_path, "live_utils.py", """
+        import pytest
+        pytestmark = pytest.mark.live
+        def test_sneaky(mgr):
+            mgr.base_patch("/redfish/v1/Systems/1", payload={"A": 1})
+        """)
+    assert [name for _, name in find_violations(p)] == ["base_patch"]
 
 
 def test_gate_main_exit_codes(tmp_path):
