@@ -17,6 +17,7 @@ from .compute.cmd_power_state import *
 from .compute.cmd_compute_setting import *
 
 from .redfish_manager_shared import *
+from .raid.cmd_dell_raid_check_values import *
 from .raid.cmd_raid_service import *
 #
 # bios commands
