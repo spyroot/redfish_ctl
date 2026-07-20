@@ -61,6 +61,9 @@ ACTION_POLICY = {
     "#NvidiaWorkloadPower.DisableProfiles": Destructiveness.REVERSIBLE,
     "#NvidiaDebugToken.GenerateToken": Destructiveness.REVERSIBLE,
     "#NvidiaDebugToken.DisableToken": Destructiveness.REVERSIBLE,
+    (
+        "#DellSwitchConnectionService.ServerPortConnectionRefresh"
+    ): Destructiveness.REVERSIBLE,
 
     # destructive: service disruption / config rewrite — dry-run unless --confirm
     "#ComputerSystem.Reset": Destructiveness.DESTRUCTIVE,

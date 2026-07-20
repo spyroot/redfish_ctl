@@ -120,6 +120,7 @@ Safety labels:
 | `current_boot` | Read current boot source details. | Read |
 | `dell-lc-network-share-test` | Test Dell Lifecycle Controller network-share reachability; previews unless `--confirm` is given. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
+| `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
