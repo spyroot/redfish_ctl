@@ -88,6 +88,7 @@ ACTION_POLICY = {
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.InitializeMedia": Destructiveness.IRREVERSIBLE,
 }
 
 # An unclassified action is treated as DESTRUCTIVE: it can never POST without an
