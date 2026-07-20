@@ -90,6 +90,7 @@ class ApiRequestType(Enum):
     EnableBootOptions = auto()
     Sensors = auto()
     ControlsQuery = auto()
+    ControlResetDefaults = auto()
     Thermal = auto()
     Power = auto()
     PowerSmoothing = auto()

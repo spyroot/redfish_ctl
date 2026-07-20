@@ -86,6 +86,7 @@ from .chassis.cmd_asset_tag_set import *
 from .chassis.cmd_identify_led import *
 from .sensors.cmd_sensors import *
 from .controls.cmd_controls import *
+from .controls.cmd_control_reset_defaults import *
 from .thermal.cmd_thermal import *
 from .power.cmd_power import *
 from .power.cmd_power_smoothing import *

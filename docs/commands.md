@@ -114,6 +114,7 @@ Safety labels:
 | `chassis-reset` | Change chassis power state. | Write |
 | `component-integrity` | Read ComponentIntegrity/SPDM attestation resources. | Read |
 | `controls` | Read Chassis Controls collections, setpoints, ranges, and current readings from `redfish_ctl/controls/cmd_controls.py`. | Read |
+| `control-reset-defaults` | Reset a Redfish Control resource through discovered `#Control.ResetToDefaults`; lists reset-capable controls by default, requires `--confirm` to write. | Guarded |
 | `compute-query` | Read ComputerSystem settings. | Read |
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
 | `current_boot` | Read current boot source details. | Read |
