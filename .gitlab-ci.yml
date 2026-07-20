@@ -1,0 +1,115 @@
+# GitLab pipeline for the homelab platform. Every job runs on the self-managed `homelab-k8s` runner
+# (Kubernetes executor: one disposable pod per job — the execution authority). Gates are driven from
+# gates/manifest.yaml via scripts/gates/run.sh <profile>. The meta-gate (tools/gate_meta.py) enforces
+# that the required jobs exist, none uses allow_failure, every job carries the homelab-k8s tag, and no
+# live-apply job is reachable from a merge-request pipeline.
+#
+# Four pipeline shapes:
+#   merge-request  -> gate-merge (static + unit + render; NO cluster mutation, NO production creds)
+#   default-branch -> gate-merge + gate-integration
+#   scheduled      -> gate-integration (cluster smoke)
+#   manual protected deploy -> deploy-apply (protected branch only, manual, serialized)
+#   protected default branch -> publish-github (GATED outbound mirror: agent files/names/secrets
+#                               must pass the boundary gates before anything reaches public GitHub)
+stages: [validate, integration, deploy, publish]
+
+# The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
+# git-lfs, gate tools); this project supplies its dependencies via environment.yml.
+# Registry and tag come from builder inventory/images/shared-images.yaml.
+default:
+  image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
+  tags: [homelab-k8s]
+  before_script:
+    # Corpora are Git LFS; without this the suite runs against pointer files.
+    - git lfs install --local && git lfs pull --include='tests/*_corpus.tar.gz'
+    # Bootstrap the project environment from its own declaration. conda env
+    # create IS the dependency test: an unresolvable or malformed environment.yml
+    # fails here, before any gate runs.
+    - conda env create -q -f environment.yml || conda env update -q -f environment.yml --prune
+    - eval "$(conda shell.bash hook)" && conda activate redfish_ctl
+
+variables:
+  # Gates resolve pytest/ruff through the project environment, never a
+  # pre-installed toolchain in the image.
+  CONDA_ENV: redfish_ctl
+
+gate-merge:
+  stage: validate
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - ./scripts/check.sh --list
+    - ./scripts/gates/run.sh merge
+
+gate-integration:
+  stage: integration
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - ./scripts/gates/run.sh integration
+
+# Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
+# never from a workstation. The runner pod already carries a ServiceAccount, so
+# no kubeconfig or context is involved.
+#
+# Cluster-down is an expected state, not a failure of this project: the job
+# reports UNAVAILABLE and succeeds, so an outage cannot red a pipeline that has
+# nothing to do with the cluster. A cluster that IS up but answers wrongly does
+# fail, because that is a real defect.
+k8s-live-check:
+  stage: integration
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  before_script: []          # no project env needed; this probes the cluster only
+  script:
+    - |
+      if ! kubectl version --request-timeout=10s >/dev/null 2>&1; then
+        echo "k8s-live-check: UNAVAILABLE (API unreachable from the runner pod)"
+        echo "  This is reported, not failed: cluster availability is not this project's gate."
+        exit 0
+      fi
+      echo "k8s-live-check: cluster reachable"
+      kubectl get nodes -o wide
+      kubectl get crd 2>/dev/null | grep -i redfish || echo "(no redfish CRDs registered)"
+
+# Live apply: protected branch ONLY, manual, serialized (resource_group), never from a merge request.
+deploy-apply:
+  stage: deploy
+  tags: [homelab-k8s]
+  environment:
+    name: production
+  resource_group: homelab-apply
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+  variables:
+    MUTATION_LOCK: "$CI_JOB_ID"
+  script:
+    - ./scripts/gates/run.sh deploy
+
+# Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
+# Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
+# branch only — never a merge request (an MR must never push to the public mirror).
+publish-github:
+  stage: publish
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+  before_script: []          # boundary gates need no project environment
+  script:
+    # Run the PROFILE, not a hand-listed set of scripts. A hand-listed set silently stops covering
+    # the boundary the moment a gate is added to the registry — which is exactly how the exact-commit,
+    # agent-artifact and large-artifact checks came to be missing here.
+    - ./scripts/gates/run.sh repository-export
+    # The shared contract's export chain also requires a secret scan and sanitized evidence. Both are
+    # registered under `merge` because they run there too, and the schema allows a gate exactly one
+    # profile, so they are named explicitly rather than duplicated under a second id.
+    - ./scripts/gates/repository/no-secrets.sh
+    - ./scripts/gates/evidence/sanitized.sh
+    - ./scripts/publish_github.sh

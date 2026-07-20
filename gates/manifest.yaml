@@ -1,0 +1,91 @@
+# Gate registry — the ONE canonical source of every mandatory gate (validated by schemas/gates.schema.json).
+# Each gate: id, profile (when it runs), command (executable), required, mutates (does it change a target).
+# Enforced by tools/gate_meta.py (the meta-gate) + tests/gates/. Run a profile with scripts/gates/run.sh.
+#
+# Profiles: merge (MR/pre-merge, no cluster mutation) | integration (needs cluster, no BMC mutation)
+#           | deploy (live apply, protected pipeline only)
+#           | repository-export (public boundary: internal -> GitLab.com/GitHub).
+# Runner tag: every CI job carries homelab-k8s.
+version: 1
+runner_tag: homelab-k8s
+
+# GitLab jobs that MUST exist and MUST NOT use allow_failure (meta.required-jobs checks these when
+# .gitlab-ci.yml is present).
+required_jobs:
+  - gate-merge
+  - gate-integration
+
+mandatory_ids:
+  - meta.gate-registry
+  - meta.ci-runner-tags
+  - meta.required-jobs
+  - repo.no-secrets
+  - repo.shellcheck
+  - repo.format
+  - repo.yaml
+  - repo.schemas
+  - repo.no-agent-names
+  - repo.no-agent-files
+  - scm.exact-commit
+  - repo.no-agent-artifacts
+  - repo.large-artifact-policy
+  - toolbox.consumer-smoke
+  - unit.all
+  - kubernetes.render
+  - kubernetes.schema
+  - kubernetes.policy
+  - integration.namespace
+  - gitlab.project-token.exists
+  - gitlab.project-token.project-bound
+  - gitlab.project-token.api-access
+  - gitlab.project-token.no-cross-project-access
+  - mutation.plan-required
+  - mutation.protected-apply
+  - mutation.same-commit
+  - mutation.serialized
+  - mutation.verify-required
+  - mutation.rollback-required
+  - evidence.sanitized
+
+gates:
+  # --- repository-export: the public boundary. Every gate here inspects the EXACT commit
+  #     being pushed, because an export ships history, not a snapshot. ---
+  - {id: scm.exact-commit,          profile: repository-export, command: scripts/gates/scm/exact-commit.sh,                 required: true, mutates: false}
+  - {id: repo.no-agent-artifacts,   profile: repository-export, command: scripts/gates/repository/no-agent-artifacts.sh,    required: true, mutates: false}
+  - {id: repo.large-artifact-policy,profile: repository-export, command: scripts/gates/repository/large-artifact-policy.sh, required: true, mutates: false}
+  # --- toolbox: the shared image can still run this project ---
+  - {id: toolbox.consumer-smoke, profile: merge, command: scripts/gates/toolbox/consumer-smoke.sh, required: true, mutates: false}
+  # --- meta: validate the registry + pipeline themselves ---
+  - {id: meta.gate-registry,   profile: merge, command: scripts/gates/meta/gate-registry.sh,   required: true, mutates: false}
+  - {id: meta.ci-runner-tags,  profile: merge, command: scripts/gates/meta/ci-runner-tags.sh,  required: true, mutates: false}
+  - {id: meta.required-jobs,   profile: merge, command: scripts/gates/meta/required-jobs.sh,   required: true, mutates: false}
+  # --- repository: static repo hygiene ---
+  - {id: repo.no-secrets,      profile: merge, command: scripts/gates/repository/no-secrets.sh, required: true, mutates: false}
+  - {id: repo.shellcheck,      profile: merge, command: scripts/gates/repository/shellcheck.sh,  required: true, mutates: false}
+  - {id: repo.format,          profile: merge, command: scripts/gates/repository/format.sh,      required: true, mutates: false}
+  - {id: repo.yaml,            profile: merge, command: scripts/gates/repository/yaml.sh,         required: true, mutates: false}
+  - {id: repo.schemas,         profile: merge, command: scripts/gates/repository/schemas.sh,      required: true, mutates: false}
+  - {id: repo.no-agent-names,  profile: merge, command: scripts/gates/repository/no-agent-names.sh, required: true, mutates: false}
+  - {id: repo.no-agent-files,  profile: merge, command: scripts/gates/repository/no-agent-files.sh, required: true, mutates: false}
+  # --- unit: the offline suite ---
+  - {id: unit.all,             profile: merge, command: scripts/gates/unit/all.sh,               required: true, mutates: false}
+  # --- kubernetes: render + validate manifests ---
+  - {id: kubernetes.render,    profile: merge, command: scripts/gates/kubernetes/render.sh,      required: true, mutates: false}
+  - {id: kubernetes.schema,    profile: merge, command: scripts/gates/kubernetes/schema.sh,      required: true, mutates: false}
+  - {id: kubernetes.policy,    profile: merge, command: scripts/gates/kubernetes/policy.sh,      required: true, mutates: false}
+  # --- integration: needs the cluster, no BMC mutation ---
+  - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
+  # --- gitlab.project-token: the CI token is least-privilege and usable (shared, needs live GitLab) ---
+  - {id: gitlab.project-token.exists,                profile: integration, command: scripts/gates/gitlab/project-token-exists.sh,                required: true, mutates: false}
+  - {id: gitlab.project-token.project-bound,         profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh,         required: true, mutates: false}
+  - {id: gitlab.project-token.api-access,            profile: integration, command: scripts/gates/gitlab/project-token-api-access.sh,            required: true, mutates: false}
+  - {id: gitlab.project-token.no-cross-project-access, profile: integration, command: scripts/gates/gitlab/project-token-no-cross-project-access.sh, required: true, mutates: false}
+  # --- mutation protection: govern live applies (deploy profile) ---
+  - {id: mutation.plan-required,     profile: deploy, command: scripts/gates/mutation/plan-required.sh,     required: true, mutates: false}
+  - {id: mutation.protected-apply,   profile: deploy, command: scripts/gates/mutation/protected-apply.sh,   required: true, mutates: true}
+  - {id: mutation.same-commit,       profile: deploy, command: scripts/gates/mutation/same-commit.sh,       required: true, mutates: false}
+  - {id: mutation.serialized,        profile: deploy, command: scripts/gates/mutation/serialized.sh,        required: true, mutates: false}
+  - {id: mutation.verify-required,   profile: deploy, command: scripts/gates/mutation/verify-required.sh,   required: true, mutates: false}
+  - {id: mutation.rollback-required, profile: deploy, command: scripts/gates/mutation/rollback-required.sh, required: true, mutates: false}
+  # --- evidence: the artifact is sanitized (no secrets) ---
+  - {id: evidence.sanitized,   profile: merge, command: scripts/gates/evidence/sanitized.sh,     required: true, mutates: false}

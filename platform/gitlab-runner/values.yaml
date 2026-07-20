@@ -1,0 +1,45 @@
+# Helm values for a RESTRICTED self-managed GitLab Runner (gitlab-runner chart), Kubernetes executor:
+# one disposable pod per CI job, tagged homelab-k8s. No privileged mode, no Docker socket, no hostPath.
+#   helm repo add gitlab https://charts.gitlab.io
+#   helm install gitlab-runner gitlab/gitlab-runner -n rfctl-runners -f platform/gitlab-runner/values.yaml
+# The runner registration token is a k8s Secret (creation: docs/secrets.md; the credential index is
+# builder's shared inventory, scripts/shared_inventory_map.sh --validate);
+# never inline it here.
+gitlabUrl: "<your-gitlab-url>"           # operator-set
+runnerRegistrationToken: ""              # supplied via an existing Secret, not inline
+runners:
+  # Every job this runner picks up is tagged homelab-k8s (the meta-gate requires the tag).
+  tags: "homelab-k8s"
+  runUntagged: false
+  locked: true
+  config: |
+    [[runners]]
+      [runners.kubernetes]
+        namespace = "rfctl-runners"
+        image = "harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest"
+        privileged = false
+        service_account = "home-lab-ci"
+        cpu_request = "500m"
+        cpu_limit = "2"
+        memory_request = "512Mi"
+        memory_limit = "2Gi"
+        poll_timeout = 600
+        [runners.kubernetes.pod_security_context]
+          run_as_non_root = true
+        # No host paths, no docker socket, no privilege escalation.
+        allow_privilege_escalation = false
+
+# Chart-level hardening.
+rbac:
+  create: true
+  clusterWideAccess: false               # namespaced only — never cluster-admin
+serviceAccount:
+  create: false
+  name: home-lab-ci
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 500m, memory: 256Mi}
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true

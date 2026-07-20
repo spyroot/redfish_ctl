@@ -1,0 +1,57 @@
+# RESTRICTED Kubernetes Job template for running a repository-editing automation agent in the cluster
+# (the execution authority). Disposable, own ServiceAccount (home-lab-agent), no privilege, no Docker
+# socket, no hostPath, read-only root fs, resource limits, execution timeout, no automatic
+# production-secret access. Substitute __JOB_NAME__ / __REF__ / __TASK__ and apply into rfctl-ci.
+# Repo write happens over the git SSH key mounted from a k8s Secret (creation: docs/secrets.md)
+# — never inline a credential here.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: __JOB_NAME__
+  namespace: rfctl-ci
+  labels:
+    app.kubernetes.io/name: agent-runner
+    app.kubernetes.io/component: repo-editor
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  activeDeadlineSeconds: 3600            # hard execution timeout
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: agent-runner}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: home-lab-agent
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: runner
+          image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
+          workingDir: /work
+          env:
+            - name: REDFISH_CTL_REF
+              value: "__REF__"
+            - name: AGENT_TASK
+              value: "__TASK__"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          command: ["bash", "-euo", "pipefail", "-c"]
+          args:
+            - |
+              git clone --quiet https://github.com/spyroot/redfish_ctl.git /work
+              git fetch --quiet origin "$REDFISH_CTL_REF" && git checkout --quiet FETCH_HEAD
+              # The agent runs its task here; repo pushes use the git SSH key mounted from a Secret.
+              echo "agent-runner: task=$AGENT_TASK ref=$REDFISH_CTL_REF"
+          resources:
+            requests: {cpu: "1", memory: 1Gi}
+            limits: {cpu: "2", memory: 2Gi}
+          volumeMounts:
+            - {name: work, mountPath: /work}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: work, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
