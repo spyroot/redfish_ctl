@@ -13,12 +13,25 @@
 #                               must pass the boundary gates before anything reaches public GitHub)
 stages: [validate, integration, deploy, publish]
 
+# The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
+# git-lfs, gate tools); this project supplies its dependencies via environment.yml.
+# Registry and tag come from builder inventory/images/shared-images.yaml.
 default:
-  image: ghcr.io/spyroot/redfish-ctl-ci:latest    # gate toolchain (built by the CI image workflow)
+  image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
   tags: [homelab-k8s]
+  before_script:
+    # Corpora are Git LFS; without this the suite runs against pointer files.
+    - git lfs install --local && git lfs pull --include='tests/*_corpus.tar.gz'
+    # Bootstrap the project environment from its own declaration. conda env
+    # create IS the dependency test: an unresolvable or malformed environment.yml
+    # fails here, before any gate runs.
+    - conda env create -q -f environment.yml || conda env update -q -f environment.yml --prune
+    - eval "$(conda shell.bash hook)" && conda activate redfish_ctl
 
 variables:
-  KUBE_CONTEXT: home-lab-k8s
+  # Gates resolve pytest/ruff through the project environment, never a
+  # pre-installed toolchain in the image.
+  CONDA_ENV: redfish_ctl
 
 gate-merge:
   stage: validate
@@ -38,6 +51,32 @@ gate-integration:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
     - ./scripts/gates/run.sh integration
+
+# Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
+# never from a workstation. The runner pod already carries a ServiceAccount, so
+# no kubeconfig or context is involved.
+#
+# Cluster-down is an expected state, not a failure of this project: the job
+# reports UNAVAILABLE and succeeds, so an outage cannot red a pipeline that has
+# nothing to do with the cluster. A cluster that IS up but answers wrongly does
+# fail, because that is a real defect.
+k8s-live-check:
+  stage: integration
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  before_script: []          # no project env needed; this probes the cluster only
+  script:
+    - |
+      if ! kubectl version --request-timeout=10s >/dev/null 2>&1; then
+        echo "k8s-live-check: UNAVAILABLE (API unreachable from the runner pod)"
+        echo "  This is reported, not failed: cluster availability is not this project's gate."
+        exit 0
+      fi
+      echo "k8s-live-check: cluster reachable"
+      kubectl get nodes -o wide
+      kubectl get crd 2>/dev/null | grep -i redfish || echo "(no redfish CRDs registered)"
 
 # Live apply: protected branch ONLY, manual, serialized (resource_group), never from a merge request.
 deploy-apply:

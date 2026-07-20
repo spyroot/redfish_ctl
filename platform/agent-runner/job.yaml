@@ -28,7 +28,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: runner
-          image: ghcr.io/spyroot/redfish-ctl-ci:latest
+          image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
           workingDir: /work
           env:
             - name: REDFISH_CTL_REF

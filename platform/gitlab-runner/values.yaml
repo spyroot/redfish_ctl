@@ -15,7 +15,7 @@ runners:
     [[runners]]
       [runners.kubernetes]
         namespace = "rfctl-runners"
-        image = "ghcr.io/spyroot/redfish-ctl-ci:latest"
+        image = "harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest"
         privileged = false
         service_account = "home-lab-ci"
         cpu_request = "500m"

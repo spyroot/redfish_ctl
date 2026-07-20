@@ -86,16 +86,8 @@ docker-clean: ## Reclaim local docker space: sandbox cluster, exited redfish con
 	 if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi
 	docker image prune -f
 
-K8S_CI := ./scripts/k8s_ci.sh
-
-k8s-check: ## Home-cluster health: nodes, redfish CRDs, CI jobs (uses current kubectl context).
-	@$(K8S_CI) check
-
-k8s-ci: ## Run the offline gate as a Job on the home cluster. REF=<branch> (default main).
-	$(K8S_CI) run $(REF) $(NS)
-
-k8s-ci-clean: ## Delete finished redfish-ctl CI Jobs on the home cluster. [NS=rfctl-ci]
-	@$(K8S_CI) clean $(NS)
+# Cluster work is dispatched by the GitLab pipeline on the in-cluster runner,
+# never by kubectl from a workstation. See .gitlab-ci.yml k8s-live-check.
 
 k8s-consumer: ## Build and deploy the fleet-status consumer into the sandbox.
 	./k8s/consumer/deploy.sh

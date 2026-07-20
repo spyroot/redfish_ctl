@@ -1,7 +1,7 @@
 # In-cluster offline gate: runs the redfish_ctl unit suite + changed-files ruff
 # + whole-tree docstring gate as a Kubernetes Job on the home cluster, so the
 # gate never touches an operator workstation and stays independent of the GB300
-# fleet. scripts/k8s_ci.sh substitutes the __PLACEHOLDER__ tokens and applies it.
+# fleet. the GitLab pipeline substitutes the __PLACEHOLDER__ tokens and applies it.
 #
 # No StorageClass is required: the repo is cloned into an emptyDir. The Job runs
 # to completion once (restartPolicy Never, no retries) and self-cleans after the
