@@ -14,7 +14,14 @@
 # A missing RUNTIME tool is BLOCKED, never repaired locally: installing it would
 # hide a provider defect and create the second toolchain the protocol forbids.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+# Locate the repo root with shell builtins only. This gate exists to inspect what
+# is and is not on PATH, so it must not itself depend on PATH to find its own
+# directory: `$(dirname ...)` fails with "command not found" the moment PATH is
+# reduced, and the gate then dies misreporting the failure it was asked to test.
+_self="${BASH_SOURCE[0]}"
+_dir="${_self%/*}"
+[ "$_dir" = "$_self" ] && _dir="."
+cd "$_dir/../../.."
 
 fail=0
 
