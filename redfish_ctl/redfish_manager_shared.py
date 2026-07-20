@@ -36,6 +36,7 @@ class ApiRequestType(Enum):
 
     # dell oem
     DellOemTask = auto()
+    DellBiosDeviceRecovery = auto()
     DellLcQuery = auto()
     DellOemDisconnect = auto()
 

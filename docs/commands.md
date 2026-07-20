@@ -117,6 +117,7 @@ Safety labels:
 | `compute-query` | Read ComputerSystem settings. | Read |
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
 | `current_boot` | Read current boot source details. | Read |
+| `dell-bios-device-recovery` | Recover a Dell BIOS device through `DellBIOSService.DeviceRecovery`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
