@@ -32,6 +32,7 @@ class ApiRequestType(Enum):
     VolumeCreate = auto()
     VolumeDelete = auto()
     VolumeCheckConsistency = auto()
+    DellRaidClearActions = auto()
     ImportOneTimeBoot = auto()
 
     # dell oem
