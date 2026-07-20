@@ -1487,8 +1487,15 @@ class RedfishManagerBase(RedfishManager):
                     )
             else:
                 loop = asyncio.get_event_loop()
+                # The api_async_*_until_complete helpers return
+                # (Response, RedfishApiRespond) - the same order the sync branch
+                # above binds. Unpacking them the other way round bound the enum
+                # to `response` and the Response object to `api_resp`, so on the
+                # async path parse_json_respond_msg() received an enum and
+                # api_success_msg() did a dict lookup with a Response as the key,
+                # raising KeyError AFTER the write had already been sent.
                 if method == HTTPMethod.PATCH:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_patch_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1496,7 +1503,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.POST:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_post_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1504,7 +1511,7 @@ class RedfishManagerBase(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.DELETE:
-                    api_resp, response = loop.run_until_complete(
+                    response, api_resp = loop.run_until_complete(
                         self.api_async_delete_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,

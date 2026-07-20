@@ -1,0 +1,141 @@
+"""Async-path checks for ``RedfishManagerBase.base_request_respond``.
+
+``base_request_respond`` had no test at all, and the whole offline suite exercised ``do_async=True``
+in exactly one file. That gap let a reversed tuple unpack ship in three places: the
+``api_async_*_until_complete`` helpers return ``(Response, RedfishApiRespond)`` — the same order the
+synchronous branch binds — but the async branch unpacked them as ``api_resp, response``.
+
+The consequence was not a clean failure. The write was sent to the BMC first, and only then did
+``parse_json_respond_msg()`` receive an enum and ``api_success_msg()`` do a dict lookup keyed by a
+``Response`` object, raising ``KeyError`` outside any ``try``. So the mutation landed on real hardware
+and the caller got a traceback instead of the result.
+
+These tests pin the unpack order for all three mutating verbs by stubbing the async helper: the stub
+returns the documented ``(Response, RedfishApiRespond)`` shape, and each test asserts the values
+arrive bound to the right names. Under the old code every one of them raises.
+
+Author Mus spyroot@gmail.com
+"""
+import pytest
+
+from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_shared import HTTPMethod, RedfishApiRespond
+
+
+class _FakeResponse:
+    """Minimal stand-in for ``requests.Response`` carrying just what the path touches.
+
+    :param status_code: HTTP status the caller should observe.
+    :param body: object returned by :meth:`json`.
+    """
+
+    def __init__(self, status_code: int = 200, body: dict | None = None):
+        self.status_code = status_code
+        self.headers: dict = {}
+        self._body = body if body is not None else {}
+
+    def json(self) -> dict:
+        """Return the canned response body.
+
+        :return: the body this fake was constructed with.
+        """
+        return self._body
+
+
+def _stub_async(monkeypatch, manager, helper_name: str, response, api_resp):
+    """Replace one ``api_async_*_until_complete`` helper with a coroutine returning a fixed tuple.
+
+    The helper is stubbed rather than mocked at the transport layer so the test pins the CONTRACT
+    between the helper and its caller — which is exactly where the defect lived — instead of
+    re-testing requests.
+
+    :param monkeypatch: pytest monkeypatch fixture.
+    :param manager: the RedfishManagerBase instance under test.
+    :param helper_name: attribute name of the async helper to replace.
+    :param response: object to return in the first tuple slot.
+    :param api_resp: RedfishApiRespond to return in the second tuple slot.
+    """
+
+    async def _fake(*_args, **_kwargs):
+        return response, api_resp
+
+    monkeypatch.setattr(type(manager), helper_name, _fake, raising=True)
+
+
+@pytest.mark.parametrize(
+    "method, helper",
+    [
+        (HTTPMethod.POST, "api_async_post_until_complete"),
+        (HTTPMethod.PATCH, "api_async_patch_until_complete"),
+        (HTTPMethod.DELETE, "api_async_delete_until_complete"),
+    ],
+)
+def test_async_unpack_binds_response_and_status_correctly(
+    redfish_mock, monkeypatch, method, helper
+):
+    """Each async verb must bind (Response, RedfishApiRespond) in that order.
+
+    Reversed, ``api_success_msg`` is called with a Response as a dict key and raises KeyError after
+    the request has already been sent. Asserting a clean CommandResult plus a real enum is what
+    proves the binding, and it fails loudly under the old code.
+    """
+    _stub_async(monkeypatch, redfish_mock, helper,
+                _FakeResponse(200, {"Id": "1"}), RedfishApiRespond.Ok)
+
+    result, api_resp = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1",
+        method,
+        payload={},
+        do_async=True,
+        expected_status=200,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert isinstance(api_resp, RedfishApiRespond), (
+        "api_resp must be the enum; binding a Response here is the reversed-unpack defect"
+    )
+    assert api_resp is RedfishApiRespond.Ok
+    assert result.error is None
+
+
+def test_async_accepted_task_reads_the_header_from_the_response(redfish_mock, monkeypatch):
+    """An accepted async task must read its id from the Response, not from the enum.
+
+    This is the branch that made the reversal expensive: on AcceptedTaskGenerated the code calls
+    ``job_id_from_header(response)``. With the names swapped that receives an enum, so a caller
+    polling an async job could never learn its task id — after the mutation had already been issued.
+    """
+    fake = _FakeResponse(202, {})
+    fake.headers = {"Location": "/redfish/v1/TaskService/Tasks/JID_123456789"}
+    _stub_async(monkeypatch, redfish_mock, "api_async_post_until_complete",
+                fake, RedfishApiRespond.AcceptedTaskGenerated)
+
+    result, api_resp = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1/Actions/Anything",
+        HTTPMethod.POST,
+        payload={},
+        do_async=True,
+        expected_status=202,
+    )
+
+    assert api_resp is RedfishApiRespond.AcceptedTaskGenerated
+    assert isinstance(result, CommandResult)
+    assert "task_id" in result.data, "the task id must come from the Response headers"
+
+
+def test_async_and_sync_agree_on_the_return_contract(redfish_mock, monkeypatch):
+    """Both branches must return (CommandResult, RedfishApiRespond) in the same order.
+
+    The two branches were written independently and only the sync one was covered, which is how they
+    drifted. Pinning them together stops the next divergence.
+    """
+    _stub_async(monkeypatch, redfish_mock, "api_async_post_until_complete",
+                _FakeResponse(200, {}), RedfishApiRespond.Ok)
+
+    async_result, async_status = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1",
+        HTTPMethod.POST, payload={}, do_async=True, expected_status=200,
+    )
+
+    assert isinstance(async_result, CommandResult)
+    assert isinstance(async_status, RedfishApiRespond)
