@@ -1,0 +1,25 @@
+# gitleaks config for the repo.no-secrets gate (scripts/gates/repository/no-secrets.sh).
+# Keeps every default rule active and adds path-scoped allowlists ONLY for the
+# two known-public, non-credential locations that the generic-api-key rule
+# false-positives on. Secrets anywhere outside these paths are still caught.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """Captured Redfish corpora. Per docs/internal/corpus/CORPA_POLICE.md the
+captures come from decommissioned, sandboxed, privately-addressed lab gear and are public by
+decided policy. Redfish never returns account passwords (every Password field is null), so the
+SNMPv3 localized-key hex the generic-api-key rule matches here is config material from dead
+hardware, not a live secret. Scoped to the corpus paths only."""
+paths = [
+    '''tests/.*_corpus/.*''',
+    '''tests/.*_corpus\.tar\.gz''',
+    '''tests/corpus/.*''',
+]
+
+[[allowlists]]
+description = """Synthetic SNMPv3-key fixtures in the corpus contract test — literal placeholder
+hex (0123456789abcdef..., deadbeef*8, cafebabe...) used to exercise redaction, never real keys."""
+paths = [
+    '''tests/test_full_corpus_contract\.py''',
+]
