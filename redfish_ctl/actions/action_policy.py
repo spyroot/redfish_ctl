@@ -87,6 +87,8 @@ ACTION_POLICY = {
     "#DellLCService.UpdateOSAppHealthData": Destructiveness.REVERSIBLE,
     "#DellRaidService.StartPatrolRead": Destructiveness.REVERSIBLE,
     "#DellRaidService.StopPatrolRead": Destructiveness.REVERSIBLE,
+    "#DellLCService.SupportAssistClearAutoCollectSchedule": Destructiveness.REVERSIBLE,
+    "#DellLCService.SupportAssistSetAutoCollectSchedule": Destructiveness.REVERSIBLE,
 
     # destructive: service disruption / config rewrite — dry-run unless --confirm
     "#ComputerSystem.Reset": Destructiveness.DESTRUCTIVE,
