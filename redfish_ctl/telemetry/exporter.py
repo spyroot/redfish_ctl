@@ -1016,54 +1016,27 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     }
 
 
-# Splunk Observability ingest host: accepts a datapoint POST and returns 200/"OK"
-# but never records the metric time series. SignalFx datapoint ingest requires the
-# ingest.<realm>.signalfx.com host instead.
-_OBSERVABILITY_INGEST_HOST = re.compile(
-    r"ingest\.([a-z0-9-]+)\.observability\.splunkcloud\.com", re.IGNORECASE)
-
-
-def _normalize_signalfx_ingest_url(ingest_url: str) -> str:
-    """Rewrite a Splunk Observability ingest host to the SignalFx datapoint host.
-
-    ``ingest.<realm>.observability.splunkcloud.com`` is replaced with
-    ``ingest.<realm>.signalfx.com``; the realm, scheme, path, and port are kept.
-    Any other host is returned unchanged.
-
-    :param ingest_url: the ingest URL to normalize.
-    :return: the URL with the observability host rewritten, else unchanged.
-    """
-    return _OBSERVABILITY_INGEST_HOST.sub(r"ingest.\1.signalfx.com", ingest_url or "")
-
-
 def _require_datapoint_url(ingest_url: str) -> str:
     """Return ``ingest_url`` when it is a full SignalFx datapoint endpoint, else raise.
 
     ``push_signalfx`` POSTs the URL as-is (it does not append a path), so a bare
     host such as ``https://ingest.us1.observability.splunkcloud.com`` accepts the
     request context but silently drops every datapoint. Require the full
-    ``…/v2/datapoint`` endpoint, and reject the Observability ingest host outright,
-    so misconfiguration fails loudly instead.
+    ``…/v2/datapoint`` endpoint so misconfiguration fails loudly instead. The host
+    itself is not restricted: ``ingest.<realm>.observability.splunkcloud.com`` is
+    the current Splunk ingest host and ``ingest.<realm>.signalfx.com`` is the
+    legacy one — both are accepted.
 
     :param ingest_url: the SignalFx ingest URL to validate.
     :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
-    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint, or it
-        targets the Observability ingest host that silently drops datapoints.
+    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
     """
     if SIGNALFX_DATAPOINT_PATH not in (ingest_url or ""):
         raise ValueError(
             "SignalFx ingest URL must be the full datapoint endpoint ending in "
             f"{SIGNALFX_DATAPOINT_PATH} (e.g. "
-            "https://ingest.us1.signalfx.com/v2/datapoint), not a bare host like "
-            f"https://ingest.us1.observability.splunkcloud.com; got {ingest_url!r}"
-        )
-    if _OBSERVABILITY_INGEST_HOST.search(ingest_url):
-        raise ValueError(
-            "SignalFx ingest URL targets the Splunk Observability host "
-            "(ingest.<realm>.observability.splunkcloud.com), which returns 200/OK "
-            "but drops every datapoint; use ingest.<realm>.signalfx.com instead; "
-            f"got {ingest_url!r}"
-        )
+            "https://ingest.us1.observability.splunkcloud.com/v2/datapoint), not a "
+            f"bare host; got {ingest_url!r}")
     return ingest_url
 
 
@@ -1102,22 +1075,13 @@ def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
     full ``…/v2/datapoint`` endpoint (see ``_require_datapoint_url``).
 
     :param ingest_url: explicit ingest URL; falls back to ``SPLUNK_INGEST_URL``.
-    :return: a validated full ``…/v2/datapoint`` ingest URL (Observability host
-        normalized to the SignalFx datapoint host).
+    :return: a validated full ``…/v2/datapoint`` ingest URL.
     :raises ValueError: if no URL is set or it is not a full datapoint endpoint.
     """
     url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
     if not url:
         raise ValueError("SPLUNK_INGEST_URL is not set")
-    normalized = _normalize_signalfx_ingest_url(url)
-    if normalized != url:
-        # Never silent: surface the rewrite so a deploy dry-run shows the real target.
-        print(
-            f"note: rewrote SignalFx ingest host to the datapoint host {normalized} "
-            "(the observability.splunkcloud.com host returns OK but drops datapoints)",
-            file=sys.stderr,
-        )
-    return _require_datapoint_url(normalized)
+    return _require_datapoint_url(url)
 
 
 def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 20.0) -> int:
@@ -1146,24 +1110,45 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
         return response.status
 
 
+def _mts_query(metric: str, dimensions: Optional[Mapping] = None) -> str:
+    """Build a metrictimeseries query for one metric, scoped by dimensions.
+
+    A metric time series is identified by the metric name AND its dimension set
+    (Splunk data model), so scoping by a unique dimension such as ``host.name``
+    reads back this host's series rather than every host that reports the metric.
+
+    :param metric: the SignalFx metric name.
+    :param dimensions: dimension key->value pairs to AND into the query.
+    :return: the SignalFx search query string.
+    """
+    terms = [f'sf_metric:"{metric}"']
+    for key, value in sorted((dimensions or {}).items()):
+        terms.append(f'{key}:"{value}"')
+    return " AND ".join(terms)
+
+
 def signalfx_metric_readback(
-        realm: str, api_token: str, metric: str, timeout: float = 20.0) -> dict:
+        realm: str, api_token: str, metric: str,
+        dimensions: Optional[Mapping] = None, timeout: float = 20.0) -> dict:
     """Return how many time series exist for a metric in Splunk MTS, and how fresh.
 
     A SignalFx datapoint POST returns HTTP 200/``OK`` even when the datapoints are
-    dropped (for example the Observability ingest host, see issue #363), so ingest
-    success must be confirmed by reading the metric time series back — not by
-    trusting the POST status.
+    not recorded, so ingest success must be confirmed by reading the metric time
+    series back — not by trusting the POST status (issue #363). Because Splunk
+    retains inactive series for 13 months, the caller must also check freshness
+    (``newest_ms``), not merely a nonzero count.
 
     :param realm: Splunk Observability realm (for example ``us1``).
     :param api_token: API (read) token, sent as the ``X-SF-Token`` header; never logged.
     :param metric: SignalFx metric name to look up.
+    :param dimensions: dimension key->value pairs to scope the query to one entity.
     :param timeout: HTTP timeout in seconds.
     :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>}``.
     :raises ValueError: when the API answers with a non-JSON body.
     """
     query = urllib.parse.urlencode(
-        {"query": f'sf_metric:"{metric}"', "limit": 50, "orderBy": "-sf_updatedOnMs"})
+        {"query": _mts_query(metric, dimensions), "limit": 50,
+         "orderBy": "-sf_updatedOnMs"})
     url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
     request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -1184,52 +1169,61 @@ def signalfx_metric_readback(
 
 def verify_signalfx_readback(
         realm: str, api_token: str, metrics: Iterable[str],
-        timeout: float = 20.0) -> dict:
-    """Confirm each pushed metric is visible in Splunk MTS.
+        dimensions: Optional[Mapping] = None, timeout: float = 20.0) -> dict:
+    """Confirm each pushed metric is visible in Splunk MTS for one entity.
 
     :param realm: Splunk Observability realm.
     :param api_token: API (read) token; never logged.
     :param metrics: metric names to confirm (the names that were pushed).
+    :param dimensions: dimension key->value pairs scoping the query to this host.
     :param timeout: per-query HTTP timeout in seconds.
     :return: ``{metric: {"count": int, "newest_ms": int}}`` for each metric.
     """
-    return {metric: signalfx_metric_readback(realm, api_token, metric, timeout)
+    return {metric: signalfx_metric_readback(realm, api_token, metric, dimensions, timeout)
             for metric in sorted(set(metrics))}
 
 
 def build_readback_result(
-        push_status: int, ingest_url: str, sample_count: int,
-        metric_names: list, readback: dict, timing_ms: dict) -> tuple:
+        push_status: int, ingest_url: str, sample_count: int, metric_names: list,
+        readback: dict, timing_ms: dict, now_ms: int,
+        freshness_ms: int = 900000) -> tuple:
     """Build the compact canary summary and verdict from a readback.
 
-    A metric is visible when its readback ``count`` is greater than zero. When any
-    pushed metric is missing, the verdict is an error: the POST succeeded but the
-    datapoints were not ingested (issue #363), so a 200 is not proof.
+    A metric is confirmed only when its readback series is BOTH present
+    (``count`` > 0) AND fresh (``newest_ms`` within ``freshness_ms`` of ``now_ms``).
+    Splunk retains inactive series for 13 months, so a nonzero count alone can be a
+    stale series this push did not create; a missing or stale metric is an error:
+    the POST succeeded yet the datapoints were not ingested now (issue #363).
 
     :param push_status: the HTTP status the SignalFx POST returned.
-    :param ingest_url: the (normalized) ingest URL that was POSTed to.
+    :param ingest_url: the ingest URL that was POSTed to.
     :param sample_count: number of samples scraped and pushed.
     :param metric_names: the distinct metric names that were pushed.
     :param readback: ``{metric: {"count": int, "newest_ms": int}}`` from MTS.
     :param timing_ms: ``{"scrape": int, "push": int, "readback": int}`` durations.
-    :return: ``(summary_dict, error_or_None)`` — the compact result and verdict.
+    :param now_ms: current wall-clock time in ms, for the freshness window.
+    :param freshness_ms: how recent ``newest_ms`` must be to count as this push.
+    :return: ``(summary_dict, error_or_None)`` -- the compact result and verdict.
     """
-    visible = sorted(name for name, series in readback.items() if series["count"] > 0)
-    missing = sorted(set(metric_names) - set(visible))
+    fresh = sorted(
+        name for name, series in readback.items()
+        if series["count"] > 0 and series["newest_ms"] >= now_ms - freshness_ms)
+    missing = sorted(set(metric_names) - set(fresh))
     summary = {
         "push_status": push_status,
         "ingest_url": ingest_url,
         "sample_count": sample_count,
         "metrics_pushed": len(metric_names),
-        "metrics_visible": len(visible),
+        "metrics_fresh": len(fresh),
         "missing_metrics": missing,
         "readback": readback,
         "timing_ms": timing_ms,
+        "freshness_ms": freshness_ms,
     }
     error = None if not missing else (
         f"SignalFx POST returned {push_status} but {len(missing)} of "
-        f"{len(metric_names)} pushed metrics have no time series in Splunk MTS — "
-        "the POST succeeded yet datapoints were not ingested")
+        f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
+        "MTS -- the POST succeeded yet the datapoints were not ingested")
     return summary, error
 
 
