@@ -12,6 +12,13 @@ from redfish_ctl.redfish_manager import CommandResult
 from tests.test_utils import create_json_resp
 
 JOB_ID = "JID_000000000001"
+DELL_JOB_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
+SETUP_JOB_QUEUE = f"{DELL_JOB_SERVICE}/Actions/DellJobService.SetupJobQueue"
+
+
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service."""
+    return [request for request in service.requests if request.method == "POST"]
 
 
 def test_jobs_list_returns_expanded_job_members(redfish_api):
@@ -113,6 +120,77 @@ def test_dell_job_service_returns_delete_queue_action(redfish_api):
         "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/"
         "Actions/DellJobService.DeleteJobQueue"
     )
+    assert "SetupJobQueue" in result.extra
+    assert result.extra["SetupJobQueue"].target == SETUP_JOB_QUEUE
+
+
+def test_dell_job_queue_setup_dry_run_resolves_action_without_post(
+    redfish_mock,
+    redfish_service,
+):
+    """dell-job-queue-setup previews SetupJobQueue without POSTing."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobQueueSetup,
+        "dell-job-queue-setup",
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data == {
+        "dry_run": True,
+        "action": "#DellJobService.SetupJobQueue",
+        "target": SETUP_JOB_QUEUE,
+        "payload": {},
+        "level": "destructive",
+        "blocked": "destructive action requires --confirm",
+    }
+    assert _post_requests(redfish_service) == []
+
+
+def test_dell_job_queue_setup_confirm_posts_empty_payload(
+    redfish_mock,
+    redfish_service,
+):
+    """dell-job-queue-setup --confirm POSTs to the discovered target."""
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobQueueSetup,
+        "dell-job-queue-setup",
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["executed"] is True
+    assert result.data["action"] == "#DellJobService.SetupJobQueue"
+    posts = _post_requests(redfish_service)
+    assert len(posts) == 1
+    assert posts[0].path.lower() == SETUP_JOB_QUEUE.lower()
+    assert posts[0].json() == {}
+
+
+def test_dell_job_queue_setup_missing_action_fails_closed_without_post(
+    redfish_mock,
+    redfish_service,
+):
+    """dell-job-queue-setup reports a missing action without POSTing."""
+    service = dict(redfish_service._state(DELL_JOB_SERVICE.lower()))
+    service["Actions"] = {
+        name: metadata
+        for name, metadata in service.get("Actions", {}).items()
+        if name != "#DellJobService.SetupJobQueue"
+    }
+    redfish_service._overlay[DELL_JOB_SERVICE.lower()] = service
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.DellJobQueueSetup,
+        "dell-job-queue-setup",
+        confirm=True,
+    )
+
+    assert result.error == (
+        f"action '#DellJobService.SetupJobQueue' not found on {DELL_JOB_SERVICE}"
+    )
+    assert _post_requests(redfish_service) == []
 
 
 def test_task_service_root_query_returns_task_links(redfish_api):

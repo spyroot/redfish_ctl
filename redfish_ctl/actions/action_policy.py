@@ -108,6 +108,7 @@ ACTION_POLICY = {
     "#LogService.ClearLog": Destructiveness.DESTRUCTIVE,
     "#TelemetryService.ClearMetricReports": Destructiveness.DESTRUCTIVE,
     "#TelemetryService.ResetMetricReportDefinitionsToDefaults": Destructiveness.DESTRUCTIVE,
+    "#DellJobService.SetupJobQueue": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,

@@ -209,6 +209,7 @@ class ApiRequestType(Enum):
     #  dell services
     JobRmDellServices = auto()
     JobDellServices = auto()
+    DellJobQueueSetup = auto()
 
     Discovery = auto()
     FleetInventory = auto()

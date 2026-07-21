@@ -24,6 +24,9 @@
         "JID_CLEARALL",
         "JID_CLEARALL_FORCE"
       ]
+    },
+    "#DellJobService.SetupJobQueue": {
+      "target": "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService/Actions/DellJobService.SetupJobQueue"
     }
   }
 }

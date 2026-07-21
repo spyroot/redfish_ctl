@@ -50,6 +50,7 @@ def test_policy_classifies_known_and_unknown():
         classify("#TelemetryService.ResetMetricReportDefinitionsToDefaults")
         is Destructiveness.DESTRUCTIVE
     )
+    assert classify("#DellJobService.SetupJobQueue") is Destructiveness.DESTRUCTIVE
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE
