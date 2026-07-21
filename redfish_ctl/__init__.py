@@ -26,6 +26,7 @@ from .raid.cmd_raid_service import *
 from .raid.cmd_dell_raid_blink import *
 from .raid.cmd_dell_raid_spare import *
 from .raid.cmd_dell_raid_cancel import *
+from .raid.cmd_raid_patrol_read import *
 #
 # bios commands
 from .bios.cmd_bios import *

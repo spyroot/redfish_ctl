@@ -81,6 +81,8 @@ ACTION_POLICY = {
     "#DellRaidService.BlinkTarget": Destructiveness.REVERSIBLE,
     "#DellRaidService.UnBlinkTarget": Destructiveness.REVERSIBLE,
     "#DellLCService.UpdateOSAppHealthData": Destructiveness.REVERSIBLE,
+    "#DellRaidService.StartPatrolRead": Destructiveness.REVERSIBLE,
+    "#DellRaidService.StopPatrolRead": Destructiveness.REVERSIBLE,
 
     # destructive: service disruption / config rewrite — dry-run unless --confirm
     "#ComputerSystem.Reset": Destructiveness.DESTRUCTIVE,
