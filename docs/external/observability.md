@@ -90,7 +90,7 @@ redfish_ctl exporter --output otlp --once     # one scrape of hw.* metrics to th
 ```
 
 For a **k8s deployment** (one exporter pod per BMC, the operator reconciling profiles, all streaming
-to an in-cluster Collector), see the [Kubernetes guide](../k8s/README.md) and the Helm chart under
+to an in-cluster Collector), see the [Kubernetes guide](../../k8s/README.md) and the Helm chart under
 `charts/`.
 
 ## Try it with zero hardware

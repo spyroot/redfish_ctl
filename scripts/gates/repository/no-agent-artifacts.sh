@@ -7,7 +7,7 @@
 # — a file deleted from the tip is still present in an older commit, and an export pushes history, not
 # a snapshot. The merge-time gate cannot see that; this one is the boundary's own check.
 #
-# Named by the shared contract (builder docs/gates.md) and required by the export chain, so the id is
+# Named by the shared contract (builder docs/external/gates.md) and required by the export chain, so the id is
 # not ours to rename.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
