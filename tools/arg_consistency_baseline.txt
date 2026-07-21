@@ -1,0 +1,8 @@
+# Grandfathered split-spelling flags (arg-consistency ratchet).
+# Each is ONE concept with two spellings — standardize to one, then delete the
+# line. New splits fail. Convention: dash for multi-word new flags; --idrac_* stays underscore (config contract).
+--event-type|--event_type
+--reset-type|--reset_type
+--share-name|--share_name
+--share-type|--share_type
+--transfer-protocol|--transfer_protocol

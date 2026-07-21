@@ -31,6 +31,7 @@ mandatory_ids:
   - repo.dry-run-contract
   - repo.no-local-build
   - repo.no-ghost-env
+  - repo.arg-consistency
   - scm.exact-commit
   - repo.no-agent-artifacts
   - repo.large-artifact-policy
@@ -77,6 +78,7 @@ gates:
   - {id: repo.dry-run-contract, profile: merge, command: scripts/gates/repository/dry-run-contract.sh, required: true, mutates: false}
   - {id: repo.no-local-build, profile: merge, command: scripts/gates/repository/no-local-build.sh, required: true, mutates: false}
   - {id: repo.no-ghost-env, profile: merge, command: scripts/gates/repository/no-ghost-env.sh, required: true, mutates: false}
+  - {id: repo.arg-consistency, profile: merge, command: scripts/gates/repository/arg-consistency.sh, required: true, mutates: false}
   # --- unit: the offline suite ---
   - {id: unit.all,             profile: merge, command: scripts/gates/unit/all.sh,               required: true, mutates: false}
   # --- kubernetes: render + validate manifests ---
