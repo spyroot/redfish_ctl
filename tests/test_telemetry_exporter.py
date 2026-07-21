@@ -12,6 +12,7 @@ from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
+    _require_datapoint_url,
     apply_exporter_env_file,
     build_identity_dimensions,
     build_metric_samples,
@@ -22,7 +23,6 @@ from redfish_ctl.telemetry.exporter import (
     resolve_signalfx_token,
     to_signalfx_body,
 )
-from redfish_ctl.telemetry.exporter import _require_datapoint_url
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
 GB300_CORPUS = corpus_dir(
