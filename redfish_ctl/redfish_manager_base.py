@@ -1460,6 +1460,7 @@ class RedfishManagerBase(RedfishManager):
         err = None
         response = None
         api_resp = RedfishApiRespond.Error
+        self._redfish_error = None
         try:
             r = f"{self._default_method}{self.redfish_ip}{resource}"
             if not do_async:
@@ -1549,6 +1550,10 @@ class RedfishManagerBase(RedfishManager):
         api_resp_msg = self.api_success_msg(api_resp)
         if redfish_resp is not None:
             api_resp_msg.update(api_resp_msg)
+        if api_resp == RedfishApiRespond.Error and err is None:
+            err = self._redfish_error
+            if err is None and response is not None:
+                err = self.parse_error(response)
 
         return CommandResult(api_resp_msg, None, None, err), api_resp
 
@@ -1919,14 +1924,23 @@ class RedfishManagerBase(RedfishManager):
             "redfish.action.level": level.value,
         }
         with tracing.client_span_attributes(span_attributes):
-            result, _ = self.base_post(target, payload=body, do_async=do_async,
-                                       expected_status=expected_status)
+            result, api_resp = self.base_post(target, payload=body, do_async=do_async,
+                                              expected_status=expected_status)
         data = result.data if isinstance(result.data, dict) else {"result": result.data}
-        data.setdefault("executed", True)
         data.setdefault("action", full)
         data.setdefault("target", target)
         data.setdefault("level", level.value)
-        return CommandResult(data, actions, None, result.error)
+
+        error = result.error
+        if api_resp == RedfishApiRespond.Error or error is not None:
+            data["executed"] = False
+            if error is None:
+                status_name = getattr(api_resp, "name", str(api_resp))
+                error = f"action {full} failed with {status_name}"
+            return CommandResult(data, actions, None, error)
+
+        data.setdefault("executed", True)
+        return CommandResult(data, actions, None, None)
 
     def reboot(
             self,

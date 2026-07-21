@@ -7,7 +7,9 @@ against tests/supermicro_fixtures/ through the real requests path; the mock
 records every POST so we can assert exactly what did (or did not) fire.
 """
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import RedfishApiRespond
 
 
 def _post_count(svc):
@@ -124,6 +126,97 @@ def test_invoke_resolves_target_from_actions_block(redfish_mock_factory):
     assert result.data.get("executed") is True
     assert result.data["target"] == "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent"
     assert _post_count(svc) == 1
+
+
+def test_invoke_action_rejected_post_reports_error(redfish_mock_factory, monkeypatch):
+    """A rejected action POST must not be reported as successful execution."""
+    mgr, svc = redfish_mock_factory("supermicro")
+    calls = []
+
+    def rejected_post(resource, payload=None, do_async=False, expected_status=202):
+        calls.append((resource, payload, do_async, expected_status))
+        return (
+            CommandResult({"Status": "error"}, None, None, "429 Too Many Requests"),
+            RedfishApiRespond.Error,
+        )
+
+    monkeypatch.setattr(mgr, "base_post", rejected_post)
+
+    result = mgr.invoke_action("/redfish/v1/EventService", "SubmitTestEvent",
+                               payload={"MessageId": "Alert.1.0.TestEvent"},
+                               full_action_type="#EventService.SubmitTestEvent")
+
+    assert calls == [(
+        "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent",
+        {"MessageId": "Alert.1.0.TestEvent"},
+        False,
+        202,
+    )]
+    assert result.error == "429 Too Many Requests"
+    assert result.data["Status"] == "error"
+    assert result.data["executed"] is False
+    assert result.data["action"] == "#EventService.SubmitTestEvent"
+    assert result.data["target"] == "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent"
+    assert _post_count(svc) == 0
+
+
+def test_invoke_action_rejected_post_without_error_uses_status_fallback(
+    redfish_mock_factory, monkeypatch
+):
+    """A rejected action POST still returns an actionable error without details."""
+    mgr, svc = redfish_mock_factory("supermicro")
+
+    def rejected_post(resource, payload=None, do_async=False, expected_status=202):
+        return CommandResult({"Status": "error"}, None, None, None), RedfishApiRespond.Error
+
+    monkeypatch.setattr(mgr, "base_post", rejected_post)
+
+    result = mgr.invoke_action(
+        "/redfish/v1/EventService",
+        "SubmitTestEvent",
+        payload={"MessageId": "Alert.1.0.TestEvent"},
+        full_action_type="#EventService.SubmitTestEvent",
+    )
+
+    assert result.error == "action #EventService.SubmitTestEvent failed with Error"
+    assert result.data["executed"] is False
+    assert _post_count(svc) == 0
+
+
+class _WriteErrorResponse:
+    status_code = 405
+    headers = {}
+
+    def json(self):
+        return {
+            "error": {
+                "code": "Base.1.18.GeneralError",
+                "message": "write rejected",
+            }
+        }
+
+
+def test_base_post_error_response_carries_parsed_error(
+    redfish_mock_factory, monkeypatch
+):
+    """A rejected write returns its parsed Redfish error with the result."""
+    mgr, _svc = redfish_mock_factory("supermicro")
+    monkeypatch.setattr(
+        mgr,
+        "api_post_call",
+        lambda *_args, **_kwargs: _WriteErrorResponse(),
+    )
+
+    result, api_resp = mgr.base_post(
+        "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent",
+        payload={"MessageId": "Alert.1.0.TestEvent"},
+        expected_status=202,
+    )
+
+    assert api_resp == RedfishApiRespond.Error
+    assert result.error is mgr._redfish_error
+    assert result.error.status_code == 405
+    assert result.error.code == "Base.1.18.GeneralError"
 
 
 def test_destructive_blocks_without_confirm(redfish_mock_factory):
