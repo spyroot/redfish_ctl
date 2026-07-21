@@ -147,6 +147,7 @@ Safety labels:
 | `dell-raid-clear-actions` | Preview Dell RAID clear actions. | Guarded |
 | `dell-persistent-initialize-media` | Initialize Dell vFlash media through `DellPersistentStorageService.InitializeMedia`; previews by default and requires `--confirm --i-understand-irreversible` to write. | Guarded |
 | `dell-vflash-state` | Enable or disable Dell vFlash through `DellPersistentStorageService.VFlashStateChange`; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-system-lcd-errors` | Show Dell system errors on the chassis LCD through `DellSystemManagementService.ShowErrorsOnLCD`; dry-run by default and `--confirm` posts. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |

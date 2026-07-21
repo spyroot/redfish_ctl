@@ -123,6 +123,7 @@ class ApiRequestType(Enum):
     TelemetryResetMetricDefinitions = auto()
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
+    DellSystemLcdErrors = auto()
     NetworkAdapters = auto()
     NetworkAdapterReset = auto()
     NicFirmware = auto()

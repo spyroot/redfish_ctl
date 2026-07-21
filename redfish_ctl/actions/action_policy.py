@@ -138,6 +138,7 @@ ACTION_POLICY = {
     "#DellJobService.SetupJobQueue": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.SetAssetName": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.SetBootVD": Destructiveness.DESTRUCTIVE,
+    "#DellSystemManagementService.ShowErrorsOnLCD": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelBackgroundInitialization": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelCheckConsistency": Destructiveness.DESTRUCTIVE,
