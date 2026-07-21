@@ -22,7 +22,7 @@ TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
 
-.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-agent-image gb300-provision gb300-test gb300-lint gb300-gate gb300-shell gb300-clean gb300-push-key k8s-check k8s-ci k8s-ci-clean
+.PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-test gb300-lint gb300-gate gb300-shell gb300-clean k8s-check k8s-ci k8s-ci-clean
 
 DOCSTRING_BASE ?= origin/main
 
@@ -141,22 +141,6 @@ gb300-image: ## Build the public base image on a slot from this checkout's HEAD.
 		'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -' < "$$ctx"; \
 	rc=$$?; rm -f "$$ctx"; exit $$rc
 
-gb300-agent-image: ## Build the internal agent image (base + staged credentials) on a slot. SLOT=<n>
-	@test -n "$(SLOT)" || { echo "usage: make gb300-agent-image SLOT=<n>"; exit 2; }
-	@test -f .internal/docker/secrets/git_key || { \
-		echo "stage credentials first — see .internal/docker/README.md"; exit 2; }
-	@ctx=$$(mktemp) && \
-	tar -C .internal/docker -cf "$$ctx" . && \
-	ssh $(GB300_HOSTC) \
-		'docker build -t redfish-ctl-agent -f Dockerfile.gb300-agent -' < "$$ctx"; \
-	rc=$$?; rm -f "$$ctx"; exit $$rc
-
-gb300-provision: ## Build base + agent images on every slot (operator bootstrap).
-	@for s in $$($(GB300_SH) list); do \
-		echo "=== slot $$s ==="; \
-		$(MAKE) gb300-image SLOT=$$s && $(MAKE) gb300-agent-image SLOT=$$s || exit 1; \
-	done
-
 gb300-test: ## Run the offline pytest suite on a slot. SLOT=<n> [REF=main] [AGENT=me]
 	@test -n "$(SLOT)" || { echo "usage: make gb300-test SLOT=<n> [REF=<branch>]"; exit 2; }
 	$(GB300_SH) run $(SLOT) $(AGENT) $(REF) pytest $(PYTEST_ARGS)
@@ -187,12 +171,3 @@ gb300-clean: ## Remove exited rfctl containers + dangling layers on a slot. SLOT
 		if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi; \
 		docker image prune -f'
 
-gb300-push-key: ## Operator only: install the git key + gh token on every slot.
-	@test -f "$(HOME)/.ssh/id_rsa" || { echo "no ~/.ssh/id_rsa"; exit 2; }
-	@for s in $$($(GB300_SH) list); do \
-		h=$$($(GB300_SH) host $$s); \
-		scp -o BatchMode=yes -o ConnectTimeout=5 -q ~/.ssh/id_rsa $$h:.ssh/redfish_ctl_git \
-			&& gh auth token | ssh $$h 'cat > .ssh/redfish_ctl_gh_token; chmod 600 .ssh/redfish_ctl_git .ssh/redfish_ctl_gh_token' \
-			&& echo "slot $$s ($$h): key + token installed" \
-			|| echo "slot $$s ($$h): FAILED"; \
-	done
