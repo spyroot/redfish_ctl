@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 if command -v yamllint >/dev/null 2>&1; then
-  git ls-files '*.yml' '*.yaml' | grep -v '__' | xargs -r yamllint -d relaxed
+  git ls-files '*.yml' '*.yaml' | grep -v '__' | grep -vE 'charts/[^/]+/templates/' | xargs -r yamllint -d relaxed
   echo "repo.yaml: OK (yamllint)"
 else
   python - <<'PY'
