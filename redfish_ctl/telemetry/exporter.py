@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
+from redfish_ctl.config import ConfigurationConflict
+
 REQUIRED_DIMENSIONS = ("host.name", "node", "server.address", "bmc.ip", "vendor")
 SENSOR_METRIC = {
     "Temperature": ("hw.temperature", "sensor"),
@@ -401,8 +403,8 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         return
     values = load_exporter_env_file(file_path)
     # (canonical namespace attr, legacy namespace attr, REDFISH_* key, legacy
-    # IDRAC_* key). REDFISH_* wins when both are present in the file; IDRAC_* is
-    # the fallback. Legacy attrs keep older programmatic callers working.
+    # IDRAC_* key). Matching pairs are harmless; conflicting pairs fail closed.
+    # Legacy attrs keep older programmatic callers working.
     mapping = (
         ("redfish_host", "idrac_ip", "REDFISH_IP", "IDRAC_IP"),
         ("redfish_username", "idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
@@ -410,6 +412,14 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         ("redfish_port", "idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
     )
     for primary_attr, legacy_attr, redfish_key, idrac_key in mapping:
+        if (
+            redfish_key in values
+            and idrac_key in values
+            and values[redfish_key].strip() != values[idrac_key].strip()
+        ):
+            raise ConfigurationConflict(
+                f"Configuration conflict in {file_path}: "
+                f"use only {redfish_key} for this credential.")
         attrs = [
             attr
             for attr in (primary_attr, legacy_attr)
