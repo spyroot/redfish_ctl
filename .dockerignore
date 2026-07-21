@@ -1,33 +1,28 @@
-# Keep build context small AND keep agent/secret data out of the image (hard rule:
-# agent instruction files must never be baked into a shipped artifact).
-.git
-.gitignore
+# Keep build context small and limited to runtime or package inputs.
+.*
+!.dockerignore
 
-# Live-lab secrets and coordination board — MUST never enter an image. The
-# container gets BMC creds at run time via env, never from a baked-in file.
-.internal/
-COORDINATION.md
+# Runtime credentials are supplied via env files or Kubernetes Secrets, never
+# from a baked-in file.
+*.env
+devices/*.env
+
+# Root-level planning notes and generated review artifacts are not package
+# inputs for any Docker image.
+/*.md
+!README.md
+/*.diff
+/*BRIEF*
+/*HANDOFF*
+/*PATCH*
+/*PLAN*
+/*REVIEW*
+/*TASKS*
 
 # Bulky, run-time-only, or captured data the package does not need to run.
 dumps/
 reports/
 .json_responses/
-
-# Agent / AI instruction files and generated plans
-CLAUDE.md
-AGENTS.md
-AGENT_BOOTSTRAP.md
-CODEX_HANDOFF.md
-TEAM_GUIDE.md
-AGENT_HANDOFF*.md
-CLAUDE_REVIEW*
-CLAUDE_PLAN.md
-CLAUDE_PATCH.diff
-IMPROVEMENT_PLAN.md
-ROADMAP*.md
-.codex/
-.claude/
-.agent-review/
 
 # Caches / build artifacts / local cruft
 __pycache__/
