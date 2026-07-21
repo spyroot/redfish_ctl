@@ -133,6 +133,7 @@ from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
 from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *
+from .oem.cmd_dell_card_sekm_test import *
 from .oem.cmd_hpe_test_actions import *
 from .oem.cmd_hpe_kerberos_keytab import *
 from .oem.cmd_dell_card_test_actions import *

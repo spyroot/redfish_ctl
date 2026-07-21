@@ -24,6 +24,9 @@ def test_policy_classifies_known_and_unknown():
         "#DellLCService.TestNetworkShare",
     assert classify("#HpeServerChassis.DisableMCTPOnServer") is Destructiveness.DESTRUCTIVE
     assert classify("#HpeServerChassis.FactoryResetMCTP") is Destructiveness.IRREVERSIBLE
+    assert classify("#DelliDRACCardService.TestSEKMServerConnection") is (
+        Destructiveness.REVERSIBLE
+    )
     hpe_reversible_actions = (
         "#HpeDirectoryTest.StartTest",
         "#HpeDirectoryTest.StopTest",

@@ -40,6 +40,7 @@ class ApiRequestType(Enum):
     DellMetricActions = auto()
     DellLcExport = auto()
     DellOemDisconnect = auto()
+    DellCardSekmTest = auto()
 
     RemoteServicesRssAPIStatus = auto()
     RemoteServicesAPIStatus = auto()

@@ -47,6 +47,7 @@ ACTION_POLICY = {
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
+    "#DelliDRACCardService.TestSEKMServerConnection": Destructiveness.REVERSIBLE,
     "#HpeDirectoryTest.StartTest": Destructiveness.REVERSIBLE,
     "#HpeDirectoryTest.StopTest": Destructiveness.REVERSIBLE,
     "#HpeiLOSnmpService.SendSNMPTestAlert": Destructiveness.REVERSIBLE,
