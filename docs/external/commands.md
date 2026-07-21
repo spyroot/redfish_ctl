@@ -150,6 +150,7 @@ Safety labels:
 | `dell-vflash-state` | Enable or disable Dell vFlash through `DellPersistentStorageService.VFlashStateChange`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-system-lcd-errors` | Show Dell system errors on the chassis LCD through `DellSystemManagementService.ShowErrorsOnLCD`; dry-run by default and `--confirm` posts. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
+| `drive-secure-erase` | Preview or run `Drive.SecureErase`; requires `--confirm --i-understand-irreversible` before POSTing. | Guarded |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
 | `ethernet-interfaces` | Read host and manager EthernetInterfaces. | Read |
