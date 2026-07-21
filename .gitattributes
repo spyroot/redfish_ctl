@@ -1,5 +1,0 @@
-docs/commands.md merge=union
-redfish_ctl/__init__.py merge=union
-redfish_ctl/actions/action_policy.py merge=union
-redfish_ctl/redfish_manager_shared.py merge=union
-tests/test_action_foundation.py merge=union
