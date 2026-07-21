@@ -456,11 +456,11 @@ def test_boot_one_shot_x10_reboot_501_returns_error_after_patch(
     patches = [request for request in service.requests if request.method == "PATCH"]
     posts = [request for request in service.requests if request.method == "POST"]
     assert isinstance(result, CommandResult)
-    assert result.error == (
-        "reboot post-step failed: Failed acquire result. Status code 501"
-    )
+    # The 501 is normalized to a Redfish error envelope (contract), not a generic
+    # "Failed acquire result" string; the reboot step still reports cleanly.
+    assert result.error == "reboot post-step failed: Redfish error (HTTP 501)"
     assert result.data["Status"] == "ok"
-    assert result.data["reboot_error"] == "Failed acquire result. Status code 501"
+    assert result.data["reboot_error"] == "Redfish error (HTTP 501)"
     assert len(patches) == 1
     assert patches[0].path.lower() == "/redfish/v1/systems/1"
     assert patches[0].json() == {

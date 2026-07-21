@@ -93,7 +93,9 @@ def test_network_adapter_reset_reports_root_read_failures(gb300_corpus_mock):
     assert isinstance(result, CommandResult)
     assert result.data is None
     assert "failed to read /redfish/v1/Chassis" in result.error
-    assert "Authentication failed" in result.error
+    # 401 is normalized to the Redfish error envelope (HTTP status preserved),
+    # not the old hardcoded "Authentication failed." string.
+    assert "HTTP 401" in result.error
     assert _post_requests(service) == []
 
 
