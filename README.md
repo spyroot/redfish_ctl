@@ -184,9 +184,10 @@ export REDFISH_PASSWORD='your-password'
 export REDFISH_PORT=443
 ```
 
-Any of these can be overridden per-invocation by a CLI flag. The flags keep their legacy names —
-`--idrac_ip`, `--idrac_username`, `--idrac_password`, `--idrac_port` — so existing scripts don't
-break; the `REDFISH_*` env vars above are the preferred way to configure the connection.
+Any of these can be overridden per-invocation by a CLI flag. The canonical flags are
+`--host`, `--username`, `--password`, and `--port`; the legacy aliases
+`--idrac_ip`, `--idrac_username`, `--idrac_password`, and `--idrac_port` still work for
+existing scripts.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.

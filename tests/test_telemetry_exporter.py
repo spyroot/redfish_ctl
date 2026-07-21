@@ -627,6 +627,7 @@ def test_exporter_env_file_loader_and_argv_secret_guard(tmp_path):
         "IDRAC_PASSWORD": "not-real",
         "IDRAC_PORT": "443",
     }
+    assert exporter_argv_uses_secret(["redfish_ctl", "--password", "not-real", "exporter"])
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password", "not-real", "exporter"])
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password=not-real", "exporter"])
     assert not exporter_argv_uses_secret(["idrac_ctl", "exporter"])
@@ -658,6 +659,15 @@ def test_exporter_env_file_supports_redfish_keys(tmp_path):
     assert args.idrac_username == "admin"
     assert args.idrac_password == "not-real"
     assert args.idrac_port == 443
+
+    canonical_args = argparse.Namespace(redfish_host="", redfish_username="root",
+                                        redfish_password="", redfish_port=443,
+                                        exporter_credential_file=str(env_file))
+    apply_exporter_env_file(canonical_args)
+    assert canonical_args.redfish_host == "203.0.113.10"
+    assert canonical_args.redfish_username == "admin"
+    assert canonical_args.redfish_password == "not-real"
+    assert canonical_args.redfish_port == 443
 
 
 def test_exporter_env_file_prefers_redfish_over_idrac(tmp_path):

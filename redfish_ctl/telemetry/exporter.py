@@ -108,7 +108,7 @@ ISO_DURATION = re.compile(
     r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
     r")?$"
 )
-SECRET_ARG_NAMES = {"--idrac_password", "--idrac-password"}
+SECRET_ARG_NAMES = {"--password", "--idrac_password", "--idrac-password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
 # datapoint endpoint (…/v2/datapoint), never a bare host.
@@ -400,23 +400,26 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
     if not file_path:
         return
     values = load_exporter_env_file(file_path)
-    # (namespace attr, REDFISH_* key, legacy IDRAC_* key). REDFISH_* wins when both
-    # are present in the file; IDRAC_* is the fallback.
+    # (canonical namespace attr, legacy namespace attr, REDFISH_* key, legacy
+    # IDRAC_* key). REDFISH_* wins when both are present in the file; IDRAC_* is
+    # the fallback. Legacy attrs keep older programmatic callers working.
     mapping = (
-        ("idrac_ip", "REDFISH_IP", "IDRAC_IP"),
-        ("idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
-        ("idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
-        ("idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
+        ("redfish_host", "idrac_ip", "REDFISH_IP", "IDRAC_IP"),
+        ("redfish_username", "idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
+        ("redfish_password", "idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
+        ("redfish_port", "idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
     )
-    for attr, redfish_key, idrac_key in mapping:
+    for primary_attr, legacy_attr, redfish_key, idrac_key in mapping:
+        attr = primary_attr if hasattr(args, primary_attr) else legacy_attr
         key = redfish_key if redfish_key in values else idrac_key
         if key not in values:
             continue
-        is_password = attr == "idrac_password"
+        is_password = attr in {"redfish_password", "idrac_password"}
         current = getattr(args, attr, "")
         if current in ("", None, "root") or is_password:
             value = values[key]
-            setattr(args, attr, int(value) if attr == "idrac_port" else value)
+            is_port = attr in {"redfish_port", "idrac_port"}
+            setattr(args, attr, int(value) if is_port else value)
 
 
 def resolve_identity_options(

@@ -4,7 +4,30 @@ Phase 1: `import redfish_ctl` and `from redfish_ctl.<sub> import ...` resolve to
 idrac_ctl modules (same objects). Phase 2: endpoint/credentials read REDFISH_* first,
 falling back to the legacy IDRAC_* names.
 """
-from redfish_ctl.redfish_main import _env
+import pytest
+
+from redfish_ctl.config import ConfigurationConflict, endpoint_defaults
+
+_ENDPOINT_ENV = (
+    "REDFISH_IP",
+    "REDFISH_USERNAME",
+    "REDFISH_PASSWORD",
+    "REDFISH_PORT",
+    "IDRAC_IP",
+    "IDRAC_USERNAME",
+    "IDRAC_PASSWORD",
+    "IDRAC_PORT",
+)
+
+
+def _clear_endpoint_env(monkeypatch):
+    """Remove endpoint env vars so tests never inherit shell state.
+
+    :param monkeypatch: pytest monkeypatch fixture.
+    :return: None.
+    """
+    for name in _ENDPOINT_ENV:
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_idrac_ctl_is_redfish_ctl_alias():
@@ -22,22 +45,45 @@ def test_idrac_ctl_submodule_is_same_object():
     assert aliased is real
 
 
-def test_env_prefers_redfish_over_idrac(monkeypatch):
-    """REDFISH_* wins when both it and the legacy IDRAC_* are set."""
+def test_endpoint_defaults_use_redfish_names(monkeypatch):
+    """REDFISH_* values populate the canonical endpoint defaults."""
+    _clear_endpoint_env(monkeypatch)
     monkeypatch.setenv("REDFISH_IP", "203.0.113.10")
-    monkeypatch.setenv("IDRAC_IP", "198.51.100.10")
-    assert _env("REDFISH_IP", "IDRAC_IP") == "203.0.113.10"
+    monkeypatch.setenv("REDFISH_USERNAME", "admin")
+    monkeypatch.setenv("REDFISH_PASSWORD", "secret")
+    monkeypatch.setenv("REDFISH_PORT", "8443")
+
+    defaults = endpoint_defaults()
+
+    assert defaults.host == "203.0.113.10"
+    assert defaults.username == "admin"
+    assert defaults.password == "secret"
+    assert defaults.port == 8443
 
 
-def test_env_falls_back_to_idrac(monkeypatch):
+def test_endpoint_defaults_fall_back_to_idrac(monkeypatch):
     """With REDFISH_* unset, the legacy IDRAC_* value is used."""
-    monkeypatch.delenv("REDFISH_IP", raising=False)
+    _clear_endpoint_env(monkeypatch)
     monkeypatch.setenv("IDRAC_IP", "198.51.100.20")
-    assert _env("REDFISH_IP", "IDRAC_IP") == "198.51.100.20"
+    monkeypatch.setenv("IDRAC_PORT", "8443")
+
+    defaults = endpoint_defaults()
+
+    assert defaults.host == "198.51.100.20"
+    assert defaults.port == 8443
+
+
+def test_endpoint_defaults_reject_conflicting_aliases(monkeypatch):
+    """Different canonical and legacy endpoint values fail closed."""
+    _clear_endpoint_env(monkeypatch)
+    monkeypatch.setenv("REDFISH_IP", "203.0.113.10")
+    monkeypatch.setenv("IDRAC_IP", "198.51.100.20")
+
+    with pytest.raises(ConfigurationConflict):
+        endpoint_defaults()
 
 
 def test_env_default_when_none_set(monkeypatch):
     """Neither set -> the provided default."""
-    monkeypatch.delenv("REDFISH_USERNAME", raising=False)
-    monkeypatch.delenv("IDRAC_USERNAME", raising=False)
-    assert _env("REDFISH_USERNAME", "IDRAC_USERNAME", default="root") == "root"
+    _clear_endpoint_env(monkeypatch)
+    assert endpoint_defaults().username == "root"

@@ -30,6 +30,22 @@ def _cmd(host, password="mock", is_http=False):
     )
 
 
+def test_constructor_accepts_canonical_connection_keywords():
+    """Commands accept host/username/password/port without legacy keyword names."""
+    cmd = SystemQuery(
+        host="10.9.9.30",
+        username="admin",
+        password="secret",
+        port=8443,
+        insecure=True,
+    )
+
+    assert cmd.host == "10.9.9.30:8443"
+    assert cmd.idrac_ip == "10.9.9.30:8443"
+    assert cmd.username == "admin"
+    assert cmd.password == "secret"
+
+
 def test_two_connections_get_distinct_instances():
     """Different BMCs must never share a command instance.
 

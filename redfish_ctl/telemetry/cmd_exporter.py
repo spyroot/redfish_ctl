@@ -80,7 +80,7 @@ class Exporter(RedfishManagerBase,
             help="output format for --once or push mode")
         cmd_parser.add_argument(
             "--label-bmc-ip", dest="label_bmc_ip", default=None, type=str,
-            help="BMC IP used only for metric dimensions when different from IDRAC_IP")
+            help="BMC IP used only for metric dimensions when different from REDFISH_IP")
         cmd_parser.add_argument(
             "--vendor", default=None, type=str,
             help="vendor dimension override, e.g. supermicro or dell")

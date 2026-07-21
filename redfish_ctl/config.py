@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 import warnings
+from dataclasses import dataclass
 from typing import Optional
 
 # A name whose value must never appear in an error message.
@@ -34,6 +35,22 @@ class ConfigurationConflict(RuntimeError):
     (or any two names for the same setting) hold different values, so no silent
     override can pick a winner. See the registry specs/config/environment.yaml.
     """
+
+
+@dataclass(frozen=True)
+class EndpointConfig:
+    """Resolved Redfish endpoint defaults from the process environment.
+
+    :param host: BMC host or IP address.
+    :param username: BMC account username.
+    :param password: BMC account password.
+    :param port: BMC TCP port.
+    """
+
+    host: str
+    username: str
+    password: str
+    port: int
 
 
 def _redacted(name: str, value: str) -> str:
@@ -76,3 +93,22 @@ def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
             f"{winner} is a deprecated alias for {names[0]}; set {names[0]} instead",
             DeprecationWarning, stacklevel=2)
     return value
+
+
+def endpoint_defaults() -> EndpointConfig:
+    """Return endpoint defaults from canonical env vars and legacy aliases.
+
+    The canonical REDFISH_* names are resolved first. Deprecated IDRAC_* names
+    remain accepted as aliases through :func:`env_first`.
+
+    :return: endpoint defaults for the root CLI parser.
+    :raises ConfigurationConflict: when canonical and legacy env vars disagree.
+    :raises ValueError: when REDFISH_PORT/IDRAC_PORT is not an integer.
+    """
+    return EndpointConfig(
+        host=env_first("REDFISH_IP", "IDRAC_IP", default="") or "",
+        username=env_first(
+            "REDFISH_USERNAME", "IDRAC_USERNAME", default="root") or "",
+        password=env_first("REDFISH_PASSWORD", "IDRAC_PASSWORD", default="") or "",
+        port=int(env_first("REDFISH_PORT", "IDRAC_PORT", default="443")),
+    )

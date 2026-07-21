@@ -237,6 +237,54 @@ def test_bios_profile_cli_runs_without_bmc_credentials():
     assert payload["data"]["attributes"] == {"ProcCStates": "Disabled"}
 
 
+def test_bios_profile_cli_accepts_canonical_connection_flags():
+    """Canonical global connection flags parse without a live BMC."""
+    env = os.environ.copy()
+    for name in (
+            "REDFISH_IP",
+            "REDFISH_USERNAME",
+            "REDFISH_PASSWORD",
+            "REDFISH_PORT",
+            "IDRAC_IP",
+            "IDRAC_USERNAME",
+            "IDRAC_PASSWORD",
+            "IDRAC_PORT",
+    ):
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "redfish_ctl.redfish_main",
+            "--host",
+            "203.0.113.10",
+            "--username",
+            "root",
+            "--password",
+            "not-real",
+            "--port",
+            "443",
+            "--json_only",
+            "--nocolor",
+            "bios-profile",
+            "show",
+            "dell-cstates-off",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["data"]["name"] == "dell-cstates-off"
+
+
 def test_bios_profile_diff_cli_requires_bmc_connection():
     env = os.environ.copy()
     for name in (
@@ -270,7 +318,7 @@ def test_bios_profile_diff_cli_requires_bmc_connection():
     )
 
     assert result.returncode == 1
-    assert "Please indicate the idrac ip." in result.stdout
+    assert "Please indicate the Redfish host." in result.stdout
 
 
 def test_bios_profile_apply_cli_requires_bmc_credentials():
@@ -306,4 +354,4 @@ def test_bios_profile_apply_cli_requires_bmc_credentials():
     )
 
     assert result.returncode == 1
-    assert "Please indicate the idrac ip." in result.stdout
+    assert "Please indicate the Redfish host." in result.stdout
