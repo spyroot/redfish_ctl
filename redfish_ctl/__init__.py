@@ -128,6 +128,7 @@ from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *
 from .oem.cmd_hpe_test_actions import *
 from .oem.cmd_hpe_kerberos_keytab import *
+from .oem.cmd_dell_card_test_actions import *
 from .oem.cmd_nvidia_debug_token import *
 from .oem.cmd_smc_node_manager import *
 from .oem.cmd_hpe_chassis_actions import *

@@ -33,6 +33,13 @@ def test_policy_classifies_known_and_unknown():
     )
     for action in reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
+    dell_reversible_actions = (
+        "#DelliDRACCardService.SendTestEmailAlert",
+        "#DelliDRACCardService.SendTestSNMPTrap",
+        "#DelliDRACCardService.TestRsyslogServerConnection",
+    )
+    for action in dell_reversible_actions:
+        assert classify(action) is Destructiveness.REVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#HpeiLOAccountService.ImportKerberosKeytab") is Destructiveness.DESTRUCTIVE

@@ -117,6 +117,7 @@ class ApiRequestType(Enum):
     EventSubmitTest = auto()
     HpeTestActions = auto()
     HpeKerberosKeytabImport = auto()
+    DellCardTestActions = auto()
     NvidiaDebugToken = auto()
     HpeChassisActions = auto()
     EventServiceQuery = auto()
