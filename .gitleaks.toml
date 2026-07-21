@@ -1,0 +1,36 @@
+# gitleaks config for the repo.no-secrets gate (scripts/gates/repository/no-secrets.sh).
+# Keeps every default rule active and narrowly suppresses ONLY the known
+# false-positive class: Dell iDRAC credential-derived attribute values
+# (SNMPv3 v3 keys, IPMI keys, SHA256 password hashes + salts) in the public
+# corpora and the synthetic-hex contract test.
+#
+# Each allowlist requires BOTH an anchored corpus/test path AND a line matching
+# one of the specific Dell attribute names (condition = "AND", regexTarget =
+# "line"). A real secret placed under these paths later — an AWS key, a JWT, a
+# PEM private key on a normal line — does NOT match the attribute-name regex and
+# is still caught. Path-only allowlisting was rejected in review as too broad.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """Dell iDRAC credential-derived DellAttributes values in captured Redfish corpora.
+Per docs/internal/corpus/CORPA_POLICE.md the captures come from decommissioned, sandboxed,
+privately-addressed lab gear with throwaway credentials and are public by decided policy.
+Suppresses ONLY the specific Dell attribute lines (v3 keys, IPMI keys, SHA256 password hashes and
+salts), never an arbitrary secret elsewhere in the same file."""
+condition = "AND"
+regexTarget = "line"
+paths = [
+    '''^tests/[^/]*_corpus/.*''',
+    '''^tests/corpus/.*''',
+]
+regexes = ['''"Users\.\d+\.(SHA\d*v3Key|MD5v3Key|IPMIKey|SHA256Password|SHA256PasswordSalt)"''']
+
+[[allowlists]]
+description = """Synthetic Dell key fixtures in the corpus contract test — literal placeholder hex
+(0123456789abcdef..., deadbeef*8, cafebabe...) on the same Users.N.<attr> attribute lines, used to
+exercise redaction; never real keys."""
+condition = "AND"
+regexTarget = "line"
+paths = ['''^tests/test_full_corpus_contract\.py$''']
+regexes = ['''"Users\.\d+\.(SHA\d*v3Key|MD5v3Key|IPMIKey|SHA256Password|SHA256PasswordSalt)"''']
