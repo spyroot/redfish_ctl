@@ -109,6 +109,7 @@ class ApiRequestType(Enum):
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
     NetworkAdapters = auto()
+    NetworkAdapterReset = auto()
     NicFirmware = auto()
     NvLinkPorts = auto()
     Exporter = auto()
