@@ -46,6 +46,10 @@ application:
     REDFISH_EXPORTER_BMC_OCTET_BASE:    {alias: IDRAC_EXPORTER_BMC_OCTET_BASE,   interpreted: true}
     REDFISH_EXPORTER_SERVER_OCTET_BASE: {alias: IDRAC_EXPORTER_SERVER_OCTET_BASE, interpreted: true}
     REDFISH_EXPORTER_SERVER_SUBNET:     {alias: IDRAC_EXPORTER_SERVER_SUBNET,    interpreted: false}
+    REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT: {alias: IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT, interpreted: false}
+    REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT: {alias: IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT, interpreted: true, default: both}
+    REDFISH_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT: {alias: IDRAC_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT, interpreted: true}
+    REDFISH_EXPORTER_EXTRA_DIMENSIONS:   {alias: IDRAC_EXPORTER_EXTRA_DIMENSIONS, interpreted: true}
     # canonical-only (no IDRAC_* alias by design — do not auto-generate one)
     REDFISH_SCHEME:                     {alias: null, interpreted: false, default: https}
     REDFISH_CSDL_DIR:                   {alias: null, interpreted: true}
@@ -80,6 +84,10 @@ application:
     IDRAC_EXPORTER_BMC_OCTET_BASE:    {canonical: REDFISH_EXPORTER_BMC_OCTET_BASE,    read_direct: false}
     IDRAC_EXPORTER_SERVER_OCTET_BASE: {canonical: REDFISH_EXPORTER_SERVER_OCTET_BASE, read_direct: false}
     IDRAC_EXPORTER_SERVER_SUBNET:     {canonical: REDFISH_EXPORTER_SERVER_SUBNET,     read_direct: false}
+    IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT: {canonical: REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT, read_direct: false}
+    IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT: {canonical: REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT, read_direct: false}
+    IDRAC_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT: {canonical: REDFISH_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT, read_direct: false}
+    IDRAC_EXPORTER_EXTRA_DIMENSIONS:   {canonical: REDFISH_EXPORTER_EXTRA_DIMENSIONS,   read_direct: false}
 
   # App-owned config that LOOKS external but is consumed by the tool's OWN
   # urllib request (parsed/validated), so it is NOT pass-through.

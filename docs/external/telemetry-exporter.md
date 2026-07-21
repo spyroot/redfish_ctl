@@ -161,6 +161,8 @@ Every series carries the join labels used by the GB300 dashboards:
 | `server.address` | `192.0.2.{40+N}` |
 | `bmc.ip` | BMC address from `REDFISH_IP` or `--label-bmc-ip` |
 | `vendor` | `supermicro`, `dell`, or the value passed with `--vendor` |
+| `deployment.environment` | Optional value from `--deployment-environment` or `REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT` |
+| `deployment.environment.name` | The same optional value, emitted by default for newer OTel-compatible consumers |
 
 The default slot math is `N = BMC last octet - 20`. For BMC `192.0.2.29`, the exporter labels the
 series as `host.name=gb300-poc1-slot9`, `node=slot9`, and `server.address=192.0.2.49`.
@@ -175,6 +177,14 @@ Override the identity math with `--identity-host-prefix`, `--identity-bmc-octet-
 from the process environment. A config spec can also carry them; the sample
 `specs/exporter_signalfx_spec.json`, defined in this repository's `specs/` directory, uses the
 `identity` object for these fields.
+
+Set `--deployment-environment nv72-gb300`, defined by the exporter command, when dashboards or
+detectors join Redfish hardware metrics with another producer by deployment environment. The value
+is normalized to lowercase and emitted as both `deployment.environment` and
+`deployment.environment.name` unless `--deployment-environment-compat deprecated|stable` narrows the
+compatibility mode. Use `--require-deployment-environment` in a fleet manifest to fail startup when
+that join key is missing. For a bounded extra label, use `--dimension telemetry.source=redfish`; it
+cannot override identity labels or carry URL/token-shaped values.
 
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
@@ -242,9 +252,10 @@ redfish_ctl exporter --vendor supermicro --output otlp --once             # push
 ```
 
 The contract is unchanged: metric names and dimension keys are identical to the Prometheus/SignalFx
-outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`) map to
-OTel **resource** attributes; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`,
-`resource_type`, `resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
+outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`,
+`deployment.environment`, `deployment.environment.name`) map to OTel **resource** attributes when
+present; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`, `resource_type`,
+`resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
 byte/frame/error/packet/count totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything
 instantaneous stays a **Gauge**.
 

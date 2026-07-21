@@ -5,7 +5,8 @@ mapped onto the OTLP data model so ``redfish_ctl`` drops into an existing
 OpenTelemetry pipeline as just another producer:
 
 * identity dimensions (``host.name``/``server.address``/``bmc.ip``/``node``/
-  ``vendor``) become OTel **resource** attributes; the remaining per-metric
+  ``vendor``/``deployment.environment``/``deployment.environment.name``)
+  become OTel **resource** attributes when present; the remaining per-metric
   dimensions (``gpu``/``port``/``chassis``/``system``/``index``) become
   **datapoint** attributes;
 * monotonic cumulative counters (fabric byte/frame/error/packet/discard/count
@@ -23,8 +24,10 @@ import os
 import time
 from typing import Callable, Iterable, Optional
 
+from .identity import RESOURCE_DIMENSIONS
+
 # Identity dims that describe the emitting host -> OTel resource attributes.
-RESOURCE_DIM_KEYS = ("host.name", "server.address", "bmc.ip", "node", "vendor")
+RESOURCE_DIM_KEYS = RESOURCE_DIMENSIONS
 
 # A metric is a monotonic cumulative counter (OTLP Sum) when its name ends with
 # one of these suffixes, or is total energy. Everything else is a Gauge.
