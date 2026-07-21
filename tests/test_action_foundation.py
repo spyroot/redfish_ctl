@@ -71,6 +71,8 @@ def test_policy_classifies_known_and_unknown():
     )
     for action in card_group_actions:
         assert classify(action) is Destructiveness.DESTRUCTIVE
+    assert classify("#SecureBoot.ResetKeys") is Destructiveness.DESTRUCTIVE
+    assert classify("#SecureBootDatabase.ResetKeys") is Destructiveness.DESTRUCTIVE
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE

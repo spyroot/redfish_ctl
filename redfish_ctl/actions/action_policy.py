@@ -158,6 +158,7 @@ ACTION_POLICY = {
     "#DellRaidService.PrepareToRemove": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.RebuildPhysicalDisk": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
+    "#SecureBoot.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
     "#UpdateService.SimpleUpdate": Destructiveness.DESTRUCTIVE,
