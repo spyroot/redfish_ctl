@@ -1,0 +1,10 @@
+# Orphaned requests.<verb> calls: outside a client_span AND not handed to a
+# tracing wrapper (traced_request / traced_request_callable). Wrap each so it
+# joins the trace, then delete its line. New orphans fail the gate.
+redfish_ctl/cmd_wait.py:38
+redfish_ctl/discover/cli.py:220
+redfish_ctl/discovery/net_scan.py:61
+redfish_ctl/redfish_manager.py:237
+redfish_ctl/redfish_manager.py:245
+redfish_ctl/redfish_manager_base.py:370
+redfish_ctl/redfish_manager_base.py:378
