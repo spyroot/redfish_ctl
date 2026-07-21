@@ -10,6 +10,8 @@ Author Mus spyroot@gmail.com
 import json
 from unittest import mock
 
+import pytest
+
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter import (
     build_readback_result,
@@ -39,24 +41,48 @@ def test_readback_counts_visible_series():
     """A metric with time series in MTS reports count>0 and the newest stamp."""
     payload = {"count": 2, "results": [
         {"lastUpdated": 1700000000000}, {"lastUpdated": 1700000009000}]}
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp(payload)):
+    with mock.patch.object(exporter, "_open_signalfx_request", return_value=_FakeResp(payload)):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
     assert out == {"count": 2, "newest_ms": 1700000009000}
 
 
 def test_readback_zero_when_not_ingested():
     """The #363 case: POST succeeded but MTS shows no series -> count 0."""
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp({"count": 0, "results": []})):
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           return_value=_FakeResp({"count": 0, "results": []})):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
     assert out == {"count": 0, "newest_ms": 0}
 
 
 def test_verify_readback_covers_each_metric():
     """verify_signalfx_readback returns a per-metric readback for every name."""
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp({"count": 1, "results": [{"created": 5}]})):
+    with mock.patch.object(
+            exporter, "_open_signalfx_request",
+            return_value=_FakeResp({"count": 1, "results": [{"created": 5}]})):
         out = verify_signalfx_readback("us1", "tok", ["hw.power", "hw.temperature"])
     assert set(out) == {"hw.power", "hw.temperature"}
     assert all(v["count"] == 1 for v in out.values())
+
+
+def test_readback_uses_no_redirect_token_request():
+    """MTS readback sends the token through the redirect-disabled request helper."""
+    captured = []
+
+    def refuse_redirect(request, timeout):
+        captured.append((request, timeout))
+        raise ValueError("SignalFx request refused redirect")
+
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           side_effect=refuse_redirect):
+        with pytest.raises(ValueError, match="refused redirect"):
+            signalfx_metric_readback("us1", "api-token", "hw.power")
+
+    assert len(captured) == 1
+    request, timeout = captured[0]
+    assert timeout == 20.0
+    assert request.full_url.startswith("https://api.us1.signalfx.com/v2/metrictimeseries?")
+    headers = {key.lower(): value for key, value in request.header_items()}
+    assert headers["x-sf-token"] == "api-token"
 
 
 def test_readback_scopes_query_by_dimension():
