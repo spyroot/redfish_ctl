@@ -4,8 +4,8 @@ Author: Mus <spyroot@gmail.com>
 
 `redfish_ctl` emits OpenTelemetry **metrics** and **traces** over OTLP, so a fleet of server BMCs —
 and the operations run against them — become visible in Splunk Observability APM (or any OTLP
-backend: Grafana Tempo/Mimir, an OpenTelemetry Collector, etc.). No agent on the host, no code in the
-firmware; everything is read out-of-band over the Redfish API and shipped as standard telemetry.
+backend: Grafana Tempo/Mimir, an OpenTelemetry Collector, etc.). No host-side daemon and no code in
+the firmware; everything is read out-of-band over the Redfish API and shipped as standard telemetry.
 
 ## What problem this addresses
 
@@ -13,8 +13,9 @@ At fleet scale (hundreds to thousands of servers, each with a different tuning p
 team mutates BMCs constantly — tuning BIOS, upgrading firmware, setting boot order, remediating
 drift — usually through a k8s operator. Without telemetry, that activity is invisible: which node's
 BIOS apply failed, which vendor's firmware flash is slow, which reconcile is stuck waiting on a
-reboot. `redfish_ctl` turns every read and every mutation into a span, so that activity shows up as a
-normal APM service map + trace waterfall + per-operation error/latency breakdown.
+reboot. `redfish_ctl` wraps command executions in operation spans and traced Redfish request helpers
+in client spans, so covered activity shows up as a normal APM service map, trace waterfall, and
+per-operation error/latency breakdown.
 
 ## Who it is for
 
@@ -44,13 +45,14 @@ flowchart LR
 Two signals, one pipeline:
 
 - **Traces.** Each command run through the engine opens an **operation span** named by the command
-  (`firmware-update`, `bios-change`, `reboot`). Every BMC HTTP call inside it opens a `SpanKind.CLIENT`
-  span (`redfish.bmc.request`) carrying `peer.service="bmc"`. Because the BMC is uninstrumented, Splunk
+  (`firmware-update`, `bios-change`, `reboot`). BMC calls routed through the manager HTTP verbs, the
+  Redfish action primitive, and the firmware upload helper open `SpanKind.CLIENT` spans
+  (`redfish.bmc.request`) carrying `peer.service="bmc"`. Because the BMC is uninstrumented, Splunk
   infers it as a single downstream service node — so a whole fleet renders as `redfish-ctl → bmc`, not
   one node per address. Failures set the span to ERROR (from the HTTP status or `CommandResult.error`),
-  which drives the red edges, error rate, and Root Cause in APM. See the span model in
-  [`.internal/design-notes/splunk-apm-traces/`] (design notes) and the code in
-  `redfish_ctl/telemetry/tracing.py`.
+  which drives the red edges, error rate, and Root Cause in APM. The public span contract lives in
+  `specs/telemetry/span_contract.yaml`; the merge-gate coverage requirements live in
+  `specs/telemetry/gates.md`, and the implementation is in `redfish_ctl/telemetry/tracing.py`.
 - **Metrics.** The exporter samples hardware state (power, thermal, fans, GPU, leak detection, fabric)
   into the stable `hw.*` metric family. Traces say *what operation ran and whether it failed*; metrics
   say *what the hardware did* — a firmware-update span sits next to the `hw.power` spike it caused,
@@ -63,7 +65,7 @@ within the Troubleshooting MetricSet cardinality budget.
 
 ## Quick start — stream to Splunk in three commands
 
-Install with the OTLP extra, point at your collector (or Splunk OTLP endpoint), and run any command
+Install with the OTLP extra, point at your collector (or Splunk OTLP endpoint), and run a command
 with tracing on:
 
 ```bash
@@ -93,6 +95,6 @@ to an in-cluster Collector), see the [Kubernetes guide](../k8s/README.md) and th
 
 ## Try it with zero hardware
 
-The mock BMC serves the committed GB300 corpus over HTTP and can replay mutations, so the full
-read-and-mutate path — and the traces it produces — can be exercised with no real BMC. See
+The mock BMC serves the committed GB300 corpus over HTTP and can replay captured mutations, so
+supported read paths and replay-backed mutation paths can be exercised with no real BMC. See
 [Simulation and replay](simulation-and-replay.md).
