@@ -23,8 +23,16 @@ import os
 import time
 from typing import Callable, Iterable, Optional
 
-# Identity dims that describe the emitting host -> OTel resource attributes.
-RESOURCE_DIM_KEYS = ("host.name", "server.address", "bmc.ip", "node", "vendor")
+# Identity dims that describe the emitting host/deployment/service -> OTel resource
+# attributes. service.name and deployment.environment[.name] are emitted as dimensions on
+# the SignalFx/Prometheus planes, but on OTLP they are process-scoped Resource attributes
+# (lifted here, and stripped from datapoint attributes below to avoid a double-emit).
+RESOURCE_DIM_KEYS = ("host.name", "server.address", "bmc.ip", "node", "vendor",
+                     "service.name", "deployment.environment", "deployment.environment.name")
+# The unresolved deployment sentinel: OTel defines no "unknown environment" convention
+# and a Resource attribute is a factual claim, so an unknown value is omitted from the
+# OTLP Resource entirely (the SignalFx/Prometheus join planes still carry it for #363).
+_DEPLOYMENT_ENVIRONMENT_UNKNOWN = "unknown"
 
 # A metric is a monotonic cumulative counter (OTLP Sum) when its name ends with
 # one of these suffixes, or is total energy. Everything else is a Gauge.
@@ -87,7 +95,11 @@ def _resource_attrs(samples, service_name: str) -> dict:
     for sample in samples:
         for key in RESOURCE_DIM_KEYS:
             if key in sample.dimensions and key not in attrs:
-                attrs[key] = sample.dimensions[key]
+                value = sample.dimensions[key]
+                if (key.startswith("deployment.environment")
+                        and value == _DEPLOYMENT_ENVIRONMENT_UNKNOWN):
+                    continue  # do not assert an unknown environment on the Resource
+                attrs[key] = value
     return attrs
 
 

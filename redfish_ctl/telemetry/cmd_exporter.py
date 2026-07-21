@@ -131,6 +131,38 @@ class Exporter(RedfishManagerBase,
             choices=("grpc", "http/protobuf"),
             help="OTLP transport for --output otlp; defaults to "
                  "OTEL_EXPORTER_OTLP_PROTOCOL, else grpc")
+        cmd_parser.add_argument(
+            "--deployment-environment", dest="deployment_environment",
+            default=None, type=str,
+            help="deployment.environment identity dimension the observability dashboard "
+                 "filters on, e.g. nv72-gb300 (issue #363). Dual-emitted as the deprecated "
+                 "deployment.environment and the stable deployment.environment.name so a "
+                 "mixed-version dashboard renders either. Package default 'unknown'; also "
+                 "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT. A custom cluster id or an OTel "
+                 "tier (development|production|staging|test), lowercased, and it must match "
+                 "the value co-resident collectors use for the same environment")
+        cmd_parser.add_argument(
+            "--deployment-environment-compat", dest="deployment_environment_compat",
+            default="both", choices=("both", "deprecated", "stable"),
+            help="which deployment key(s) to emit: both (default), deprecated "
+                 "(deployment.environment only), or stable (deployment.environment.name only)")
+        cmd_parser.add_argument(
+            "--require-deployment-environment", dest="require_deployment_environment",
+            action="store_true", default=False,
+            help="fail closed: refuse to start when deployment.environment resolves to "
+                 "'unknown'; set this in a fleet deploy so a forgotten value cannot "
+                 "silently recreate issue #363")
+        cmd_parser.add_argument(
+            "--service-name", dest="service_name", default=None, type=str,
+            help="OTel service.name (the logical service name) emitted on every series as a "
+                 "SignalFx/Prometheus dimension and the OTLP/trace resource attribute. "
+                 "Override only; defaults to 'redfish_ctl'. Also REDFISH_EXPORTER_SERVICE_NAME")
+        cmd_parser.add_argument(
+            "--dimension", dest="dimension", action="append", default=None,
+            metavar="KEY=VALUE",
+            help="extra metric dimension added to every series, repeatable, e.g. "
+                 "telemetry.source=redfish; may not override a discovered identity key "
+                 "(host.name/node/server.address/bmc.ip/vendor) or the deployment keys")
         help_text = ("serve Redfish telemetry as Prometheus /metrics, or push SignalFx "
                      "or OTLP (OpenTelemetry) datapoints")
         return cmd_parser, "exporter", help_text
@@ -280,7 +312,10 @@ class Exporter(RedfishManagerBase,
                         identity_host_prefix: Optional[str] = None,
                         identity_bmc_octet_base: Optional[int] = None,
                         identity_server_octet_base: Optional[int] = None,
-                        identity_server_subnet: Optional[str] = None) -> list:
+                        identity_server_subnet: Optional[str] = None,
+                        deployment_dims: Optional[dict] = None,
+                        service_name: Optional[str] = None,
+                        extra_dimensions: Optional[dict] = None) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -292,6 +327,11 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param deployment_dims: deployment.environment identity dimensions merged onto every
+            sample (the #363 join key); None/empty adds none.
+        :param service_name: OTel service.name (logical service name) emitted on every
+            sample; defaults to 'redfish_ctl' at the call site when None.
+        :param extra_dimensions: caller-supplied ``--dimension`` extras merged onto every sample.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
@@ -306,6 +346,12 @@ class Exporter(RedfishManagerBase,
             vendor=self._vendor_label(vendor),
             **identity_options,
         )
+        if deployment_dims:
+            identity.update(deployment_dims)
+        if service_name:
+            identity["service.name"] = service_name
+        if extra_dimensions:
+            identity.update(extra_dimensions)
         environment_rows = self._environment_command_rows(do_async=do_async)
         thermal_rows = self._thermal_rows(do_async=do_async, do_expanded=do_expanded)
         sensor_rows = self._invoke_rows(ApiRequestType.Sensors, "sensors",
@@ -365,6 +411,11 @@ class Exporter(RedfishManagerBase,
                 identity_server_subnet: Optional[str] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
+                deployment_environment: Optional[str] = None,
+                deployment_environment_compat: Optional[str] = "both",
+                require_deployment_environment: Optional[bool] = False,
+                service_name: Optional[str] = None,
+                dimension: Optional[list] = None,
                 **kwargs) -> CommandResult:
         """Scrape once, serve Prometheus, or push SignalFx/OTLP datapoints.
 
@@ -402,6 +453,16 @@ class Exporter(RedfishManagerBase,
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
             OTEL_* env when None.
+        :param deployment_environment: deployment.environment identity value the dashboard
+            filters on (issue #363); resolved from the env, else the 'unknown' default.
+        :param deployment_environment_compat: which deployment key(s) to emit — ``both``
+            (default), ``deprecated``, or ``stable``.
+        :param require_deployment_environment: when True, refuse to start if
+            deployment.environment resolves to 'unknown' (fail-closed for a fleet deploy).
+        :param service_name: OTel service.name (logical service name) emitted on every
+            series as a dimension/label and the OTLP/trace resource attribute; resolved to
+            'redfish_ctl' when None.
+        :param dimension: repeatable ``key=value`` extra dimensions added to every series.
         :return: on ``once``, a CommandResult wrapping the rendered/pushed output and a
             sample-count summary; a CommandResult with empty payload when serving or looping
             forever.
@@ -429,6 +490,17 @@ class Exporter(RedfishManagerBase,
         identity_server_subnet = option(
             "identity_server_subnet", identity_server_subnet)
 
+        # Resolve the deployment/service identity ONCE (validates + fails closed here,
+        # before any scrape) so every sample this run emits carries the same dimensions.
+        deployment_dims = exporter.deployment_dimensions(
+            exporter.resolve_deployment_environment(
+                option("deployment_environment", deployment_environment),
+                require=bool(require_deployment_environment)),
+            compat=deployment_environment_compat or "both")
+        extra_dimensions = exporter.parse_extra_dimensions(dimension)
+        service_name_value = exporter.resolve_service_name(
+            option("service_name", service_name))
+
         def collect_current_samples():
             """Collect samples with the resolved exporter identity options.
 
@@ -443,6 +515,9 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base=identity_bmc_octet_base,
                 identity_server_octet_base=identity_server_octet_base,
                 identity_server_subnet=identity_server_subnet,
+                deployment_dims=deployment_dims,
+                service_name=service_name_value,
+                extra_dimensions=extra_dimensions,
             )
 
         if exporter_output == "otlp":
@@ -450,7 +525,8 @@ class Exporter(RedfishManagerBase,
             if once:
                 samples = collect_current_samples()
                 result = otlp.push_otlp(
-                    samples, endpoint=otlp_endpoint, protocol=otlp_protocol)
+                    samples, service_name=service_name_value,
+                    endpoint=otlp_endpoint, protocol=otlp_protocol)
                 return CommandResult(
                     None, None,
                     {"sample_count": len(samples), "export_result": str(result)}, None)
@@ -464,6 +540,7 @@ class Exporter(RedfishManagerBase,
 
             otlp.run_otlp_loop(
                 scrape_samples, float(interval or 30.0),
+                service_name=service_name_value,
                 endpoint=otlp_endpoint, protocol=otlp_protocol)
             return CommandResult(None, None, None, None)
 

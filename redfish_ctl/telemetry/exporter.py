@@ -208,6 +208,42 @@ _IDENTITY_ENV_KEYS = {
     ),
 }
 
+# --- deployment.environment identity (#363 join key) + generic dimension escape hatch ---
+# The exporter's hw.* series must carry the same deployment.environment dimension the
+# rest of the observability org filters on, or a deployment-scoped dashboard tab shows
+# nothing (issue #363: a datapoint POST returns 200 but the series never appears under
+# the filter because it lacks the filtered dimension). Package default is 'unknown'; a
+# deployment sets the real value via --deployment-environment or the env var. The generic
+# library never bakes a site-specific value.
+DEPLOYMENT_ENVIRONMENT_ENV_KEYS = (
+    "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT",
+    "IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT",
+)
+SERVICE_NAME_ENV_KEYS = (
+    "REDFISH_EXPORTER_SERVICE_NAME",
+    "IDRAC_EXPORTER_SERVICE_NAME",
+)
+DEPLOYMENT_ENVIRONMENT_UNKNOWN = "unknown"
+DEPLOYMENT_ENVIRONMENT_COMPAT_CHOICES = ("both", "deprecated", "stable")
+DEFAULT_SERVICE_NAME = "redfish_ctl"
+# An explicit deployment value that is a non-answer is a hard error, so a forgotten env
+# var surfaces as 'unknown' but a typed placeholder never masquerades as a real value.
+_DEPLOYMENT_ENVIRONMENT_SENTINELS = frozenset(
+    {"unknown", "none", "null", "nil", "n/a", "na"})
+# deployment.environment is a lowercase DNS-ish label: 1-63 chars of [a-z0-9._-],
+# starting and ending alphanumeric.
+_DEPLOYMENT_ENVIRONMENT_RE = re.compile(r"^[a-z0-9]([a-z0-9._-]{0,61}[a-z0-9])?$")
+# Identity/discovered keys a caller must NOT set via --dimension (use the dedicated
+# flag, or let the exporter discover it from the BMC).
+_RESERVED_DIMENSION_KEYS = frozenset({
+    "host.name", "node", "server.address", "bmc.ip", "vendor",
+    "deployment.environment", "deployment.environment.name", "service.name",
+})
+# Deterministic credential shapes refused in any caller-supplied identity value.
+_CREDENTIAL_SHAPE_MARKERS = ("://", "@")
+_CREDENTIAL_SHAPE_PREFIXES = (
+    "ghp_", "gho_", "ghu_", "ghs_", "github_pat_", "xox", "AKIA", "Bearer ", "eyJ")
+
 
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
@@ -351,6 +387,10 @@ def exporter_config_options(path: Optional[str] = None) -> dict:
             config, "identity", "identity_server_octet_base", "server_octet_base"),
         "identity_server_subnet": _config_value(
             config, "identity", "identity_server_subnet", "server_subnet"),
+        "deployment_environment": _config_value(
+            config, "identity", "deployment_environment", "deployment_environment"),
+        "service_name": _config_value(
+            config, "identity", "service_name", "service_name"),
     }
     return {
         key: value
@@ -450,6 +490,151 @@ def resolve_identity_options(
             else None
         ),
     }
+
+
+def _reject_credential_shape(value: str, field_name: str) -> None:
+    """Raise when a caller-supplied value looks like a leaked credential.
+
+    Screens only deterministic shapes (a URL with embedded credentials, a known token
+    prefix, a JWT header) so an ordinary id or UUID is never blocked.
+
+    :param value: the value to screen.
+    :param field_name: field name used in the error message.
+    :raises ValueError: when the value matches a credential shape.
+    """
+    if (any(marker in value for marker in _CREDENTIAL_SHAPE_MARKERS)
+            or any(value.startswith(prefix) for prefix in _CREDENTIAL_SHAPE_PREFIXES)):
+        raise ValueError(
+            f"{field_name} looks like a credential; refusing to use it as telemetry "
+            "identity")
+
+
+def resolve_deployment_environment(
+        explicit: Optional[str] = None,
+        config_value: Optional[str] = None,
+        require: bool = False) -> str:
+    """Resolve the ``deployment.environment`` identity value (the #363 join key).
+
+    Precedence: explicit CLI/programmatic value > JSON exporter config value >
+    ``REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT`` env > ``IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT``
+    legacy env > package default ``unknown``. The generic library never bakes a
+    site-specific value; a deployment sets it explicitly.
+
+    :param explicit: explicit CLI/programmatic value, if any.
+    :param config_value: value from the JSON exporter config, if any.
+    :param require: when True, refuse the ``unknown`` default (fail-closed for a fleet).
+    :return: the validated, lowercased deployment.environment value, or ``unknown``.
+    :raises ValueError: when an explicit value is empty, is a literal sentinel
+        (unknown/none/null/n/a), fails length/charset validation, looks like a
+        credential, or when ``require`` is set and no value is provided.
+    """
+    provided = _first_non_empty(
+        explicit, config_value,
+        *(os.environ.get(name) for name in DEPLOYMENT_ENVIRONMENT_ENV_KEYS),
+    )
+    if provided is None:
+        if require:
+            raise ValueError(
+                "deployment.environment is required but unset; set "
+                "--deployment-environment or REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT")
+        return DEPLOYMENT_ENVIRONMENT_UNKNOWN
+    value = str(provided).strip()
+    if not value:
+        raise ValueError("--deployment-environment must not be empty")
+    # Screen for a credential shape BEFORE lowercasing so case-sensitive markers
+    # (AKIA, Bearer, eyJ) are caught; the value is never echoed in an error/log.
+    _reject_credential_shape(value, "--deployment-environment")
+    value = value.lower()
+    if value in _DEPLOYMENT_ENVIRONMENT_SENTINELS:
+        raise ValueError(
+            "--deployment-environment must be a real environment; "
+            "unknown/none/null/n/a are rejected")
+    if len(value) > 63 or not _DEPLOYMENT_ENVIRONMENT_RE.match(value):
+        raise ValueError(
+            "--deployment-environment must be 1-63 chars of [a-z0-9._-] starting and "
+            "ending alphanumeric (value omitted from this message)")
+    return value
+
+
+def deployment_dimensions(value: str, compat: str = "both") -> dict[str, str]:
+    """Return the deployment identity dimensions for a compat mode (dual-emit by default).
+
+    OTel marks ``deployment.environment`` deprecated in favor of the stable
+    ``deployment.environment.name``; the default ``both`` emits the same value under each
+    key so a mixed-version dashboard renders whichever key it filters on.
+
+    :param value: the resolved deployment.environment value.
+    :param compat: ``both`` (default), ``deprecated`` (only the deprecated key), or
+        ``stable`` (only the stable key).
+    :return: dict of deployment identity dimensions to merge onto every sample.
+    :raises ValueError: when ``compat`` is not a known mode.
+    """
+    if compat not in DEPLOYMENT_ENVIRONMENT_COMPAT_CHOICES:
+        raise ValueError(
+            "deployment-environment-compat must be one of "
+            f"{DEPLOYMENT_ENVIRONMENT_COMPAT_CHOICES}; got {compat!r}")
+    dims: dict[str, str] = {}
+    if compat in ("both", "deprecated"):
+        dims["deployment.environment"] = value
+    if compat in ("both", "stable"):
+        dims["deployment.environment.name"] = value
+    return dims
+
+
+def parse_extra_dimensions(pairs: Optional[Iterable[str]]) -> dict[str, str]:
+    """Parse and validate ``--dimension KEY=VALUE`` overrides into a dimension dict.
+
+    A caller may add its own dimensions (for example ``telemetry.source=redfish``) but
+    not override a discovered identity key or the deployment join keys — those come from
+    the BMC or the dedicated flags.
+
+    :param pairs: iterable of ``key=value`` strings (repeatable ``--dimension``), or None.
+    :return: dict of validated extra dimensions to merge onto every sample.
+    :raises ValueError: when an entry is not ``key=value``, has an empty key or value,
+        targets a reserved key, or has a credential-shaped value.
+    """
+    extra: dict[str, str] = {}
+    for raw in pairs or ():
+        key, sep, val = str(raw).partition("=")
+        key = key.strip()
+        val = val.strip()
+        if not sep or not key or not val:
+            raise ValueError(f"--dimension must be a non-empty key=value; got {raw!r}")
+        if key in _RESERVED_DIMENSION_KEYS:
+            raise ValueError(
+                f"--dimension {key} is reserved (discovered from the BMC or set by a "
+                "dedicated flag); do not override it")
+        _reject_credential_shape(val, f"--dimension {key}")
+        extra[key] = val
+    return extra
+
+
+def resolve_service_name(explicit: Optional[str] = None,
+                         config_value: Optional[str] = None) -> str:
+    """Resolve the OTel ``service.name`` producer identity for the exporter.
+
+    Precedence mirrors the other identity settings; default ``redfish_ctl``.
+    ``service.name`` is an OTLP/trace resource attribute, not a SignalFx/Prometheus
+    dimension, so it identifies the producer without changing the metric join set.
+
+    :param explicit: explicit CLI/programmatic value, if any.
+    :param config_value: value from the JSON exporter config, if any.
+    :return: the validated service.name value.
+    :raises ValueError: when an explicit value is empty, too long, or looks like a credential.
+    """
+    provided = _first_non_empty(
+        explicit, config_value,
+        *(os.environ.get(name) for name in SERVICE_NAME_ENV_KEYS),
+    )
+    if provided is None:
+        return DEFAULT_SERVICE_NAME
+    value = str(provided).strip()
+    if not value:
+        raise ValueError("--service-name must not be empty")
+    if len(value) > 255:
+        raise ValueError("--service-name must be at most 255 characters")
+    _reject_credential_shape(value, "--service-name")
+    return value
 
 
 def build_metric_samples(
@@ -1429,12 +1614,20 @@ def _sample(metric: str,
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
-    """Build a dimension dict from identity plus non-empty extras.
+    """Build a dimension dict from the full identity plus non-empty extras.
 
-    :param identity: fixed join dimensions to seed the result.
-    :return: dimension mapping with the required dims plus any non-empty extras.
+    Carries EVERY identity dimension — the required join keys plus any deployment,
+    service, or caller-supplied dimensions merged into ``identity`` — while still
+    guaranteeing the required keys default to ``unknown`` when absent. (Seeding only
+    from ``REQUIRED_DIMENSIONS`` would silently drop deployment.environment and the
+    ``--dimension`` extras before they reach any emitted series — issue #363.)
+
+    :param identity: join + deployment/service/extra dimensions to seed the result.
+    :return: dimension mapping with every identity dim plus any non-empty extras.
     """
-    dims = {key: str(identity.get(key, "unknown")) for key in REQUIRED_DIMENSIONS}
+    dims = {key: str(value) for key, value in identity.items()}
+    for key in REQUIRED_DIMENSIONS:
+        dims.setdefault(key, "unknown")
     for key, value in extra.items():
         if value not in (None, ""):
             dims[key] = str(value)
