@@ -355,10 +355,10 @@ class RedfishManagerBase(RedfishManager):
         )
 
         inst = disp(
-            host=_host,
-            username=_username,
-            password=_password,
-            port=_port,
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -396,10 +396,10 @@ class RedfishManagerBase(RedfishManager):
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
-            host=_host,
-            username=_username,
-            password=_password,
-            port=_port,
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
             insecure=_insecure,
             is_http=_is_http
         )

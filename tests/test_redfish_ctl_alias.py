@@ -73,11 +73,21 @@ def test_endpoint_defaults_fall_back_to_idrac(monkeypatch):
     assert defaults.port == 8443
 
 
-def test_endpoint_defaults_reject_conflicting_aliases(monkeypatch):
+@pytest.mark.parametrize(
+    ("redfish_name", "redfish_value", "idrac_name", "idrac_value"),
+    [
+        ("REDFISH_IP", "203.0.113.10", "IDRAC_IP", "198.51.100.20"),
+        ("REDFISH_USERNAME", "admin", "IDRAC_USERNAME", "root"),
+        ("REDFISH_PASSWORD", "secret-a", "IDRAC_PASSWORD", "secret-b"),
+        ("REDFISH_PORT", "443", "IDRAC_PORT", "8443"),
+    ],
+)
+def test_endpoint_defaults_reject_conflicting_aliases(
+        monkeypatch, redfish_name, redfish_value, idrac_name, idrac_value):
     """Different canonical and legacy endpoint values fail closed."""
     _clear_endpoint_env(monkeypatch)
-    monkeypatch.setenv("REDFISH_IP", "203.0.113.10")
-    monkeypatch.setenv("IDRAC_IP", "198.51.100.20")
+    monkeypatch.setenv(redfish_name, redfish_value)
+    monkeypatch.setenv(idrac_name, idrac_value)
 
     with pytest.raises(ConfigurationConflict):
         endpoint_defaults()
