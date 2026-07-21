@@ -16,8 +16,10 @@ from redfish_ctl.telemetry.exporter import (
     apply_exporter_env_file,
     build_identity_dimensions,
     build_metric_samples,
+    common_sample_dimensions,
     exporter_argv_uses_secret,
     load_exporter_env_file,
+    parse_dimension_pairs,
     render_prometheus_text,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
@@ -86,7 +88,9 @@ def test_identity_options_resolve_from_environment(monkeypatch):
     dims = build_identity_dimensions(
         "203.0.113.29",
         vendor="dell",
-        **exporter_mod.resolve_identity_options(),
+        **exporter_mod.resolve_identity_options(
+            extra_dimensions="deployment=nv72-pro,deployment.environment=nv72-gb300",
+        ),
     )
 
     assert dims == {
@@ -95,7 +99,69 @@ def test_identity_options_resolve_from_environment(monkeypatch):
         "server.address": "198.51.100.119",
         "bmc.ip": "203.0.113.29",
         "vendor": "dell",
+        "deployment": "nv72-pro",
+        "deployment.environment": "nv72-gb300",
     }
+
+
+def test_extra_identity_dimensions_are_fixed_on_every_sample():
+    """Dashboard dimensions are carried by every hw.* sample, not only resource attrs."""
+    dims = build_identity_dimensions(
+        "172.25.230.29",
+        vendor="supermicro",
+        extra_dimensions={
+            "deployment": "nv72-pro",
+            "deployment.environment": "nv72-gb300",
+            "deployment.environment.name": "nv72-gb300",
+            "model": "deepseek-v4-pro",
+        },
+    )
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[{"Chassis": "HGX_GPU_0", "PowerWatts": {"Reading": 231.0}}],
+        sensor_rows=[],
+        nvlink_rows=[],
+        metric_report_rows=[],
+    )
+
+    assert samples
+    assert all(sample.dimensions["deployment"] == "nv72-pro" for sample in samples)
+    assert all(
+        sample.dimensions["deployment.environment.name"] == "nv72-gb300"
+        for sample in samples
+    )
+    assert all(sample.dimensions["model"] == "deepseek-v4-pro" for sample in samples)
+
+
+def test_dimension_parser_rejects_identity_override():
+    """Extra dimensions cannot rewrite the derived host identity by accident."""
+    assert parse_dimension_pairs(
+        "deployment=nv72-pro,model=deepseek-v4-pro"
+    ) == {"deployment": "nv72-pro", "model": "deepseek-v4-pro"}
+    with pytest.raises(ValueError, match="cannot override"):
+        build_identity_dimensions(
+            "172.25.230.29",
+            extra_dimensions={"host.name": "wrong-host"},
+        )
+
+
+def test_common_sample_dimensions_keep_dashboard_labels_only():
+    """Readback uses dimensions common to all samples and drops per-metric labels."""
+    identity = build_identity_dimensions(
+        "172.25.230.29",
+        vendor="supermicro",
+        extra_dimensions={"deployment.environment.name": "nv72-gb300"},
+    )
+    samples = [
+        MetricSample("hw.gpu.power", 1, identity | {"gpu": "GPU_0"}),
+        MetricSample("hw.gpu.power", 2, identity | {"gpu": "GPU_1"}),
+    ]
+
+    common = common_sample_dimensions(samples)
+
+    assert common["host.name"] == "gb300-poc1-slot9"
+    assert common["deployment.environment.name"] == "nv72-gb300"
+    assert "gpu" not in common
 
 
 def test_mapper_emits_chassis_gpu_and_fabric_samples():
@@ -519,6 +585,12 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "dimensions": {
+                "deployment": "nv72-pro",
+                "deployment.environment": "nv72-gb300",
+                "deployment.environment.name": "nv72-gb300",
+                "model": "deepseek-v4-pro",
+            },
         },
     }), encoding="utf-8")
 
@@ -529,6 +601,12 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
         "identity_bmc_octet_base": 20,
         "identity_server_octet_base": 100,
         "identity_server_subnet": "198.51.100",
+        "identity_dimensions": {
+            "deployment": "nv72-pro",
+            "deployment.environment": "nv72-gb300",
+            "deployment.environment.name": "nv72-gb300",
+            "model": "deepseek-v4-pro",
+        },
     }
 
 
@@ -620,6 +698,12 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "dimensions": {
+                "deployment": "nv72-pro",
+                "deployment.environment": "nv72-gb300",
+                "deployment.environment.name": "nv72-gb300",
+                "model": "deepseek-v4-pro",
+            },
         },
     }), encoding="utf-8")
 
@@ -650,6 +734,9 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     first_dims = calls[0]["body"]["gauge"][0]["dimensions"]
     assert first_dims["host.name"] == "rack-a-slot9"
     assert first_dims["server.address"] == "198.51.100.109"
+    assert first_dims["deployment"] == "nv72-pro"
+    assert first_dims["deployment.environment.name"] == "nv72-gb300"
+    assert first_dims["model"] == "deepseek-v4-pro"
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):

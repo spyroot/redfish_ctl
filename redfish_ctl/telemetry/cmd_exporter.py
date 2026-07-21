@@ -123,6 +123,11 @@ class Exporter(RedfishManagerBase,
             default=None, type=str,
             help="server.address subnet override for derived identity dimensions")
         cmd_parser.add_argument(
+            "--dimension", dest="identity_dimensions", action="append",
+            default=None, metavar="KEY=VALUE",
+            help="fixed dimension applied to every exported sample; repeat for "
+                 "dashboard filters such as deployment.environment or model")
+        cmd_parser.add_argument(
             "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
             help="OTLP collector endpoint for --output otlp; defaults to "
                  "OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -280,7 +285,8 @@ class Exporter(RedfishManagerBase,
                         identity_host_prefix: Optional[str] = None,
                         identity_bmc_octet_base: Optional[int] = None,
                         identity_server_octet_base: Optional[int] = None,
-                        identity_server_subnet: Optional[str] = None) -> list:
+                        identity_server_subnet: Optional[str] = None,
+                        identity_dimensions: Optional[list[str]] = None) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -292,6 +298,7 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param identity_dimensions: fixed dashboard/filter dimensions for every sample.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
@@ -300,6 +307,7 @@ class Exporter(RedfishManagerBase,
             bmc_octet_base=identity_bmc_octet_base,
             server_octet_base=identity_server_octet_base,
             server_subnet=identity_server_subnet,
+            extra_dimensions=identity_dimensions,
         )
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
@@ -363,6 +371,7 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base: Optional[int] = None,
                 identity_server_octet_base: Optional[int] = None,
                 identity_server_subnet: Optional[str] = None,
+                identity_dimensions: Optional[list[str]] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
@@ -398,6 +407,7 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param identity_dimensions: fixed dashboard/filter dimensions for every sample.
         :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
@@ -428,6 +438,7 @@ class Exporter(RedfishManagerBase,
             "identity_server_octet_base", identity_server_octet_base)
         identity_server_subnet = option(
             "identity_server_subnet", identity_server_subnet)
+        identity_dimensions = option("identity_dimensions", identity_dimensions)
 
         def collect_current_samples():
             """Collect samples with the resolved exporter identity options.
@@ -443,6 +454,7 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base=identity_bmc_octet_base,
                 identity_server_octet_base=identity_server_octet_base,
                 identity_server_subnet=identity_server_subnet,
+                identity_dimensions=identity_dimensions,
             )
 
         if exporter_output == "otlp":
@@ -502,15 +514,10 @@ class Exporter(RedfishManagerBase,
                         "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
                         "or SPLUNK_API_TOKEN)")
                 metric_names = sorted({sample.metric for sample in samples})
-                # Scope the readback to this host's MTS via its unique identity
-                # dimension, so a neighbor pushing the same metric is not mistaken
-                # for this host's series.
-                dimensions = {}
-                for sample in samples:
-                    host = sample.dimensions.get("host.name")
-                    if host:
-                        dimensions = {"host.name": host}
-                        break
+                # Scope readback by the dimensions fixed across every sample, so
+                # host identity and dashboard filters are proven without
+                # accidentally including metric-specific gpu/sensor labels.
+                dimensions = exporter.common_sample_dimensions(samples)
                 readback_start = time.monotonic()
                 readback = exporter.verify_signalfx_readback(
                     realm, api_token, metric_names, dimensions)

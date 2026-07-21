@@ -62,9 +62,24 @@ def test_verify_readback_covers_each_metric():
 def test_readback_scopes_query_by_dimension():
     """The MTS query is scoped by the entity dimension so only this host's series
     is read back, not every host reporting the metric (Splunk MTS identity)."""
-    assert exporter._mts_query("hw.power", {"host.name": "slot1"}) == (
-        'sf_metric:"hw.power" AND host.name:"slot1"')
+    assert exporter._mts_query(
+        "hw.power",
+        {
+            "deployment.environment.name": "nv72-gb300",
+            "host.name": "slot1",
+            "model": "deepseek-v4-pro",
+        },
+    ) == (
+        'sf_metric:"hw.power" AND '
+        'deployment.environment.name:"nv72-gb300" AND '
+        'host.name:"slot1" AND model:"deepseek-v4-pro"')
     assert exporter._mts_query("hw.power") == 'sf_metric:"hw.power"'
+
+
+def test_readback_query_escapes_term_values():
+    """Quoted or backslash-bearing dimensions are escaped in the MTS query."""
+    assert exporter._mts_query("hw.power", {"host.name": 'slot"1\\a'}) == (
+        'sf_metric:"hw.power" AND host.name:"slot\\"1\\\\a"')
 
 
 _NOW = 1_700_000_000_000

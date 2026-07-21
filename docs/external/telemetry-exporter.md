@@ -176,6 +176,11 @@ from the process environment. A config spec can also carry them; the sample
 `specs/exporter_signalfx_spec.json`, defined in this repository's `specs/` directory, uses the
 `identity` object for these fields.
 
+Add fixed dashboard dimensions with repeated `--dimension KEY=VALUE` options or with
+`identity.dimensions` in the exporter config spec. These dimensions are merged into every sample, so
+Splunk dashboard filters such as `deployment.environment`, `deployment.environment.name`, and `model`
+match Redfish `hw.*` datapoints the same way they match host and GPU telemetry.
+
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
 falls back to the reported sensor name.
@@ -202,6 +207,10 @@ redfish_ctl exporter \
   --credential-file .internal/idrac_exporter.env \
   --exporter-config specs/exporter_signalfx_spec.json \
   --vendor supermicro \
+  --dimension deployment=nv72-pro \
+  --dimension deployment.environment=nv72-gb300 \
+  --dimension deployment.environment.name=nv72-gb300 \
+  --dimension model=deepseek-v4-pro \
   --output signalfx \
   --push-signalfx
 ```

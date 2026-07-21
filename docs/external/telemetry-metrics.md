@@ -81,8 +81,11 @@ redfish_ctl exporter --vendor supermicro --output signalfx --push-signalfx
    rows), plus `hw.temperature`, `hw.energy_kwh`, and `hw.leak.state` from
    the non-MetricReport samplers. Every datapoint carries these dimensions
    for filtering/grouping: `host.name`, `node`, `server.address`, `bmc.ip`,
-   and `vendor`; report-derived datapoints also carry `report` and any
-   applicable `gpu`, `port`, `sensor`, `memory`, or state label.
+   and `vendor`; deployments can add fixed dashboard dimensions such as
+   `deployment.environment`, `deployment.environment.name`, and `model` with
+   `--dimension` or the exporter config spec. Report-derived datapoints also
+   carry `report` and any applicable `gpu`, `port`, `sensor`, `memory`, or
+   state label.
 
 3. Confirm points are arriving with a chart or SignalFlow query, for example
    fabric receive rate per port on one host:

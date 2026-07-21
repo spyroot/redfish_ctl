@@ -148,7 +148,8 @@ def build_identity_dimensions(
         host_prefix: str = "gb300-poc1",
         bmc_octet_base: int = 20,
         server_octet_base: int = 40,
-        server_subnet: Optional[str] = None) -> dict[str, str]:
+        server_subnet: Optional[str] = None,
+        extra_dimensions: Optional[Mapping | Iterable[str]] = None) -> dict[str, str]:
     """Return the fixed join dimensions required on every exported series.
 
     :param bmc_ip: BMC management IP; its final octet derives the slot/node.
@@ -158,8 +159,10 @@ def build_identity_dimensions(
     :param server_octet_base: host last-octet offset added to the slot for ``server.address``.
     :param server_subnet: override for the first three octets of ``server.address``;
         defaults to the BMC subnet.
+    :param extra_dimensions: fixed non-identity dimensions to apply to every
+        sample, as a mapping or ``KEY=VALUE`` iterable.
     :return: dict of ``host.name``, ``node``, ``server.address``, ``bmc.ip`` and
-        ``vendor`` dimensions.
+        ``vendor`` dimensions plus any fixed extra dimensions.
     """
     bmc = str(bmc_ip or "unknown")
     parts = bmc.split(".")
@@ -173,13 +176,20 @@ def build_identity_dimensions(
         node = "unknown"
         host = bmc
         server = "unknown"
-    return {
+    dims = {
         "host.name": host,
         "node": node,
         "server.address": server,
         "bmc.ip": bmc,
         "vendor": str(vendor or "unknown").lower(),
     }
+    for key, value in parse_dimension_pairs(extra_dimensions).items():
+        if key in REQUIRED_DIMENSIONS and dims[key] != value:
+            raise ValueError(
+                f"extra dimension {key!r} cannot override the exporter identity; "
+                "use the dedicated identity options instead")
+        dims[key] = value
+    return dims
 
 
 # Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
@@ -207,6 +217,43 @@ _IDENTITY_ENV_KEYS = {
         "IDRAC_EXPORTER_SERVER_SUBNET",
     ),
 }
+def parse_dimension_pairs(value: Optional[Mapping | Iterable[str] | str]) -> dict[str, str]:
+    """Parse fixed exporter dimensions from a mapping, CSV string, or pairs.
+
+    :param value: mapping, comma-separated ``KEY=VALUE`` string, or iterable of
+        ``KEY=VALUE`` strings.
+    :return: sanitized dimension mapping with blank entries omitted.
+    :raises ValueError: when a dimension lacks a non-empty key or value.
+    """
+    if value in (None, ""):
+        return {}
+    if isinstance(value, Mapping):
+        raw_items = list(value.items())
+    else:
+        if isinstance(value, str):
+            parts = value.split(",")
+        else:
+            parts = list(value)
+        raw_items = []
+        for part in parts:
+            if part in (None, ""):
+                continue
+            text = str(part).strip()
+            if not text:
+                continue
+            if "=" not in text:
+                raise ValueError(f"dimension {text!r} must use KEY=VALUE")
+            key, item_value = text.split("=", 1)
+            raw_items.append((key, item_value))
+
+    dimensions: dict[str, str] = {}
+    for raw_key, raw_value in raw_items:
+        key = str(raw_key).strip()
+        dim_value = str(raw_value).strip()
+        if not key or not dim_value:
+            raise ValueError(f"dimension {raw_key!r} must have a non-empty key and value")
+        dimensions[key] = dim_value
+    return dimensions
 
 
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
@@ -351,6 +398,12 @@ def exporter_config_options(path: Optional[str] = None) -> dict:
             config, "identity", "identity_server_octet_base", "server_octet_base"),
         "identity_server_subnet": _config_value(
             config, "identity", "identity_server_subnet", "server_subnet"),
+        "identity_dimensions": _first_non_empty(
+            _config_value(config, "identity", "identity_dimensions", "dimensions"),
+            _config_value(config, "identity", "extra_dimensions", "extra_dimensions"),
+            config.get("dimensions"),
+            config.get("extra_dimensions"),
+        ),
     }
     return {
         key: value
@@ -411,13 +464,15 @@ def resolve_identity_options(
         host_prefix: Optional[str] = None,
         bmc_octet_base: Optional[int] = None,
         server_octet_base: Optional[int] = None,
-        server_subnet: Optional[str] = None) -> dict:
+        server_subnet: Optional[str] = None,
+        extra_dimensions: Optional[Mapping | Iterable[str] | str] = None) -> dict:
     """Resolve exporter identity dimension options from args, env, and defaults.
 
     :param host_prefix: explicit ``host.name`` prefix override.
     :param bmc_octet_base: explicit BMC last-octet base used to derive slot.
     :param server_octet_base: explicit server last-octet base used to derive host IP.
     :param server_subnet: explicit server subnet for ``server.address``.
+    :param extra_dimensions: fixed dimensions applied to every exported sample.
     :return: keyword arguments for :func:`build_identity_dimensions`.
     """
     resolved_host_prefix = _first_non_empty(
@@ -449,6 +504,7 @@ def resolve_identity_options(
             if resolved_server_subnet is not None
             else None
         ),
+        "extra_dimensions": parse_dimension_pairs(extra_dimensions),
     }
 
 
@@ -1121,10 +1177,41 @@ def _mts_query(metric: str, dimensions: Optional[Mapping] = None) -> str:
     :param dimensions: dimension key->value pairs to AND into the query.
     :return: the SignalFx search query string.
     """
-    terms = [f'sf_metric:"{metric}"']
+    terms = [f'sf_metric:"{_escape_mts_value(metric)}"']
     for key, value in sorted((dimensions or {}).items()):
-        terms.append(f'{key}:"{value}"')
+        terms.append(f'{key}:"{_escape_mts_value(value)}"')
     return " AND ".join(terms)
+
+
+def _escape_mts_value(value) -> str:
+    """Escape a value for a Splunk Observability MTS search term.
+
+    :param value: the raw metric or dimension value to place in a query term.
+    :return: the escaped string representation.
+    """
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def common_sample_dimensions(samples: Iterable[MetricSample]) -> dict[str, str]:
+    """Return dimensions that have the same value on every sample.
+
+    The canary readback should prove the fixed identity/dashboard dimensions
+    without accidentally adding metric-specific labels like ``gpu`` or ``sensor``.
+
+    :param samples: metric samples that will be pushed or read back together.
+    :return: dimensions whose key and value are common to every sample.
+    """
+    iterator = iter(samples)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return {}
+    common = dict(first.dimensions)
+    for sample in iterator:
+        for key in list(common):
+            if sample.dimensions.get(key) != common[key]:
+                common.pop(key, None)
+    return common
 
 
 def signalfx_metric_readback(
@@ -1434,7 +1521,13 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
     :param identity: fixed join dimensions to seed the result.
     :return: dimension mapping with the required dims plus any non-empty extras.
     """
-    dims = {key: str(identity.get(key, "unknown")) for key in REQUIRED_DIMENSIONS}
+    dims = {
+        str(key): str(value)
+        for key, value in identity.items()
+        if value not in (None, "")
+    }
+    for key in REQUIRED_DIMENSIONS:
+        dims.setdefault(key, str(identity.get(key, "unknown")))
     for key, value in extra.items():
         if value not in (None, ""):
             dims[key] = str(value)
