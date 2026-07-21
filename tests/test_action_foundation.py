@@ -22,6 +22,7 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#EventService.SubmitTestEvent") is Destructiveness.REVERSIBLE
     reversible_actions = (
         "#DellLCService.TestNetworkShare",
+    )
     assert classify("#HpeServerChassis.DisableMCTPOnServer") is Destructiveness.DESTRUCTIVE
     assert classify("#HpeServerChassis.FactoryResetMCTP") is Destructiveness.IRREVERSIBLE
     assert classify("#DelliDRACCardService.TestSEKMServerConnection") is (
@@ -35,6 +36,8 @@ def test_policy_classifies_known_and_unknown():
         "#HpeiLOManagerNetworkService.SendTestSyslog",
     )
     for action in reversible_actions:
+        assert classify(action) is Destructiveness.REVERSIBLE
+    for action in hpe_reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
     dell_reversible_actions = (
         "#DelliDRACCardService.SendTestEmailAlert",
