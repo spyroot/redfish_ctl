@@ -67,6 +67,7 @@ ACTION_POLICY = {
     "#DelliDRACCardService.SendTestEmailAlert": Destructiveness.REVERSIBLE,
     "#DelliDRACCardService.SendTestSNMPTrap": Destructiveness.REVERSIBLE,
     "#DelliDRACCardService.TestRsyslogServerConnection": Destructiveness.REVERSIBLE,
+    "#TelemetryService.SubmitTestMetricReport": Destructiveness.REVERSIBLE,
     "#VirtualMedia.InsertMedia": Destructiveness.REVERSIBLE,
     "#VirtualMedia.EjectMedia": Destructiveness.REVERSIBLE,
     "#CertificateService.GenerateCSR": Destructiveness.REVERSIBLE,

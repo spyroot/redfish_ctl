@@ -128,6 +128,7 @@ class ApiRequestType(Enum):
     MetricReportDefinitions = auto()
     TelemetryClearReports = auto()
     TelemetryResetMetricDefinitions = auto()
+    TelemetrySubmitTest = auto()
     ComponentIntegrity = auto()
     SpdmMeasurements = auto()
     DellSystemLcdErrors = auto()
