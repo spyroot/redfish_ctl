@@ -130,6 +130,7 @@ class ApiRequestType(Enum):
     HpeChassisActions = auto()
     DellCardCertExport = auto()
     DellCardHwProof = auto()
+    DellCardKeyManagement = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
     SubscriptionDelete = auto()

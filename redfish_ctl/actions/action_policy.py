@@ -133,6 +133,12 @@ ACTION_POLICY = {
     "#SmcNodeManager.ClearAllPolicies": Destructiveness.DESTRUCTIVE,
     "#DellMetricService.ControlMetrics": Destructiveness.DESTRUCTIVE,
     "#DellMetricService.ExportThermalHistory": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.DisableiLKM": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.DisableSEKM": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.EnableiLKM": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.EnableSEKM": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.Rekey": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.iLKMToSEKMTransition": Destructiveness.DESTRUCTIVE,
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,
