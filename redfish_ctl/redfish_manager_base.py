@@ -1460,6 +1460,7 @@ class RedfishManagerBase(RedfishManager):
         err = None
         response = None
         api_resp = RedfishApiRespond.Error
+        self._redfish_error = None
         try:
             r = f"{self._default_method}{self.redfish_ip}{resource}"
             if not do_async:
@@ -1549,6 +1550,10 @@ class RedfishManagerBase(RedfishManager):
         api_resp_msg = self.api_success_msg(api_resp)
         if redfish_resp is not None:
             api_resp_msg.update(api_resp_msg)
+        if api_resp == RedfishApiRespond.Error and err is None:
+            err = self._redfish_error
+            if err is None and response is not None:
+                err = self.parse_error(response)
 
         return CommandResult(api_resp_msg, None, None, err), api_resp
 
@@ -1930,9 +1935,8 @@ class RedfishManagerBase(RedfishManager):
         if api_resp == RedfishApiRespond.Error or error is not None:
             data["executed"] = False
             if error is None:
-                error = getattr(self, "_redfish_error", None)
-            if error is None:
-                error = f"action {full} failed with {api_resp.name}"
+                status_name = getattr(api_resp, "name", str(api_resp))
+                error = f"action {full} failed with {status_name}"
             return CommandResult(data, actions, None, error)
 
         data.setdefault("executed", True)
