@@ -86,6 +86,7 @@ class ApiRequestType(Enum):
     DellRaidRenameVD = auto()
     DellRaidPhysicalDiskActions = auto()
     DellRaidForeignConfigActions = auto()
+    DellRaidCheckValues = auto()
     StorageQuery = auto()
     Tasks = auto()
     GetTask = auto()

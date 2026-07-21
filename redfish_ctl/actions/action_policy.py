@@ -54,6 +54,7 @@ ACTION_POLICY = {
         Destructiveness.READ_ONLY
     ),
     "#DelliDRACCardService.VerifyHWProofOfPossession": Destructiveness.READ_ONLY,
+    "#DellRaidService.CheckVDValues": Destructiveness.READ_ONLY,
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
