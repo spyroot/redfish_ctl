@@ -9,6 +9,7 @@ dry-run unless ``--confirm`` is given, or additionally needs an explicit
 Fail-safe by construction: an action not in the table is treated as DESTRUCTIVE,
 so a newly exposed (unclassified) action can never POST without an explicit
 confirm. This module is product-neutral — it names standard DMTF plus known OEM
+confirm. This module is product-neutral — it names standard DMTF and vendor OEM
 action types and imports nothing from the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
@@ -36,8 +37,7 @@ class Destructiveness(Enum):
 
 
 # Keyed by the full Redfish action type "#Type.Action" (as discover_redfish_actions
-# reports it in RedfishAction.full_redfish_name). Covers the 25 action types the
-# GB300 NVL exposes plus a couple of standard siblings.
+# reports it in RedfishAction.full_redfish_name).
 ACTION_POLICY = {
     # read-only: a signed-measurement fetch carried over POST
     "#ComponentIntegrity.SPDMGetSignedMeasurements": Destructiveness.READ_ONLY,
@@ -92,6 +92,15 @@ ACTION_POLICY = {
     "#DellLicenseManagementService.ImportLicenseFromNetworkShare": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.AssignSpare": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.UnassignSpare": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportCompleteLCLog": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportFactoryConfiguration": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportHWInventory": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportLCLog": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportSVGFile": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportServerScreenShot": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportTechSupportReport": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportVideoLog": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExportePSADiagnosticsResult": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for

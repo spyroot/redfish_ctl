@@ -121,6 +121,7 @@ Safety labels:
 | `dell-lc-network-share-test` | Test Dell Lifecycle Controller network-share reachability; previews unless `--confirm` is given. | Guarded |
 | `dell-card-test-actions` | List or send Dell iDRAC card email, SNMP, and rsyslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-license-actions` | List or invoke Dell OEM license-management import, export, and delete actions; previews by default and `--confirm` posts. | Guarded |
+| `dell-lc-export` | Export Dell LC data; preview unless confirmed. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
