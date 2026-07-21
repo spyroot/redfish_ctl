@@ -15,6 +15,7 @@ from .dell_lc.cmd_dell_lc_services import *
 from .dell_lc.cmd_dell_lc_network_share_test import *
 from .dell_lc.cmd_dell_lc_supportassist_status import *
 from .metrics.cmd_dell_metric_actions import *
+from .dell_lc.cmd_dell_lc_os_health_update import *
 #
 # compute
 from .compute.cmd_power_state import *
