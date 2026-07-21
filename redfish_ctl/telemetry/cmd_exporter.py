@@ -14,7 +14,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishResponseCache
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from . import exporter
@@ -324,17 +324,24 @@ class Exporter(RedfishManagerBase,
                           api_type: ApiRequestType,
                           name: str,
                           extract_rows: Callable[[object], list],
+                          redfish_cache: Optional[RedfishResponseCache] = None,
                           **kwargs) -> exporter.CollectorResult:
         """Invoke a registered read-only collector and return its result model.
 
         :param api_type: ApiRequestType of the collector command.
         :param name: registered command name and collector label.
         :param extract_rows: callable that extracts the collector row list.
+        :param redfish_cache: optional per-scrape cache shared by collectors.
         :return: CollectorResult for the collector.
         """
         return self._collect_result(
             name,
-            lambda: self.sync_invoke(api_type, name, **kwargs),
+            lambda: self.sync_invoke(
+                api_type,
+                name,
+                redfish_cache=redfish_cache,
+                **kwargs,
+            ),
             extract_rows,
         )
 
@@ -423,16 +430,25 @@ class Exporter(RedfishManagerBase,
             return data
         return self._environment_rows(do_async=do_async)
 
-    def _vendor_label(self, vendor: Optional[str]) -> str:
+    def _vendor_label(self,
+                      vendor: Optional[str],
+                      redfish_cache: Optional[RedfishResponseCache] = None) -> str:
         """Return a stable lower-case vendor label.
 
         :param vendor: explicit vendor override; when falsy the vendor is auto-detected.
+        :param redfish_cache: optional per-scrape cache for the ServiceRoot read.
         :return: the vendor label, or ``"unknown"`` when neither is available.
         """
         if vendor:
             return vendor
         try:
-            detected = self.redfish_vendor
+            if redfish_cache is None:
+                detected = self.redfish_vendor
+            else:
+                service_root = self.base_query(
+                    "/redfish/v1/", redfish_cache=redfish_cache).data
+                detected = service_root.get("Vendor", "") \
+                    if isinstance(service_root, dict) else ""
         except Exception:
             detected = ""
         return detected or "unknown"
@@ -460,6 +476,7 @@ class Exporter(RedfishManagerBase,
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
+        redfish_cache = RedfishResponseCache()
         identity_options = exporter.resolve_identity_options(
             host_prefix=identity_host_prefix,
             bmc_octet_base=identity_bmc_octet_base,
@@ -468,7 +485,7 @@ class Exporter(RedfishManagerBase,
         )
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
-            vendor=self._vendor_label(vendor),
+            vendor=self._vendor_label(vendor, redfish_cache=redfish_cache),
             **identity_options,
         )
         collector_results = [
@@ -476,12 +493,14 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.EnvironmentMetrics,
                 "environment-metrics",
                 self._extract_environment_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
             ),
             self._invoke_collector(
                 ApiRequestType.Thermal,
                 "thermal",
                 self._extract_thermal_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -489,6 +508,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.Sensors,
                 "sensors",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -496,6 +516,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.NvLinkPorts,
                 "nvlink-ports",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -503,6 +524,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.MetricReports,
                 "metric-reports",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -510,12 +532,14 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.LeakDetectors,
                 "leak-detectors",
                 self._extract_leak_detector_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
             ),
             self._invoke_collector(
                 ApiRequestType.NetworkAdapters,
                 "network-adapters",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -523,6 +547,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.ComponentIntegrity,
                 "component-integrity",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
