@@ -390,7 +390,7 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         if loop is None:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
         await self.async_default_error_handler(await response)
         return await response
@@ -1061,7 +1061,7 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         if loop is None:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
         response = await self.api_async_patch_call(loop, r, payload, hdr)
         api_respond_status = await self.async_default_patch_success(
             await response, expected=expected, ignore_error_code=ignore_error_code)
@@ -1087,7 +1087,7 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         if loop is None:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
         response = await self.api_async_delete_call(loop, r, payload, hdr)
         api_respond_status = await self.async_default_delete_success(
             await response, expected=expected, ignore_error_code=ignore_error_code)
@@ -1113,7 +1113,7 @@ class RedfishManagerBase(RedfishManager):
         :return:
         """
         if loop is None:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
         response = await self.api_async_post_call(loop, r, payload, hdr)
         api_respond_status = await self.async_default_post_success(
             await response, ignore_error_code=ignore_error_code, expected=expected
@@ -1419,24 +1419,6 @@ class RedfishManagerBase(RedfishManager):
             ]
         return payload
 
-    @staticmethod
-    def _event_loop() -> asyncio.AbstractEventLoop:
-        """Return a usable event loop for a synchronous caller.
-
-        ``asyncio.get_event_loop()`` used to create a loop implicitly when none existed. Python 3.12
-        deprecated that and 3.14 removed it, so on 3.14 it raises RuntimeError and every async path in
-        this client dies before sending anything. Creating the loop explicitly when there is none keeps
-        one behaviour across 3.10 through 3.14.
-
-        :return: the running loop when one exists, otherwise a new loop installed for this thread.
-        :raises RuntimeError: never — the no-loop case is handled by creating one.
-        """
-        try:
-            return asyncio.get_event_loop_policy().get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return loop
 
     def base_request_respond(
             self,
