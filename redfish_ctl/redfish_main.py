@@ -47,7 +47,7 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
-from .config import ConfigurationConflict, endpoint_defaults
+from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_manager_base import RedfishManagerBase
 from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
@@ -89,20 +89,23 @@ _LEGACY_ENDPOINT_ATTRS = {
     "idrac_port": "redfish_port",
 }
 
-
 class _EndpointAliasAction(argparse.Action):
     """Argparse action that mirrors one option into canonical and legacy attrs."""
 
-    def __init__(self, option_strings, dest, legacy_dest=None, **kwargs):
+    def __init__(
+            self, option_strings, dest, legacy_dest=None, endpoint_field=None,
+            **kwargs):
         """Create a mirrored endpoint action.
 
         :param option_strings: option spellings handled by this action.
         :param dest: canonical argparse destination.
         :param legacy_dest: legacy argparse destination to mirror.
+        :param endpoint_field: endpoint field this option explicitly overrides.
         :param kwargs: additional argparse action options.
         :return: None.
         """
         self.legacy_dest = legacy_dest
+        self.endpoint_field = endpoint_field
         super().__init__(option_strings, dest, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
@@ -117,16 +120,25 @@ class _EndpointAliasAction(argparse.Action):
         setattr(namespace, self.dest, values)
         if self.legacy_dest is not None:
             setattr(namespace, self.legacy_dest, values)
+        if self.endpoint_field is not None:
+            overridden = set(
+                getattr(namespace, "_endpoint_cli_overrides", set()) or set()
+            )
+            overridden.add(self.endpoint_field)
+            setattr(namespace, "_endpoint_cli_overrides", overridden)
 
 
 def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
-    """Mirror canonical root credential attrs onto legacy Namespace attrs.
+    """Mirror endpoint attrs between canonical and legacy Namespace names.
 
-    :param args: parsed CLI namespace carrying the canonical root endpoint attrs.
+    :param args: parsed CLI namespace carrying root endpoint attrs.
     :return: None. The namespace is updated in place.
     """
     for legacy_attr, canonical_attr in _LEGACY_ENDPOINT_ATTRS.items():
-        setattr(args, legacy_attr, getattr(args, canonical_attr))
+        if hasattr(args, canonical_attr):
+            setattr(args, legacy_attr, getattr(args, canonical_attr))
+        elif hasattr(args, legacy_attr):
+            setattr(args, canonical_attr, getattr(args, legacy_attr))
 
 
 class TermColors:
@@ -597,9 +609,13 @@ def redfish_main_ctl():
     """
     """
     logger.setLevel(logging.ERROR)
+    endpoint_conflicts = set()
     try:
         endpoint = endpoint_defaults()
-    except (ConfigurationConflict, ValueError) as err:
+    except ConfigurationConflict:
+        endpoint = endpoint_defaults(strict=False)
+        endpoint_conflicts = endpoint_conflict_fields()
+    except ValueError as err:
         console_error_printer(f"Error: {err}")
         sys.exit(1)
 
@@ -623,24 +639,28 @@ def redfish_main_ctl():
     credentials.add_argument(
         '--host', '--idrac_ip', required=False, type=str,
         action=_EndpointAliasAction, legacy_dest="idrac_ip",
+        endpoint_field="host",
         dest="redfish_host", default=endpoint.host,
         help="BMC host or IP address, by default "
              "read from environment REDFISH_IP (or legacy IDRAC_IP).")
     credentials.add_argument(
         '--username', '--idrac_username', required=False, type=str,
         action=_EndpointAliasAction, legacy_dest="idrac_username",
+        endpoint_field="username",
         dest="redfish_username", default=endpoint.username,
         help="BMC username, by default "
              "read from environment REDFISH_USERNAME (or legacy IDRAC_USERNAME).")
     credentials.add_argument(
         '--password', '--idrac_password', required=False, type=str,
         action=_EndpointAliasAction, legacy_dest="idrac_password",
+        endpoint_field="password",
         dest="redfish_password", default=endpoint.password,
         help="BMC password, by default "
              "read from environment REDFISH_PASSWORD (or legacy IDRAC_PASSWORD).")
     credentials.add_argument(
         '--port', '--idrac_port', required=False, type=int,
         action=_EndpointAliasAction, legacy_dest="idrac_port",
+        endpoint_field="port",
         dest="redfish_port", default=endpoint.port,
         help="BMC port, by default "
              "read from environment REDFISH_PORT (or legacy IDRAC_PORT).")
@@ -649,6 +669,7 @@ def redfish_main_ctl():
         idrac_username=endpoint.username,
         idrac_password=endpoint.password,
         idrac_port=endpoint.port,
+        _endpoint_cli_overrides=set(),
     )
     credentials.add_argument(
         '--insecure', action='store_true', required=False, default=False,
@@ -741,6 +762,17 @@ def redfish_main_ctl():
     cmd_dict = create_cmd_tree(parser)
     args = parser.parse_args()
     _sync_legacy_endpoint_attrs(args)
+    unresolved_endpoint_conflicts = (
+        endpoint_conflicts - getattr(args, "_endpoint_cli_overrides", set())
+    )
+    if unresolved_endpoint_conflicts:
+        console_error_printer(
+            "Error: conflicting REDFISH_* and IDRAC_* endpoint environment "
+            "values; supply explicit CLI flags for "
+            f"{', '.join(sorted(unresolved_endpoint_conflicts))} or unset the "
+            "legacy aliases."
+        )
+        sys.exit(1)
     if args.debug:
         logger.setLevel(args.log)
 

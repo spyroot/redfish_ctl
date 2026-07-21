@@ -6,7 +6,11 @@ falling back to the legacy IDRAC_* names.
 """
 import pytest
 
-from redfish_ctl.config import ConfigurationConflict, endpoint_defaults
+from redfish_ctl.config import (
+    ConfigurationConflict,
+    endpoint_conflict_fields,
+    endpoint_defaults,
+)
 
 _ENDPOINT_ENV = (
     "REDFISH_IP",
@@ -93,6 +97,18 @@ def test_endpoint_defaults_reject_conflicting_aliases(
         endpoint_defaults()
 
 
+def test_endpoint_defaults_can_collect_conflicts_for_cli_overrides(monkeypatch):
+    """Conflict fields are observable while parser defaults stay canonical-first."""
+    _clear_endpoint_env(monkeypatch)
+    monkeypatch.setenv("REDFISH_IP", "203.0.113.10")
+    monkeypatch.setenv("IDRAC_IP", "198.51.100.20")
+
+    defaults = endpoint_defaults(strict=False)
+
+    assert defaults.host == "203.0.113.10"
+    assert endpoint_conflict_fields() == {"host"}
+
+
 def test_env_default_when_none_set(monkeypatch):
     """Neither set -> the provided default."""
     _clear_endpoint_env(monkeypatch)
@@ -120,6 +136,27 @@ def test_legacy_cli_namespace_attrs_mirror_canonical_names():
     assert args.idrac_port == 8443
 
 
+def test_endpoint_namespace_sync_accepts_legacy_only_names():
+    """Programmatic legacy-only namespaces are promoted to canonical names."""
+    from argparse import Namespace
+
+    from redfish_ctl.redfish_main import _sync_legacy_endpoint_attrs
+
+    args = Namespace(
+        idrac_ip="203.0.113.11",
+        idrac_username="root",
+        idrac_password="secret",
+        idrac_port=443,
+    )
+
+    _sync_legacy_endpoint_attrs(args)
+
+    assert args.redfish_host == "203.0.113.11"
+    assert args.redfish_username == "root"
+    assert args.redfish_password == "secret"
+    assert args.redfish_port == 443
+
+
 def test_endpoint_alias_action_sets_legacy_attrs_without_sync():
     """Root endpoint flags populate canonical and legacy attrs during parsing."""
     import argparse
@@ -129,11 +166,13 @@ def test_endpoint_alias_action_sets_legacy_attrs_without_sync():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--host", dest="redfish_host", default="",
-        action=_EndpointAliasAction, legacy_dest="idrac_ip")
+        action=_EndpointAliasAction, legacy_dest="idrac_ip",
+        endpoint_field="host")
     parser.add_argument(
         "--port", dest="redfish_port", default=443, type=int,
-        action=_EndpointAliasAction, legacy_dest="idrac_port")
-    parser.set_defaults(idrac_ip="", idrac_port=443)
+        action=_EndpointAliasAction, legacy_dest="idrac_port",
+        endpoint_field="port")
+    parser.set_defaults(idrac_ip="", idrac_port=443, _endpoint_cli_overrides=set())
 
     parsed = parser.parse_args(["--host", "203.0.113.10", "--port", "8443"])
     defaults = parser.parse_args([])
@@ -142,5 +181,7 @@ def test_endpoint_alias_action_sets_legacy_attrs_without_sync():
     assert parsed.idrac_ip == "203.0.113.10"
     assert parsed.redfish_port == 8443
     assert parsed.idrac_port == 8443
+    assert parsed._endpoint_cli_overrides == {"host", "port"}
     assert defaults.redfish_host == ""
     assert defaults.idrac_ip == ""
+    assert defaults._endpoint_cli_overrides == set()
