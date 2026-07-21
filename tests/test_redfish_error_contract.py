@@ -372,8 +372,16 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
     assert any("output mode" in rule for rule in manifest["automationRules"])
 
     for artifact in artifacts.values():
-        local_path = artifact.get("localPath")
-        if artifact.get("localRequired"):
+        if not artifact.get("localRequired"):
+            continue
+        carried = artifact.get("carriedBy")
+        if carried:
+            # No standalone file: the artifact rides inside a carrier bundle
+            # (e.g. DSP2046/DSP2053 are members of the DSP8010 zip), so the
+            # carrier's presence is what "locally required" means here.
+            assert (DMTF_2026_1_ROOT / carried["path"]).exists()
+        else:
+            local_path = artifact.get("localPath")
             assert local_path
             assert (DMTF_2026_1_ROOT / local_path).exists()
 
