@@ -1,0 +1,288 @@
+apiVersion: redfishctl.dev/v1alpha1
+kind: DmtfRedfishBaseline
+metadata:
+  release: "2026.1"
+  publicationDate: "2026-05-17"
+  source: "https://www.dmtf.org/standards/redfish"
+  schemaIndex: "https://redfish.dmtf.org/redfish/schema_index"
+
+artifacts:
+  - id: DSP0266
+    title: Redfish Specification
+    version: "1.24.0"
+    status: Standard
+    role: protocol
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP0266_1.24.0.pdf"
+    localPath: "protocol/DSP0266_1.24.0.pdf"
+    gitStorage: git-lfs
+    localRequired: true
+
+  - id: DSP0268
+    title: Redfish Data Model Specification
+    version: "2026.1"
+    status: Standard
+    role: data-model
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP0268_2026.1.pdf"
+    localPath: "data-model/DSP0268_2026.1.pdf"
+    gitStorage: git-lfs
+    carriedBy:
+      path: "schemas/DSP8010_2026.1.zip"
+      members:
+        - "DSP8010_2026.1/DSP0268_2026.1.html"
+        - "DSP8010_2026.1/DSP0268_2026.1.pdf"
+    localRequired: true
+
+  - id: DSP0272
+    title: Redfish Interoperability Profiles Specification
+    version: "1.10.0"
+    status: Standard
+    role: interoperability-profile-spec
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP0272_1.10.0.pdf"
+    localPath: "profiles/DSP0272_1.10.0.pdf"
+    gitStorage: git-lfs
+    localRequired: true
+
+  - id: DSP2043
+    title: Redfish Mockups Bundle
+    version: "2026.1"
+    status: Informational
+    role: simulator-corpus
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP2043_2026.1.zip"
+    localPath: "mockups/DSP2043_2026.1.zip"
+    gitStorage: normal-git
+    localRequired: true
+
+  - id: DSP2046
+    title: Redfish Resource and Schema Guide
+    version: "2026.1"
+    status: Informational
+    role: resource-schema-guide
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP2046_2026.1.pdf"
+    carriedBy:
+      path: "schemas/DSP8010_2026.1.zip"
+      members:
+        - "DSP8010_2026.1/DSP2046_2026.1.html"
+        - "DSP8010_2026.1/DSP2046_2026.1.pdf"
+    localRequired: true
+
+  - id: DSP2053
+    title: Redfish Property Guide
+    version: "2026.1"
+    status: Informational
+    role: property-guide
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP2053_2026.1.pdf"
+    carriedBy:
+      path: "schemas/DSP8010_2026.1.zip"
+      members:
+        - "DSP8010_2026.1/DSP2053_2026.1.html"
+    localRequired: true
+
+  - id: DSP2065
+    title: Redfish Message Registry Guide
+    version: "2026.1"
+    status: Informational
+    role: message-registry-guide
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP2065_2026.1.pdf"
+    localPath: "guides/DSP2065_2026.1.pdf"
+    gitStorage: git-lfs
+    carriedBy:
+      path: "registries/DSP8011_2026.1.zip"
+      members:
+        - "DSP2065_2026.1.html"
+        - "DSP2065_2026.1.pdf"
+    localRequired: true
+
+  - id: DSP8010
+    title: Redfish Schema Bundle
+    version: "2026.1"
+    status: Standard
+    role: schema-bundle
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP8010_2026.1.zip"
+    localPath: "schemas/DSP8010_2026.1.zip"
+    gitStorage: git-lfs
+    localRequired: true
+
+  - id: DSP8011
+    title: Redfish Standard Registries Bundle
+    version: "2026.1"
+    status: Standard
+    role: registry-bundle
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP8011_2026.1.zip"
+    localPath: "registries/DSP8011_2026.1.zip"
+    gitStorage: git-lfs
+    requiredMembers:
+      - "Base.1.12.1.json"
+      - "Base.1.18.1.json"
+      - "Base.1.23.0.json"
+      - "Telemetry.1.0.0.json"
+      - "Telemetry.1.1.0.json"
+      - "Telemetry.1.2.0.json"
+      - "DSP2065_2026.1.html"
+      - "DSP2065_2026.1.pdf"
+    localRequired: true
+
+  - id: DSP8013
+    title: Redfish Interoperability Profiles Bundle
+    version: "2026.1"
+    status: Standard
+    role: interoperability-profile-bundle
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP8013_2026.1.zip"
+    localPath: "profiles/DSP8013_2026.1.zip"
+    gitStorage: git-lfs
+    localRequired: true
+
+supplementalArtifacts:
+  - id: DSP-IS0027-WIP80
+    title: Redfish Telemetry Streaming and Reporting WIP
+    role: telemetry-streaming-wip
+    repoPath: "spec/dmtf/redfish/wip/telemetry-streaming/DSP-IS0027_WIP80.zip"
+    gitStorage: git-lfs
+    requiredMembers:
+      - "metadata/TelemetryFeed_v1.xml"
+      - "metadata/TelemetryService_v1.xml"
+      - "mockups/public-pdu/TelemetryService/index.json"
+      - "mockups/public-pdu/TelemetryService/TelemetryFeeds/index.json"
+      - "Redfish Telemetry Streaming and Reporting WIP v0.8.pdf"
+    localRequired: true
+
+  - id: DSP-IS0026-WIP80
+    title: Redfish ART WIP
+    role: telemetry-adjacent-wip
+    repoPath: "spec/dmtf/redfish/wip/art/DSP-IS0026_WIP80.zip"
+    gitStorage: git-lfs
+    requiredMembers:
+      - "csdl/AutomaticRecoveryTrigger_v1.xml"
+      - "mockups/AutomaticRecoveryTrigger-v1-example.json"
+      - "mockups/AutomaticRecoveryTrigger-v1-SendTicket-request-example.json"
+      - "DSPIS0026_WIP80.pdf"
+      - "DSPIS0026_WIP80.html"
+    localRequired: true
+
+  - id: DSP0271-WIP
+    title: Redfish YANG
+    role: yang-wip
+    repoPath: "spec/dmtf/redfish/wip/yang/DSP0271_0.5.6.pdf"
+    gitStorage: git-lfs
+    localRequired: true
+
+  - id: DSP0288
+    title: Redfish CXL Mapping
+    version: "1.3.0"
+    role: extension-cxl
+    repoPath: "spec/dmtf/redfish/extensions/cxl/1.3.0/DSP0288_1.3.0.pdf"
+    gitStorage: git-lfs
+    localRequired: true
+
+contracts:
+  - id: error-envelope-normalization
+    authority:
+      - DSP0266
+      - DSP0268
+      - DSP8010
+      - DSP8011
+    rule: >
+      Redfish HTTP error responses keep status, error.code, error.message,
+      error.@Message.ExtendedInfo, schema pointers, registry pointers, target,
+      and raw body. Human string rendering is never the authoritative data path.
+    enforcedBy:
+      - "tests/test_redfish_error_contract.py::test_parse_error_preserves_dmtf_error_envelope_fields_and_status"
+      - "tests/test_redfish_error_contract.py::test_http_error_command_results_are_parser_backed"
+      - "tests/test_redfish_error_contract.py::test_dsp8011_registry_members_have_message_templates_and_severity_fields"
+
+  - id: schema-pointer-compatibility
+    authority:
+      - DSP0268
+      - DSP8010
+    rule: >
+      Consumers accept service-observed schema names and versions, including
+      older vendor-exposed forms such as RedfishError.v1_0_1 and newer forms
+      such as redfish-error.v1_0_2.
+    enforcedBy:
+      - "tests/test_redfish_error_contract.py::test_dell_full_corpus_exposes_dmtf_error_schema_and_registry_contract"
+      - "tests/test_redfish_error_contract.py::test_gb300_full_corpus_exposes_dmtf_error_schema_and_registry_contract"
+
+  - id: simulator-corpus-baseline
+    authority:
+      - DSP2043
+      - DSP8010
+    rule: >
+      The Redfish simulator uses public DMTF mockups as one seed corpus and
+      validates payload shape against the pinned schema bundle.
+    enforcedBy:
+      - "tests/test_redfish_error_contract.py::test_dsp2043_2026_1_mockups_bundle_contains_simulator_seed_payloads"
+
+  - id: redfish-telemetry-resource-contract
+    authority:
+      - DSP0268
+      - DSP8010
+      - DSP8011
+      - DSP2043
+      - DSP-IS0027-WIP80
+    rule: >
+      Telemetry code binds Redfish telemetry resources, actions, message
+      registries, and mock payloads to DMTF schemas. OTLP export is a rendering
+      of normalized Redfish telemetry samples, not a replacement protocol.
+    enforcedBy:
+      - "tests/test_redfish_error_contract.py::test_dsp8010_2026_1_schema_bundle_contains_telemetry_artifacts"
+      - "tests/test_redfish_error_contract.py::test_dsp8011_2026_1_registry_bundle_contains_base_and_telemetry_messages"
+      - "tests/test_redfish_error_contract.py::test_dsp8011_registry_members_have_message_templates_and_severity_fields"
+      - "tests/test_redfish_error_contract.py::test_dsp2043_2026_1_mockups_bundle_contains_telemetry_examples"
+      - "tests/test_redfish_error_contract.py::test_telemetry_wip_bundle_contains_streaming_schema_and_mockups"
+      - "tests/test_redfish_error_contract.py::test_art_wip_bundle_contains_automatic_recovery_trigger_schema_and_mockups"
+
+  - id: output-rendering-adapter-contract
+    authority:
+      - error-envelope-normalization
+      - redfish-telemetry-resource-contract
+    rule: >
+      Human, JSON, and YAML output modes render one normalized result object.
+      Machine output preserves DMTF fields and never routes through __str__.
+    enforcedBy:
+      - "tests/test_redfish_error_contract.py::test_normalized_error_contract_round_trips_as_json_and_yaml"
+      - "tests/test_redfish_error_contract.py::test_output_adapter_plan_is_documented"
+
+gates:
+  - id: dmtf-release-manifest
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_dmtf_2026_1_release_manifest_names_required_contracts"
+      - "tests/test_redfish_error_contract.py::test_dmtf_manifest_enforced_by_entries_resolve_to_defined_tests"
+
+  - id: dmtf-schema-bundle
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_dsp8010_2026_1_schema_bundle_contains_required_error_artifacts"
+
+  - id: dmtf-mockup-bundle
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_dsp2043_2026_1_mockups_bundle_contains_simulator_seed_payloads"
+
+  - id: dmtf-registry-bundle
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_dsp8011_2026_1_registry_bundle_contains_base_and_telemetry_messages"
+      - "tests/test_redfish_error_contract.py::test_dsp8011_registry_members_have_message_templates_and_severity_fields"
+
+  - id: dmtf-telemetry-contract
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_dsp8010_2026_1_schema_bundle_contains_telemetry_artifacts"
+      - "tests/test_redfish_error_contract.py::test_dsp2043_2026_1_mockups_bundle_contains_telemetry_examples"
+      - "tests/test_redfish_error_contract.py::test_telemetry_wip_bundle_contains_streaming_schema_and_mockups"
+      - "tests/test_redfish_error_contract.py::test_art_wip_bundle_contains_automatic_recovery_trigger_schema_and_mockups"
+
+  - id: output-rendering-contract
+    command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
+    checks:
+      - "tests/test_redfish_error_contract.py::test_output_adapter_plan_is_documented"
+
+automationRules:
+  - Do not invent a Redfish error shape when a DMTF error envelope is present.
+  - Do not flatten error.@Message.ExtendedInfo into a single string for JSON or YAML output.
+  - Do not assume one latest schema version; preserve the service-observed PublicationUri and Schema.
+  - Do not treat DSP8011 registries as optional once offline MessageId expansion or registry membership validation is present.
+  - Do not treat OTLP/export formats as the Redfish telemetry protocol contract; bind telemetry reads to DMTF resources first.
+  - Do not add a new user-visible output mode unless it renders the normalized result object shared by human, JSON, and YAML.
+  - Do not extract bundled ZIP archives in unit tests; inspect central-directory members unless a fixture needs a specific file.
+  - Do not add a new simulator seed corpus without adding it to this manifest and a gate that proves it can be discovered.

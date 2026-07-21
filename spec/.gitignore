@@ -1,0 +1,3 @@
+# Local extraction scratch for inspecting public DMTF bundles.
+# Tests use ZIP central directories and do not need duplicate extracted payloads.
+/dmtf/redfish/2026.1/mockups/extracted/

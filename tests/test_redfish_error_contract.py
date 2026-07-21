@@ -30,11 +30,27 @@ PACKAGE_ROOT = REPO_ROOT / "redfish_ctl"
 CONTRACT_DOC = REPO_ROOT / "docs" / "external" / "redfish-error-contract.md"
 DMTF_2026_1_ROOT = REPO_ROOT / "spec" / "dmtf" / "redfish" / "2026.1"
 DMTF_2026_1_MANIFEST = DMTF_2026_1_ROOT / "manifest.yaml"
+HTTP_STATUS_CONTRACT = DMTF_2026_1_ROOT / "reference" / (
+    "http-status-and-error-contract.md"
+)
+TELEMETRY_CONTRACT = DMTF_2026_1_ROOT / "reference" / "telemetry-contract.md"
+OUTPUT_ADAPTER_PLAN = DMTF_2026_1_ROOT / "reference" / "output-adapter-plan.md"
 DSP8010_2026_1_SCHEMA_BUNDLE = (
     DMTF_2026_1_ROOT / "schemas" / "DSP8010_2026.1.zip"
 )
+DSP8011_2026_1_REGISTRY_BUNDLE = (
+    DMTF_2026_1_ROOT / "registries" / "DSP8011_2026.1.zip"
+)
 DSP2043_2026_1_MOCKUPS_BUNDLE = (
     DMTF_2026_1_ROOT / "mockups" / "DSP2043_2026.1.zip"
+)
+TELEMETRY_WIP_BUNDLE = (
+    REPO_ROOT / "spec" / "dmtf" / "redfish" / "wip" / "telemetry-streaming" /
+    "DSP-IS0027_WIP80.zip"
+)
+ART_WIP_BUNDLE = (
+    REPO_ROOT / "spec" / "dmtf" / "redfish" / "wip" / "art" /
+    "DSP-IS0026_WIP80.zip"
 )
 DELL_FULL_CORPUS = REPO_ROOT / "full_corpus" / "dell_xr8620t_full_corpus.tar.gz"
 GB300_FULL_CORPUS = REPO_ROOT / "full_corpus" / "supermicro_gb300_full_corpus.tar.gz"
@@ -75,6 +91,19 @@ def _corpus_json(tarball, member):
 def _zip_names(bundle):
     with zipfile.ZipFile(bundle) as archive:
         return set(archive.namelist())
+
+
+def _repo_path(path):
+    return REPO_ROOT / path
+
+
+def _defined_test_names():
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    return {
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+    }
 
 
 def _assert_location_points_to_dmtf(descriptor, expected_publication_uri, expected_uri):
@@ -310,13 +339,19 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
     assert artifacts["DSP8010"]["gitStorage"] == "git-lfs"
     assert artifacts["DSP2043"]["localPath"] == "mockups/DSP2043_2026.1.zip"
     assert artifacts["DSP2043"]["gitStorage"] == "normal-git"
-    assert artifacts["DSP8011"]["localRequiredWhen"]
+    assert artifacts["DSP8011"]["localPath"] == "registries/DSP8011_2026.1.zip"
+    assert artifacts["DSP8011"]["gitStorage"] == "git-lfs"
+    assert {"Base.1.12.1.json", "Base.1.18.1.json", "Telemetry.1.2.0.json"}.issubset(
+        set(artifacts["DSP8011"]["requiredMembers"])
+    )
 
     contracts = {contract["id"]: contract for contract in manifest["contracts"]}
     assert {
         "error-envelope-normalization",
         "schema-pointer-compatibility",
         "simulator-corpus-baseline",
+        "redfish-telemetry-resource-contract",
+        "output-rendering-adapter-contract",
     }.issubset(contracts)
     assert "DSP8011" in contracts["error-envelope-normalization"]["authority"]
 
@@ -325,17 +360,58 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
         "dmtf-release-manifest",
         "dmtf-schema-bundle",
         "dmtf-mockup-bundle",
+        "dmtf-registry-bundle",
+        "dmtf-telemetry-contract",
+        "output-rendering-contract",
     }.issubset(gates)
     assert any(
         "Do not invent a Redfish error shape" in rule
         for rule in manifest["automationRules"]
     )
+    assert any("DSP8011 registries" in rule for rule in manifest["automationRules"])
+    assert any("output mode" in rule for rule in manifest["automationRules"])
 
     for artifact in artifacts.values():
         local_path = artifact.get("localPath")
         if artifact.get("localRequired"):
             assert local_path
             assert (DMTF_2026_1_ROOT / local_path).exists()
+
+    supplemental = {
+        artifact["id"]: artifact
+        for artifact in manifest.get("supplementalArtifacts", [])
+    }
+    assert {
+        "DSP-IS0027-WIP80",
+        "DSP-IS0026-WIP80",
+        "DSP0271-WIP",
+        "DSP0288",
+    }.issubset(supplemental)
+    assert supplemental["DSP-IS0027-WIP80"]["requiredMembers"]
+
+    for artifact in supplemental.values():
+        if artifact.get("localRequired"):
+            assert _repo_path(artifact["repoPath"]).exists()
+
+
+def test_dmtf_manifest_enforced_by_entries_resolve_to_defined_tests():
+    """Every manifest-enforced test reference must exist in this test module."""
+    manifest = yaml.safe_load(DMTF_2026_1_MANIFEST.read_text(encoding="utf-8"))
+    known_tests = _defined_test_names()
+    references = []
+
+    for contract in manifest["contracts"]:
+        references.extend(contract.get("enforcedBy", []))
+    for gate in manifest["gates"]:
+        references.extend(gate.get("checks", []))
+
+    assert references
+    missing = []
+    for reference in references:
+        module, _, test_name = reference.partition("::")
+        if module != "tests/test_redfish_error_contract.py" or test_name not in known_tests:
+            missing.append(reference)
+    assert not missing
 
 
 def test_dsp8010_2026_1_schema_bundle_contains_required_error_artifacts():
@@ -363,6 +439,85 @@ def test_dsp8010_2026_1_schema_bundle_contains_required_error_artifacts():
     assert info == {"version": "2026.1", "date": "2026-04-02"}
 
 
+def test_dsp8010_2026_1_schema_bundle_contains_telemetry_artifacts():
+    """DMTF telemetry schema files are local input for exporter and span tests."""
+    names = _zip_names(DSP8010_2026_1_SCHEMA_BUNDLE)
+    expected_members = {
+        "DSP8010_2026.1/json-schema/TelemetryService.json",
+        "DSP8010_2026.1/json-schema/TelemetryService.v1_4_1.json",
+        "DSP8010_2026.1/json-schema/MetricDefinition.json",
+        "DSP8010_2026.1/json-schema/MetricDefinition.v1_3_6.json",
+        "DSP8010_2026.1/json-schema/MetricReport.json",
+        "DSP8010_2026.1/json-schema/MetricReport.v1_5_2.json",
+        "DSP8010_2026.1/json-schema/MetricReportDefinition.json",
+        "DSP8010_2026.1/json-schema/MetricReportDefinition.v1_4_7.json",
+        "DSP8010_2026.1/json-schema/TelemetryData.json",
+        "DSP8010_2026.1/json-schema/TelemetryData.v1_0_0.json",
+        "DSP8010_2026.1/json-schema/EventService.json",
+        "DSP8010_2026.1/json-schema/EventDestination.json",
+        "DSP8010_2026.1/json-schema/Sensor.json",
+        "DSP8010_2026.1/json-schema/EnvironmentMetrics.json",
+        "DSP8010_2026.1/json-schema/ThermalMetrics.json",
+        "DSP8010_2026.1/json-schema/ProcessorMetrics.json",
+        "DSP8010_2026.1/json-schema/MemoryMetrics.json",
+        "DSP8010_2026.1/csdl/TelemetryService_v1.xml",
+        "DSP8010_2026.1/openapi/TelemetryService.v1_4_1.yaml",
+    }
+    assert expected_members.issubset(names)
+
+
+def test_dsp8011_2026_1_registry_bundle_contains_base_and_telemetry_messages():
+    """The pinned DSP8011 bundle carries live-corpus Base versions and telemetry."""
+    names = _zip_names(DSP8011_2026_1_REGISTRY_BUNDLE)
+    expected_members = {
+        "Base.1.12.1.json",
+        "Base.1.18.1.json",
+        "Base.1.23.0.json",
+        "Telemetry.1.0.0.json",
+        "Telemetry.1.0.1.json",
+        "Telemetry.1.1.0.json",
+        "Telemetry.1.1.1.json",
+        "Telemetry.1.2.0.json",
+        "DSP2065_2026.1.html",
+        "DSP2065_2026.1.pdf",
+    }
+    assert expected_members.issubset(names)
+
+    with zipfile.ZipFile(DSP8011_2026_1_REGISTRY_BUNDLE) as archive:
+        dell_base = json.loads(archive.read("Base.1.12.1.json"))
+        gb300_base = json.loads(archive.read("Base.1.18.1.json"))
+        telemetry = json.loads(archive.read("Telemetry.1.2.0.json"))
+
+    assert dell_base["RegistryPrefix"] == "Base"
+    assert dell_base["RegistryVersion"] == "1.12.1"
+    assert gb300_base["RegistryPrefix"] == "Base"
+    assert gb300_base["RegistryVersion"] == "1.18.1"
+    assert telemetry["RegistryPrefix"] == "Telemetry"
+    assert telemetry["RegistryVersion"] == "1.2.0"
+
+
+def test_dsp8011_registry_members_have_message_templates_and_severity_fields():
+    """Registry entries keep templates, severity, resolution, and arg metadata."""
+    cases = [
+        ("Base.1.18.1.json", "GeneralError", 0),
+        ("Base.1.18.1.json", "ResourceMissingAtURI", 1),
+        ("Base.1.23.0.json", "ActionParameterNotSupported", 2),
+        ("Telemetry.1.2.0.json", "TelemetryDataCreated", 2),
+        ("Telemetry.1.2.0.json", "TriggerNumericAboveUpperCritical", 4),
+    ]
+    with zipfile.ZipFile(DSP8011_2026_1_REGISTRY_BUNDLE) as archive:
+        for member, message_id, expected_args in cases:
+            registry = json.loads(archive.read(member))
+            message = registry["Messages"][message_id]
+            assert message["Message"]
+            assert message["Resolution"]
+            assert message["NumberOfArgs"] == expected_args
+            assert message.get("MessageSeverity") or message.get("Severity")
+            if expected_args:
+                assert len(message["ParamTypes"]) == expected_args
+                assert len(message["ArgDescriptions"]) == expected_args
+
+
 def test_dsp2043_2026_1_mockups_bundle_contains_simulator_seed_payloads():
     """The pinned DSP2043 bundle carries DMTF mockups for simulator seeding."""
     names = _zip_names(DSP2043_2026_1_MOCKUPS_BUNDLE)
@@ -375,6 +530,58 @@ def test_dsp2043_2026_1_mockups_bundle_contains_simulator_seed_payloads():
         "DSP2043_2026.1/public-applications/AccountService/index.json",
         "DSP2043_2026.1/public-bladed/Chassis/index.json",
         "DSP2043_2026.1/DSP2046-examples/ServiceRoot-v1-example.json",
+    }
+    assert expected_members.issubset(names)
+
+
+def test_dsp2043_2026_1_mockups_bundle_contains_telemetry_examples():
+    """The mockup bundle carries DMTF telemetry payloads for simulator seeding."""
+    names = _zip_names(DSP2043_2026_1_MOCKUPS_BUNDLE)
+    expected_members = {
+        "DSP2043_2026.1/public-telemetry/index.json",
+        "DSP2043_2026.1/public-telemetry/TelemetryService/index.json",
+        "DSP2043_2026.1/public-telemetry/TelemetryService/MetricReports/index.json",
+        "DSP2043_2026.1/public-telemetry/TelemetryService/MetricDefinitions/index.json",
+        "DSP2043_2026.1/public-telemetry/TelemetryService/TelemetryData/index.json",
+        "DSP2043_2026.1/public-telemetry/TelemetryService/MetricReportDefinitions/index.json",
+        "DSP2043_2026.1/DSP2046-examples/TelemetryService-v1-example.json",
+        "DSP2043_2026.1/DSP2046-examples/MetricReport-v1-example.json",
+        "DSP2043_2026.1/DSP2046-examples/MetricReportDefinition-v1-example.json",
+        "DSP2043_2026.1/DSP2046-examples/TelemetryData-v1-example.json",
+        "DSP2043_2026.1/DSP2046-examples/EventService-v1-example.json",
+        "DSP2043_2026.1/DSP2046-examples/TelemetryService-v1-CollectTelemetryData-request-example.json",
+        "DSP2043_2026.1/DSP2046-examples/TelemetryService-v1-SubmitTestMetricReport-request-example.json",
+    }
+    assert expected_members.issubset(names)
+
+
+def test_telemetry_wip_bundle_contains_streaming_schema_and_mockups():
+    """The WIP telemetry bundle carries feed schemas and public PDU mockups."""
+    names = _zip_names(TELEMETRY_WIP_BUNDLE)
+    expected_members = {
+        "metadata/TelemetryFeed_v1.xml",
+        "metadata/TelemetryService_v1.xml",
+        "metadata/EventService_v1.xml",
+        "metadata/EventDestination_v1.xml",
+        "mockups/public-pdu/TelemetryService/index.json",
+        "mockups/public-pdu/TelemetryService/TelemetryFeeds/index.json",
+        "mockups/public-pdu/TelemetryService/TelemetryFeeds/Circuits/index.json",
+        "mockups/public-pdu/TelemetryService/TelemetryFeeds/EnvironmentMetrics/index.json",
+        "mockups/public-pdu/TelemetryService/TelemetryFeeds/Outlets/index.json",
+        "Redfish Telemetry Streaming and Reporting WIP v0.8.pdf",
+    }
+    assert expected_members.issubset(names)
+
+
+def test_art_wip_bundle_contains_automatic_recovery_trigger_schema_and_mockups():
+    """The ART WIP bundle carries automatic recovery trigger schema/examples."""
+    names = _zip_names(ART_WIP_BUNDLE)
+    expected_members = {
+        "csdl/AutomaticRecoveryTrigger_v1.xml",
+        "mockups/AutomaticRecoveryTrigger-v1-example.json",
+        "mockups/AutomaticRecoveryTrigger-v1-SendTicket-request-example.json",
+        "DSPIS0026_WIP80.pdf",
+        "DSPIS0026_WIP80.html",
     }
     assert expected_members.issubset(names)
 
@@ -393,6 +600,53 @@ def test_contract_doc_names_dmtf_publication_surfaces():
     assert "https://redfish.dmtf.org/schemas/v1/AccelerationFunction.v1_0_5.json" in text
     assert "https://redfish.dmtf.org/schemas/v1/AccelerationFunction.yaml" in text
     assert "https://redfish.dmtf.org/registries/" in text
+    assert "output-adapter-plan.md" in text
+    assert "telemetry-contract.md" in text
+
+
+def test_reference_docs_lock_status_telemetry_and_output_contracts():
+    """Agent-readable references name the status, telemetry, and output rules."""
+    http_text = HTTP_STATUS_CONTRACT.read_text(encoding="utf-8")
+    telemetry_text = TELEMETRY_CONTRACT.read_text(encoding="utf-8")
+    output_text = OUTPUT_ADAPTER_PLAN.read_text(encoding="utf-8")
+
+    for status in ["200 OK", "201 Created", "202 Accepted", "204 No Content"]:
+        assert status in http_text
+    for status in ["400 Bad Request", "404 Not Found", "501 Not Implemented"]:
+        assert status in http_text
+    assert "@Message.ExtendedInfo" in http_text
+    assert "MessageId" in http_text
+    assert "MessageArgs" in http_text
+    assert "Redfish parser" in http_text
+
+    for resource in [
+        "TelemetryService",
+        "MetricDefinition",
+        "MetricReport",
+        "MetricReportDefinition",
+        "TelemetryData",
+        "TelemetryFeed",
+    ]:
+        assert resource in telemetry_text
+    assert "OTLP" in telemetry_text
+    assert "public-telemetry" in telemetry_text
+
+    assert "-o, --output human|json|yaml|name|wide" in output_text
+    assert "--machine" in output_text
+    assert "--raw" in output_text
+    assert "JSON and YAML never call `str(exception)`" in output_text
+
+
+def test_output_adapter_plan_is_documented():
+    """The planned renderer keeps human, JSON, and YAML on one object."""
+    plan = OUTPUT_ADAPTER_PLAN.read_text(encoding="utf-8")
+
+    assert "human|json|yaml|name|wide" in plan
+    assert "--output json --json_only --nocolor" in plan
+    assert "Telemetry exporter" in plan
+    assert "--log-file" in plan
+    assert "--no-stdout" in plan
+    assert "--insecure" in plan
 
 
 def test_default_error_handler_raises_resource_not_found_with_parsed_dmtf_error():
@@ -409,7 +663,7 @@ def test_default_error_handler_raises_resource_not_found_with_parsed_dmtf_error(
 
 
 def _base_manager():
-    """Return a RedfishManagerBase instance — the class every command subclasses.
+    """Return a RedfishManagerBase instance - the class every command subclasses.
 
     :return: an offline RedfishManagerBase (no BMC contact).
     """
@@ -433,8 +687,8 @@ def _base_manager():
     ],
 )
 def test_base_default_error_handler_preserves_dmtf_envelope(status_code, exc_type):
-    """Every command subclasses RedfishManagerBase, so ITS default_error_handler —
-    not the parent RedfishManager's — is the real command error path. For every
+    """Every command subclasses RedfishManagerBase, so ITS default_error_handler -
+    not the parent RedfishManager's - is the real command error path. For every
     error code it must raise the parsed RedfishError envelope (status, error.code,
     every @Message.ExtendedInfo), never a generic string, per the Redfish error
     contract. Regression: the base override previously raised the generic
@@ -456,7 +710,7 @@ def test_base_default_error_handler_preserves_dmtf_envelope(status_code, exc_typ
     [(200, "Ok"), (201, "Created"), (202, "AcceptedTaskGenerated"), (204, "Success")],
 )
 def test_base_default_error_handler_maps_success_codes(status_code, expected):
-    """A 2xx code returns its mapped RedfishApiRespond — the line-689 tautology
+    """A 2xx code returns its mapped RedfishApiRespond - the line-689 tautology
     (status_code >= 200 or < 300, always true) that made this branch meaningless
     is fixed, so success codes resolve instead of falling through."""
     manager = _base_manager()
