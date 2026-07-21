@@ -126,6 +126,7 @@ Safety labels:
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
 | `dell-metric-actions` | List or invoke Dell MetricService ControlMetrics and ExportThermalHistory actions; previews by default and masks share passwords. | Guarded |
 | `dell-raid-blink` | List or run DellRaidService `BlinkTarget` / `UnBlinkTarget` for a physical disk FQDD; previews by default and requires `--confirm` to POST. | Guarded |
+| `dell-raid-spare` | Assign or unassign Dell RAID hot spare disks through DellRaidService, the Dell OEM service linked from ComputerSystem resources; lists targets/candidates by default and requires `--confirm` to write. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |

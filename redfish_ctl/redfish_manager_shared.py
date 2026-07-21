@@ -67,6 +67,7 @@ class ApiRequestType(Enum):
     VirtualDiskQuery = auto()
     RaidServiceQuery = auto()
     DellRaidBlink = auto()
+    DellRaidSpareActions = auto()
     StorageQuery = auto()
     Tasks = auto()
     GetTask = auto()

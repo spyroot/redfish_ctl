@@ -90,6 +90,8 @@ ACTION_POLICY = {
     "#DellLicenseManagementService.ExportLicenseToNetworkShare": Destructiveness.DESTRUCTIVE,
     "#DellLicenseManagementService.ImportLicense": Destructiveness.DESTRUCTIVE,
     "#DellLicenseManagementService.ImportLicenseFromNetworkShare": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.AssignSpare": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.UnassignSpare": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
