@@ -103,6 +103,8 @@ ACTION_POLICY = {
     "#DellLCService.ExportTechSupportReport": Destructiveness.DESTRUCTIVE,
     "#DellLCService.ExportVideoLog": Destructiveness.DESTRUCTIVE,
     "#DellLCService.ExportePSADiagnosticsResult": Destructiveness.DESTRUCTIVE,
+    "#DellSoftwareInstallationService.ClearUpdateSchedule": Destructiveness.DESTRUCTIVE,
+    "#DellSoftwareInstallationService.SetUpdateSchedule": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for

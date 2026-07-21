@@ -155,6 +155,7 @@ from .delloem.delloem_disconnect import *
 from .delloem.delloem_get_networkios import *
 from .delloem.delloem_boot_netios import *
 from .delloem.delloem_os_deployment import *
+from .delloem.cmd_dell_software_update_schedule import *
 
 
 # tasks

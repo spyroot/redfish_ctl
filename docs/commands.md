@@ -131,6 +131,7 @@ Safety labels:
 | `dell-raid-blink` | List or run DellRaidService `BlinkTarget` / `UnBlinkTarget` for a physical disk FQDD; previews by default and requires `--confirm` to POST. | Guarded |
 | `dell-raid-spare` | Assign or unassign Dell RAID hot spare disks through DellRaidService, the Dell OEM service linked from ComputerSystem resources; lists targets/candidates by default and requires `--confirm` to write. | Guarded |
 | `dell-lc-os-health-update` | Update Dell Lifecycle Controller OS application health data; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-software-update-schedule` | Manage Dell software update schedules; writes require `--confirm`. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
