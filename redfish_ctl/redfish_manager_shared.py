@@ -163,6 +163,7 @@ class ApiRequestType(Enum):
     DellPersistentPartitionActions = auto()
     EthernetInterfaces = auto()
     SecureBoot = auto()
+    SecureBootResetKeys = auto()
     CertificatesQuery = auto()
     CertificateGenerateCSR = auto()
     DellCardCsr = auto()
