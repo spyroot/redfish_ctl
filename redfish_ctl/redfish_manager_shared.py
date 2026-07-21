@@ -71,6 +71,7 @@ class ApiRequestType(Enum):
     RaidServiceQuery = auto()
     DellRaidBlink = auto()
     DellRaidSpareActions = auto()
+    DellRaidCancelActions = auto()
     StorageQuery = auto()
     Tasks = auto()
     GetTask = auto()

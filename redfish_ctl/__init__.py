@@ -25,6 +25,7 @@ from .redfish_manager_shared import *
 from .raid.cmd_raid_service import *
 from .raid.cmd_dell_raid_blink import *
 from .raid.cmd_dell_raid_spare import *
+from .raid.cmd_dell_raid_cancel import *
 #
 # bios commands
 from .bios.cmd_bios import *

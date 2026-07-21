@@ -133,6 +133,7 @@ Safety labels:
 | `dell-raid-spare` | Assign or unassign Dell RAID hot spare disks through DellRaidService, the Dell OEM service linked from ComputerSystem resources; lists targets/candidates by default and requires `--confirm` to write. | Guarded |
 | `dell-lc-os-health-update` | Update Dell Lifecycle Controller OS application health data; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-software-update-schedule` | Manage Dell software update schedules; writes require `--confirm`. | Guarded |
+| `dell-raid-cancel-actions` | Cancel DellRaidService actions discovered from the managed system's Dell OEM links; lists background-init, consistency-check, and physical-disk rebuild targets by default and requires `--confirm` to POST. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
