@@ -8,9 +8,13 @@ import pytest
 from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
+from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
+    CollectorResult,
     MetricSample,
     _require_datapoint_url,
     apply_exporter_env_file,
@@ -29,6 +33,28 @@ GB300_CORPUS = corpus_dir(
     Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
 GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
+
+
+def _metric_samples(samples, metric):
+    """Return samples with ``metric`` from a sample list."""
+    return [sample for sample in samples if sample.metric == metric]
+
+
+def _single_metric(samples, metric):
+    """Return the only sample with ``metric``."""
+    matches = _metric_samples(samples, metric)
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _collector_metric(samples, metric, collector):
+    """Return one collector-scoped self-telemetry sample."""
+    matches = [
+        sample for sample in _metric_samples(samples, metric)
+        if sample.dimensions.get("collector") == collector
+    ]
+    assert len(matches) == 1
+    return matches[0]
 
 
 def _gb300_fixture_for_path(path):
@@ -385,19 +411,165 @@ def test_leak_detection_mapper_emits_state_gauges_with_detector_dimensions():
 def test_scrape_health_samples_report_success_and_duration():
     """Each exporter scrape reports a health gauge and duration sample."""
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    collector_results = (
+        CollectorResult("sensors", True, True, 0.10, ({"Name": "PSU"},), None),
+        CollectorResult("metric-reports", True, False, 0.20, (), "timeout"),
+        CollectorResult("nvlink-ports", False, True, 0.0, (), None),
+    )
 
     samples = exporter_mod.scrape_health_samples(
         dims,
-        ok=True,
+        ok=False,
         duration_seconds=1.25,
+        collector_results=collector_results,
+        partial=True,
+        timestamp_seconds=1234.0,
     )
 
     by_metric = {sample.metric: sample for sample in samples}
-    assert by_metric["hw.scrape.ok"].value == 1
+    assert by_metric["redfish_exporter_scrape_success"].value == 0
+    assert by_metric["redfish_exporter_scrape_partial"].value == 1
+    assert by_metric["redfish_exporter_last_success_timestamp_seconds"].value == 0
+    assert by_metric["hw.scrape.ok"].value == 0
     assert by_metric["hw.scrape.ok"].dimensions["source"] == "exporter"
+    assert by_metric["redfish_exporter_scrape_duration_seconds"].value == pytest.approx(
+        1.25)
     assert by_metric["hw.scrape.duration_seconds"].value == pytest.approx(1.25)
     assert by_metric["hw.scrape.duration_seconds"].unit == "s"
     assert REQUIRED_DIMS <= set(by_metric["hw.scrape.ok"].dimensions)
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_success", "sensors").value == 1
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_samples", "sensors").value == 1
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_success", "metric-reports").value == 0
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_supported", "nvlink-ports").value == 0
+    errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
+    assert len(errors) == 1
+    assert errors[0].metric_type == "counter"
+    assert errors[0].dimensions["collector"] == "metric-reports"
+    assert errors[0].dimensions["error"] == "timeout"
+
+
+def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch):
+    """One supported collector failure produces partial scrape self-telemetry."""
+    manager = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def fake_sync_invoke(_api_type, name, **_kwargs):
+        """Return one useful collector and one classified failure."""
+        if name == "environment-metrics":
+            return CommandResult({"metrics": []}, None, None, None)
+        if name == "thermal":
+            return CommandResult({"temperature_readings": []}, None, None, None)
+        if name == "sensors":
+            return CommandResult([
+                {
+                    "Reading": 42.0,
+                    "ReadingType": "Power",
+                    "Name": "PSU 1",
+                    "Chassis": "Chassis_0",
+                },
+            ], None, None, None)
+        if name == "metric-reports":
+            raise TimeoutError("timed out reading /redfish/v1/SensitivePath?query=abc")
+        if name == "leak-detectors":
+            return CommandResult({"detectors": []}, None, None, None)
+        return CommandResult([], None, None, None)
+
+    monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+
+    assert _single_metric(samples, "redfish_exporter_scrape_success").value == 0
+    assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 1
+    assert _single_metric(samples, "hw.scrape.ok").value == 0
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_success", "sensors").value == 1
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_samples", "sensors").value == 1
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_success", "metric-reports").value == 0
+    errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
+    assert len(errors) == 1
+    assert errors[0].dimensions == {
+        "host.name": "gb300-poc1-slot9",
+        "node": "slot9",
+        "server.address": "172.25.230.49",
+        "bmc.ip": "172.25.230.29",
+        "vendor": "dell",
+        "source": "exporter",
+        "collector": "metric-reports",
+        "error": "timeout",
+    }
+    assert "SensitivePath" not in repr(errors[0].dimensions)
+    assert "query" not in repr(errors[0].dimensions)
+
+
+def test_exporter_collect_samples_treats_unsupported_collectors_as_healthy(
+        monkeypatch):
+    """A healthy BMC with no optional telemetry collectors is zero-sample success."""
+    manager = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def fake_sync_invoke(_api_type, _name, **_kwargs):
+        """Model optional collectors absent from the BMC."""
+        raise ResourceNotFound("optional telemetry resource absent")
+
+    monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+
+    assert _single_metric(samples, "redfish_exporter_scrape_success").value == 1
+    assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 0
+    assert _single_metric(samples, "hw.scrape.ok").value == 1
+    assert not _metric_samples(samples, "redfish_exporter_collection_errors_total")
+    supported = _metric_samples(samples, "redfish_exporter_collector_supported")
+    assert len(supported) == 8
+    assert {sample.value for sample in supported} == {0.0}
+
+
+def test_exporter_collect_samples_classifies_malformed_collector_payload(
+        monkeypatch):
+    """Malformed collector payloads fail that collector with invalid_payload."""
+    manager = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def fake_sync_invoke(_api_type, name, **_kwargs):
+        """Return a non-list payload for a list collector."""
+        if name == "environment-metrics":
+            return CommandResult({"metrics": []}, None, None, None)
+        if name == "thermal":
+            return CommandResult({"temperature_readings": []}, None, None, None)
+        if name == "sensors":
+            return CommandResult({"rows": []}, None, None, None)
+        if name == "leak-detectors":
+            return CommandResult({"detectors": []}, None, None, None)
+        return CommandResult([], None, None, None)
+
+    monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+
+    assert _collector_metric(
+        samples, "redfish_exporter_collector_success", "sensors").value == 0
+    errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
+    assert len(errors) == 1
+    assert errors[0].dimensions["collector"] == "sensors"
+    assert errors[0].dimensions["error"] == "invalid_payload"
 
 
 def test_prometheus_text_preserves_contract_names_and_dimensions():

@@ -142,6 +142,18 @@ class MetricSample:
     timestamp: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class CollectorResult:
+    """Outcome from one read-only telemetry collector."""
+
+    name: str
+    supported: bool
+    success: bool
+    duration_seconds: float
+    rows: tuple[Mapping, ...] = ()
+    error_kind: Optional[str] = None
+
+
 def build_identity_dimensions(
         bmc_ip: str,
         vendor: str = "unknown",
@@ -490,25 +502,110 @@ def build_metric_samples(
 def scrape_health_samples(
         identity: Mapping[str, str],
         ok: bool,
-        duration_seconds: float) -> list[MetricSample]:
+        duration_seconds: float,
+        collector_results: Iterable[CollectorResult] = (),
+        partial: bool = False,
+        timestamp_seconds: Optional[float] = None) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
     :param identity: fixed join dimensions applied to the health samples.
     :param ok: whether the scrape succeeded (1.0) or failed (0.0).
     :param duration_seconds: scrape wall-clock duration, in seconds.
-    :return: list of the ``hw.scrape.ok`` and ``hw.scrape.duration_seconds`` samples.
+    :param collector_results: per-collector outcomes for exporter self-telemetry.
+    :param partial: whether at least one supported collector failed while another
+        collector still returned a usable result.
+    :param timestamp_seconds: wall-clock timestamp used for last-success freshness.
+    :return: scrape-level, collector-level, and deprecated compatibility samples.
     """
     dims = _with_dims(identity, source="exporter")
     duration = _as_float(duration_seconds)
-    return [
+    safe_duration = max(0.0, duration if duration is not None else 0.0)
+    health = [
+        _sample("redfish_exporter_scrape_success", 1.0 if ok else 0.0, dims, None),
+        _sample(
+            "redfish_exporter_scrape_partial",
+            1.0 if partial else 0.0,
+            dims,
+            None,
+        ),
+        _sample("redfish_exporter_scrape_duration_seconds", safe_duration, dims, "s"),
+        _sample(
+            "redfish_exporter_last_success_timestamp_seconds",
+            float(timestamp_seconds or 0.0) if ok else 0.0,
+            dims,
+            "s",
+        ),
         _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
         _sample(
             "hw.scrape.duration_seconds",
-            max(0.0, duration if duration is not None else 0.0),
+            safe_duration,
             dims,
             "s",
         ),
     ]
+    for result in collector_results:
+        collector_dims = _with_dims(
+            identity,
+            source="exporter",
+            collector=_dim_value(result.name),
+        )
+        collector_duration = _as_float(result.duration_seconds)
+        collector_duration = max(
+            0.0,
+            collector_duration if collector_duration is not None else 0.0,
+        )
+        health.extend([
+            _sample(
+                "redfish_exporter_collector_success",
+                1.0 if result.success else 0.0,
+                collector_dims,
+                None,
+            ),
+            _sample(
+                "redfish_exporter_collector_supported",
+                1.0 if result.supported else 0.0,
+                collector_dims,
+                None,
+            ),
+            _sample(
+                "redfish_exporter_collector_duration_seconds",
+                collector_duration,
+                collector_dims,
+                "s",
+            ),
+            _sample(
+                "redfish_exporter_collector_samples",
+                float(len(result.rows)),
+                collector_dims,
+                None,
+            ),
+        ])
+        if result.error_kind:
+            error_dims = collector_dims | {"error": _dim_value(result.error_kind)}
+            health.append(_sample(
+                "redfish_exporter_collection_errors_total",
+                1.0,
+                error_dims,
+                None,
+                metric_type="counter",
+            ))
+    return health
+
+
+def collector_scrape_status(results: Iterable[CollectorResult]) -> tuple[bool, bool]:
+    """Return ``(success, partial)`` for a set of collector outcomes.
+
+    :param results: per-collector outcomes from one scrape.
+    :return: success is true only when no supported collector failed; partial is true
+        when failures and usable collector results are both present.
+    """
+    materialized = tuple(results)
+    failed_supported = [
+        result for result in materialized
+        if result.supported and not result.success
+    ]
+    any_usable = any(result.success for result in materialized)
+    return not failed_supported, bool(failed_supported and any_usable)
 
 
 def jittered_interval(
@@ -1413,7 +1510,8 @@ def _sample(metric: str,
             value: float,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
-            timestamp: Optional[str] = None) -> MetricSample:
+            timestamp: Optional[str] = None,
+            metric_type: str = "gauge") -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
@@ -1421,11 +1519,12 @@ def _sample(metric: str,
     :param dims: dimension mapping.
     :param unit: optional unit annotation.
     :param timestamp: optional sample timestamp.
+    :param metric_type: Prometheus/OpenMetrics sample type.
     :return: the assembled MetricSample.
     """
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
-                        unit=unit, timestamp=timestamp)
+                        metric_type=metric_type, unit=unit, timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:

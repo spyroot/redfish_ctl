@@ -11,6 +11,7 @@ observability demo.
 import os
 import time
 from abc import abstractmethod
+from collections.abc import Callable, Mapping
 from typing import Optional
 
 from ..redfish_manager import CommandResult
@@ -34,6 +35,20 @@ class Exporter(RedfishManagerBase,
                name='exporter',
                metaclass=Singleton):
     """Read BMC telemetry and expose Prometheus or SignalFx metric output."""
+
+    _UNSUPPORTED_COLLECTOR_ERRORS = {
+        "FailedDiscoverAction",
+        "MissingResource",
+        "RedfishMethodNotAllowed",
+        "RedfishNotFound",
+        "ResourceNotFound",
+        "UnsupportedAction",
+    }
+    _AUTHENTICATION_ERRORS = {
+        "AuthenticationFailed",
+        "RedfishForbidden",
+        "RedfishUnauthorized",
+    }
 
     def __init__(self, *args, **kwargs):
         """Initialize the exporter command."""
@@ -173,6 +188,156 @@ class Exporter(RedfishManagerBase,
             return {}
         return result.data if isinstance(result.data, dict) else {}
 
+    @classmethod
+    def _is_unsupported_collector_error(cls, exc: Exception) -> bool:
+        """Return whether ``exc`` means the optional collector is unsupported.
+
+        :param exc: exception raised by a collector command.
+        :return: True when the collector should be counted unsupported, not failed.
+        """
+        return exc.__class__.__name__ in cls._UNSUPPORTED_COLLECTOR_ERRORS
+
+    @classmethod
+    def _collector_error_kind(cls, exc: Exception) -> str:
+        """Map a collector exception to the bounded exporter error-kind label.
+
+        :param exc: exception raised while collecting or validating rows.
+        :return: one of the allowed exporter error-kind labels.
+        """
+        name = exc.__class__.__name__
+        lowered = name.lower()
+        if isinstance(exc, TimeoutError) or "timeout" in lowered:
+            return "timeout"
+        if name in cls._AUTHENTICATION_ERRORS or "unauthoriz" in lowered:
+            return "authentication"
+        if "jsondecode" in lowered or "decode" in lowered:
+            return "decode_error"
+        if name in {"TypeError", "ValueError", "KeyError", "UnexpectedResponse"}:
+            return "invalid_payload"
+        if "http" in lowered or "redfish" in lowered or "requestfailed" in lowered:
+            return "http_error"
+        return "internal"
+
+    @staticmethod
+    def _validate_collector_rows(rows) -> tuple[Mapping, ...]:
+        """Return rows as an immutable tuple after shape validation.
+
+        :param rows: candidate iterable of mapping rows.
+        :return: tuple of mapping rows.
+        :raises ValueError: when the payload is not a row list.
+        """
+        if isinstance(rows, (str, bytes, dict)) or not hasattr(rows, "__iter__"):
+            raise ValueError("collector returned a non-list payload")
+        normalized = tuple(rows)
+        if not all(isinstance(row, Mapping) for row in normalized):
+            raise ValueError("collector returned a non-mapping row")
+        return normalized
+
+    @staticmethod
+    def _extract_list_rows(data) -> list:
+        """Extract rows from collectors that return a list payload.
+
+        :param data: command result payload.
+        :return: list payload.
+        :raises ValueError: when the payload is not a list.
+        """
+        if not isinstance(data, list):
+            raise ValueError("collector returned a non-list payload")
+        return data
+
+    @staticmethod
+    def _extract_environment_rows(data) -> list:
+        """Extract rows from the environment-metrics command payload.
+
+        :param data: command result payload.
+        :return: list of EnvironmentMetrics rows.
+        :raises ValueError: when the payload has an unexpected shape.
+        """
+        if isinstance(data, dict) and isinstance(data.get("metrics"), list):
+            return data["metrics"]
+        if isinstance(data, list):
+            return data
+        raise ValueError("environment-metrics returned an unexpected payload")
+
+    @staticmethod
+    def _extract_leak_detector_rows(data) -> list:
+        """Extract rows from the leak-detectors command payload.
+
+        :param data: command result payload.
+        :return: list of leak-detector rows.
+        :raises ValueError: when the payload has an unexpected shape.
+        """
+        if isinstance(data, dict) and isinstance(data.get("detectors"), list):
+            return data["detectors"]
+        raise ValueError("leak-detectors returned an unexpected payload")
+
+    @staticmethod
+    def _extract_thermal_rows(data) -> list:
+        """Extract rows from the thermal command payload.
+
+        :param data: command result payload.
+        :return: list of temperature-reading rows.
+        :raises ValueError: when the payload has an unexpected shape.
+        """
+        if isinstance(data, dict) and isinstance(data.get("temperature_readings"), list):
+            return data["temperature_readings"]
+        raise ValueError("thermal returned an unexpected payload")
+
+    def _collect_result(self,
+                        collector: str,
+                        call: Callable[[], CommandResult],
+                        extract_rows: Callable[[object], list]) -> exporter.CollectorResult:
+        """Run one collector command and preserve its health classification.
+
+        :param collector: stable collector name used in exporter self-telemetry.
+        :param call: callable that invokes the collector command.
+        :param extract_rows: callable that extracts the row list from command data.
+        :return: CollectorResult for the collector.
+        """
+        started_at = exporter.time.monotonic()
+        try:
+            result = call()
+        except Exception as exc:
+            duration = exporter.time.monotonic() - started_at
+            if self._is_unsupported_collector_error(exc):
+                return exporter.CollectorResult(
+                    collector, False, True, duration, (), None)
+            return exporter.CollectorResult(
+                collector, True, False, duration, (),
+                self._collector_error_kind(exc))
+        duration = exporter.time.monotonic() - started_at
+        if not hasattr(result, "data"):
+            return exporter.CollectorResult(
+                collector, True, False, duration, (), "invalid_payload")
+        if getattr(result, "error", None):
+            return exporter.CollectorResult(
+                collector, True, False, duration, (), "internal")
+        try:
+            rows = self._validate_collector_rows(extract_rows(result.data))
+        except Exception as exc:
+            return exporter.CollectorResult(
+                collector, True, False, duration, (),
+                self._collector_error_kind(exc))
+        return exporter.CollectorResult(collector, True, True, duration, rows, None)
+
+    def _invoke_collector(self,
+                          api_type: ApiRequestType,
+                          name: str,
+                          extract_rows: Callable[[object], list],
+                          **kwargs) -> exporter.CollectorResult:
+        """Invoke a registered read-only collector and return its result model.
+
+        :param api_type: ApiRequestType of the collector command.
+        :param name: registered command name and collector label.
+        :param extract_rows: callable that extracts the collector row list.
+        :return: CollectorResult for the collector.
+        """
+        return self._collect_result(
+            name,
+            lambda: self.sync_invoke(api_type, name, **kwargs),
+            extract_rows,
+        )
+
     def _leak_detection_rows(self, do_async: bool = False) -> list[dict]:
         """Return LeakDetector rows from the read-only leak-detectors command.
 
@@ -306,34 +471,85 @@ class Exporter(RedfishManagerBase,
             vendor=self._vendor_label(vendor),
             **identity_options,
         )
-        environment_rows = self._environment_command_rows(do_async=do_async)
-        thermal_rows = self._thermal_rows(do_async=do_async, do_expanded=do_expanded)
-        sensor_rows = self._invoke_rows(ApiRequestType.Sensors, "sensors",
-                                        do_async=do_async, do_expanded=do_expanded)
-        nvlink_rows = self._invoke_rows(ApiRequestType.NvLinkPorts, "nvlink-ports",
-                                        do_async=do_async, do_expanded=do_expanded)
-        metric_rows = self._invoke_rows(ApiRequestType.MetricReports, "metric-reports",
-                                        do_async=do_async, do_expanded=do_expanded)
-        leak_rows = self._leak_detection_rows(do_async=do_async)
-        network_rows = self._invoke_rows(ApiRequestType.NetworkAdapters, "network-adapters",
-                                         do_async=do_async, do_expanded=do_expanded)
-        component_rows = self._invoke_rows(ApiRequestType.ComponentIntegrity, "component-integrity",
-                                           do_async=do_async, do_expanded=do_expanded)
+        collector_results = [
+            self._invoke_collector(
+                ApiRequestType.EnvironmentMetrics,
+                "environment-metrics",
+                self._extract_environment_rows,
+                do_async=do_async,
+            ),
+            self._invoke_collector(
+                ApiRequestType.Thermal,
+                "thermal",
+                self._extract_thermal_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+            self._invoke_collector(
+                ApiRequestType.Sensors,
+                "sensors",
+                self._extract_list_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+            self._invoke_collector(
+                ApiRequestType.NvLinkPorts,
+                "nvlink-ports",
+                self._extract_list_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+            self._invoke_collector(
+                ApiRequestType.MetricReports,
+                "metric-reports",
+                self._extract_list_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+            self._invoke_collector(
+                ApiRequestType.LeakDetectors,
+                "leak-detectors",
+                self._extract_leak_detector_rows,
+                do_async=do_async,
+            ),
+            self._invoke_collector(
+                ApiRequestType.NetworkAdapters,
+                "network-adapters",
+                self._extract_list_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+            self._invoke_collector(
+                ApiRequestType.ComponentIntegrity,
+                "component-integrity",
+                self._extract_list_rows,
+                do_async=do_async,
+                do_expanded=do_expanded,
+            ),
+        ]
+        rows_by_collector = {
+            result.name: result.rows
+            for result in collector_results
+        }
         samples = build_metric_samples(
             identity=identity,
-            environment_rows=environment_rows,
-            sensor_rows=sensor_rows,
-            nvlink_rows=nvlink_rows,
-            metric_report_rows=metric_rows,
-            thermal_rows=thermal_rows,
-            leak_detection_rows=leak_rows,
-            network_rows=network_rows,
-            component_integrity_rows=component_rows,
+            environment_rows=rows_by_collector["environment-metrics"],
+            sensor_rows=rows_by_collector["sensors"],
+            nvlink_rows=rows_by_collector["nvlink-ports"],
+            metric_report_rows=rows_by_collector["metric-reports"],
+            thermal_rows=rows_by_collector["thermal"],
+            leak_detection_rows=rows_by_collector["leak-detectors"],
+            network_rows=rows_by_collector["network-adapters"],
+            component_integrity_rows=rows_by_collector["component-integrity"],
         )
+        scrape_ok, scrape_partial = exporter.collector_scrape_status(collector_results)
         samples.extend(exporter.scrape_health_samples(
             identity,
-            ok=bool(samples),
+            ok=scrape_ok,
             duration_seconds=exporter.time.monotonic() - started_at,
+            collector_results=collector_results,
+            partial=scrape_partial,
+            timestamp_seconds=exporter.time.time(),
         ))
         return samples
 
