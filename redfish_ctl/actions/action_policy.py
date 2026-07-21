@@ -169,6 +169,9 @@ ACTION_POLICY = {
     "#DelliDRACCardService.EnableSEKM": Destructiveness.DESTRUCTIVE,
     "#DelliDRACCardService.Rekey": Destructiveness.DESTRUCTIVE,
     "#DelliDRACCardService.iLKMToSEKMTransition": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.DeleteGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.JoinGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.RemoveSelf": Destructiveness.DESTRUCTIVE,
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,

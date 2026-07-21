@@ -147,6 +147,7 @@ class ApiRequestType(Enum):
     DellCardHwProof = auto()
     DellCardKeyManagement = auto()
     DellPersistentInitializeMedia = auto()
+    DellCardGroupActions = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
     SubscriptionDelete = auto()

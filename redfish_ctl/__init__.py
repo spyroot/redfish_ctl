@@ -164,6 +164,7 @@ from .oem.cmd_dell_card_hw_proof import *
 from .oem.cmd_dell_card_key_management import *
 from .oem.cmd_dell_persistent_initialize_media import *
 from .oem.cmd_dell_persistent_partition import *
+from .oem.cmd_dell_card_group_actions import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *
