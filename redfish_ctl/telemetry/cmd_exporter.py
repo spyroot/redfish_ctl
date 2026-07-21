@@ -8,6 +8,8 @@ The exporter is read-only. It walks modern Redfish telemetry resources and
 normalizes them into the ``hw.*`` metric contract used by the GB300/NV72
 observability demo.
 """
+import os
+import time
 from abc import abstractmethod
 from typing import Optional
 
@@ -92,6 +94,18 @@ class Exporter(RedfishManagerBase,
         token_group.add_argument(
             "--signalfx-token-file", dest="signalfx_token_file", default=None, type=str,
             help="file containing the SignalFx ingest token")
+        cmd_parser.add_argument(
+            "--verify-readback", dest="verify_readback", action="store_true",
+            help="after a --once SignalFx push, read the metric time series back from "
+                 "Splunk MTS and report a compact canary result; a POST returning 200 "
+                 "is not treated as proof the datapoints were ingested (issue #363)")
+        cmd_parser.add_argument(
+            "--signalfx-realm", dest="signalfx_realm", default=None, type=str,
+            help="Splunk Observability realm for readback; defaults to SPLUNK_O11Y_REALM")
+        cmd_parser.add_argument(
+            "--signalfx-api-token-env", dest="signalfx_api_token_env", default=None,
+            type=str, help="env var holding the Splunk API (read) token for readback; "
+                           "defaults to SPLUNK_API_TOKEN")
         cmd_parser.add_argument(
             "--identity-host-prefix", dest="identity_host_prefix",
             default=None, type=str,
@@ -342,6 +356,9 @@ class Exporter(RedfishManagerBase,
                 signalfx_token_env: Optional[str] = None,
                 signalfx_token: Optional[str] = None,
                 signalfx_token_file: Optional[str] = None,
+                verify_readback: Optional[bool] = False,
+                signalfx_realm: Optional[str] = None,
+                signalfx_api_token_env: Optional[str] = None,
                 identity_host_prefix: Optional[str] = None,
                 identity_bmc_octet_base: Optional[int] = None,
                 identity_server_octet_base: Optional[int] = None,
@@ -370,6 +387,13 @@ class Exporter(RedfishManagerBase,
         :param signalfx_token_env: environment variable holding the SignalFx ingest token.
         :param signalfx_token: direct SignalFx ingest token value.
         :param signalfx_token_file: file containing the SignalFx ingest token.
+        :param verify_readback: when True, a --once SignalFx push reads the metric
+            time series back from Splunk MTS and returns a compact canary result;
+            a POST returning 200 is not treated as proof of ingestion.
+        :param signalfx_realm: Splunk Observability realm for readback; resolved
+            from SPLUNK_O11Y_REALM when None.
+        :param signalfx_api_token_env: env var holding the Splunk API (read) token
+            for readback; defaults to SPLUNK_API_TOKEN.
         :param identity_host_prefix: host.name prefix override.
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
@@ -453,16 +477,39 @@ class Exporter(RedfishManagerBase,
                     token_file=signalfx_token_file,
                 )
                 ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
+                scrape_start = time.monotonic()
                 samples = collect_current_samples()
+                scrape_ms = int((time.monotonic() - scrape_start) * 1000)
                 body = to_signalfx_body(samples)
+                push_start = time.monotonic()
                 status = exporter.push_signalfx(body, token, ingest_url)
-                return CommandResult(
-                    body, None,
-                    {"sample_count": len(samples),
-                     "push_status": status,
-                     "ingest_url": ingest_url},
-                    None,
-                )
+                push_ms = int((time.monotonic() - push_start) * 1000)
+                if not verify_readback:
+                    return CommandResult(
+                        body, None,
+                        {"sample_count": len(samples),
+                         "push_status": status,
+                         "ingest_url": ingest_url},
+                        None,
+                    )
+                # POST 200 is not proof: confirm the datapoints are visible in MTS.
+                realm = signalfx_realm or os.environ.get("SPLUNK_O11Y_REALM", "")
+                api_token = os.environ.get(
+                    signalfx_api_token_env or "SPLUNK_API_TOKEN", "")
+                if not realm or not api_token:
+                    raise ValueError(
+                        "--verify-readback needs a realm (--signalfx-realm or "
+                        "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
+                        "or SPLUNK_API_TOKEN)")
+                metric_names = sorted({sample.metric for sample in samples})
+                readback_start = time.monotonic()
+                readback = exporter.verify_signalfx_readback(
+                    realm, api_token, metric_names)
+                readback_ms = int((time.monotonic() - readback_start) * 1000)
+                summary, error = exporter.build_readback_result(
+                    status, ingest_url, len(samples), metric_names, readback,
+                    {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms})
+                return CommandResult(summary, None, summary, error)
             samples = collect_current_samples()
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"
                     else render_prometheus_text(samples))

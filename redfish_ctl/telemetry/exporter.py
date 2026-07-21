@@ -9,6 +9,7 @@ import random
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -1143,6 +1144,93 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
     )
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return response.status
+
+
+def signalfx_metric_readback(
+        realm: str, api_token: str, metric: str, timeout: float = 20.0) -> dict:
+    """Return how many time series exist for a metric in Splunk MTS, and how fresh.
+
+    A SignalFx datapoint POST returns HTTP 200/``OK`` even when the datapoints are
+    dropped (for example the Observability ingest host, see issue #363), so ingest
+    success must be confirmed by reading the metric time series back — not by
+    trusting the POST status.
+
+    :param realm: Splunk Observability realm (for example ``us1``).
+    :param api_token: API (read) token, sent as the ``X-SF-Token`` header; never logged.
+    :param metric: SignalFx metric name to look up.
+    :param timeout: HTTP timeout in seconds.
+    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>}``.
+    :raises ValueError: when the API answers with a non-JSON body.
+    """
+    query = urllib.parse.urlencode(
+        {"query": f'sf_metric:"{metric}"', "limit": 50, "orderBy": "-sf_updatedOnMs"})
+    url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
+    request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        raw = response.read()
+    try:
+        data = json.loads(raw)
+    except ValueError as exc:
+        raise ValueError(f"non-JSON metrictimeseries response for {metric}") from exc
+    results = data.get("results") or []
+    newest = 0
+    for row in results:
+        for key in ("lastUpdated", "sf_updatedOnMs", "updatedOnMs", "created"):
+            stamp = row.get(key)
+            if isinstance(stamp, (int, float)) and stamp > newest:
+                newest = int(stamp)
+    return {"count": int(data.get("count") or len(results)), "newest_ms": newest}
+
+
+def verify_signalfx_readback(
+        realm: str, api_token: str, metrics: Iterable[str],
+        timeout: float = 20.0) -> dict:
+    """Confirm each pushed metric is visible in Splunk MTS.
+
+    :param realm: Splunk Observability realm.
+    :param api_token: API (read) token; never logged.
+    :param metrics: metric names to confirm (the names that were pushed).
+    :param timeout: per-query HTTP timeout in seconds.
+    :return: ``{metric: {"count": int, "newest_ms": int}}`` for each metric.
+    """
+    return {metric: signalfx_metric_readback(realm, api_token, metric, timeout)
+            for metric in sorted(set(metrics))}
+
+
+def build_readback_result(
+        push_status: int, ingest_url: str, sample_count: int,
+        metric_names: list, readback: dict, timing_ms: dict) -> tuple:
+    """Build the compact canary summary and verdict from a readback.
+
+    A metric is visible when its readback ``count`` is greater than zero. When any
+    pushed metric is missing, the verdict is an error: the POST succeeded but the
+    datapoints were not ingested (issue #363), so a 200 is not proof.
+
+    :param push_status: the HTTP status the SignalFx POST returned.
+    :param ingest_url: the (normalized) ingest URL that was POSTed to.
+    :param sample_count: number of samples scraped and pushed.
+    :param metric_names: the distinct metric names that were pushed.
+    :param readback: ``{metric: {"count": int, "newest_ms": int}}`` from MTS.
+    :param timing_ms: ``{"scrape": int, "push": int, "readback": int}`` durations.
+    :return: ``(summary_dict, error_or_None)`` — the compact result and verdict.
+    """
+    visible = sorted(name for name, series in readback.items() if series["count"] > 0)
+    missing = sorted(set(metric_names) - set(visible))
+    summary = {
+        "push_status": push_status,
+        "ingest_url": ingest_url,
+        "sample_count": sample_count,
+        "metrics_pushed": len(metric_names),
+        "metrics_visible": len(visible),
+        "missing_metrics": missing,
+        "readback": readback,
+        "timing_ms": timing_ms,
+    }
+    error = None if not missing else (
+        f"SignalFx POST returned {push_status} but {len(missing)} of "
+        f"{len(metric_names)} pushed metrics have no time series in Splunk MTS — "
+        "the POST succeeded yet datapoints were not ingested")
+    return summary, error
 
 
 def _report_signalfx_loop_error(exc: Exception) -> None:
