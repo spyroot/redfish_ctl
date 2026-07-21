@@ -11,6 +11,8 @@ so a newly exposed (unclassified) action can never POST without an explicit
 confirm. This module is product-neutral — it names standard DMTF plus known OEM
 confirm. This module is product-neutral — it names standard DMTF and vendor OEM
 action types and imports nothing from the Redfish manager layer.
+confirm. This module is product-neutral — it names standard DMTF actions and
+selected vendor OEM action types without importing the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
@@ -93,6 +95,7 @@ ACTION_POLICY = {
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#DellBIOSService.DeviceRecovery": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.VFlashStateChange": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     "#HpeiLOAccountService.ImportKerberosKeytab": Destructiveness.DESTRUCTIVE,

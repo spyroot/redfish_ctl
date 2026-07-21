@@ -158,6 +158,7 @@ class ApiRequestType(Enum):
     DellSwitchPortRefresh = auto()
     OemInfo = auto()
     SmcNodeManagerClearPolicies = auto()
+    DellVFlashStateChange = auto()
     ConsoleInfo = auto()
     SerialConsoleConfig = auto()
     BiosSnapshot = auto()
