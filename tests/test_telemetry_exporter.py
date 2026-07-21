@@ -879,27 +879,28 @@ def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypat
         resolve_signalfx_ingest_url()
 
 
-def test_resolve_signalfx_normalizes_observability_ingest_host(monkeypatch, capsys):
-    """The Observability ingest host returns 200/OK but drops datapoints, so it is
-    rewritten to the SignalFx datapoint host, preserving realm and path (#363)."""
+def test_resolve_signalfx_accepts_observability_host(monkeypatch):
+    """ingest.<realm>.observability.splunkcloud.com/v2/datapoint is the current,
+    correct Splunk ingest host — it is accepted as-is, not rewritten (the zero-
+    visibility in #363 was not the host; see the readback gate)."""
     monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
-    out = resolve_signalfx_ingest_url(
-        "https://ingest.us1.observability.splunkcloud.com/v2/datapoint")
-    assert out == "https://ingest.us1.signalfx.com/v2/datapoint"
-    # the rewrite is surfaced, not silent, so a deploy dry-run shows the real target
-    assert "rewrote SignalFx ingest host" in capsys.readouterr().err
+    url = "https://ingest.us1.observability.splunkcloud.com/v2/datapoint"
+    assert resolve_signalfx_ingest_url(url) == url
     monkeypatch.setenv("SPLUNK_INGEST_URL",
                        "https://ingest.eu0.observability.splunkcloud.com/v2/datapoint")
     assert (resolve_signalfx_ingest_url()
-            == "https://ingest.eu0.signalfx.com/v2/datapoint")
+            == "https://ingest.eu0.observability.splunkcloud.com/v2/datapoint")
 
 
-def test_require_datapoint_url_rejects_observability_host_directly():
-    """The validator rejects the Observability host even with the /v2/datapoint
-    path, so a direct push_signalfx call cannot bypass the normalization (#363)."""
-    with pytest.raises(ValueError, match="Observability"):
-        _require_datapoint_url(
-            "https://ingest.us1.observability.splunkcloud.com/v2/datapoint")
+def test_require_datapoint_url_accepts_both_hosts_needs_path():
+    """Both the observability and legacy signalfx hosts are accepted with the
+    /v2/datapoint path; only a bare host (no path) is rejected."""
+    for host in ("ingest.us1.observability.splunkcloud.com",
+                 "ingest.us1.signalfx.com"):
+        full = f"https://{host}/v2/datapoint"
+        assert _require_datapoint_url(full) == full
+    with pytest.raises(ValueError, match="v2/datapoint"):
+        _require_datapoint_url("https://ingest.us1.observability.splunkcloud.com")
 
 
 def _report_row(source_property, value, report="HGX_HealthMetrics_0"):

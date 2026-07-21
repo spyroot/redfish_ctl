@@ -10,6 +10,7 @@ Author Mus spyroot@gmail.com
 import json
 from unittest import mock
 
+from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter import (
     build_readback_result,
     signalfx_metric_readback,
@@ -58,27 +59,45 @@ def test_verify_readback_covers_each_metric():
     assert all(v["count"] == 1 for v in out.values())
 
 
-def test_verdict_ok_when_all_visible():
-    """All pushed metrics visible -> no error, compact summary populated."""
-    readback = {"hw.power": {"count": 1, "newest_ms": 9}, "hw.temp": {"count": 3, "newest_ms": 9}}
-    summary, error = build_readback_result(
-        200, "https://ingest.us1.signalfx.com/v2/datapoint", 5,
-        ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30})
-    assert error is None
-    assert summary["metrics_visible"] == 2 and summary["missing_metrics"] == []
-    assert "readback" not in summary["timing_ms"] or summary["timing_ms"]["readback"] == 30
+def test_readback_scopes_query_by_dimension():
+    """The MTS query is scoped by the entity dimension so only this host's series
+    is read back, not every host reporting the metric (Splunk MTS identity)."""
+    assert exporter._mts_query("hw.power", {"host.name": "slot1"}) == (
+        'sf_metric:"hw.power" AND host.name:"slot1"')
+    assert exporter._mts_query("hw.power") == 'sf_metric:"hw.power"'
 
 
-def test_verdict_errors_when_a_metric_is_missing():
-    """POST 200 but a metric has no series -> verdict is an error (issue #363).
+_NOW = 1_700_000_000_000
 
-    This is the false-success the gate exists to catch: a 200 is not proof.
-    """
-    readback = {"hw.power": {"count": 1, "newest_ms": 9}, "hw.temp": {"count": 0, "newest_ms": 0}}
+
+def test_verdict_ok_when_series_fresh():
+    """All pushed metrics have a fresh series -> no error."""
+    readback = {"hw.power": {"count": 1, "newest_ms": _NOW - 1000},
+                "hw.temp": {"count": 3, "newest_ms": _NOW - 2000}}
     summary, error = build_readback_result(
         200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 5,
-        ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30})
-    assert error is not None
-    assert "not ingested" in error
+        ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
+    assert error is None
+    assert summary["metrics_fresh"] == 2 and summary["missing_metrics"] == []
+
+
+def test_verdict_errors_when_a_metric_is_absent():
+    """POST 200 but a metric has no series -> error (issue #363): 200 is not proof."""
+    readback = {"hw.power": {"count": 1, "newest_ms": _NOW},
+                "hw.temp": {"count": 0, "newest_ms": 0}}
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 5,
+        ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
+    assert error is not None and "not ingested" in error
     assert summary["missing_metrics"] == ["hw.temp"]
-    assert summary["push_status"] == 200
+
+
+def test_verdict_errors_on_stale_series():
+    """A series with count>0 but a STALE newest_ms is not proof of this push —
+    Splunk retains inactive MTS for 13 months, so freshness is required."""
+    readback = {"hw.power": {"count": 1, "newest_ms": _NOW - 40 * 24 * 3600 * 1000}}
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
+    assert error is not None
+    assert summary["metrics_fresh"] == 0 and summary["missing_metrics"] == ["hw.power"]

@@ -502,13 +502,23 @@ class Exporter(RedfishManagerBase,
                         "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
                         "or SPLUNK_API_TOKEN)")
                 metric_names = sorted({sample.metric for sample in samples})
+                # Scope the readback to this host's MTS via its unique identity
+                # dimension, so a neighbor pushing the same metric is not mistaken
+                # for this host's series.
+                dimensions = {}
+                for sample in samples:
+                    host = sample.dimensions.get("host.name")
+                    if host:
+                        dimensions = {"host.name": host}
+                        break
                 readback_start = time.monotonic()
                 readback = exporter.verify_signalfx_readback(
-                    realm, api_token, metric_names)
+                    realm, api_token, metric_names, dimensions)
                 readback_ms = int((time.monotonic() - readback_start) * 1000)
                 summary, error = exporter.build_readback_result(
                     status, ingest_url, len(samples), metric_names, readback,
-                    {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms})
+                    {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms},
+                    int(time.time() * 1000))
                 return CommandResult(summary, None, summary, error)
             samples = collect_current_samples()
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"
