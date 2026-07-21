@@ -38,6 +38,7 @@ from .raid.cmd_dell_raid_config_actions import *
 from .raid.cmd_dell_raid_clear_actions import *
 from .raid.cmd_dell_raid_rename_vd import *
 from .raid.cmd_pd_state import *
+from .raid.cmd_dell_raid_foreign_config import *
 #
 # bios commands
 from .bios.cmd_bios import *
