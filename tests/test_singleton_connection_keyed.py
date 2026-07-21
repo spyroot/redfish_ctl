@@ -188,7 +188,8 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
             :param kwargs: command arguments left after connection dispatch.
             :return: command result wrapping the remaining kwargs.
             """
-            return CommandResult(data=kwargs)
+            return CommandResult(
+                data=kwargs, discovered=None, extra=None, error=None)
 
         @staticmethod
         def register_subcommand(cls):
