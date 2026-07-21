@@ -97,7 +97,7 @@ capture path.
 Adding the next box is a small, repeatable step:
 
 1. Capture and **sanitize** the full tree following the canonical SOP in
-   [fixture-capture.md](fixture-capture.md) — that document defines the crawl,
+   [fixture-capture.md](../internal/fixture-capture.md) — that document defines the crawl,
    the redaction checklist, and the schema-validation step. A full crawl carries
    device identifiers, so sanitization is mandatory; never commit a real
    credential or token.

@@ -6,7 +6,7 @@ Author: Mus <spyroot@gmail.com>
 against captured real-hardware behavior. This exists for three reasons: fast offline tests, an
 end-to-end Kubernetes sandbox with no BMC, and a deterministic Redfish environment that a
 reinforcement-learning agent can train against. The three layers below build on each other.
-The frozen surface is documented in [Redfish Simulator Contract](simulator-contract.md).
+The frozen surface is documented in [Redfish Simulator Contract](../internal/simulator-contract.md).
 
 ## Layer 1: corpus as simulator (reads)
 

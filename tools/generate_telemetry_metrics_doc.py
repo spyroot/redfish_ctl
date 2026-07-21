@@ -446,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Generate docs/telemetry-metrics.md from the committed GB300 corpus. "
+            "Generate docs/external/telemetry-metrics.md from the committed GB300 corpus. "
             "Audience: both humans and scripted callers."
         )
     )
@@ -480,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
                 lineterm="",
             )
             print("\n".join(diff), file=sys.stderr)
-            print("BLOCKER: docs/telemetry-metrics.md is stale; regenerate it",
+            print("BLOCKER: docs/external/telemetry-metrics.md is stale; regenerate it",
                   file=sys.stderr)
             return 1
         return 0

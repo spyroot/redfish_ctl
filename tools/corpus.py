@@ -4,7 +4,7 @@
 The corpora are one Git-LFS ``.tar.gz`` per captured box under ``tests/`` (built
 by ``tools/pack_corpus.py``), indexed by ``tests/corpus/manifest.json``. This CLI
 is the single documented entry point for pulling every corpus and materializing
-the JSON — see ``docs/corpus-library.md``.
+the JSON — see ``docs/external/corpus-library.md``.
 
 Subcommands
 -----------

@@ -32,7 +32,7 @@ What it does across the whole server lifecycle:
 - **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
   an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
   — to Prometheus, SignalFx, and Splunk Observability. The
-  [telemetry exporter guide](docs/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
+  [telemetry exporter guide](docs/external/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
   model and the supported consumer modes.
 - **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
 - **Accounts & security** — create/update/delete accounts, SSH-key import, the account and privilege
@@ -69,7 +69,7 @@ redfish_ctl --help             # every subcommand
 ```
 
 Reads are safe. Commands that change hardware are labeled **Guarded** or **Write** in the
-[command reference](docs/commands.md#registered-commands): Guarded commands require an explicit
+[command reference](docs/external/commands.md#registered-commands): Guarded commands require an explicit
 intent flag such as `--confirm`; Write commands can mutate immediately and require explicit target
 approval before live use. Preview with `--show` or `--dry_run` when the command supports it, then
 see [Mutating Commands](#mutating-commands) below before applying anything.
@@ -227,8 +227,8 @@ temperature, power, fan, and voltage readings with units. `discovery`, defined i
 
 Dell iDRAC is the main control target. Vendor-neutral reads are fixture-backed for Dell iDRAC,
 Supermicro GB300/X10, HPE iLO, and generic DMTF Redfish corpora, with HPE also covered by the
-opt-in emulator canary in `examples/hpe_ilo_canary.sh`. See [Vendors](docs/vendors.md) and the
-[Corpus Library](docs/corpus-library.md) for exact coverage.
+opt-in emulator canary in `examples/hpe_ilo_canary.sh`. See [Vendors](docs/external/vendors.md) and the
+[Corpus Library](docs/external/corpus-library.md) for exact coverage.
 
 ## Mutating Commands
 
@@ -249,13 +249,13 @@ Use `--confirm` only when you mean to perform a guarded action such as `system-r
 
 `redfish_ctl` streams what it does to Splunk Observability APM (or any OTLP backend) so a fleet of
 BMCs — and the operations run against them — are visible with no agent on the host and no code in the
-firmware. Full guide: [Observability](docs/observability.md).
+firmware. Full guide: [Observability](docs/external/observability.md).
 
 ### Telemetry (metrics)
 
 The exporter turns out-of-band hardware state (power, thermal, fans, GPU, leak detection, fabric)
 into the stable `hw.*` metric family and pushes it over native OTLP. One exporter streams one BMC;
-scale by running more. See [Telemetry Exporter](docs/telemetry-exporter.md).
+scale by running more. See [Telemetry Exporter](docs/external/telemetry-exporter.md).
 
 ```bash
 redfish_ctl exporter --output otlp --once
@@ -300,22 +300,22 @@ First-run problems are almost always the connection, not the command:
 
 ## More Docs
 
-- [Command reference](docs/commands.md) - registered subcommands and safe workflow patterns.
+- [Command reference](docs/external/commands.md) - registered subcommands and safe workflow patterns.
 - [Examples](examples/README.md) - one-line index of every script under `examples/`.
-- [BIOS profiles](docs/bios-profiles.md) - low-latency, Dell System Profile, custom, Intel, and AMD
+- [BIOS profiles](docs/external/bios-profiles.md) - low-latency, Dell System Profile, custom, Intel, and AMD
   profile examples.
-- [Vendors](docs/vendors.md) - Dell, Supermicro, HPE, and generic Redfish support.
-- [Observability](docs/observability.md) - stream BMC operations to Splunk APM as traces and metrics.
-- [Telemetry Exporter](docs/telemetry-exporter.md) - the `hw.*` metric exporter and deployment model.
-- [Simulation and replay](docs/simulation-and-replay.md) - the hardware-free mock and mutation replay.
-- [Testing](docs/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
-- [Corpus library](docs/corpus-library.md) - manifest-indexed Redfish corpus tarballs and pull-all extraction.
+- [Vendors](docs/external/vendors.md) - Dell, Supermicro, HPE, and generic Redfish support.
+- [Observability](docs/external/observability.md) - stream BMC operations to Splunk APM as traces and metrics.
+- [Telemetry Exporter](docs/external/telemetry-exporter.md) - the `hw.*` metric exporter and deployment model.
+- [Simulation and replay](docs/external/simulation-and-replay.md) - the hardware-free mock and mutation replay.
+- [Testing](docs/external/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
+- [Corpus library](docs/external/corpus-library.md) - manifest-indexed Redfish corpus tarballs and pull-all extraction.
 - [Docker](docker/README.md) - production image and Linux offline-test image usage.
-- [Fixture capture](docs/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
-- [CI/CD](docs/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
-- [Architecture](docs/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
-- [Telemetry metrics](docs/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
+- [Fixture capture](docs/internal/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
+- [CI/CD](docs/internal/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
+- [Architecture](docs/external/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
+- [Telemetry metrics](docs/external/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
-- [Releasing](docs/releasing.md) - local verification, package build, PyPI upload, and tagging.
-- [Fleet proxy design](docs/redfish-proxy.md) - planned service/controller shape for fleet management.
-- [Scaling and benchmarks](docs/scaling-and-benchmarks.md) - planned concurrency engine and benchmark goals.
+- [Releasing](docs/internal/releasing.md) - local verification, package build, PyPI upload, and tagging.
+- [Fleet proxy design](docs/external/redfish-proxy.md) - planned service/controller shape for fleet management.
+- [Scaling and benchmarks](docs/external/scaling-and-benchmarks.md) - planned concurrency engine and benchmark goals.

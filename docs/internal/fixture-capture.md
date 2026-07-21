@@ -18,7 +18,7 @@ Pick the path that matches what you are contributing — the two are deliberatel
 - **Path B — a curated fixture set.** Hand-pick, sanitize, and import only the *handful* of resources
   one specific test needs. Best when adding or fixing **one command on an already-covered vendor**.
 
-For the existing shared archive, see the [Redfish Corpus Library](corpus-library.md), the repository
+For the existing shared archive, see the [Redfish Corpus Library](../external/corpus-library.md), the repository
 index for committed corpus tarballs and pull-all extraction commands.
 
 ## Path A — Full BMC crawl (whole tree → vendor corpus)
