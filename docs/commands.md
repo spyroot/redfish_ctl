@@ -119,8 +119,30 @@ Safety labels:
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
 | `current_boot` | Read current boot source details. | Read |
 | `dell-lc-network-share-test` | Test Dell Lifecycle Controller network-share reachability; previews unless `--confirm` is given. | Guarded |
+| `dell-card-test-actions` | List or send Dell iDRAC card email, SNMP, and rsyslog test actions; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-license-actions` | List or invoke Dell OEM license-management import, export, and delete actions; previews by default and `--confirm` posts. | Guarded |
+| `dell-lc-export` | Export Dell LC data; preview unless confirmed. | Guarded |
+| `dell-job-queue-setup` | Start Dell JobService `SetupJobQueue`; previews unless `--confirm` is given. | Guarded |
+| `dell-card-sekm-test` | Test Dell SEKM server connectivity through `DelliDRACCardService`; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-card-cert-export` | Export Dell iDRAC card-service certificates; lists targets by default and `--query` posts the selected read-only action. | Read |
+| `dell-card-csr` | Generate Dell card-service factory-identity or SEKM CSRs; lists targets by default and requires `--confirm` to POST. | Guarded |
+| `dell-card-hw-proof` | Verify Dell iDRAC card-service hardware proof of possession; lists targets by default and requires `--confirm` before POSTing. | Guarded |
+| `dell-card-key-management` | Preview or run Dell iDRAC card-service key-management actions; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-raid-config-actions` | Set selected DellRaidService virtual-disk boot and RAID asset-name values; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-lc-ism-installer` | Expose Dell iSM installer media through `DellLCService.ExposeiSMInstallerToHostOS`; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-bios-device-recovery` | Recover a Dell BIOS device through `DellBIOSService.DeviceRecovery`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
+| `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
+| `dell-metric-actions` | List or invoke Dell MetricService ControlMetrics and ExportThermalHistory actions; previews by default and masks share passwords. | Guarded |
+| `dell-raid-blink` | List or run DellRaidService `BlinkTarget` / `UnBlinkTarget` for a physical disk FQDD; previews by default and requires `--confirm` to POST. | Guarded |
+| `dell-raid-spare` | Assign or unassign Dell RAID hot spare disks through DellRaidService, the Dell OEM service linked from ComputerSystem resources; lists targets/candidates by default and requires `--confirm` to write. | Guarded |
+| `dell-lc-os-health-update` | Update Dell Lifecycle Controller OS application health data; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-software-update-schedule` | Manage Dell software update schedules; writes require `--confirm`. | Guarded |
+| `dell-raid-cancel-actions` | Cancel DellRaidService actions discovered from the managed system's Dell OEM links; lists background-init, consistency-check, and physical-disk rebuild targets by default and requires `--confirm` to POST. | Guarded |
+| `dell-raid-patrol-read` | Start or stop Dell RAID patrol read; previews unless `--confirm` is given. | Guarded |
+| `dell-raid-clear-actions` | Preview Dell RAID clear actions. | Guarded |
+| `dell-persistent-initialize-media` | Initialize Dell vFlash media through `DellPersistentStorageService.InitializeMedia`; previews by default and requires `--confirm --i-understand-irreversible` to write. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
@@ -135,6 +157,8 @@ Safety labels:
 | `get` | Read an arbitrary Redfish resource URI. | Read |
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
+| `hpe-chassis-actions` | List or disable HPE server-side MCTP; dry-run by default and `--confirm` posts. | Guarded |
+| `hpe-kerberos-keytab-import` | Import an HPE iLO Kerberos keytab through `AccountService`; keytab material is read from env/file, previews are redacted, and `--confirm` is required to write. | Guarded |
 | `hpe-test-actions` | List or send HPE iLO directory, SNMP, mail, and syslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `identify-led` | Read or set a chassis/system identify LED; requires `--confirm` to write. | Guarded |
 | `insert_vm` | Insert virtual media from a URI. | Write |
@@ -159,6 +183,7 @@ Safety labels:
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
+| `network-adapter-reset` | Reset a discovered NetworkAdapter through `NetworkAdapter.Reset`; lists reset-capable adapters when no target is given, requires `--confirm` to write. | Guarded |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
 | `ntp-set` | Set or clear Manager NTP servers through standard ManagerNetworkProtocol or legacy Manager NTP resources; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
 | `nvidia-debug-token` | List or invoke NVIDIA debug-token generate, disable, and install actions; previews by default and install token material is read from env/file. | Guarded |
@@ -189,6 +214,7 @@ Safety labels:
 | `spdm-measurements` | Fetch signed measurements from SPDM ComponentIntegrity resources. | Read |
 | `storage-controllers` | Read storage controller information. | Read |
 | `storage-convert-noraid` | Convert RAID disks under a controller to non-RAID. | Write |
+| `smc-clear-policies` | Clear all Supermicro X10 Node Manager policies; previews unless `--confirm` is given. | Guarded |
 | `storage-convert-raid` | Convert non-RAID disks under a controller to RAID. | Write |
 | `storage-drives` | Read storage drive members. | Read |
 | `storage-get` | Read one storage controller with optional `--filter Drives,Volumes`. | Read |
@@ -203,6 +229,7 @@ Safety labels:
 | `task-watch` | Watch task progress. | Read |
 | `tasks` | Read the task collection. | Read |
 | `telemetry-clear-reports` | Clear generated TelemetryService MetricReports; dry-run by default and `--confirm` posts. | Guarded |
+| `telemetry-reset-definitions` | Reset TelemetryService MetricReportDefinitions to service defaults; dry-run by default and `--confirm` posts. | Guarded |
 | `telemetry-triggers` | Read TelemetryService triggers and thresholds. | Read |
 | `thermal` | Read Chassis `ThermalSubsystem` links, ThermalMetrics temperature readings, and fan collection counts from `redfish_ctl/thermal/cmd_thermal.py`. | Read |
 | `update-start` | Start updates staged for `UpdateService.StartUpdate`, the action advertised by UpdateService; previews unless `--confirm` is given. | Guarded |

@@ -22,6 +22,13 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#EventService.SubmitTestEvent") is Destructiveness.REVERSIBLE
     reversible_actions = (
         "#DellLCService.TestNetworkShare",
+    )
+    assert classify("#HpeServerChassis.DisableMCTPOnServer") is Destructiveness.DESTRUCTIVE
+    assert classify("#HpeServerChassis.FactoryResetMCTP") is Destructiveness.IRREVERSIBLE
+    assert classify("#DelliDRACCardService.TestSEKMServerConnection") is (
+        Destructiveness.REVERSIBLE
+    )
+    hpe_reversible_actions = (
         "#HpeDirectoryTest.StartTest",
         "#HpeDirectoryTest.StopTest",
         "#HpeiLOSnmpService.SendSNMPTestAlert",
@@ -30,9 +37,30 @@ def test_policy_classifies_known_and_unknown():
     )
     for action in reversible_actions:
         assert classify(action) is Destructiveness.REVERSIBLE
+    for action in hpe_reversible_actions:
+        assert classify(action) is Destructiveness.REVERSIBLE
+    dell_reversible_actions = (
+        "#DelliDRACCardService.SendTestEmailAlert",
+        "#DelliDRACCardService.SendTestSNMPTrap",
+        "#DelliDRACCardService.TestRsyslogServerConnection",
+    )
+    for action in dell_reversible_actions:
+        assert classify(action) is Destructiveness.REVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
+    assert classify("#HpeiLOAccountService.ImportKerberosKeytab") is Destructiveness.DESTRUCTIVE
+    assert classify("#DellLCService.ExportLCLog") is Destructiveness.DESTRUCTIVE
+    assert classify("#DellBIOSService.DeviceRecovery") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
+    assert classify("#SmcNodeManager.ClearAllPolicies") is Destructiveness.DESTRUCTIVE
+    assert (
+        classify("#TelemetryService.ResetMetricReportDefinitionsToDefaults")
+        is Destructiveness.DESTRUCTIVE
+    )
+    assert classify("#DellJobService.SetupJobQueue") is Destructiveness.DESTRUCTIVE
+    assert classify("#DellLCService.ExposeiSMInstallerToHostOS") is (
+        Destructiveness.DESTRUCTIVE
+    )
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE

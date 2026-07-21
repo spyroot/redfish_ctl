@@ -1,0 +1,17 @@
+# Production image context allowlist.
+**
+
+!pyproject.toml
+!setup.py
+!requirements.txt
+!README.md
+!LICENSE
+
+!idrac_ctl/
+!idrac_ctl/**
+!redfish_ctl/
+!redfish_ctl/**
+
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/

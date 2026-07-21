@@ -9,9 +9,14 @@ from .system.cmd_system_import import *
 #
 from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
+from .dell_lc.cmd_dell_lc_export import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
 from .dell_lc.cmd_dell_lc_network_share_test import *
+from .dell_lc.cmd_dell_lc_supportassist_status import *
+from .metrics.cmd_dell_metric_actions import *
+from .dell_lc.cmd_dell_lc_os_health_update import *
+from .dell_lc.cmd_dell_lc_ism_installer import *
 #
 # compute
 from .compute.cmd_power_state import *
@@ -19,6 +24,12 @@ from .compute.cmd_compute_setting import *
 
 from .redfish_manager_shared import *
 from .raid.cmd_raid_service import *
+from .raid.cmd_dell_raid_blink import *
+from .raid.cmd_dell_raid_spare import *
+from .raid.cmd_dell_raid_cancel import *
+from .raid.cmd_raid_patrol_read import *
+from .raid.cmd_dell_raid_config_actions import *
+from .raid.cmd_dell_raid_clear_actions import *
 #
 # bios commands
 from .bios.cmd_bios import *
@@ -30,6 +41,7 @@ from .bios.cmd_bios_profile import *
 from .bios.cmd_change_bios import *
 from .bios.cmd_bios_snapshot import *
 from .bios.cmd_bios_reset_default import *
+from .bios.cmd_dell_bios_device_recovery import *
 #
 from .attribute.cmd_attribute import *
 from .attribute.cmd_attribute_clear_pending import *
@@ -45,6 +57,7 @@ from .jobs.cmd_job_del import *
 from .jobs.cmd_job_dell_services import *
 from .jobs.cmd_job_delete_all import *
 from .jobs.cmd_job_apply import *
+from .jobs.cmd_job_queue_setup import *
 #
 # # firmwares cmds
 from .firmware.cmd_firmware import *
@@ -100,10 +113,12 @@ from .metrics.cmd_gpu_metrics import *
 from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_telemetry_clear_reports import *
+from .telemetry.cmd_telemetry_reset_definitions import *
 from .telemetry.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
 from .component_integrity.cmd_spdm_measurements import *
 from .network.cmd_network_adapters import *
+from .network.cmd_network_adapter_reset import *
 from .network.cmd_nic_firmware import *
 from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *
@@ -115,6 +130,7 @@ from .logs.cmd_logs import *
 from .logs.cmd_log_clear import *
 from .logs.cmd_log_collect_diag import *
 from .licenses.cmd_license_install import *
+from .licenses.cmd_dell_license_actions import *
 from .network.cmd_ethernet_interfaces import *
 from .security.cmd_secure_boot import *
 from .security.cmd_certificates import *
@@ -124,8 +140,18 @@ from .telemetry.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
 from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *
+from .oem.cmd_dell_card_sekm_test import *
 from .oem.cmd_hpe_test_actions import *
+from .oem.cmd_hpe_kerberos_keytab import *
+from .oem.cmd_dell_card_test_actions import *
 from .oem.cmd_nvidia_debug_token import *
+from .oem.cmd_smc_node_manager import *
+from .oem.cmd_hpe_chassis_actions import *
+from .oem.cmd_dell_card_cert_export import *
+from .oem.cmd_dell_card_csr import *
+from .oem.cmd_dell_card_hw_proof import *
+from .oem.cmd_dell_card_key_management import *
+from .oem.cmd_dell_persistent_initialize_media import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *
@@ -140,6 +166,7 @@ from .delloem.delloem_disconnect import *
 from .delloem.delloem_get_networkios import *
 from .delloem.delloem_boot_netios import *
 from .delloem.delloem_os_deployment import *
+from .delloem.cmd_dell_software_update_schedule import *
 
 
 # tasks
