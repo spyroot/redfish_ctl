@@ -80,6 +80,7 @@ _ROOT_CONNECTION_ARGS = {
     "idrac_username",
     "idrac_password",
     "idrac_port",
+    "_endpoint_cli_overrides",
 }
 
 _LEGACY_ENDPOINT_ATTRS = {
@@ -786,6 +787,9 @@ def redfish_main_ctl():
         try:
             apply_exporter_env_file(args)
             _sync_legacy_endpoint_attrs(args)
+        except ConfigurationConflict as err:
+            console_error_printer(f"Error: {err}")
+            sys.exit(1)
         except FileNotFoundError as fne:
             console_error_printer(f"Error:{fne}")
             sys.exit(1)

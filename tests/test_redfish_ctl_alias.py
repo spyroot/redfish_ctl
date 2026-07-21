@@ -185,3 +185,10 @@ def test_endpoint_alias_action_sets_legacy_attrs_without_sync():
     assert defaults.redfish_host == ""
     assert defaults.idrac_ip == ""
     assert defaults._endpoint_cli_overrides == set()
+
+
+def test_private_endpoint_override_tracker_is_filtered_from_command_kwargs():
+    """The parser's private override tracker never reaches subcommands."""
+    from redfish_ctl.redfish_main import _ROOT_CONNECTION_ARGS
+
+    assert "_endpoint_cli_overrides" in _ROOT_CONNECTION_ARGS
