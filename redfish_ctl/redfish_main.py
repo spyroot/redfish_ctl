@@ -91,7 +91,11 @@ _LEGACY_ENDPOINT_ATTRS = {
 
 
 def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
-    """Mirror canonical root credential attrs onto legacy Namespace attrs."""
+    """Mirror canonical root credential attrs onto legacy Namespace attrs.
+
+    :param args: parsed CLI namespace carrying the canonical root endpoint attrs.
+    :return: None. The namespace is updated in place.
+    """
     for legacy_attr, canonical_attr in _LEGACY_ENDPOINT_ATTRS.items():
         setattr(args, legacy_attr, getattr(args, canonical_attr))
 
