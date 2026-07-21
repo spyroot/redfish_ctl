@@ -100,7 +100,7 @@ clean: ## Remove local build, test, and type-check artifacts.
 
 # ---------------------------------------------------------------------------
 # GB300 remote docker test fleet — ALL gates run there, never on a laptop.
-# Slot/host resolution comes from scripts/gb300.sh + .internal/gb300-fleet.env
+# Slot/host resolution comes from scripts/gb300.sh + .internal/inventory/gb300-fleet.env
 # (gitignored; see TEAM_GUIDE.md "GB300 Docker test environment"). The env
 # file is also included here so a locally defined image name (for example an
 # internal agent image layered on the public base) wins over the default.
@@ -108,7 +108,7 @@ clean: ## Remove local build, test, and type-check artifacts.
 #   AGENT = your agent name; isolates your /work volume and container
 #   REF   = git ref to test (default main); any pushed branch works
 # ---------------------------------------------------------------------------
--include .internal/gb300-fleet.env
+-include .internal/inventory/gb300-fleet.env
 GB300_SH    := ./scripts/gb300.sh
 GB300_HOSTC  = $$($(GB300_SH) host $(SLOT))
 AGENT      ?= $(shell whoami)
