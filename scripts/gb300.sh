@@ -17,7 +17,7 @@
 #         gb300.sh shell <slot> <agent>                -> interactive container
 #
 # run/shell mount the node's ~/.ssh/redfish_ctl_git and
-# ~/.ssh/redfish_ctl_gh_token (installed once by `make gb300-push-key`) into
+# ~/.ssh/redfish_ctl_gh_token (staged by the operator) into
 # /secrets ONLY when they exist, so a key-less node still runs read-only
 # work (the entrypoint falls back to an https clone).
 set -euo pipefail
