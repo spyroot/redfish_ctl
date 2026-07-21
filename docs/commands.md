@@ -131,6 +131,10 @@ Safety labels:
 | `dell-raid-config-actions` | Set selected DellRaidService virtual-disk boot and RAID asset-name values; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-ism-installer` | Expose Dell iSM installer media through `DellLCService.ExposeiSMInstallerToHostOS`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-bios-device-recovery` | Recover a Dell BIOS device through `DellBIOSService.DeviceRecovery`; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-lc-supportassist-export` | Export the last Dell SupportAssist collection; previews unless `--confirm` is given. | Guarded |
+| `dell-vflash-partition` | List or invoke Dell VFlash partition actions exposed by `DellPersistentStorageService`; previews by default and erase-class actions require both confirmation flags. | Guarded |
+| `dell-lc-log-comment` | Insert a Dell Lifecycle Controller log comment; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-lc-supportassist-schedule` | Manage Dell LC SupportAssist auto-collection schedules; previews by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
@@ -143,6 +147,8 @@ Safety labels:
 | `dell-raid-patrol-read` | Start or stop Dell RAID patrol read; previews unless `--confirm` is given. | Guarded |
 | `dell-raid-clear-actions` | Preview Dell RAID clear actions. | Guarded |
 | `dell-persistent-initialize-media` | Initialize Dell vFlash media through `DellPersistentStorageService.InitializeMedia`; previews by default and requires `--confirm --i-understand-irreversible` to write. | Guarded |
+| `dell-vflash-state` | Enable or disable Dell vFlash through `DellPersistentStorageService.VFlashStateChange`; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-system-lcd-errors` | Show Dell system errors on the chassis LCD through `DellSystemManagementService.ShowErrorsOnLCD`; dry-run by default and `--confirm` posts. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |

@@ -6,10 +6,12 @@ from .redfish_shared import *
 from .system.cmd_system import *
 from .system.cmd_system_config import *
 from .system.cmd_system_import import *
+from .system.cmd_dell_system_lcd_errors import *
 #
 from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
 from .dell_lc.cmd_dell_lc_export import *
+from .dell_lc.cmd_dell_lc_log_comment import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
 from .dell_lc.cmd_dell_lc_network_share_test import *
@@ -17,6 +19,8 @@ from .dell_lc.cmd_dell_lc_supportassist_status import *
 from .metrics.cmd_dell_metric_actions import *
 from .dell_lc.cmd_dell_lc_os_health_update import *
 from .dell_lc.cmd_dell_lc_ism_installer import *
+from .dell_lc.cmd_dell_lc_supportassist_export import *
+from .dell_lc.cmd_dell_lc_supportassist_schedule import *
 #
 # compute
 from .compute.cmd_power_state import *
@@ -141,6 +145,7 @@ from .network.cmd_network_ports import *
 from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *
 from .oem.cmd_dell_card_sekm_test import *
+from .oem.cmd_dell_vflash_state import *
 from .oem.cmd_hpe_test_actions import *
 from .oem.cmd_hpe_kerberos_keytab import *
 from .oem.cmd_dell_card_test_actions import *
@@ -152,6 +157,7 @@ from .oem.cmd_dell_card_csr import *
 from .oem.cmd_dell_card_hw_proof import *
 from .oem.cmd_dell_card_key_management import *
 from .oem.cmd_dell_persistent_initialize_media import *
+from .oem.cmd_dell_persistent_partition import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *
