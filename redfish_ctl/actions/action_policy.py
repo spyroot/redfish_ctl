@@ -92,6 +92,7 @@ ACTION_POLICY = {
     "#Control.ResetToDefaults": Destructiveness.DESTRUCTIVE,
     "#Bios.ResetBios": Destructiveness.DESTRUCTIVE,
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
+    "#DellBIOSService.DeviceRecovery": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     "#HpeiLOAccountService.ImportKerberosKeytab": Destructiveness.DESTRUCTIVE,

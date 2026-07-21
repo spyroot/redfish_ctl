@@ -47,6 +47,7 @@ def test_policy_classifies_known_and_unknown():
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
     assert classify("#HpeiLOAccountService.ImportKerberosKeytab") is Destructiveness.DESTRUCTIVE
     assert classify("#DellLCService.ExportLCLog") is Destructiveness.DESTRUCTIVE
+    assert classify("#DellBIOSService.DeviceRecovery") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
     assert classify("#SmcNodeManager.ClearAllPolicies") is Destructiveness.DESTRUCTIVE
     assert (
