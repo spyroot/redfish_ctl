@@ -305,9 +305,9 @@ class RedfishManagerBase(RedfishManager):
         :return: the popped value.
         :raises KeyError: when neither key exists.
         """
-        if primary in kwargs:
-            return kwargs.pop(primary)
-        return kwargs.pop(legacy)
+        if legacy in kwargs:
+            return kwargs.pop(legacy)
+        return kwargs.pop(primary)
 
     @classmethod
     def invoke(cls,
@@ -483,10 +483,10 @@ class RedfishManagerBase(RedfishManager):
 
         kwargs.update(
             {
-                "host": self.redfish_ip,
-                "username": self._username,
-                "password": self._password,
-                "port": self._port,
+                "idrac_ip": self.redfish_ip,
+                "idrac_username": self._username,
+                "idrac_password": self._password,
+                "idrac_port": self._port,
                 # forward the original "skip verification" intent; _is_verify_cert
                 # is the inverse (requests' verify flag), so flip it back here.
                 "insecure": not self._is_verify_cert,

@@ -443,10 +443,10 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             # enforces. Segment scans and local catalog reads need no host.
             invoke_kwargs = dict(arg_dict)
             invoke_kwargs.update({
-                "host": cmd_args.redfish_host or "",
-                "username": cmd_args.redfish_username or "",
-                "password": cmd_args.redfish_password or "",
-                "port": cmd_args.redfish_port,
+                "idrac_ip": cmd_args.redfish_host or "",
+                "idrac_username": cmd_args.redfish_username or "",
+                "idrac_password": cmd_args.redfish_password or "",
+                "idrac_port": cmd_args.redfish_port,
                 "insecure": insecure,
                 "is_http": cmd_args.use_http,
             })
