@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Shared resolver for the remote docker test fleet ("GB300" targets in the
 # Makefile). Committed code carries NO internal addresses: the concrete
-# values live in the gitignored .internal/gb300-fleet.env next to this repo
+# values live in the gitignored .internal/inventory/gb300-fleet.env next to this repo
 # (see TEAM_GUIDE.md, "GB300 Docker test environment"), or come from the
 # caller's environment.
 #
-#   .internal/gb300-fleet.env defines:
+#   .internal/inventory/gb300-fleet.env defines:
 #     GB300_USER        ssh login on the nodes
 #     GB300_IP_BASE     first three octets of the node subnet
 #     GB300_SLOT0_OCTET last octet of slot 0 (slot N = SLOT0_OCTET + N)
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-_env_file="${GB300_ENV_FILE:-$_repo_root/.internal/gb300-fleet.env}"
+_env_file="${GB300_ENV_FILE:-$_repo_root/.internal/inventory/gb300-fleet.env}"
 if [ -f "$_env_file" ]; then
     # The env file supplies DEFAULTS: values already set in the caller's
     # environment (for example `make gb300-test GB300_IMAGE=...`) win over
@@ -45,7 +45,7 @@ fi
 _require() {
     local name="$1"
     if [ -z "${!name:-}" ]; then
-        echo "gb300.sh: $name is not set — create .internal/gb300-fleet.env" \
+        echo "gb300.sh: $name is not set — create .internal/inventory/gb300-fleet.env" \
              "(see TEAM_GUIDE.md, GB300 Docker test environment) or export it" >&2
         exit 2
     fi
