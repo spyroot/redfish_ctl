@@ -20,8 +20,9 @@ default:
   image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
   tags: [homelab-k8s]
   before_script:
-    # Corpora are Git LFS; without this the suite runs against pointer files.
-    - git lfs install --local && git lfs pull --include='tests/*_corpus.tar.gz'
+    # Corpora and the DMTF spec bundles are Git LFS; without this the suite runs
+    # against pointer files and the bundle/corpus tests fail with BadZipFile/ReadError.
+    - git lfs install --local && git lfs pull --include='tests/*_corpus.tar.gz,full_corpus/*.tar.gz,spec/dmtf/**/*.zip'
     # Bootstrap the project environment from its own declaration. conda env
     # create IS the dependency test: an unresolvable or malformed environment.yml
     # fails here, before any gate runs.
