@@ -19,7 +19,7 @@ ILO_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.ilo-sim"
 MOCK_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "mock-bmc.yaml"
 FLEET_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "gb300-fleet.yaml"
 ILO_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "ilo-sim.yaml"
-CONTRACT_DOC = REPO_ROOT / "docs" / "simulator-contract.md"
+CONTRACT_DOC = REPO_ROOT / "docs" / "external" / "simulator-contract.md"
 GB300_CORPUS = corpus_dir(
     REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
