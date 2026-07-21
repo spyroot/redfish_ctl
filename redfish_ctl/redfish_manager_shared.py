@@ -127,6 +127,7 @@ class ApiRequestType(Enum):
     DellSystemLcdErrors = auto()
     NetworkAdapters = auto()
     NetworkAdapterReset = auto()
+    DellNetworkAttributes = auto()
     NicFirmware = auto()
     NvLinkPorts = auto()
     Exporter = auto()
