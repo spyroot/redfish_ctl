@@ -133,6 +133,7 @@ Safety labels:
 | `dell-bios-device-recovery` | Recover a Dell BIOS device through `DellBIOSService.DeviceRecovery`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-supportassist-export` | Export the last Dell SupportAssist collection; previews unless `--confirm` is given. | Guarded |
 | `dell-vflash-partition` | List or invoke Dell VFlash partition actions exposed by `DellPersistentStorageService`; previews by default and erase-class actions require both confirmation flags. | Guarded |
+| `dell-lc-log-comment` | Insert a Dell Lifecycle Controller log comment; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
