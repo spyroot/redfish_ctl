@@ -17,6 +17,7 @@ from .dell_lc.cmd_dell_lc_supportassist_status import *
 from .metrics.cmd_dell_metric_actions import *
 from .dell_lc.cmd_dell_lc_os_health_update import *
 from .dell_lc.cmd_dell_lc_ism_installer import *
+from .dell_lc.cmd_dell_lc_supportassist_export import *
 #
 # compute
 from .compute.cmd_power_state import *
