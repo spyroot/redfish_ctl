@@ -118,3 +118,29 @@ def test_legacy_cli_namespace_attrs_mirror_canonical_names():
     assert args.idrac_username == "admin"
     assert args.idrac_password == "secret"
     assert args.idrac_port == 8443
+
+
+def test_endpoint_alias_action_sets_legacy_attrs_without_sync():
+    """Root endpoint flags populate canonical and legacy attrs during parsing."""
+    import argparse
+
+    from redfish_ctl.redfish_main import _EndpointAliasAction
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--host", dest="redfish_host", default="",
+        action=_EndpointAliasAction, legacy_dest="idrac_ip")
+    parser.add_argument(
+        "--port", dest="redfish_port", default=443, type=int,
+        action=_EndpointAliasAction, legacy_dest="idrac_port")
+    parser.set_defaults(idrac_ip="", idrac_port=443)
+
+    parsed = parser.parse_args(["--host", "203.0.113.10", "--port", "8443"])
+    defaults = parser.parse_args([])
+
+    assert parsed.redfish_host == "203.0.113.10"
+    assert parsed.idrac_ip == "203.0.113.10"
+    assert parsed.redfish_port == 8443
+    assert parsed.idrac_port == 8443
+    assert defaults.redfish_host == ""
+    assert defaults.idrac_ip == ""

@@ -6,5 +6,5 @@ redfish_ctl/discover/cli.py:220
 redfish_ctl/discovery/net_scan.py:61
 redfish_ctl/redfish_manager.py:237
 redfish_ctl/redfish_manager.py:245
-redfish_ctl/redfish_manager_base.py:427
-redfish_ctl/redfish_manager_base.py:435
+redfish_ctl/redfish_manager_base.py:437
+redfish_ctl/redfish_manager_base.py:445

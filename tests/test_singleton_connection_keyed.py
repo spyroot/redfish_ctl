@@ -143,6 +143,21 @@ def test_internal_dispatch_connection_key_preserves_command_host_arg():
     assert kwargs == {"host": "downloads.example.test"}
 
 
+def test_internal_dispatch_connection_key_removes_duplicate_host_arg():
+    """Duplicate public connection host values do not leak into command kwargs."""
+    kwargs = {
+        "_redfish_host": "10.9.9.43",
+        "idrac_ip": "10.9.9.44",
+        "host": "10.9.9.43",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.43"
+    assert kwargs == {}
+
+
 def test_dispatch_constructs_registered_commands_with_legacy_keywords():
     """Registered commands with legacy-only constructors still dispatch safely."""
 
@@ -221,6 +236,30 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
         "is_http": False,
     }
     assert result.data == {"path": "/redfish/v1/"}
+
+    LegacyConstructorCommand.constructed = None
+    manager = SystemQuery(
+        host="10.9.9.46",
+        username="admin",
+        password="secret",
+        port=443,
+        insecure=True,
+    )
+    sync_result = manager.sync_invoke(
+        ApiRequestType.SystemQuery,
+        "legacy-constructor-compat",
+        path="/redfish/v1/Managers",
+    )
+
+    assert LegacyConstructorCommand.constructed == {
+        "idrac_ip": "10.9.9.46",
+        "idrac_username": "admin",
+        "idrac_password": "secret",
+        "idrac_port": 443,
+        "insecure": True,
+        "is_http": False,
+    }
+    assert sync_result.data == {"path": "/redfish/v1/Managers"}
 
 
 def test_two_connections_get_distinct_instances():

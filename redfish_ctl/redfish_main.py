@@ -90,6 +90,35 @@ _LEGACY_ENDPOINT_ATTRS = {
 }
 
 
+class _EndpointAliasAction(argparse.Action):
+    """Argparse action that mirrors one option into canonical and legacy attrs."""
+
+    def __init__(self, option_strings, dest, legacy_dest=None, **kwargs):
+        """Create a mirrored endpoint action.
+
+        :param option_strings: option spellings handled by this action.
+        :param dest: canonical argparse destination.
+        :param legacy_dest: legacy argparse destination to mirror.
+        :param kwargs: additional argparse action options.
+        :return: None.
+        """
+        self.legacy_dest = legacy_dest
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Store the parsed value under both endpoint destination names.
+
+        :param parser: parser invoking the action.
+        :param namespace: namespace being populated.
+        :param values: parsed value for the option.
+        :param option_string: option spelling used by the caller.
+        :return: None. The namespace is updated in place.
+        """
+        setattr(namespace, self.dest, values)
+        if self.legacy_dest is not None:
+            setattr(namespace, self.legacy_dest, values)
+
+
 def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
     """Mirror canonical root credential attrs onto legacy Namespace attrs.
 
@@ -593,24 +622,34 @@ def redfish_main_ctl():
     # separately from subcommand-local --host/--port options.
     credentials.add_argument(
         '--host', '--idrac_ip', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_ip",
         dest="redfish_host", default=endpoint.host,
         help="BMC host or IP address, by default "
              "read from environment REDFISH_IP (or legacy IDRAC_IP).")
     credentials.add_argument(
         '--username', '--idrac_username', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_username",
         dest="redfish_username", default=endpoint.username,
         help="BMC username, by default "
              "read from environment REDFISH_USERNAME (or legacy IDRAC_USERNAME).")
     credentials.add_argument(
         '--password', '--idrac_password', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_password",
         dest="redfish_password", default=endpoint.password,
         help="BMC password, by default "
              "read from environment REDFISH_PASSWORD (or legacy IDRAC_PASSWORD).")
     credentials.add_argument(
         '--port', '--idrac_port', required=False, type=int,
+        action=_EndpointAliasAction, legacy_dest="idrac_port",
         dest="redfish_port", default=endpoint.port,
         help="BMC port, by default "
              "read from environment REDFISH_PORT (or legacy IDRAC_PORT).")
+    parser.set_defaults(
+        idrac_ip=endpoint.host,
+        idrac_username=endpoint.username,
+        idrac_password=endpoint.password,
+        idrac_port=endpoint.port,
+    )
     credentials.add_argument(
         '--insecure', action='store_true', required=False, default=False,
         help="skip TLS certificate verification (explicit form of the "

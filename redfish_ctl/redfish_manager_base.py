@@ -311,6 +311,8 @@ class RedfishManagerBase(RedfishManager):
         if internal in kwargs:
             value = kwargs.pop(internal)
             kwargs.pop(legacy, None)
+            if kwargs.get(primary) in (value, None):
+                kwargs.pop(primary, None)
             return value
 
         if primary in kwargs:
@@ -329,11 +331,15 @@ class RedfishManagerBase(RedfishManager):
                api_call: ApiRequestType,
                name: str, **kwargs) -> CommandResult:
         """Main interface uses to invoke a command.
+
         :param api_call: api request type is enum for each cmd.
         :param name: a name is key for a given api request type.
                       So we can register under same type sub-commands.
-        :param kwargs: args passed to command.
-        :return:
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: command result returned by the registered command.
         """
         z = cls._registry[api_call]
         if name not in z:
@@ -370,10 +376,14 @@ class RedfishManagerBase(RedfishManager):
     async def async_invoke(
             cls, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
         """Main interface uses to invoke a command.
+
         :param api_call: api request type is enum for each cmd.
         :param name: a name.
-        :param kwargs: argument passed to command
-        :return: CommandResult
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: CommandResult.
         """
         z = cls._registry[api_call]
         disp = z[name]
@@ -491,9 +501,12 @@ class RedfishManagerBase(RedfishManager):
 
     def sync_invoke(self, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
         """Synchronous invocation of target command
+
         :param name: a name for command to differentiate sub-commands
         :param api_call: enum i.e. a type command that we need invoke
-        :param kwargs: arguments passed to a command
+        :param kwargs: command-specific arguments. The manager injects private
+            ``_redfish_*`` connection keys before dispatching to the registered
+            command constructor.
         :return: Return result depends on actual command,
                  encapsulated in generic CommandResult
         """
