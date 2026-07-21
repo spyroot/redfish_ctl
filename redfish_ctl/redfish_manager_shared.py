@@ -142,6 +142,7 @@ class ApiRequestType(Enum):
     SecureBoot = auto()
     CertificatesQuery = auto()
     CertificateGenerateCSR = auto()
+    DellCardCsr = auto()
     FirmwareUpdate = auto()
     Triggers = auto()
     NetworkPorts = auto()

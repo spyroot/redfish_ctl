@@ -125,6 +125,7 @@ Safety labels:
 | `dell-job-queue-setup` | Start Dell JobService `SetupJobQueue`; previews unless `--confirm` is given. | Guarded |
 | `dell-card-sekm-test` | Test Dell SEKM server connectivity through `DelliDRACCardService`; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-card-cert-export` | Export Dell iDRAC card-service certificates; lists targets by default and `--query` posts the selected read-only action. | Read |
+| `dell-card-csr` | Generate Dell card-service factory-identity or SEKM CSRs; lists targets by default and requires `--confirm` to POST. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
