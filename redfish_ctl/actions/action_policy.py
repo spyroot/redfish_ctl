@@ -81,6 +81,13 @@ ACTION_POLICY = {
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     "#HpeiLOAccountService.ImportKerberosKeytab": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.DeleteLicense": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ExportLicense": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ExportLicenseByDevice": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ExportLicenseByDeviceToNetworkShare": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ExportLicenseToNetworkShare": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ImportLicense": Destructiveness.DESTRUCTIVE,
+    "#DellLicenseManagementService.ImportLicenseFromNetworkShare": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
