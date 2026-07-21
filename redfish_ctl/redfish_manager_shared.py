@@ -127,6 +127,7 @@ class ApiRequestType(Enum):
     DellCardTestActions = auto()
     NvidiaDebugToken = auto()
     HpeChassisActions = auto()
+    DellCardCertExport = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
     SubscriptionDelete = auto()

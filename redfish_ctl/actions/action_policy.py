@@ -44,6 +44,11 @@ ACTION_POLICY = {
     "#ComponentIntegrity.TPMGetSignedMeasurements": Destructiveness.READ_ONLY,
     "#DellLCService.SupportAssistGetAutoCollectSchedule": Destructiveness.READ_ONLY,
     "#DellLCService.SupportAssistGetEULAStatus": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.ExportCertificate": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.ExportSSLCertificate": Destructiveness.READ_ONLY,
+    "#DelliDRACCardService.FactoryIdentityExportCertificate": (
+        Destructiveness.READ_ONLY
+    ),
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
