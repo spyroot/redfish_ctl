@@ -46,6 +46,28 @@ def test_constructor_accepts_canonical_connection_keywords():
     assert cmd.password == "secret"
 
 
+def test_canonical_connection_keywords_are_keyed_per_host():
+    """Canonical connection keywords keep command singletons per BMC."""
+    a = SystemQuery(
+        host="10.9.9.31",
+        username="admin",
+        password="secret-a",
+        port=443,
+        insecure=True,
+    )
+    b = SystemQuery(
+        host="10.9.9.32",
+        username="admin",
+        password="secret-b",
+        port=443,
+        insecure=True,
+    )
+
+    assert a is not b
+    assert a.host == "10.9.9.31"
+    assert b.host == "10.9.9.32"
+
+
 def test_two_connections_get_distinct_instances():
     """Different BMCs must never share a command instance.
 
