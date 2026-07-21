@@ -89,11 +89,20 @@ def test_deployment_environment_config_value_used():
     assert exporter.resolve_deployment_environment(config_value="cfg-env") == "cfg-env"
 
 
-@pytest.mark.parametrize("bad", ["", "   ", "unknown", "None", "null", "n/a"])
-def test_deployment_environment_rejects_placeholder(bad):
-    """An explicit empty or literal-sentinel value is a hard error, not a silent default."""
+@pytest.mark.parametrize("bad", ["unknown", "None", "null", "n/a"])
+def test_deployment_environment_rejects_literal_sentinel(bad):
+    """An explicit literal-sentinel value is a hard error, not a silent default."""
     with pytest.raises(ValueError):
         exporter.resolve_deployment_environment(bad)
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_deployment_environment_blank_falls_back_to_default(blank):
+    """An explicit empty/whitespace value is treated as unset -> the 'unknown' default.
+
+    (--require-deployment-environment then catches 'unknown' fail-closed in a fleet.)
+    """
+    assert exporter.resolve_deployment_environment(blank) == "unknown"
 
 
 @pytest.mark.parametrize("bad", ["Bad Env", "env/slash", "a" * 64, "-lead", "trail-"])
@@ -209,10 +218,9 @@ def test_service_name_explicit_preserved():
     assert exporter.resolve_service_name("My-Exporter") == "My-Exporter"
 
 
-def test_service_name_rejects_empty():
-    """An explicit empty service.name is rejected."""
-    with pytest.raises(ValueError):
-        exporter.resolve_service_name("   ")
+def test_service_name_blank_falls_back_to_default():
+    """An explicit empty/whitespace service.name is treated as unset -> the default."""
+    assert exporter.resolve_service_name("   ") == "redfish_ctl"
 
 
 # --- GATE: every emitted series carries deployment.environment[.name] (issue #363) ---

@@ -524,7 +524,8 @@ def resolve_deployment_environment(
     :param config_value: value from the JSON exporter config, if any.
     :param require: when True, refuse the ``unknown`` default (fail-closed for a fleet).
     :return: the validated, lowercased deployment.environment value, or ``unknown``.
-    :raises ValueError: when an explicit value is empty, is a literal sentinel
+        An explicit empty/whitespace value is treated as unset (yields ``unknown``).
+    :raises ValueError: when an explicit value is a literal sentinel
         (unknown/none/null/n/a), fails length/charset validation, looks like a
         credential, or when ``require`` is set and no value is provided.
     """
@@ -619,8 +620,8 @@ def resolve_service_name(explicit: Optional[str] = None,
 
     :param explicit: explicit CLI/programmatic value, if any.
     :param config_value: value from the JSON exporter config, if any.
-    :return: the validated service.name value.
-    :raises ValueError: when an explicit value is empty, too long, or looks like a credential.
+    :return: the validated service.name value (``redfish_ctl`` when unset or blank).
+    :raises ValueError: when an explicit value is too long or looks like a credential.
     """
     provided = _first_non_empty(
         explicit, config_value,
