@@ -12,6 +12,8 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
@@ -1240,7 +1242,8 @@ def signalfx_metric_readback(
     :param metric: SignalFx metric name to look up.
     :param dimensions: dimension key->value pairs to scope the query to one entity.
     :param timeout: HTTP timeout in seconds.
-    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>}``.
+    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>,
+        "server_ms": <response Date header in ms, 0 if unavailable>}``.
     :raises ValueError: when the API answers with a non-JSON body.
     """
     query = urllib.parse.urlencode(
@@ -1249,6 +1252,7 @@ def signalfx_metric_readback(
     url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
     request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
     with urllib.request.urlopen(request, timeout=timeout) as response:
+        server_ms = _response_date_ms(response)
         raw = response.read()
     try:
         data = json.loads(raw)
@@ -1261,7 +1265,11 @@ def signalfx_metric_readback(
             stamp = row.get(key)
             if isinstance(stamp, (int, float)) and stamp > newest:
                 newest = int(stamp)
-    return {"count": int(data.get("count") or len(results)), "newest_ms": newest}
+    return {
+        "count": int(data.get("count") or len(results)),
+        "newest_ms": newest,
+        "server_ms": server_ms,
+    }
 
 
 def verify_signalfx_readback(
@@ -1274,7 +1282,7 @@ def verify_signalfx_readback(
     :param metrics: metric names to confirm (the names that were pushed).
     :param dimensions: dimension key->value pairs scoping the query to this host.
     :param timeout: per-query HTTP timeout in seconds.
-    :return: ``{metric: {"count": int, "newest_ms": int}}`` for each metric.
+    :return: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` for each metric.
     """
     return {metric: signalfx_metric_readback(realm, api_token, metric, dimensions, timeout)
             for metric in sorted(set(metrics))}
@@ -1282,7 +1290,7 @@ def verify_signalfx_readback(
 
 def build_readback_result(
         push_status: int, ingest_url: str, sample_count: int, metric_names: list,
-        readback: dict, timing_ms: dict, now_ms: int,
+        readback: dict, timing_ms: dict, now_ms: Optional[int] = None,
         freshness_ms: int = 900000) -> tuple:
     """Build the compact canary summary and verdict from a readback.
 
@@ -1296,16 +1304,31 @@ def build_readback_result(
     :param ingest_url: the ingest URL that was POSTed to.
     :param sample_count: number of samples scraped and pushed.
     :param metric_names: the distinct metric names that were pushed.
-    :param readback: ``{metric: {"count": int, "newest_ms": int}}`` from MTS.
+    :param readback: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` from MTS.
     :param timing_ms: ``{"scrape": int, "push": int, "readback": int}`` durations.
-    :param now_ms: current wall-clock time in ms, for the freshness window.
+    :param now_ms: current wall-clock time in ms, for the freshness window. When
+        omitted, freshness is anchored to the Splunk API response server time.
     :param freshness_ms: how recent ``newest_ms`` must be to count as this push.
     :return: ``(summary_dict, error_or_None)`` -- the compact result and verdict.
     """
-    fresh = sorted(
-        name for name, series in readback.items()
-        if series["count"] > 0 and series["newest_ms"] >= now_ms - freshness_ms)
+    anchor_ms = now_ms
+    clock_source = "caller"
+    if anchor_ms is None:
+        anchor_ms = _readback_server_ms(readback)
+        clock_source = "signalfx_http_date" if anchor_ms is not None else "unavailable"
+
+    if anchor_ms is None:
+        fresh = []
+    else:
+        fresh = sorted(
+            name for name, series in readback.items()
+            if series["count"] > 0 and series["newest_ms"] >= anchor_ms - freshness_ms)
     missing = sorted(set(metric_names) - set(fresh))
+    clock_error = None
+    if anchor_ms is None:
+        clock_error = (
+            "SignalFx readback did not include server time, so freshness cannot be "
+            "verified without trusting the local exporter clock")
     summary = {
         "push_status": push_status,
         "ingest_url": ingest_url,
@@ -1316,12 +1339,64 @@ def build_readback_result(
         "readback": readback,
         "timing_ms": timing_ms,
         "freshness_ms": freshness_ms,
+        "readback_now_ms": anchor_ms,
+        "clock_source": clock_source,
     }
-    error = None if not missing else (
-        f"SignalFx POST returned {push_status} but {len(missing)} of "
-        f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
-        "MTS -- the POST succeeded yet the datapoints were not ingested")
+    if clock_error:
+        error = clock_error
+    elif missing:
+        error = (
+            f"SignalFx POST returned {push_status} but {len(missing)} of "
+            f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
+            "MTS -- the POST succeeded yet the datapoints were not ingested")
+    else:
+        error = None
     return summary, error
+
+
+def _response_date_ms(response) -> int:
+    """Return the HTTP Date header as epoch milliseconds, or 0 if absent.
+
+    :param response: urllib response object from the MTS readback request.
+    :return: epoch milliseconds parsed from the Date header, or 0 when absent.
+    """
+    header = None
+    getheader = getattr(response, "getheader", None)
+    if callable(getheader):
+        header = getheader("Date")
+    if not header:
+        headers = getattr(response, "headers", None)
+        getter = getattr(headers, "get", None)
+        if callable(getter):
+            header = getter("Date")
+    if not header:
+        return 0
+    try:
+        parsed = parsedate_to_datetime(str(header))
+    except (TypeError, ValueError):
+        return 0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp() * 1000)
+
+
+def _readback_server_ms(readback: Mapping) -> Optional[int]:
+    """Return the newest server timestamp reported by readback API responses.
+
+    :param readback: per-metric readback summaries from Splunk MTS.
+    :return: newest server timestamp in milliseconds, or None when unavailable.
+    """
+    stamps = []
+    for series in readback.values():
+        if not isinstance(series, Mapping):
+            continue
+        try:
+            stamp = int(series.get("server_ms") or 0)
+        except (TypeError, ValueError):
+            continue
+        if stamp > 0:
+            stamps.append(stamp)
+    return max(stamps) if stamps else None
 
 
 def _report_signalfx_loop_error(exc: Exception) -> None:
