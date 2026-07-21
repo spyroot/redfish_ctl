@@ -12,6 +12,7 @@ from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
 from .dell_lc.cmd_dell_lc_export import *
 from .dell_lc.cmd_dell_lc_log_comment import *
+from .dell_lc.cmd_dell_lc_autodiscovery import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
 from .dell_lc.cmd_dell_lc_network_share_test import *

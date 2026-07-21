@@ -142,6 +142,8 @@ ACTION_POLICY = {
     "#DellRaidService.SetAssetName": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.SetBootVD": Destructiveness.DESTRUCTIVE,
     "#DellSystemManagementService.ShowErrorsOnLCD": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ReInitiateAutoDiscovery": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ReInitiateDHS": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelBackgroundInitialization": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelCheckConsistency": Destructiveness.DESTRUCTIVE,
