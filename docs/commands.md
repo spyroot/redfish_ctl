@@ -128,6 +128,7 @@ Safety labels:
 | `dell-card-csr` | Generate Dell card-service factory-identity or SEKM CSRs; lists targets by default and requires `--confirm` to POST. | Guarded |
 | `dell-card-hw-proof` | Verify Dell iDRAC card-service hardware proof of possession; lists targets by default and requires `--confirm` before POSTing. | Guarded |
 | `dell-card-key-management` | Preview or run Dell iDRAC card-service key-management actions; dry-run by default and `--confirm` posts. | Guarded |
+| `dell-raid-config-actions` | Set selected DellRaidService virtual-disk boot and RAID asset-name values; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |

@@ -123,6 +123,8 @@ ACTION_POLICY = {
     "#TelemetryService.ClearMetricReports": Destructiveness.DESTRUCTIVE,
     "#TelemetryService.ResetMetricReportDefinitionsToDefaults": Destructiveness.DESTRUCTIVE,
     "#DellJobService.SetupJobQueue": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.SetAssetName": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.SetBootVD": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelBackgroundInitialization": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelCheckConsistency": Destructiveness.DESTRUCTIVE,
