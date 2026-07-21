@@ -1,23 +1,9 @@
-import os
 from enum import Enum, auto
-from typing import Optional
 
-
-def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
-    """Return the value of the first environment variable that is set among ``names``.
-
-    Used so settings honor the going-forward ``REDFISH_*`` names first and fall back
-    to the legacy ``IDRAC_*`` names during the rename. Pass the REDFISH_* name first.
-
-    :param names: environment variable names to check, in priority order.
-    :param default: value returned when none of ``names`` is set.
-    :return: the first set variable's value, or ``default`` when none is set.
-    """
-    for name in names:
-        value = os.environ.get(name)
-        if value is not None:
-            return value
-    return default
+# env_first moved to the single config loader (redfish_ctl/config.py); re-exported
+# here for back-compat so existing `from .redfish_shared import env_first` keeps
+# working. New env reads must live in the loader, not at the call site.
+from .config import env_first as env_first
 
 
 class RedfishActions(Enum):

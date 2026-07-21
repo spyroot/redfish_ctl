@@ -1,0 +1,74 @@
+# Canonical configuration model for redfish_ctl.
+#
+# One entry per setting. The loader (redfish_ctl/config.py) is the only place the
+# environment is read (enforced by gate repo.config-loader); application code
+# receives these values as config, e.g. config.protocol.request_timeout, never by
+# calling os.getenv/env_first at the point of use.
+#
+# Naming: the canonical env var is REDFISH_*; the IDRAC_* form is a deprecated
+# alias honored via env_first(REDFISH_X, IDRAC_X). Multi-word CLI flags use the
+# dash form (enforced by gate repo.arg-consistency).
+#
+# status: implemented  = wired through config today
+#         partial      = value exists but under a different flag/env
+#         proposed     = target of the config-loader migration; not wired yet
+#
+# Author Mus spyroot@gmail.com
+
+settings:
+  transport.insecure:
+    type: boolean
+    default: false
+    status: partial          # effective value derives from --verify-ssl today
+    cli:
+      flag: --insecure        # declared; the read side uses verify_ssl
+    env:
+      canonical: REDFISH_INSECURE   # proposed; no env wired today
+      aliases:
+        - name: IDRAC_INSECURE
+          status: deprecated
+    applies_to: [collector, probe, exporter]
+    description: Disable TLS server-certificate verification only.
+
+  protocol.connect_timeout:
+    type: duration
+    status: proposed          # only a single REDFISH_HTTP_TIMEOUT exists today
+    cli:
+      flag: --connect-timeout
+    env:
+      canonical: REDFISH_CONNECT_TIMEOUT
+      aliases:
+        - name: IDRAC_CONNECT_TIMEOUT
+          status: deprecated
+    applies_to: [collector, probe]
+
+  protocol.request_timeout:
+    type: duration
+    status: implemented       # env wired at redfish_manager_base.py via env_first
+    cli:
+      flag: --request-timeout  # proposed flag; env is live today
+    env:
+      canonical: REDFISH_HTTP_TIMEOUT
+      aliases:
+        - name: IDRAC_HTTP_TIMEOUT
+          status: deprecated
+
+  logging.level:
+    type: enum
+    values: [debug, info, warning, error]
+    status: proposed
+    cli:
+      flag: --log-level
+
+  logging.format:
+    type: enum
+    values: [text, json]
+    status: proposed
+    cli:
+      flag: --log-format
+
+  adapter.name:
+    type: string
+    status: implemented       # --adapter exists today
+    cli:
+      flag: --adapter
