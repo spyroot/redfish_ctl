@@ -125,6 +125,7 @@ Safety labels:
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
 | `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
 | `dell-metric-actions` | List or invoke Dell MetricService ControlMetrics and ExportThermalHistory actions; previews by default and masks share passwords. | Guarded |
+| `dell-raid-blink` | List or run DellRaidService `BlinkTarget` / `UnBlinkTarget` for a physical disk FQDD; previews by default and requires `--confirm` to POST. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |

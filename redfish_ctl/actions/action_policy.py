@@ -69,6 +69,8 @@ ACTION_POLICY = {
     (
         "#DellSwitchConnectionService.ServerPortConnectionRefresh"
     ): Destructiveness.REVERSIBLE,
+    "#DellRaidService.BlinkTarget": Destructiveness.REVERSIBLE,
+    "#DellRaidService.UnBlinkTarget": Destructiveness.REVERSIBLE,
 
     # destructive: service disruption / config rewrite — dry-run unless --confirm
     "#ComputerSystem.Reset": Destructiveness.DESTRUCTIVE,
