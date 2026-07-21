@@ -136,6 +136,7 @@ Safety labels:
 | `get_vm` | Read virtual media. | Read |
 | `gpu-metrics` | Read consolidated GPU temperature, compute, throttle, and memory metric rows. | Read |
 | `hpe-chassis-actions` | List or disable HPE server-side MCTP; dry-run by default and `--confirm` posts. | Guarded |
+| `hpe-kerberos-keytab-import` | Import an HPE iLO Kerberos keytab through `AccountService`; keytab material is read from env/file, previews are redacted, and `--confirm` is required to write. | Guarded |
 | `hpe-test-actions` | List or send HPE iLO directory, SNMP, mail, and syslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `identify-led` | Read or set a chassis/system identify LED; requires `--confirm` to write. | Guarded |
 | `insert_vm` | Insert virtual media from a URI. | Write |

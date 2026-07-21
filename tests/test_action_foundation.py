@@ -35,6 +35,7 @@ def test_policy_classifies_known_and_unknown():
         assert classify(action) is Destructiveness.REVERSIBLE
     assert classify("#ComponentIntegrity.SPDMGetSignedMeasurements") is Destructiveness.READ_ONLY
     assert classify("#LicenseService.Install") is Destructiveness.DESTRUCTIVE
+    assert classify("#HpeiLOAccountService.ImportKerberosKeytab") is Destructiveness.DESTRUCTIVE
     assert classify("#TelemetryService.ClearMetricReports") is Destructiveness.DESTRUCTIVE
     assert classify("#SmcNodeManager.ClearAllPolicies") is Destructiveness.DESTRUCTIVE
     assert (
