@@ -54,6 +54,7 @@ ACTION_POLICY = {
         Destructiveness.READ_ONLY
     ),
     "#DelliDRACCardService.VerifyHWProofOfPossession": Destructiveness.READ_ONLY,
+    "#DellRaidService.CheckVDValues": Destructiveness.READ_ONLY,
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
@@ -67,6 +68,7 @@ ACTION_POLICY = {
     "#DelliDRACCardService.SendTestEmailAlert": Destructiveness.REVERSIBLE,
     "#DelliDRACCardService.SendTestSNMPTrap": Destructiveness.REVERSIBLE,
     "#DelliDRACCardService.TestRsyslogServerConnection": Destructiveness.REVERSIBLE,
+    "#TelemetryService.SubmitTestMetricReport": Destructiveness.REVERSIBLE,
     "#VirtualMedia.InsertMedia": Destructiveness.REVERSIBLE,
     "#VirtualMedia.EjectMedia": Destructiveness.REVERSIBLE,
     "#CertificateService.GenerateCSR": Destructiveness.REVERSIBLE,
@@ -100,6 +102,7 @@ ACTION_POLICY = {
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#DellBIOSService.DeviceRecovery": Destructiveness.DESTRUCTIVE,
     "#DellPersistentStorageService.VFlashStateChange": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ClearProvisioningServer": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     "#HpeiLOAccountService.ImportKerberosKeytab": Destructiveness.DESTRUCTIVE,
@@ -130,6 +133,7 @@ ACTION_POLICY = {
     "#DellPersistentStorageService.DetachPartition": Destructiveness.DESTRUCTIVE,
     "#DellPersistentStorageService.ExportDataFromPartition": Destructiveness.DESTRUCTIVE,
     "#DellPersistentStorageService.ModifyPartition": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.RenameVD": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
@@ -141,6 +145,8 @@ ACTION_POLICY = {
     "#DellRaidService.SetAssetName": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.SetBootVD": Destructiveness.DESTRUCTIVE,
     "#DellSystemManagementService.ShowErrorsOnLCD": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ReInitiateAutoDiscovery": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ReInitiateDHS": Destructiveness.DESTRUCTIVE,
     "#Volume.CheckConsistency": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelBackgroundInitialization": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelCheckConsistency": Destructiveness.DESTRUCTIVE,
@@ -148,6 +154,9 @@ ACTION_POLICY = {
     "#DellLCService.ExposeiSMInstallerToHostOS": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.ClearControllerPreservedCache": Destructiveness.IRREVERSIBLE,
     "#DellRaidService.ClearForeignConfig": Destructiveness.IRREVERSIBLE,
+    "#DellRaidService.ChangePDState": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.PrepareToRemove": Destructiveness.DESTRUCTIVE,
+    "#DellRaidService.RebuildPhysicalDisk": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,
@@ -162,9 +171,14 @@ ACTION_POLICY = {
     "#DelliDRACCardService.EnableSEKM": Destructiveness.DESTRUCTIVE,
     "#DelliDRACCardService.Rekey": Destructiveness.DESTRUCTIVE,
     "#DelliDRACCardService.iLKMToSEKMTransition": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.DeleteGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.JoinGroup": Destructiveness.DESTRUCTIVE,
+    "#DelliDRACCardService.RemoveSelf": Destructiveness.DESTRUCTIVE,
 
     # irreversible: data loss or one-way security change — needs the extra token
     "#Drive.SecureErase": Destructiveness.IRREVERSIBLE,
+    "#DellRaidService.ImportForeignConfig": Destructiveness.IRREVERSIBLE,
+    "#DellRaidService.UnLockSecureForeignConfig": Destructiveness.IRREVERSIBLE,
     "#Manager.ResetToDefaults": Destructiveness.IRREVERSIBLE,
     "#HpeServerChassis.FactoryResetMCTP": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,

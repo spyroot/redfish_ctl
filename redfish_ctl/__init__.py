@@ -12,6 +12,7 @@ from .cmd_boot import *
 from .dell_lc.cmd_dell_lc_api import *
 from .dell_lc.cmd_dell_lc_export import *
 from .dell_lc.cmd_dell_lc_log_comment import *
+from .dell_lc.cmd_dell_lc_autodiscovery import *
 from .dell_lc.cmd_dell_lc_rs import *
 from .dell_lc.cmd_dell_lc_services import *
 from .dell_lc.cmd_dell_lc_network_share_test import *
@@ -21,12 +22,14 @@ from .dell_lc.cmd_dell_lc_os_health_update import *
 from .dell_lc.cmd_dell_lc_ism_installer import *
 from .dell_lc.cmd_dell_lc_supportassist_export import *
 from .dell_lc.cmd_dell_lc_supportassist_schedule import *
+from .dell_lc.cmd_dell_lc_clear_provisioning import *
 #
 # compute
 from .compute.cmd_power_state import *
 from .compute.cmd_compute_setting import *
 
 from .redfish_manager_shared import *
+from .raid.cmd_dell_raid_check_values import *
 from .raid.cmd_raid_service import *
 from .raid.cmd_dell_raid_blink import *
 from .raid.cmd_dell_raid_spare import *
@@ -34,6 +37,9 @@ from .raid.cmd_dell_raid_cancel import *
 from .raid.cmd_raid_patrol_read import *
 from .raid.cmd_dell_raid_config_actions import *
 from .raid.cmd_dell_raid_clear_actions import *
+from .raid.cmd_dell_raid_rename_vd import *
+from .raid.cmd_pd_state import *
+from .raid.cmd_dell_raid_foreign_config import *
 #
 # bios commands
 from .bios.cmd_bios import *
@@ -94,6 +100,7 @@ from .storage.cmd_storage_controllers import *
 from .storage.cmd_storage_list import *
 from .storage.cmd_storage_get import *
 from .storage.cmd_drives import *
+from .storage.cmd_drive_secure_erase import *
 from .storage.cmd_convert_none_raid import *
 from .storage.cmd_convert_to_raid import *
 
@@ -118,11 +125,13 @@ from .telemetry.cmd_metric_reports import *
 from .telemetry.cmd_metric_definitions import *
 from .telemetry.cmd_telemetry_clear_reports import *
 from .telemetry.cmd_telemetry_reset_definitions import *
+from .telemetry.cmd_telemetry_submit_test import *
 from .telemetry.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
 from .component_integrity.cmd_spdm_measurements import *
 from .network.cmd_network_adapters import *
 from .network.cmd_network_adapter_reset import *
+from .network.cmd_dell_network_attributes import *
 from .network.cmd_nic_firmware import *
 from .ports.cmd_nvlink_ports import *
 from .actions.cmd_action_list import *
@@ -158,6 +167,7 @@ from .oem.cmd_dell_card_hw_proof import *
 from .oem.cmd_dell_card_key_management import *
 from .oem.cmd_dell_persistent_initialize_media import *
 from .oem.cmd_dell_persistent_partition import *
+from .oem.cmd_dell_card_group_actions import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *

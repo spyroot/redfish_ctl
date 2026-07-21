@@ -1,12 +1,14 @@
-"""Preview or run DellRaidService physical disk actions.
+"""Preview or run DellRaidService foreign-configuration actions.
 
-    redfish_ctl dell-raid-pd-actions
-    redfish_ctl dell-raid-pd-actions --action state --disk-fqdd Disk.Bay.4 --state Online
-    redfish_ctl dell-raid-pd-actions --action rebuild --disk-fqdd Disk.Bay.4 --confirm
+    redfish_ctl dell-raid-foreign-config
+    redfish_ctl dell-raid-foreign-config --action import
+    redfish_ctl dell-raid-foreign-config --action unlock-secure --confirm \
+        --i-understand-irreversible
 
 The command resolves DellRaidService from the selected ComputerSystem and lists
-advertised physical-disk actions without mutating by default. ``--confirm`` is
-required before any destructive POST is sent.
+advertised foreign-configuration actions without mutating by default. Importing
+or unlocking secure foreign RAID configuration can alter storage state, so both
+``--confirm`` and ``--i-understand-irreversible`` are required before POST.
 """
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -18,61 +20,53 @@ from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
-_CHANGE_PD_STATE_ACTION = "#DellRaidService.ChangePDState"
-_PREPARE_TO_REMOVE_ACTION = "#DellRaidService.PrepareToRemove"
-_REBUILD_PHYSICAL_DISK_ACTION = "#DellRaidService.RebuildPhysicalDisk"
+_IMPORT_FOREIGN_CONFIG_ACTION = "#DellRaidService.ImportForeignConfig"
+_UNLOCK_SECURE_FOREIGN_CONFIG_ACTION = (
+    "#DellRaidService.UnLockSecureForeignConfig"
+)
 _SYSTEM_FALLBACK = f"{RedfishApi.Version}/Systems/System.Embedded.1"
 _SERVICE_SUFFIX = "Oem/Dell/DellRaidService"
 
 
 @dataclass(frozen=True)
-class _PhysicalDiskAction:
-    """Static selector metadata for one DellRaidService physical-disk action."""
+class _ForeignConfigAction:
+    """Static selector metadata for one DellRaidService foreign action."""
 
     selector: str
     full_type: str
     action_name: str
-    required_payload: tuple[str, ...]
 
 
 _ACTION_SPECS = {
-    "prepare-remove": _PhysicalDiskAction(
-        selector="prepare-remove",
-        full_type=_PREPARE_TO_REMOVE_ACTION,
-        action_name="PrepareToRemove",
-        required_payload=("TargetFQDD", "ForceRemove"),
+    "import": _ForeignConfigAction(
+        selector="import",
+        full_type=_IMPORT_FOREIGN_CONFIG_ACTION,
+        action_name="ImportForeignConfig",
     ),
-    "rebuild": _PhysicalDiskAction(
-        selector="rebuild",
-        full_type=_REBUILD_PHYSICAL_DISK_ACTION,
-        action_name="RebuildPhysicalDisk",
-        required_payload=("TargetFQDD",),
-    ),
-    "state": _PhysicalDiskAction(
-        selector="state",
-        full_type=_CHANGE_PD_STATE_ACTION,
-        action_name="ChangePDState",
-        required_payload=("TargetFQDD", "State"),
+    "unlock-secure": _ForeignConfigAction(
+        selector="unlock-secure",
+        full_type=_UNLOCK_SECURE_FOREIGN_CONFIG_ACTION,
+        action_name="UnLockSecureForeignConfig",
     ),
 }
 
 
-class DellRaidPhysicalDiskActions(
+class DellRaidForeignConfigActions(
     RedfishManagerBase,
-    scm_type=ApiRequestType.DellRaidPhysicalDiskActions,
-    name="dell-raid-pd-actions",
+    scm_type=ApiRequestType.DellRaidForeignConfigActions,
+    name="dell-raid-foreign-config",
     metaclass=Singleton,
 ):
-    """Preview or run DellRaidService physical-disk actions."""
+    """Preview or run DellRaidService foreign-configuration actions."""
 
     def __init__(self, *args, **kwargs):
-        """Initialize the dell-raid-pd-actions command."""
-        super(DellRaidPhysicalDiskActions, self).__init__(*args, **kwargs)
+        """Initialize the dell-raid-foreign-config command."""
+        super(DellRaidForeignConfigActions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
-        """Register the guarded ``dell-raid-pd-actions`` subcommand.
+        """Register the guarded ``dell-raid-foreign-config`` subcommand.
 
         :param cls: command class supplying the shared base parser.
         :return: tuple of (ArgumentParser, command name, command help).
@@ -82,45 +76,33 @@ class DellRaidPhysicalDiskActions(
             "--action",
             choices=sorted(_ACTION_SPECS),
             default=None,
-            help="physical-disk action to preview or invoke",
-        )
-        cmd_parser.add_argument(
-            "--disk-fqdd",
-            dest="disk_fqdd",
-            default=None,
-            help="physical disk FQDD for the selected action",
-        )
-        cmd_parser.add_argument(
-            "--state",
-            choices=("Offline", "Online"),
-            default=None,
-            help="physical disk state for --action state",
-        )
-        cmd_parser.add_argument(
-            "--force-remove",
-            dest="force_remove",
-            choices=("No", "Yes"),
-            default="No",
-            help="ForceRemove payload value for --action prepare-remove",
+            help="foreign-configuration action to preview or invoke",
         )
         cmd_parser.add_argument(
             "--confirm",
             action="store_true",
             dest="confirm",
             default=False,
-            help="fire the selected DellRaidService POST; otherwise preview it",
+            help="authorize the selected DellRaidService POST",
+        )
+        cmd_parser.add_argument(
+            "--i-understand-irreversible",
+            action="store_true",
+            dest="confirm_irreversible",
+            default=False,
+            help="required with --confirm because the action changes RAID state",
         )
         cmd_parser.add_argument(
             "--dry_run",
             action="store_true",
             dest="dry_run",
             default=False,
-            help="resolve the target without POSTing; overrides --confirm",
+            help="resolve the target without POSTing; overrides confirmation",
         )
         return (
             cmd_parser,
-            "dell-raid-pd-actions",
-            "preview or run Dell RAID physical disk actions",
+            "dell-raid-foreign-config",
+            "preview or run Dell RAID foreign-configuration actions",
         )
 
     @staticmethod
@@ -161,16 +143,6 @@ class DellRaidPhysicalDiskActions(
         if not stripped:
             raise InvalidArgument(f"{label} cannot be empty")
         return stripped
-
-    @staticmethod
-    def _action_allowables(action):
-        """Return inline allowable values for one discovered action.
-
-        :param action: discovered RedfishAction.
-        :return: mapping of payload field to sorted allowable values.
-        """
-        args = getattr(action, "args", {}) or {}
-        return {key: sorted(values or []) for key, values in args.items()}
 
     def _system_uri(self):
         """Return the selected ComputerSystem URI.
@@ -218,7 +190,10 @@ class DellRaidPhysicalDiskActions(
             data = self._read_optional(uri, do_async)
             if data is not None:
                 return uri, data
-        fallback = next((uri for uri in candidates if uri), f"{system_uri}/{_SERVICE_SUFFIX}")
+        fallback = next(
+            (uri for uri in candidates if uri),
+            f"{system_uri}/{_SERVICE_SUFFIX}",
+        )
         return (
             fallback,
             CommandResult(
@@ -229,41 +204,8 @@ class DellRaidPhysicalDiskActions(
             ),
         )
 
-    def _drive_candidates(self, do_async):
-        """Collect physical drive candidate identifiers from Storage resources.
-
-        :param do_async: issue queries over the async Redfish path.
-        :return: list of physical drive candidate metadata.
-        """
-        system_uri = self._system_uri()
-        system = self._read_optional(system_uri, do_async) or {}
-        storage_uri = self._link(system, "Storage") or f"{system_uri}/Storage"
-        storage_collection = self._read_optional(storage_uri, do_async) or {}
-        drives = []
-        for member in storage_collection.get("Members") or []:
-            storage_member_uri = self._link({"member": member}, "member")
-            if not storage_member_uri:
-                continue
-            storage = self._read_optional(storage_member_uri, do_async) or {}
-            for drive_link in storage.get("Drives") or []:
-                drive_uri = self._link({"drive": drive_link}, "drive")
-                drive = self._read_optional(drive_uri, do_async) or {}
-                dell_drive = (
-                    (((drive.get("Oem") or {}).get("Dell") or {})
-                     .get("DellPhysicalDisk") or {})
-                )
-                drives.append({
-                    "id": drive.get("Id") or (drive_uri or "").rsplit("/", 1)[-1],
-                    "uri": drive_uri,
-                    "media_type": drive.get("MediaType"),
-                    "protocol": drive.get("Protocol"),
-                    "raid_status": dell_drive.get("RaidStatus"),
-                    "state": (drive.get("Status") or {}).get("State"),
-                })
-        return drives
-
     def _discover_rows(self, do_async):
-        """Discover available physical-disk action targets and metadata.
+        """Discover available foreign-configuration action targets.
 
         :param do_async: issue underlying queries over the async path.
         :return: tuple of service URI, discovered action map, and rows.
@@ -275,7 +217,6 @@ class DellRaidPhysicalDiskActions(
         targets = self._flatten_action_targets(service)
         rows = []
         for spec in _ACTION_SPECS.values():
-            action = actions.get(spec.action_name)
             target = targets.get(spec.full_type)
             if not target:
                 continue
@@ -284,48 +225,27 @@ class DellRaidPhysicalDiskActions(
                 "FullType": spec.full_type,
                 "Resource": raid_uri,
                 "Target": target,
-                "RequiredPayload": list(spec.required_payload),
-                "Parameters": self._action_allowables(action),
+                "RequiredPayload": [],
+                "Level": "irreversible",
             })
         return raid_uri, actions, rows
 
-    def _payload(self, spec, disk_fqdd, state, force_remove):
-        """Build a payload for a selected physical-disk action.
-
-        :param spec: selected action metadata.
-        :param disk_fqdd: physical disk FQDD.
-        :param state: ChangePDState target state.
-        :param force_remove: PrepareToRemove ForceRemove value.
-        :return: payload dict accepted by DellRaidService.
-        :raises InvalidArgument: when required fields are missing.
-        """
-        payload = {"TargetFQDD": self._clean_required(disk_fqdd, "disk FQDD")}
-        if spec.selector == "state":
-            payload["State"] = self._clean_required(state, "state")
-        elif spec.selector == "prepare-remove":
-            payload["ForceRemove"] = self._clean_required(force_remove, "force remove")
-        return payload
-
     def execute(self,
                 action: Optional[str] = None,
-                disk_fqdd: Optional[str] = None,
-                state: Optional[str] = None,
-                force_remove: Optional[str] = "No",
                 confirm: Optional[bool] = False,
+                confirm_irreversible: Optional[bool] = False,
                 dry_run: Optional[bool] = False,
                 filename: Optional[str] = None,
                 data_type: Optional[str] = "json",
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 **kwargs) -> CommandResult:
-        """List, preview, or run DellRaidService physical-disk actions.
+        """List, preview, or run DellRaidService foreign actions.
 
-        :param action: selected action: ``state``, ``prepare-remove``, or ``rebuild``.
-        :param disk_fqdd: physical disk FQDD.
-        :param state: target state for ``--action state``.
-        :param force_remove: ForceRemove value for ``--action prepare-remove``.
-        :param confirm: authorize the destructive DellRaidService POST.
-        :param dry_run: resolve the target without POSTing; overrides ``confirm``.
+        :param action: selected action: ``import`` or ``unlock-secure``.
+        :param confirm: authorize the DellRaidService POST.
+        :param confirm_irreversible: extra irreversible confirmation token.
+        :param dry_run: resolve the target without POSTing; overrides confirmation.
         :param filename: accepted for CLI compatibility; not used by this command.
         :param data_type: accepted for CLI compatibility; not used by this command.
         :param verbose: accepted for CLI compatibility; not used by this command.
@@ -335,13 +255,9 @@ class DellRaidPhysicalDiskActions(
         raid_uri, actions, rows = self._discover_rows(bool(do_async))
         if isinstance(rows, CommandResult):
             return rows
-        if action is None and disk_fqdd is None:
+        if action is None:
             return CommandResult(
-                {
-                    "raid_service": raid_uri,
-                    "actions": rows,
-                    "candidates": self._drive_candidates(bool(do_async)),
-                },
+                {"raid_service": raid_uri, "actions": rows},
                 actions,
                 None,
                 None,
@@ -349,9 +265,7 @@ class DellRaidPhysicalDiskActions(
 
         selected = self._clean_required(action, "action")
         if selected not in _ACTION_SPECS:
-            raise InvalidArgument(
-                "action must be one of: prepare-remove, rebuild, state"
-            )
+            raise InvalidArgument("action must be one of: import, unlock-secure")
         spec = _ACTION_SPECS[selected]
         if not any(row["Action"] == selected for row in rows):
             return CommandResult(
@@ -367,10 +281,11 @@ class DellRaidPhysicalDiskActions(
         return self.invoke_action(
             raid_uri,
             spec.action_name,
-            payload=self._payload(spec, disk_fqdd, state, force_remove),
+            payload={},
             full_action_type=spec.full_type,
             do_async=bool(do_async),
             expected_status=202,
             dry_run=bool(dry_run),
             confirm=bool(confirm),
+            confirm_irreversible=bool(confirm_irreversible),
         )
