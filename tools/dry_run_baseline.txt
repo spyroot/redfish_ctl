@@ -1,0 +1,8 @@
+# Grandfathered mutable scripts lacking --dry-run (dry-run-contract ratchet).
+# Shrink this list — each removal tightens the gate. New scripts may NOT be added.
+build_dist.sh
+docker/gb300/entrypoint.sh
+docker/run-tests.sh
+k8s/consumer/deploy.sh
+k8s/explorer/deploy.sh
+scripts/gb300.sh

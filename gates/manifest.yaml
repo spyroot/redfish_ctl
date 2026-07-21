@@ -28,6 +28,8 @@ mandatory_ids:
   - repo.no-agent-files
   - repo.live-mutation-roundtrip
   - repo.mutation-policy
+  - repo.dry-run-contract
+  - repo.no-local-build
   - scm.exact-commit
   - repo.no-agent-artifacts
   - repo.large-artifact-policy
@@ -71,6 +73,8 @@ gates:
   - {id: repo.no-agent-files,  profile: merge, command: scripts/gates/repository/no-agent-files.sh, required: true, mutates: false}
   - {id: repo.live-mutation-roundtrip, profile: merge, command: scripts/gates/repository/live-mutation-roundtrip.sh, required: true, mutates: false}
   - {id: repo.mutation-policy, profile: merge, command: scripts/gates/repository/mutation-policy.sh, required: true, mutates: false}
+  - {id: repo.dry-run-contract, profile: merge, command: scripts/gates/repository/dry-run-contract.sh, required: true, mutates: false}
+  - {id: repo.no-local-build, profile: merge, command: scripts/gates/repository/no-local-build.sh, required: true, mutates: false}
   # --- unit: the offline suite ---
   - {id: unit.all,             profile: merge, command: scripts/gates/unit/all.sh,               required: true, mutates: false}
   # --- kubernetes: render + validate manifests ---

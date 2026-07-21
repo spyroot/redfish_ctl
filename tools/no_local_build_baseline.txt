@@ -1,0 +1,9 @@
+# Grandfathered LOCAL builds/mutations (no-local-build ratchet).
+# Intent: MOVE these to the pipeline/toolbox, then delete the line. Shrink only.
+Makefile:docker-build
+Makefile:kind
+docker/run-tests.sh:docker-build
+k8s/consumer/deploy.sh:docker-build
+k8s/explorer/deploy.sh:docker-build
+k8s/sandbox/run-sandbox.sh:docker-build
+k8s/sandbox/run-sandbox.sh:kind
