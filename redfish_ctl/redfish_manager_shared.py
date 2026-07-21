@@ -135,6 +135,7 @@ class ApiRequestType(Enum):
     DellCardCertExport = auto()
     DellCardHwProof = auto()
     DellCardKeyManagement = auto()
+    DellPersistentInitializeMedia = auto()
     EventServiceQuery = auto()
     SubscriptionCreate = auto()
     SubscriptionDelete = auto()
