@@ -47,6 +47,7 @@ class ApiRequestType(Enum):
     DellLcSupportAssistSchedule = auto()
     DellOemDisconnect = auto()
     DellCardSekmTest = auto()
+    DellLcClearProvisioningServer = auto()
 
     RemoteServicesRssAPIStatus = auto()
     RemoteServicesAPIStatus = auto()

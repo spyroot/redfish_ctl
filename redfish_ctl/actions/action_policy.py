@@ -100,6 +100,7 @@ ACTION_POLICY = {
     "#Bios.ChangePassword": Destructiveness.DESTRUCTIVE,
     "#DellBIOSService.DeviceRecovery": Destructiveness.DESTRUCTIVE,
     "#DellPersistentStorageService.VFlashStateChange": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ClearProvisioningServer": Destructiveness.DESTRUCTIVE,
     "#LicenseService.Install": Destructiveness.DESTRUCTIVE,
     "#HpeServerChassis.DisableMCTPOnServer": Destructiveness.DESTRUCTIVE,
     "#HpeiLOAccountService.ImportKerberosKeytab": Destructiveness.DESTRUCTIVE,
