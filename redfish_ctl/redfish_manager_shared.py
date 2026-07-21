@@ -147,6 +147,7 @@ class ApiRequestType(Enum):
     LogCollectDiagnosticData = auto()
     LicenseInstall = auto()
     DellLicenseActions = auto()
+    DellPersistentPartitionActions = auto()
     EthernetInterfaces = auto()
     SecureBoot = auto()
     CertificatesQuery = auto()

@@ -13,6 +13,8 @@ confirm. This module is product-neutral — it names standard DMTF and vendor OE
 action types and imports nothing from the Redfish manager layer.
 confirm. This module is product-neutral — it names standard DMTF actions and
 selected vendor OEM action types without importing the Redfish manager layer.
+confirm. This module is product-neutral — it names standard DMTF and vendor OEM
+action types and imports nothing from the Redfish manager layer.
 
 Author Mus spyroot@gmail.com
 """
@@ -120,6 +122,12 @@ ACTION_POLICY = {
     "#DellSoftwareInstallationService.ClearUpdateSchedule": Destructiveness.DESTRUCTIVE,
     "#DellSoftwareInstallationService.SetUpdateSchedule": Destructiveness.DESTRUCTIVE,
     "#DellLCService.SupportAssistExportLastCollection": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.AttachPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.CreatePartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.CreatePartitionUsingImage": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.DetachPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.ExportDataFromPartition": Destructiveness.DESTRUCTIVE,
+    "#DellPersistentStorageService.ModifyPartition": Destructiveness.DESTRUCTIVE,
     # ClearLog erases log entries (unrecoverable), but it neither disrupts the
     # host/BMC nor makes a one-way security change, so it sits at DESTRUCTIVE
     # (--confirm) rather than IRREVERSIBLE (the extra token is reserved for
@@ -158,6 +166,8 @@ ACTION_POLICY = {
     "#HpeServerChassis.FactoryResetMCTP": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.RevokeKeys": Destructiveness.IRREVERSIBLE,
     "#NvidiaRoTProtectedComponent.UpdateMinimumSecurityVersion": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.DeletePartition": Destructiveness.IRREVERSIBLE,
+    "#DellPersistentStorageService.FormatPartition": Destructiveness.IRREVERSIBLE,
     "#DellPersistentStorageService.InitializeMedia": Destructiveness.IRREVERSIBLE,
 }
 
