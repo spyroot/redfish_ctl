@@ -140,6 +140,7 @@ Safety labels:
 | `dell-software-update-schedule` | Manage Dell software update schedules; writes require `--confirm`. | Guarded |
 | `dell-raid-cancel-actions` | Cancel DellRaidService actions discovered from the managed system's Dell OEM links; lists background-init, consistency-check, and physical-disk rebuild targets by default and requires `--confirm` to POST. | Guarded |
 | `dell-raid-patrol-read` | Start or stop Dell RAID patrol read; previews unless `--confirm` is given. | Guarded |
+| `dell-raid-clear-actions` | Preview Dell RAID clear actions. | Guarded |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |
