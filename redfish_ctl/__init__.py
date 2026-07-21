@@ -36,6 +36,7 @@ from .raid.cmd_dell_raid_cancel import *
 from .raid.cmd_raid_patrol_read import *
 from .raid.cmd_dell_raid_config_actions import *
 from .raid.cmd_dell_raid_clear_actions import *
+from .raid.cmd_dell_raid_rename_vd import *
 #
 # bios commands
 from .bios.cmd_bios import *
