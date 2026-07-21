@@ -14,7 +14,7 @@ Three pieces cooperate, each doing one job:
 | --- | --- | --- |
 | `RedfishEndpoint` + controller (`redfish_endpoint_controller.py`) | CRD + read-only controller | keeps each BMC's live state (power, health, temperature) on the object's `.status` |
 | `RedfishNodeProfile` + operator (`redfish_node_profile_controller.py`) | CRD + operator | computes drift between a node and its desired state; applies **only** when `spec.approvedPlanHash` matches the current `.status.planHash` |
-| exporter pods (one per BMC) | Deployment(s) | stream each BMC's metrics to the cluster's OpenTelemetry Collector — see the [deployment model](../docs/telemetry-exporter.md#deployment-model-one-exporter-per-bmc) |
+| exporter pods (one per BMC) | Deployment(s) | stream each BMC's metrics to the cluster's OpenTelemetry Collector — see the [deployment model](../docs/external/telemetry-exporter.md#deployment-model-one-exporter-per-bmc) |
 
 Credentials always come from a namespaced Secret via `secretRef` — never from
 images or CRs. Every example below can be tried with **zero hardware** using
@@ -96,7 +96,7 @@ spec:
 ```
 
 The operator diffs the node's live BIOS attributes against the named profile
-(catalogued with purpose and risk notes in [BIOS profiles](../docs/bios-profiles.md))
+(catalogued with purpose and risk notes in [BIOS profiles](../docs/external/bios-profiles.md))
 and writes the drift plan into `.status`. Nothing has touched the BMC beyond
 reads. When the plan looks right, copy the reported hash into the spec:
 

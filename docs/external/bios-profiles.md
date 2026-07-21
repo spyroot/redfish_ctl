@@ -7,7 +7,7 @@ attributes that can be inspected, previewed, staged, and verified as one unit in
 edits. The working pattern is always the same: inspect the registry, preview the change, stage it
 only after approval, then verify after the approved maintenance reset.
 
-The spec files used below are indexed with vendor and safety labels in [Specs](../specs/README.md).
+The spec files used below are indexed with vendor and safety labels in [Specs](../../specs/README.md).
 
 ## Read, Preview, Stage, Verify
 
@@ -38,7 +38,7 @@ redfish_ctl bios --filter SysProfile,ProcCStates,MemFrequency
 ## Named Profile Catalog
 
 `specs/profiles/`, the committed named-profile directory, holds vendor-scoped JSON profiles with the
-schema described in [BIOS tuning profiles](../specs/profiles/README.md). Each profile lists the BIOS
+schema described in [BIOS tuning profiles](../../specs/profiles/README.md). Each profile lists the BIOS
 attributes to stage and must match a captured vendor registry before it is accepted by the test suite.
 
 `bios-profile`, the CLI's named-profile command, reads that directory for `list` and `show` without

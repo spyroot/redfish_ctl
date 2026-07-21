@@ -6,7 +6,7 @@ corpus by dropping JsonSchemas/Registries/Entries), this keeps EVERYTHING a
 ``redfish_ctl discovery`` run produced — every JSON resource, all registries,
 schemas, actions, settings, and OEM resources — plus the exact ``rest_api_map.npy``
 from the same run and a ``corpus_manifest.json``. It is the ``full_training``
-artifact. See ``docs/full-corpus-contract.md``.
+artifact. See ``docs/external/full-corpus-contract.md``.
 
 Redaction: ONLY credential/secret values and account usernames are scrubbed
 (reusing ``tools/redact_corpus.SECRET_SUFFIXES`` plus ``username``); every other

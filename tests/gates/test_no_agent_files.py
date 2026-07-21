@@ -59,7 +59,7 @@ def test_flags_agent_only_directories():
 def test_ordinary_source_is_not_flagged():
     """Real project source and docs are not agent files."""
     assert not agent_name_guard.is_agent_file("redfish_ctl/redfish_manager.py")
-    assert not agent_name_guard.is_agent_file("docs/gates.md")
+    assert not agent_name_guard.is_agent_file("docs/external/gates.md")
     assert not agent_name_guard.is_agent_file("README.md")
 
 

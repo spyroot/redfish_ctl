@@ -21,7 +21,7 @@ Usage::
 
 It prints only counts, never redacted values. It is a mechanical first pass, NOT a
 guarantee — always read the output yourself and run the secret scan in
-``docs/fixture-capture.md`` before committing.
+``docs/external/fixture-capture.md`` before committing.
 """
 from __future__ import annotations
 
@@ -200,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  key redactions: {counts.key_redactions}")
     print(f"  ip replacements: {counts.ip_replacements}")
     print(f"  mac scrubs: {counts.mac_scrubs}")
-    print("Now read the output and run the secret scan in docs/fixture-capture.md "
+    print("Now read the output and run the secret scan in docs/external/fixture-capture.md "
           "before committing.")
     return 0
 
