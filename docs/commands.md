@@ -122,6 +122,7 @@ Safety labels:
 | `dell-card-test-actions` | List or send Dell iDRAC card email, SNMP, and rsyslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-lc-svc` | Read Dell Lifecycle Controller service data. | Read |
 | `dell-switch-port-refresh` | Refresh Dell switch-connection view metadata; lists targets by default and `--confirm` posts the refresh action. | Guarded |
+| `dell-lc-supportassist-status` | Read Dell LC SupportAssist EULA and auto-collect schedule status actions. | Read |
 | `discovery` | Recursively walk Redfish resources and record allowed methods. | Read |
 | `eject_vm` | Eject virtual media. | Write |
 | `environment-metrics` | Read linked EnvironmentMetrics resources for power, energy, temperature, and power-limit rollups. | Read |

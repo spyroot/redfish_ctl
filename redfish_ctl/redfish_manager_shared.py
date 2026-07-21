@@ -42,6 +42,7 @@ class ApiRequestType(Enum):
     RemoteServicesRssAPIStatus = auto()
     RemoteServicesAPIStatus = auto()
     DellLcNetworkShareTest = auto()
+    DellLcSupportAssistStatus = auto()
     TasksList = auto()
 
     ChangeBootOrder = auto()

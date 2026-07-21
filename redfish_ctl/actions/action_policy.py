@@ -42,6 +42,8 @@ ACTION_POLICY = {
     # read-only: a signed-measurement fetch carried over POST
     "#ComponentIntegrity.SPDMGetSignedMeasurements": Destructiveness.READ_ONLY,
     "#ComponentIntegrity.TPMGetSignedMeasurements": Destructiveness.READ_ONLY,
+    "#DellLCService.SupportAssistGetAutoCollectSchedule": Destructiveness.READ_ONLY,
+    "#DellLCService.SupportAssistGetEULAStatus": Destructiveness.READ_ONLY,
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
