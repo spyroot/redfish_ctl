@@ -1015,17 +1015,39 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     }
 
 
+# Splunk Observability ingest host: accepts a datapoint POST and returns 200/"OK"
+# but never records the metric time series. SignalFx datapoint ingest requires the
+# ingest.<realm>.signalfx.com host instead.
+_OBSERVABILITY_INGEST_HOST = re.compile(
+    r"ingest\.([a-z0-9-]+)\.observability\.splunkcloud\.com", re.IGNORECASE)
+
+
+def _normalize_signalfx_ingest_url(ingest_url: str) -> str:
+    """Rewrite a Splunk Observability ingest host to the SignalFx datapoint host.
+
+    ``ingest.<realm>.observability.splunkcloud.com`` is replaced with
+    ``ingest.<realm>.signalfx.com``; the realm, scheme, path, and port are kept.
+    Any other host is returned unchanged.
+
+    :param ingest_url: the ingest URL to normalize.
+    :return: the URL with the observability host rewritten, else unchanged.
+    """
+    return _OBSERVABILITY_INGEST_HOST.sub(r"ingest.\1.signalfx.com", ingest_url or "")
+
+
 def _require_datapoint_url(ingest_url: str) -> str:
     """Return ``ingest_url`` when it is a full SignalFx datapoint endpoint, else raise.
 
     ``push_signalfx`` POSTs the URL as-is (it does not append a path), so a bare
     host such as ``https://ingest.us1.observability.splunkcloud.com`` accepts the
     request context but silently drops every datapoint. Require the full
-    ``…/v2/datapoint`` endpoint so misconfiguration fails loudly instead.
+    ``…/v2/datapoint`` endpoint, and reject the Observability ingest host outright,
+    so misconfiguration fails loudly instead.
 
     :param ingest_url: the SignalFx ingest URL to validate.
     :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
-    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
+    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint, or it
+        targets the Observability ingest host that silently drops datapoints.
     """
     if SIGNALFX_DATAPOINT_PATH not in (ingest_url or ""):
         raise ValueError(
@@ -1033,6 +1055,13 @@ def _require_datapoint_url(ingest_url: str) -> str:
             f"{SIGNALFX_DATAPOINT_PATH} (e.g. "
             "https://ingest.us1.signalfx.com/v2/datapoint), not a bare host like "
             f"https://ingest.us1.observability.splunkcloud.com; got {ingest_url!r}"
+        )
+    if _OBSERVABILITY_INGEST_HOST.search(ingest_url):
+        raise ValueError(
+            "SignalFx ingest URL targets the Splunk Observability host "
+            "(ingest.<realm>.observability.splunkcloud.com), which returns 200/OK "
+            "but drops every datapoint; use ingest.<realm>.signalfx.com instead; "
+            f"got {ingest_url!r}"
         )
     return ingest_url
 
@@ -1072,13 +1101,22 @@ def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
     full ``…/v2/datapoint`` endpoint (see ``_require_datapoint_url``).
 
     :param ingest_url: explicit ingest URL; falls back to ``SPLUNK_INGEST_URL``.
-    :return: a validated full ``…/v2/datapoint`` ingest URL.
+    :return: a validated full ``…/v2/datapoint`` ingest URL (Observability host
+        normalized to the SignalFx datapoint host).
     :raises ValueError: if no URL is set or it is not a full datapoint endpoint.
     """
     url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
     if not url:
         raise ValueError("SPLUNK_INGEST_URL is not set")
-    return _require_datapoint_url(url)
+    normalized = _normalize_signalfx_ingest_url(url)
+    if normalized != url:
+        # Never silent: surface the rewrite so a deploy dry-run shows the real target.
+        print(
+            f"note: rewrote SignalFx ingest host to the datapoint host {normalized} "
+            "(the observability.splunkcloud.com host returns OK but drops datapoints)",
+            file=sys.stderr,
+        )
+    return _require_datapoint_url(normalized)
 
 
 def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 20.0) -> int:
