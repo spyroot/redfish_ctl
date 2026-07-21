@@ -53,18 +53,6 @@ class _SubscriptionBase(RedfishManagerBase):
         link = (data or {}).get(key)
         return link.get("@odata.id") if isinstance(link, dict) else None
 
-    @staticmethod
-    def _ensure_event_loop():
-        """Return the current asyncio event loop, creating one if none is set.
-
-        :return: an asyncio event loop usable for the async Redfish calls.
-        """
-        try:
-            return asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return loop
 
     def _subscription_collection_uri(self, do_async):
         """Resolve the EventService Subscriptions collection URI.
@@ -74,7 +62,7 @@ class _SubscriptionBase(RedfishManagerBase):
         :raises InvalidArgument: when the EventService Subscriptions link is absent.
         """
         if do_async:
-            self._ensure_event_loop()
+            self._event_loop()
         service = self.base_query(
             REDFISH_API.EventServiceQuery,
             do_async=do_async,
@@ -92,7 +80,7 @@ class _SubscriptionBase(RedfishManagerBase):
         :return: the ``@odata.id`` of each subscription member (possibly empty).
         """
         if do_async:
-            self._ensure_event_loop()
+            self._event_loop()
         collection = self.base_query(subscriptions_uri, do_async=do_async).data or {}
         members = collection.get("Members")
         if not isinstance(members, list):
@@ -197,7 +185,7 @@ class _SubscriptionBase(RedfishManagerBase):
                 return self.api_post_call(request, json.dumps(body), headers)
             if method == HTTPMethod.DELETE:
                 return self.api_delete_call(request, headers)
-        loop = self._ensure_event_loop()
+        loop = self._event_loop()
         if method == HTTPMethod.POST:
             return loop.run_until_complete(
                 self._await_async_response(

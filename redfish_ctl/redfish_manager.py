@@ -47,6 +47,25 @@ CommandResult = collections.namedtuple("cmd_result",
 
 class RedfishManager:
 
+    @staticmethod
+    def _event_loop() -> asyncio.AbstractEventLoop:
+        """Return a usable event loop for a synchronous caller.
+
+        ``asyncio.get_event_loop()`` used to create a loop implicitly when none existed. Python 3.12
+        deprecated that and 3.14 removed it, so on 3.14 it raises RuntimeError and every async path in
+        this client dies before sending anything. Creating the loop explicitly when there is none keeps
+        one behaviour across 3.10 through 3.14.
+
+        :return: the running loop when one exists, otherwise a new loop installed for this thread.
+        :raises RuntimeError: never — the no-loop case is handled by creating one.
+        """
+        try:
+            return asyncio.get_event_loop_policy().get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+
     def __init__(self,
                  redfish_ip: Optional[str] = "",
                  redfish_username: Optional[str] = "root",
@@ -349,7 +368,7 @@ class RedfishManager:
         :return: http response object
         """
         if loop is None:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
         await self.async_default_error_handler(await response)
         return await response
@@ -488,7 +507,7 @@ class RedfishManager:
             self.query_counter += 1
             self.default_error_handler(response)
         else:
-            loop = asyncio.get_event_loop()
+            loop = self._event_loop()
             response = loop.run_until_complete(
                 self.api_async_get_until_complete(
                     r, headers
