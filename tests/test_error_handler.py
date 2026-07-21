@@ -7,9 +7,25 @@ dead. These pin the success/raise mapping. No network.
 import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.redfish_exceptions import RedfishForbidden, RedfishUnauthorized
+from redfish_ctl.redfish_exceptions import (
+    RedfishException,
+    RedfishForbidden,
+    RedfishUnauthorized,
+)
 from redfish_ctl.redfish_manager import RedfishManager
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_respond_error import RedfishError
 from redfish_ctl.redfish_shared import RedfishApiRespond
+
+_DMTF_ERROR_BODY = {
+    "error": {
+        "code": "Base.1.18.GeneralError",
+        "message": "The write failed.",
+        "@Message.ExtendedInfo": [
+            {"MessageId": "Base.1.18.ActionNotSupported",
+             "Message": "not supported", "Severity": "Critical"}],
+    }
+}
 
 
 class _Resp:
@@ -20,6 +36,28 @@ class _Resp:
 
     def json(self):
         return {}
+
+
+class _WriteResp:
+    """Fake write response: status code, headers, and a JSON error body."""
+
+    def __init__(self, status_code: int, body):
+        self.status_code = status_code
+        self.headers = {}
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+def _base_manager():
+    """Return an offline RedfishManagerBase (the mutation-path host).
+
+    :return: a RedfishManagerBase instance that makes no BMC contact.
+    """
+    return RedfishManagerBase(
+        idrac_ip="mock", idrac_username="root", idrac_password="x",
+        insecure=True, is_debug=False)
 
 
 @pytest.mark.parametrize(
@@ -52,3 +90,41 @@ def test_error_codes_raise(status_code, exception):
     """4xx/5xx codes raise (the branches the tautology used to skip)."""
     with pytest.raises(exception):
         RedfishManager.default_error_handler(_Resp(status_code))
+
+
+@pytest.mark.parametrize(
+    "status_code, exception",
+    [
+        (400, RedfishException),
+        (401, RedfishUnauthorized),
+        (403, RedfishForbidden),
+        (404, ResourceNotFound),
+        (500, RedfishException),
+        (502, RedfishException),
+        (503, RedfishException),
+    ],
+)
+def test_write_path_preserves_dmtf_envelope(status_code, exception):
+    """read_api_respond (the POST/PATCH/DELETE path) raises the parsed RedfishError
+    envelope for every error code, not a flattened string. Regression: 401/403 used
+    'Authorization failed.', 5xx used '<message> HTTP Status code: N' (dropping
+    error.code + @Message.ExtendedInfo), and 404 raised the wrong type."""
+    with pytest.raises(exception) as raised:
+        _base_manager().read_api_respond(_WriteResp(status_code, _DMTF_ERROR_BODY),
+                                         expected=204)
+    parsed = raised.value.args[0]
+    assert isinstance(parsed, RedfishError)
+    assert parsed.status_code == status_code
+    assert parsed.code == "Base.1.18.GeneralError"
+
+
+def test_write_path_405_returns_error_with_envelope():
+    """405/409 keep returning RedfishApiRespond.Error (callers read the envelope
+    from self._redfish_error), so the non-raising return contract is unchanged."""
+    manager = _base_manager()
+    result = manager.read_api_respond(_WriteResp(405, _DMTF_ERROR_BODY), expected=204)
+    # compare by member name: the base uses redfish_manager_shared.RedfishApiRespond,
+    # a distinct enum from redfish_shared's, so identity comparison would fail.
+    assert result.name == "Error"
+    assert isinstance(manager._redfish_error, RedfishError)
+    assert manager._redfish_error.status_code == 405

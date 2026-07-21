@@ -1267,26 +1267,23 @@ class RedfishManagerBase(RedfishManager):
         if 200 <= response.status_code < 300:
             return self._http_code_mapping[response.status_code]
 
+        # Normalize the write-path error per the Redfish error contract: every
+        # raised exception carries the parsed RedfishError envelope (status,
+        # error.code, @Message.ExtendedInfo), never a flattened string. 405/409
+        # keep returning RedfishApiRespond.Error (the caller reads the envelope
+        # from self._redfish_error), so the return contract is unchanged.
         self._redfish_error = RedfishManagerBase.parse_error(response)
         if 300 <= response.status_code < 500:
             if response.status_code == 400:
                 raise RedfishException(self._redfish_error)
             if response.status_code == 401:
-                raise RedfishUnauthorized("Authorization failed.")
+                raise RedfishUnauthorized(self._redfish_error)
             if response.status_code == 403:
-                raise RedfishForbidden("Authorization failed.")
-            if response.status_code == 404:
                 raise RedfishForbidden(self._redfish_error)
+            if response.status_code == 404:
+                raise ResourceNotFound(self._redfish_error)
             return RedfishApiRespond.Error
-        elif response.status_code >= 500:
-            raise RedfishException(
-                f"{self._redfish_error.message} HTTP Status code: "
-                f"{response.status_code}")
-        else:
-            raise RedfishException(
-                f"{self._redfish_error}, HTTP Status code: "
-                f"{response.status_code}"
-            )
+        raise RedfishException(self._redfish_error)
 
     def default_patch_success(
             self,
