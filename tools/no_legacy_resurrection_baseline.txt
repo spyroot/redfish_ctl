@@ -1,0 +1,3 @@
+# App-code sites reading a deprecated IDRAC_* name unpaired with its canonical.
+# Empty: the statement-grouping check finds none (the one prior entry, exporter.py:386,
+# was a false positive — its REDFISH_ counterpart is in the same or-chain statement).

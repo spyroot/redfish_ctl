@@ -18,10 +18,10 @@
 settings:
   transport.insecure:
     type: boolean
-    default: false
-    status: partial          # effective value derives from --verify-ssl today
+    default: true            # runtime effective: TLS verify OFF (redfish_main.py:394 insecure = not verify_ssl)
+    status: partial          # --insecure is DEAD (declared redfish_main.py:594, never read); value derives solely from --verify-ssl
     cli:
-      flag: --insecure        # declared; the read side uses verify_ssl
+      flag: --verify-ssl      # the flag actually read; --insecure is declared but ignored
     env:
       canonical: REDFISH_INSECURE   # proposed; no env wired today
       aliases:
@@ -69,6 +69,8 @@ settings:
 
   adapter.name:
     type: string
-    status: implemented       # --adapter exists today
+    status: proposed          # the only --adapter (cmd_network_adapter_reset.py:49) is a subcommand-scoped
+                              # HARDWARE NetworkAdapter Id/URI — NOT a transport/HTTP client adapter selector.
+                              # No global --adapter, no REDFISH_ADAPTER, no config accessor.
     cli:
       flag: --adapter

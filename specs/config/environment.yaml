@@ -1,0 +1,159 @@
+# redfish_ctl environment registry — every name spelled EXACTLY, no prefix wildcards.
+#
+# This is the single source of truth for which environment variables the project
+# reads, who owns them, and which are a deprecated alias of another. It is
+# enforced by three gates:
+#   repo.no-undeclared-env      — a name read anywhere that is not listed here fails (gate B).
+#   repo.no-legacy-resurrection — direct legacy/tombstone use in app code fails (gate C).
+#   repo.config-loader          — the app reads env only in the loader (gate A).
+#
+# A prefix pass-through (OTEL_*, SPLUNK_*) is deliberately NOT allowed: a name is
+# external pass-through ONLY when the app never interprets the value and hands it
+# unchanged to an externally owned SDK. Names the app parses/branches on are
+# application config, listed by exact name — so OTEL_SOME_NEW_TIMEOUT can never
+# become a permitted ghost just because its prefix looks standard.
+#
+# Scope: this catalogs the exact names across application code, infra, harness,
+# examples, and build args. The gates today ENFORCE the application Python surface
+# (redfish_ctl/); names read only in scripts/, k8s/, docker/, examples/, or tests
+# are cataloged but not yet gate-checked (extending enforcement is a follow-up).
+# Make-level orchestration variables (e.g. SLOT, which Make resolves from CLI/env)
+# are build orchestration, not service configuration, and are out of scope here.
+#
+# Author Mus spyroot@gmail.com
+
+application:
+
+  # Canonical names the app owns. Each REDFISH_* with an `alias` accepts that
+  # deprecated IDRAC_* name too, resolved once by config.env_first (REDFISH_* wins;
+  # both set to different values is a hard conflict). interpreted=true means the
+  # app parses/branches on the value.
+  canonical:
+    REDFISH_IP:                         {alias: IDRAC_IP,                        interpreted: true}
+    REDFISH_USERNAME:                   {alias: IDRAC_USERNAME,                  interpreted: false, default: root}
+    REDFISH_PASSWORD:                   {alias: IDRAC_PASSWORD,                  interpreted: false, secret: true}
+    REDFISH_PORT:                       {alias: IDRAC_PORT,                      interpreted: true,  default: "443"}
+    REDFISH_HTTP_TIMEOUT:               {alias: IDRAC_HTTP_TIMEOUT,              interpreted: true,  default: "30"}
+    REDFISH_HTTP_POOL:                  {alias: IDRAC_HTTP_POOL,                 interpreted: true,  default: "4"}
+    REDFISH_HTTP_RETRIES:               {alias: IDRAC_HTTP_RETRIES,              interpreted: true,  default: "3"}
+    REDFISH_HTTP_BACKOFF:               {alias: IDRAC_HTTP_BACKOFF,              interpreted: true,  default: "0.5"}
+    REDFISH_DISCOVERY_RETRIES:          {alias: IDRAC_DISCOVERY_RETRIES,         interpreted: true,  default: "4"}
+    REDFISH_DISCOVERY_BACKOFF:          {alias: IDRAC_DISCOVERY_BACKOFF,         interpreted: true,  default: "2.0"}
+    REDFISH_DISCOVERY_PACE_MS:          {alias: IDRAC_DISCOVERY_PACE_MS,         interpreted: true,  default: "0"}
+    REDFISH_EXPORTER_CREDENTIAL_FILE:   {alias: IDRAC_EXPORTER_CREDENTIAL_FILE,  interpreted: false}
+    REDFISH_EXPORTER_CONFIG_FILE:       {alias: IDRAC_EXPORTER_CONFIG_FILE,      interpreted: false}
+    REDFISH_EXPORTER_HOST_PREFIX:       {alias: IDRAC_EXPORTER_HOST_PREFIX,      interpreted: false, default: gb300-poc1}
+    REDFISH_EXPORTER_BMC_OCTET_BASE:    {alias: IDRAC_EXPORTER_BMC_OCTET_BASE,   interpreted: true}
+    REDFISH_EXPORTER_SERVER_OCTET_BASE: {alias: IDRAC_EXPORTER_SERVER_OCTET_BASE, interpreted: true}
+    REDFISH_EXPORTER_SERVER_SUBNET:     {alias: IDRAC_EXPORTER_SERVER_SUBNET,    interpreted: false}
+    # canonical-only (no IDRAC_* alias by design — do not auto-generate one)
+    REDFISH_SCHEME:                     {alias: null, interpreted: false, default: https}
+    REDFISH_CSDL_DIR:                   {alias: null, interpreted: true}
+    REDFISH_SCHEMA_OFFLINE:             {alias: null, interpreted: true}
+    REDFISH_CONTROLLER_POLL_INTERVAL:   {alias: null, interpreted: true}
+    REDFISH_CONTROLLER_OTLP_TRACES:     {alias: null, interpreted: true}
+    REDFISH_CTL_REF:                    {alias: null, interpreted: false, note: "CI build ref, not a runtime knob"}
+    # test-harness only (not a shipped runtime setting)
+    REDFISH_EMULATOR_URL:               {alias: null, scope: test-only}
+    REDFISH_EMULATOR_USER:              {alias: null, scope: test-only, default: admin}
+    REDFISH_EMULATOR_PASSWORD:          {alias: null, scope: test-only, default: password}
+    REDFISH_SCHEMA_ALL:                 {alias: null, scope: test-only}
+
+  # Deprecated IDRAC_* names -> their canonical REDFISH_*. Kept working via
+  # env_first. read_direct=true records a site that still reads the legacy name
+  # with no REDFISH_ precedence (see gate C baseline).
+  legacy_aliases:
+    IDRAC_IP:                         {canonical: REDFISH_IP,                         read_direct: true}
+    IDRAC_USERNAME:                   {canonical: REDFISH_USERNAME,                   read_direct: true}
+    IDRAC_PASSWORD:                   {canonical: REDFISH_PASSWORD,                   read_direct: true}
+    IDRAC_PORT:                       {canonical: REDFISH_PORT,                       read_direct: false}
+    IDRAC_HTTP_TIMEOUT:               {canonical: REDFISH_HTTP_TIMEOUT,               read_direct: false}
+    IDRAC_HTTP_POOL:                  {canonical: REDFISH_HTTP_POOL,                  read_direct: false}
+    IDRAC_HTTP_RETRIES:               {canonical: REDFISH_HTTP_RETRIES,               read_direct: false}
+    IDRAC_HTTP_BACKOFF:               {canonical: REDFISH_HTTP_BACKOFF,               read_direct: false}
+    IDRAC_DISCOVERY_RETRIES:          {canonical: REDFISH_DISCOVERY_RETRIES,          read_direct: false}
+    IDRAC_DISCOVERY_BACKOFF:          {canonical: REDFISH_DISCOVERY_BACKOFF,          read_direct: false}
+    IDRAC_DISCOVERY_PACE_MS:          {canonical: REDFISH_DISCOVERY_PACE_MS,          read_direct: false}
+    IDRAC_EXPORTER_CREDENTIAL_FILE:   {canonical: REDFISH_EXPORTER_CREDENTIAL_FILE,   read_direct: true}
+    IDRAC_EXPORTER_CONFIG_FILE:       {canonical: REDFISH_EXPORTER_CONFIG_FILE,       read_direct: false}
+    IDRAC_EXPORTER_HOST_PREFIX:       {canonical: REDFISH_EXPORTER_HOST_PREFIX,       read_direct: false}
+    IDRAC_EXPORTER_BMC_OCTET_BASE:    {canonical: REDFISH_EXPORTER_BMC_OCTET_BASE,    read_direct: false}
+    IDRAC_EXPORTER_SERVER_OCTET_BASE: {canonical: REDFISH_EXPORTER_SERVER_OCTET_BASE, read_direct: false}
+    IDRAC_EXPORTER_SERVER_SUBNET:     {canonical: REDFISH_EXPORTER_SERVER_SUBNET,     read_direct: false}
+
+  # App-owned config that LOOKS external but is consumed by the tool's OWN
+  # urllib request (parsed/validated), so it is NOT pass-through.
+  secrets_and_config:
+    SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "validated for /v2/datapoint (exporter.py:1030,1078)"}
+    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "interpolated into api.<realm>.signalfx.com (splunk_metric_gate.py:114,139)"}
+    SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token header; read via variable name (exporter.py:1061) so it evades literal scans — listed explicitly"}
+    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token for the metric query (splunk_metric_gate.py:115,145)"}
+
+  # OTEL_* names the app INTERPRETS (branches on) — application config, not
+  # pass-through, even though the prefix is standard.
+  interpreted_external:
+    OTEL_EXPORTER_OTLP_PROTOCOL:         {owner: opentelemetry, interpreted: true, note: "branched on startswith('http') to pick exporter class (otlp.py:172)"}
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: {owner: opentelemetry, interpreted: true, note: "same http/grpc branch (otlp.py:70,172)"}
+
+  # Other app/tooling-owned knobs (exact names). Not connection config; grouped
+  # by subsystem so no real name is undeclared.
+  components:
+    mock_bmc:      [MOCK_BMC_CORPUS_DIR, MOCK_BMC_VERBOSE, MOCK_BMC_RACK, MOCK_BMC_SLOT, MOCK_BMC_SEED]
+    ilo_sim:       [MOCKUP_FOLDER, ASYNC_SLEEP, PORT]
+    consumer_app:  [WATCH_NAMESPACE, BIND_HOST, BIND_PORT]
+    gb300_harness: [GB300_ENV_FILE, GB300_HOST, GB300_USER, GB300_IP_BASE, GB300_SLOT0_OCTET, GB300_SLOTS,
+                    GB300_IMAGE, RFCTL_REPO, RFCTL_REF, RFCTL_GIT_NAME, RFCTL_GIT_EMAIL]
+    publish:       [GITHUB_REPO, GITHUB_PUSH_TOKEN]
+    k8s_deploy:    [IMAGE, NAMESPACE, KIND_CLUSTER_NAME, KUBECTL_CONTEXT, LOCAL_PORT, PORT_FORWARD,
+                    SECRET, KUBECTL, KIND_CONFIG, KEEP_CLUSTER, SANDBOX_BACKENDS, STATUS_TIMEOUT_SECONDS]
+    gates:         [EVIDENCE_DIR, TRACE_DIR, MODULE, MUTATION_LOCK, PLAN_ARTIFACT, PLAN_COMMIT, BASE_REF]
+    live_sanity:   [IDENTIFY_LED_CAPTURE_DIR, IDENTIFY_LED_PROPERTY, IDENTIFY_LED_RESOURCE, IDENTIFY_LED_TARGET_ID,
+                    ASSET_TAG_SANITY_CONFIRM, ASSET_TAG_SANITY_VALUE, SUBSCRIPTION_CONTEXT, SUBSCRIPTION_DESTINATION,
+                    VM_DEVICE_ID, VM_IMAGE_URI]
+    test_harness:  [HPE_EMULATOR_IP, HPE_EMULATOR_PORT, HPE_EMULATOR_USER, HPE_EMULATOR_PASSWORD, HPE_EMULATOR_TREE]
+    examples:      [CIFS_IMAGE, CIFS_SERVER, CIFS_SHARE, CIFS_USERNAME, CIFS_PASSWORD]  # examples/example_dell_network_cif_ios.sh
+    build_args:    [ILO_EMULATOR_REF]  # docker/Dockerfile.ilo-sim build ARG
+
+# External pass-through ONLY: interpreted=false, forwarded verbatim to the
+# OpenTelemetry SDK. The app never inspects the value. New OTEL_* names do NOT
+# belong here unless proven pass-through.
+external:
+  OTEL_EXPORTER_OTLP_ENDPOINT:         {owner: opentelemetry, passthrough: true, note: "generic endpoint fallback -> OTLPMetricExporter (otlp.py:68,167)"}
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {owner: opentelemetry, passthrough: true, note: "metrics-signal endpoint, higher precedence (otlp.py:67,167)"}
+  OTEL_EXPORTER_OTLP_HEADERS:          {owner: opentelemetry, passthrough: true, note: "generic headers fallback (otlp.py:75,169)"}
+  OTEL_EXPORTER_OTLP_METRICS_HEADERS:  {owner: opentelemetry, passthrough: true, note: "metrics headers, higher precedence (otlp.py:74,169)"}
+  OTEL_RESOURCE_ATTRIBUTES:            {owner: opentelemetry, passthrough: true, note: "SDK resource detector reads it directly; app never reads it"}
+
+# OS / toolchain / CI-runtime names. Not application configuration.
+system:
+  TERM:                          {reason: "terminal capability probe (redfish_main.py:122; customer_argdefault.py)"}
+  HOME:                          {reason: "shell HOME for ssh/git in gb300 harness"}
+  PATH:                          {reason: "Dockerfile toolchain path"}
+  BASH_ENV:                      {reason: "Dockerfile.gb300-dev bash startup file"}
+  BASH_SOURCE:                   {reason: "script self-location idiom"}
+  DEBIAN_FRONTEND:               {reason: "noninteractive apt in Docker build"}
+  PYTHONDONTWRITEBYTECODE:       {reason: "Python runtime hygiene (Docker/CI)"}
+  PYTHONUNBUFFERED:              {reason: "Python log flushing (Docker)"}
+  PYTHONPATH:                    {reason: "Dockerfile.test import path"}
+  PIP_DISABLE_PIP_VERSION_CHECK: {reason: "pip noise suppression (Docker/CI)"}
+  CONDA_PREFIX:                  {reason: "active conda env probe (consumer-smoke.sh)"}
+  KUBERNETES_SERVICE_HOST:       {reason: "in-cluster detection (scripts/check.sh)"}
+  KUBERNETES_SERVICE_PORT:       {reason: "in-cluster detection (scripts/check.sh)"}
+  TMPDIR:                        {reason: "OS temp dir, used by the HPE canary example"}
+  GH_TOKEN:                      {reason: "forwarded to gh CLI only; secret, not parsed"}
+  GIT_SSH_COMMAND:               {reason: "forwarded git ssh wrapper"}
+  CI_COMMIT_BRANCH:              {reason: "GitLab CI predefined (publish_github.sh)"}
+  CI_COMMIT_SHA:                 {reason: "GitLab CI predefined (gates/scm/exact-commit.sh)"}
+  CI_COMMIT_REF_PROTECTED:       {reason: "GitLab CI predefined (gates/mutation/protected-apply.sh)"}
+  CI_PIPELINE_SOURCE:            {reason: "GitLab CI predefined (gates/mutation/protected-apply.sh)"}
+  GITLAB_URL:                    {reason: "GitLab API base (gitlab_project_token_gate.py)"}
+  GITLAB_PROJECT_TOKEN:          {reason: "GitLab API token, secret, not parsed"}
+  GITLAB_PROJECT_ID:             {reason: "GitLab project id"}
+
+# Tombstones — retired names that MUST NEVER be reintroduced (read, exported,
+# registered as canonical, added as an alias, or used by a wrapper script).
+# Append-only.
+retired:
+  IDRACK_IP:       {reason: "typo (extra K) in first-commit error text only; code always read IDRAC_IP; fixed in 25aa93b9. Reintroducing would tell users to set a variable the tool never reads."}
+  IDRACK_USERNAME: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_USERNAME"}
+  IDRACK_PASSWORD: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_PASSWORD"}
