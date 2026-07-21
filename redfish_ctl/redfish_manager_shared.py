@@ -356,7 +356,7 @@ class Singleton(type):
 
     @staticmethod
     def _alias_value(kwargs, legacy: str, primary: str, default):
-        """Return a connection value from its legacy or canonical keyword.
+        """Return a connection value with constructor-compatible precedence.
 
         :param kwargs: command constructor keyword arguments.
         :param legacy: legacy connection keyword name.
@@ -364,9 +364,11 @@ class Singleton(type):
         :param default: value used when neither keyword is present.
         :return: the constructor value for the connection field.
         """
+        if primary in kwargs and kwargs[primary] is not None:
+            return kwargs[primary]
         if legacy in kwargs:
             return kwargs[legacy]
-        return kwargs.get(primary, default)
+        return default
 
     @staticmethod
     def _connection_key(cls, args, kwargs):

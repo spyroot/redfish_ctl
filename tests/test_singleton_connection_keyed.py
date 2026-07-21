@@ -68,6 +68,35 @@ def test_canonical_connection_keywords_are_keyed_per_host():
     assert b.host == "10.9.9.32"
 
 
+def test_singleton_key_uses_canonical_alias_precedence():
+    """When aliases conflict, singleton keying matches constructor precedence."""
+    a = SystemQuery(
+        host="10.9.9.33",
+        idrac_ip="10.9.9.34",
+        username="admin",
+        idrac_username="legacy",
+        password="secret",
+        idrac_password="legacy-secret",
+        port=443,
+        idrac_port=8443,
+        insecure=True,
+    )
+    b = SystemQuery(
+        host="10.9.9.33",
+        idrac_ip="10.9.9.35",
+        username="admin",
+        idrac_username="other-legacy",
+        password="secret",
+        idrac_password="other-legacy-secret",
+        port=443,
+        idrac_port=9443,
+        insecure=True,
+    )
+
+    assert a is b
+    assert a.host == "10.9.9.33"
+
+
 def test_two_connections_get_distinct_instances():
     """Different BMCs must never share a command instance.
 
