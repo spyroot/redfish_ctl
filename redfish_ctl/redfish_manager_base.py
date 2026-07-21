@@ -1919,14 +1919,24 @@ class RedfishManagerBase(RedfishManager):
             "redfish.action.level": level.value,
         }
         with tracing.client_span_attributes(span_attributes):
-            result, _ = self.base_post(target, payload=body, do_async=do_async,
-                                       expected_status=expected_status)
+            result, api_resp = self.base_post(target, payload=body, do_async=do_async,
+                                              expected_status=expected_status)
         data = result.data if isinstance(result.data, dict) else {"result": result.data}
-        data.setdefault("executed", True)
         data.setdefault("action", full)
         data.setdefault("target", target)
         data.setdefault("level", level.value)
-        return CommandResult(data, actions, None, result.error)
+
+        error = result.error
+        if api_resp == RedfishApiRespond.Error or error is not None:
+            data["executed"] = False
+            if error is None:
+                error = getattr(self, "_redfish_error", None)
+            if error is None:
+                error = f"action {full} failed with {api_resp.name}"
+            return CommandResult(data, actions, None, error)
+
+        data.setdefault("executed", True)
+        return CommandResult(data, actions, None, None)
 
     def reboot(
             self,
