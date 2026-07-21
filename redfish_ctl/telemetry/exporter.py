@@ -410,7 +410,14 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         ("redfish_port", "idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
     )
     for primary_attr, legacy_attr, redfish_key, idrac_key in mapping:
-        attr = primary_attr if hasattr(args, primary_attr) else legacy_attr
+        attrs = [
+            attr
+            for attr in (primary_attr, legacy_attr)
+            if hasattr(args, attr)
+        ]
+        if not attrs:
+            continue
+        attr = primary_attr if primary_attr in attrs else legacy_attr
         key = redfish_key if redfish_key in values else idrac_key
         if key not in values:
             continue
@@ -419,7 +426,9 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         if current in ("", None, "root") or is_password:
             value = values[key]
             is_port = attr in {"redfish_port", "idrac_port"}
-            setattr(args, attr, int(value) if is_port else value)
+            value = int(value) if is_port else value
+            for target_attr in attrs:
+                setattr(args, target_attr, value)
 
 
 def resolve_identity_options(

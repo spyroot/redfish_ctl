@@ -87,3 +87,24 @@ def test_env_default_when_none_set(monkeypatch):
     """Neither set -> the provided default."""
     _clear_endpoint_env(monkeypatch)
     assert endpoint_defaults().username == "root"
+
+
+def test_legacy_cli_namespace_attrs_mirror_canonical_names():
+    """Parsed args retain idrac_* attrs for subcommands that still read them."""
+    from argparse import Namespace
+
+    from redfish_ctl.redfish_main import _sync_legacy_endpoint_attrs
+
+    args = Namespace(
+        redfish_host="203.0.113.10",
+        redfish_username="admin",
+        redfish_password="secret",
+        redfish_port=8443,
+    )
+
+    _sync_legacy_endpoint_attrs(args)
+
+    assert args.idrac_ip == "203.0.113.10"
+    assert args.idrac_username == "admin"
+    assert args.idrac_password == "secret"
+    assert args.idrac_port == 8443

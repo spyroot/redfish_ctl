@@ -669,6 +669,21 @@ def test_exporter_env_file_supports_redfish_keys(tmp_path):
     assert canonical_args.redfish_password == "not-real"
     assert canonical_args.redfish_port == 443
 
+    dual_args = argparse.Namespace(redfish_host="", redfish_username="root",
+                                   redfish_password="", redfish_port=443,
+                                   idrac_ip="", idrac_username="root",
+                                   idrac_password="", idrac_port=443,
+                                   exporter_credential_file=str(env_file))
+    apply_exporter_env_file(dual_args)
+    assert dual_args.redfish_host == "203.0.113.10"
+    assert dual_args.idrac_ip == "203.0.113.10"
+    assert dual_args.redfish_username == "admin"
+    assert dual_args.idrac_username == "admin"
+    assert dual_args.redfish_password == "not-real"
+    assert dual_args.idrac_password == "not-real"
+    assert dual_args.redfish_port == 443
+    assert dual_args.idrac_port == 443
+
 
 def test_exporter_env_file_prefers_redfish_over_idrac(tmp_path):
     """When a file carries both, REDFISH_* wins; IDRAC_* alone still works."""

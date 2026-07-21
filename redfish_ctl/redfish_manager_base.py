@@ -296,18 +296,33 @@ class RedfishManagerBase(RedfishManager):
         return dict(cls._registry)
 
     @staticmethod
-    def _pop_connection_value(kwargs: dict, primary: str, legacy: str):
-        """Pop a canonical connection argument, accepting a deprecated alias.
+    def _pop_connection_value(
+            kwargs: dict, primary: str, legacy: str, internal: str):
+        """Pop a dispatch connection argument, accepting deprecated aliases.
 
         :param kwargs: dispatch keyword arguments.
         :param primary: canonical keyword name.
         :param legacy: deprecated alias keyword name.
+        :param internal: private keyword used by sync dispatch to avoid
+            colliding with subcommand-local ``host`` or ``port`` arguments.
         :return: the popped value.
-        :raises KeyError: when neither key exists.
+        :raises KeyError: when no connection key exists.
         """
-        if legacy in kwargs:
-            return kwargs.pop(legacy)
-        return kwargs.pop(primary)
+        if internal in kwargs:
+            value = kwargs.pop(internal)
+            kwargs.pop(legacy, None)
+            return value
+
+        if primary in kwargs:
+            value = kwargs.pop(primary)
+            legacy_value = kwargs.pop(legacy, None)
+            if value is not None:
+                return value
+            if legacy_value is not None:
+                return legacy_value
+            return value
+
+        return kwargs.pop(legacy)
 
     @classmethod
     def invoke(cls,
@@ -324,10 +339,14 @@ class RedfishManagerBase(RedfishManager):
         if name not in z:
             raise UnsupportedAction(f"Unknown {name} command.")
         disp = z[name]
-        _host = cls._pop_connection_value(kwargs, "host", "idrac_ip")
-        _username = cls._pop_connection_value(kwargs, "username", "idrac_username")
-        _password = cls._pop_connection_value(kwargs, "password", "idrac_password")
-        _port = cls._pop_connection_value(kwargs, "port", "idrac_port")
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -360,10 +379,14 @@ class RedfishManagerBase(RedfishManager):
         disp = z[name]
         if name not in z:
             raise UnsupportedAction(f"Unknown {name} command.")
-        _host = cls._pop_connection_value(kwargs, "host", "idrac_ip")
-        _username = cls._pop_connection_value(kwargs, "username", "idrac_username")
-        _password = cls._pop_connection_value(kwargs, "password", "idrac_password")
-        _port = cls._pop_connection_value(kwargs, "port", "idrac_port")
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -483,10 +506,10 @@ class RedfishManagerBase(RedfishManager):
 
         kwargs.update(
             {
-                "idrac_ip": self.redfish_ip,
-                "idrac_username": self._username,
-                "idrac_password": self._password,
-                "idrac_port": self._port,
+                "_redfish_host": self.redfish_ip,
+                "_redfish_username": self._username,
+                "_redfish_password": self._password,
+                "_redfish_port": self._port,
                 # forward the original "skip verification" intent; _is_verify_cert
                 # is the inverse (requests' verify flag), so flip it back here.
                 "insecure": not self._is_verify_cert,

@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests_mock as requests_mock_lib
 
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.system.cmd_system import SystemQuery
 
 HOST_A = "10.9.9.1"
@@ -95,6 +96,49 @@ def test_singleton_key_uses_canonical_alias_precedence():
 
     assert a is b
     assert a.host == "10.9.9.33"
+
+
+def test_dispatch_connection_pop_cleans_mixed_public_aliases():
+    """External invoke kwargs do not leak duplicate connection aliases to commands."""
+    kwargs = {
+        "host": "10.9.9.40",
+        "idrac_ip": "10.9.9.41",
+        "path": "/redfish/v1/",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.40"
+    assert "host" not in kwargs
+    assert "idrac_ip" not in kwargs
+    assert kwargs == {"path": "/redfish/v1/"}
+
+
+def test_dispatch_connection_pop_falls_back_when_canonical_is_none():
+    """A None canonical value keeps the deprecated alias fallback working."""
+    kwargs = {"host": None, "idrac_ip": "10.9.9.42"}
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.42"
+    assert kwargs == {}
+
+
+def test_internal_dispatch_connection_key_preserves_command_host_arg():
+    """Internal connection keys avoid consuming subcommand-local host arguments."""
+    kwargs = {
+        "_redfish_host": "10.9.9.43",
+        "idrac_ip": "10.9.9.44",
+        "host": "downloads.example.test",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.43"
+    assert kwargs == {"host": "downloads.example.test"}
 
 
 def test_two_connections_get_distinct_instances():

@@ -76,7 +76,24 @@ _ROOT_CONNECTION_ARGS = {
     "redfish_username",
     "redfish_password",
     "redfish_port",
+    "idrac_ip",
+    "idrac_username",
+    "idrac_password",
+    "idrac_port",
 }
+
+_LEGACY_ENDPOINT_ATTRS = {
+    "idrac_ip": "redfish_host",
+    "idrac_username": "redfish_username",
+    "idrac_password": "redfish_password",
+    "idrac_port": "redfish_port",
+}
+
+
+def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
+    """Mirror canonical root credential attrs onto legacy Namespace attrs."""
+    for legacy_attr, canonical_attr in _LEGACY_ENDPOINT_ATTRS.items():
+        setattr(args, legacy_attr, getattr(args, canonical_attr))
 
 
 class TermColors:
@@ -443,10 +460,10 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             # enforces. Segment scans and local catalog reads need no host.
             invoke_kwargs = dict(arg_dict)
             invoke_kwargs.update({
-                "idrac_ip": cmd_args.redfish_host or "",
-                "idrac_username": cmd_args.redfish_username or "",
-                "idrac_password": cmd_args.redfish_password or "",
-                "idrac_port": cmd_args.redfish_port,
+                "_redfish_host": cmd_args.redfish_host or "",
+                "_redfish_username": cmd_args.redfish_username or "",
+                "_redfish_password": cmd_args.redfish_password or "",
+                "_redfish_port": cmd_args.redfish_port,
                 "insecure": insecure,
                 "is_http": cmd_args.use_http,
             })
@@ -680,6 +697,7 @@ def redfish_main_ctl():
 
     cmd_dict = create_cmd_tree(parser)
     args = parser.parse_args()
+    _sync_legacy_endpoint_attrs(args)
     if args.debug:
         logger.setLevel(args.log)
 
@@ -692,6 +710,7 @@ def redfish_main_ctl():
             sys.exit(2)
         try:
             apply_exporter_env_file(args)
+            _sync_legacy_endpoint_attrs(args)
         except FileNotFoundError as fne:
             console_error_printer(f"Error:{fne}")
             sys.exit(1)
