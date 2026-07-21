@@ -144,6 +144,7 @@ from .oem.cmd_smc_node_manager import *
 from .oem.cmd_hpe_chassis_actions import *
 from .oem.cmd_dell_card_cert_export import *
 from .oem.cmd_dell_card_csr import *
+from .oem.cmd_dell_card_hw_proof import *
 from .manager.cmd_console_info import *
 from .serial_console.cmd_serial_console import *
 from .manager.cmd_manager_time import *

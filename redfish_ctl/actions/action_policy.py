@@ -49,6 +49,7 @@ ACTION_POLICY = {
     "#DelliDRACCardService.FactoryIdentityExportCertificate": (
         Destructiveness.READ_ONLY
     ),
+    "#DelliDRACCardService.VerifyHWProofOfPossession": Destructiveness.READ_ONLY,
 
     # reversible: state changes that can be undone
     "#EventService.SubmitTestEvent": Destructiveness.REVERSIBLE,
