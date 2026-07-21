@@ -23,7 +23,6 @@ https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v4.x-seri
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 import functools
 import json
 import logging
@@ -682,29 +681,34 @@ class RedfishManagerBase(RedfishManager):
 
     def default_error_handler(
             self, response: requests.models.Response) -> RedfishApiRespond:
-        """Default error handler.
-        :param response:
-        :return:
-        """
-        if response.status_code >= 200 or response.status_code < 300:
-            if response.status_code in self._http_code_mapping:
-                return self._http_code_mapping[response.status_code]
+        """Normalize a non-2xx Redfish response per the Redfish error contract.
 
-        if response.status_code == 401:
-            raise AuthenticationFailed("Authentication failed.")
-        elif response.status_code == 403:
-            raise RedfishForbidden("access forbidden")
-        elif response.status_code == 404:
-            error_msg = RedfishManager.parse_error(response)
-            raise ResourceNotFound(error_msg)
-        if 401 <= response.status_code < 500:
-            # we try to parse error.
-            self._redfish_error = RedfishManagerBase.parse_error(response)
-        if response.status_code != 200:
-            raise UnexpectedResponse(
-                f"Failed acquire result. Status code "
-                f"{response.status_code}"
-            )
+        A success code returns its mapped ``RedfishApiRespond``. Every error code
+        is normalized through :meth:`RedfishManager.parse_error`, so the raised
+        exception carries the parsed :class:`RedfishError` envelope (HTTP status,
+        ``error.code``/``error.message`` and every ``@Message.ExtendedInfo``
+        entry) as its primary value — never a generic string — including for an
+        unsupported-operation ``501``/``404``/``405``/``409``. See
+        docs/external/redfish-error-contract.md.
+
+        :param response: the Redfish HTTP response to classify.
+        :return: the mapped ``RedfishApiRespond`` for a 2xx success code.
+        :raises AuthenticationFailed: on HTTP 401, carrying the parsed error.
+        :raises RedfishForbidden: on HTTP 403, carrying the parsed error.
+        :raises ResourceNotFound: on HTTP 404, carrying the parsed error.
+        :raises UnexpectedResponse: on any other error code, carrying the parsed error.
+        """
+        code = response.status_code
+        if 200 <= code < 300:
+            return self._http_code_mapping.get(code, RedfishApiRespond.Success)
+        self._redfish_error = RedfishManager.parse_error(response)
+        if code == 401:
+            raise AuthenticationFailed(self._redfish_error)
+        if code == 403:
+            raise RedfishForbidden(self._redfish_error)
+        if code == 404:
+            raise ResourceNotFound(self._redfish_error)
+        raise UnexpectedResponse(self._redfish_error)
 
     def check_api_version(self):
         """Check Dell LLC Service API set
