@@ -129,6 +129,7 @@ ACTION_POLICY = {
     "#DellRaidService.CancelBackgroundInitialization": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelCheckConsistency": Destructiveness.DESTRUCTIVE,
     "#DellRaidService.CancelRebuildPhysicalDisk": Destructiveness.DESTRUCTIVE,
+    "#DellLCService.ExposeiSMInstallerToHostOS": Destructiveness.DESTRUCTIVE,
     "#CertificateService.ReplaceCertificate": Destructiveness.DESTRUCTIVE,
     "#SecureBootDatabase.ResetKeys": Destructiveness.DESTRUCTIVE,
     "#NvidiaDebugToken.InstallToken": Destructiveness.DESTRUCTIVE,

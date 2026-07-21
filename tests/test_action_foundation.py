@@ -54,6 +54,9 @@ def test_policy_classifies_known_and_unknown():
         is Destructiveness.DESTRUCTIVE
     )
     assert classify("#DellJobService.SetupJobQueue") is Destructiveness.DESTRUCTIVE
+    assert classify("#DellLCService.ExposeiSMInstallerToHostOS") is (
+        Destructiveness.DESTRUCTIVE
+    )
     # unmapped / empty -> DESTRUCTIVE (cannot fire without --confirm)
     assert classify("#Some.BrandNewAction") is Destructiveness.DESTRUCTIVE
     assert classify(None) is Destructiveness.DESTRUCTIVE
