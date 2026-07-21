@@ -1,0 +1,80 @@
+version: 1
+description: Runtime metric-definition catalog for redfish_ctl telemetry export.
+metrics:
+  - {name: hw.power, kind: gauge, unit: W, prometheus_name: hw.power, family: telemetry}
+  - {name: hw.energy_kwh, kind: cumulative_counter, unit: kWh, prometheus_name: hw.energy_kwh, family: telemetry}
+  - {name: hw.temperature, kind: gauge, unit: Cel, prometheus_name: hw.temperature, family: telemetry}
+  - {name: hw.voltage, kind: gauge, unit: V, prometheus_name: hw.voltage, family: telemetry}
+  - {name: hw.fan_speed, kind: gauge, unit: RPM, prometheus_name: hw.fan_speed, family: telemetry}
+  - {name: hw.gpu.power, kind: gauge, unit: W, prometheus_name: hw.gpu.power, family: gpu}
+  - {name: hw.gpu.temperature, kind: gauge, unit: Cel, prometheus_name: hw.gpu.temperature, family: gpu}
+  - {name: hw.gpu.clock_mhz, kind: gauge, unit: MHz, prometheus_name: hw.gpu.clock_mhz, family: gpu}
+  - {name: hw.gpu.compute.utilization, kind: gauge, unit: "%", prometheus_name: hw.gpu.compute.utilization, family: gpu}
+  - {name: hw.gpu.throttle.duration_seconds, kind: gauge, unit: s, prometheus_name: hw.gpu.throttle.duration_seconds, family: gpu}
+  - {name: hw.gpu.memory.bandwidth_utilization, kind: gauge, unit: "%", prometheus_name: hw.gpu.memory.bandwidth_utilization, family: gpu}
+  - {name: hw.gpu.memory.capacity_utilization, kind: gauge, unit: "%", prometheus_name: hw.gpu.memory.capacity_utilization, family: gpu}
+  - {name: hw.gpu.memory.clock_mhz, kind: gauge, unit: MHz, prometheus_name: hw.gpu.memory.clock_mhz, family: gpu}
+  - {name: hw.gpu.memory.ecc_errors, kind: cumulative_counter, prometheus_name: hw.gpu.memory.ecc_errors, family: gpu}
+  - {name: hw.gpu.memory.row_remap_count, kind: cumulative_counter, prometheus_name: hw.gpu.memory.row_remap_count, family: gpu}
+  - {name: hw.gpu.memory.row_remapping_failed, kind: gauge, prometheus_name: hw.gpu.memory.row_remapping_failed, family: gpu}
+  - {name: hw.component.health, kind: gauge, prometheus_name: hw.component.health, family: state}
+  - {name: hw.component.health_rollup, kind: gauge, prometheus_name: hw.component.health_rollup, family: state}
+  - {name: hw.component.state, kind: gauge, prometheus_name: hw.component.state, family: state}
+  - {name: hw.component.last_reset_type, kind: gauge, prometheus_name: hw.component.last_reset_type, family: state}
+  - {name: hw.power.edp_violation_state, kind: gauge, prometheus_name: hw.power.edp_violation_state, family: state}
+  - {name: hw.power.break_performance_state, kind: gauge, prometheus_name: hw.power.break_performance_state, family: state}
+  - {name: hw.fabric.link_up, kind: gauge, prometheus_name: hw.fabric.link_up, family: fabric}
+  - {name: hw.fabric.link_down_reason, kind: gauge, prometheus_name: hw.fabric.link_down_reason, family: fabric}
+  - {name: hw.fabric.port_speed, kind: gauge, unit: Gbps, prometheus_name: hw.fabric.port_speed, family: fabric}
+  - {name: hw.fabric.bit_error_rate, kind: gauge, prometheus_name: hw.fabric.bit_error_rate, family: fabric}
+  - {name: hw.fabric.effective_ber, kind: gauge, prometheus_name: hw.fabric.effective_ber, family: fabric}
+  - {name: hw.fabric.raw_ber, kind: gauge, prometheus_name: hw.fabric.raw_ber, family: fabric}
+  - {name: hw.fabric.rx_gbps, kind: gauge, unit: Gbps, prometheus_name: hw.fabric.rx_gbps, family: fabric}
+  - {name: hw.fabric.tx_gbps, kind: gauge, unit: Gbps, prometheus_name: hw.fabric.tx_gbps, family: fabric}
+  - {name: hw.fabric.raw_rx_gbps, kind: gauge, unit: Gbps, prometheus_name: hw.fabric.raw_rx_gbps, family: fabric}
+  - {name: hw.fabric.raw_tx_gbps, kind: gauge, unit: Gbps, prometheus_name: hw.fabric.raw_tx_gbps, family: fabric}
+  - {name: hw.fabric.rx_bytes, kind: cumulative_counter, unit: By, prometheus_name: hw.fabric.rx_bytes, family: fabric}
+  - {name: hw.fabric.tx_bytes, kind: cumulative_counter, unit: By, prometheus_name: hw.fabric.tx_bytes, family: fabric}
+  - {name: hw.fabric.vl15_tx_bytes, kind: cumulative_counter, unit: By, prometheus_name: hw.fabric.vl15_tx_bytes, family: fabric}
+  - {name: hw.fabric.rx_frames, kind: cumulative_counter, prometheus_name: hw.fabric.rx_frames, family: fabric}
+  - {name: hw.fabric.tx_frames, kind: cumulative_counter, prometheus_name: hw.fabric.tx_frames, family: fabric}
+  - {name: hw.fabric.vl15_tx_packets, kind: cumulative_counter, prometheus_name: hw.fabric.vl15_tx_packets, family: fabric}
+  - {name: hw.fabric.crc_errors, kind: cumulative_counter, prometheus_name: hw.fabric.crc_errors, family: fabric}
+  - {name: hw.fabric.effective_errors, kind: cumulative_counter, prometheus_name: hw.fabric.effective_errors, family: fabric}
+  - {name: hw.fabric.fec_errors, kind: cumulative_counter, prometheus_name: hw.fabric.fec_errors, family: fabric}
+  - {name: hw.fabric.malformed_packets, kind: cumulative_counter, prometheus_name: hw.fabric.malformed_packets, family: fabric}
+  - {name: hw.fabric.raw_errors, kind: cumulative_counter, prometheus_name: hw.fabric.raw_errors, family: fabric}
+  - {name: hw.fabric.rx_errors, kind: cumulative_counter, prometheus_name: hw.fabric.rx_errors, family: fabric}
+  - {name: hw.fabric.rx_no_protocol_bytes, kind: cumulative_counter, unit: By, prometheus_name: hw.fabric.rx_no_protocol_bytes, family: fabric}
+  - {name: hw.fabric.rx_remote_physical_errors, kind: cumulative_counter, prometheus_name: hw.fabric.rx_remote_physical_errors, family: fabric}
+  - {name: hw.fabric.rx_switch_relay_errors, kind: cumulative_counter, prometheus_name: hw.fabric.rx_switch_relay_errors, family: fabric}
+  - {name: hw.fabric.symbol_errors, kind: cumulative_counter, prometheus_name: hw.fabric.symbol_errors, family: fabric}
+  - {name: hw.fabric.tx_discards, kind: cumulative_counter, prometheus_name: hw.fabric.tx_discards, family: fabric}
+  - {name: hw.fabric.tx_no_protocol_bytes, kind: cumulative_counter, unit: By, prometheus_name: hw.fabric.tx_no_protocol_bytes, family: fabric}
+  - {name: hw.fabric.tx_wait, kind: cumulative_counter, prometheus_name: hw.fabric.tx_wait, family: fabric}
+  - {name: hw.fabric.intentional_link_down_count, kind: cumulative_counter, prometheus_name: hw.fabric.intentional_link_down_count, family: fabric}
+  - {name: hw.fabric.link_down_count, kind: cumulative_counter, prometheus_name: hw.fabric.link_down_count, family: fabric}
+  - {name: hw.fabric.link_error_recovery_count, kind: cumulative_counter, prometheus_name: hw.fabric.link_error_recovery_count, family: fabric}
+  - {name: hw.fabric.unintentional_link_down_count, kind: cumulative_counter, prometheus_name: hw.fabric.unintentional_link_down_count, family: fabric}
+  - {name: hw.fabric.vl15_dropped, kind: cumulative_counter, prometheus_name: hw.fabric.vl15_dropped, family: fabric}
+  - {name: hw.leak.state, kind: gauge, prometheus_name: hw.leak.state, family: chassis}
+  - {name: hw.fabric.adapter_present, kind: gauge, prometheus_name: hw.fabric.adapter_present, family: fabric}
+  - {name: hw.component_integrity.enabled, kind: gauge, prometheus_name: hw.component_integrity.enabled, family: component}
+  - {name: hw.scrape.ok, kind: gauge, prometheus_name: hw.scrape.ok, family: scrape}
+  - {name: hw.scrape.duration_seconds, kind: gauge, unit: s, prometheus_name: hw.scrape.duration_seconds, family: scrape}
+  - {name: redfish_exporter_scrape_success, kind: gauge, prometheus_name: redfish_exporter_scrape_success, family: exporter}
+  - {name: redfish_exporter_scrape_partial, kind: gauge, prometheus_name: redfish_exporter_scrape_partial, family: exporter}
+  - {name: redfish_exporter_scrape_duration_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_scrape_duration_seconds, family: exporter}
+  - {name: redfish_exporter_last_success_timestamp_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_last_success_timestamp_seconds, family: exporter}
+  - {name: redfish_exporter_collector_success, kind: gauge, prometheus_name: redfish_exporter_collector_success, family: exporter}
+  - {name: redfish_exporter_collector_supported, kind: gauge, prometheus_name: redfish_exporter_collector_supported, family: exporter}
+  - {name: redfish_exporter_collector_duration_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_collector_duration_seconds, family: exporter}
+  - {name: redfish_exporter_collector_samples, kind: gauge, prometheus_name: redfish_exporter_collector_samples, family: exporter}
+  - {name: redfish_exporter_collection_errors_total, kind: cumulative_counter, prometheus_name: redfish_exporter_collection_errors_total, family: exporter}
+dynamic_families:
+  - prefix: hw.gb300.
+    kind: inferred
+    unit: inferred
+    prometheus_name: identity
+    family: gb300
+    description: Generated from Redfish MetricReport property names not covered by curated mappings.

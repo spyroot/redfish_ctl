@@ -56,7 +56,9 @@ For SignalFx, `SPLUNK_ACCESS_TOKEN`, the ingest token read by the exporter
 from the process environment, and `SPLUNK_INGEST_URL`, the full
 `/v2/datapoint` URL read by the exporter, are required only when pushing.
 Use `--once --output signalfx` first to inspect the datapoint envelope
-without posting externally.
+without posting externally. The envelope is typed by the catalog, with
+instantaneous metrics under `gauge` and monotonic totals under
+`cumulative_counter`.
 
 ## Checking Live Data In Splunk
 
