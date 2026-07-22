@@ -17,6 +17,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests_mock as requests_mock_lib
 
+from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.system.cmd_system import SystemQuery
 
 HOST_A = "10.9.9.1"
@@ -28,6 +31,235 @@ def _cmd(host, password="mock", is_http=False):
         idrac_ip=host, idrac_username="root",
         idrac_password=password, insecure=True, is_http=is_http,
     )
+
+
+def test_constructor_accepts_canonical_connection_keywords():
+    """Commands accept host/username/password/port without legacy keyword names."""
+    cmd = SystemQuery(
+        host="10.9.9.30",
+        username="admin",
+        password="secret",
+        port=8443,
+        insecure=True,
+    )
+
+    assert cmd.host == "10.9.9.30:8443"
+    assert cmd.idrac_ip == "10.9.9.30:8443"
+    assert cmd.username == "admin"
+    assert cmd.password == "secret"
+
+
+def test_canonical_connection_keywords_are_keyed_per_host():
+    """Canonical connection keywords keep command singletons per BMC."""
+    a = SystemQuery(
+        host="10.9.9.31",
+        username="admin",
+        password="secret-a",
+        port=443,
+        insecure=True,
+    )
+    b = SystemQuery(
+        host="10.9.9.32",
+        username="admin",
+        password="secret-b",
+        port=443,
+        insecure=True,
+    )
+
+    assert a is not b
+    assert a.host == "10.9.9.31"
+    assert b.host == "10.9.9.32"
+
+
+def test_singleton_key_uses_canonical_alias_precedence():
+    """When aliases conflict, singleton keying matches constructor precedence."""
+    a = SystemQuery(
+        host="10.9.9.33",
+        idrac_ip="10.9.9.34",
+        username="admin",
+        idrac_username="legacy",
+        password="secret",
+        idrac_password="legacy-secret",
+        port=443,
+        idrac_port=8443,
+        insecure=True,
+    )
+    b = SystemQuery(
+        host="10.9.9.33",
+        idrac_ip="10.9.9.35",
+        username="admin",
+        idrac_username="other-legacy",
+        password="secret",
+        idrac_password="other-legacy-secret",
+        port=443,
+        idrac_port=9443,
+        insecure=True,
+    )
+
+    assert a is b
+    assert a.host == "10.9.9.33"
+
+
+def test_dispatch_connection_pop_cleans_mixed_public_aliases():
+    """External invoke kwargs do not leak duplicate connection aliases to commands."""
+    kwargs = {
+        "host": "10.9.9.40",
+        "idrac_ip": "10.9.9.41",
+        "path": "/redfish/v1/",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.40"
+    assert "host" not in kwargs
+    assert "idrac_ip" not in kwargs
+    assert kwargs == {"path": "/redfish/v1/"}
+
+
+def test_dispatch_connection_pop_falls_back_when_canonical_is_none():
+    """A None canonical value keeps the deprecated alias fallback working."""
+    kwargs = {"host": None, "idrac_ip": "10.9.9.42"}
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.42"
+    assert kwargs == {}
+
+
+def test_internal_dispatch_connection_key_preserves_command_host_arg():
+    """Internal connection keys avoid consuming subcommand-local host arguments."""
+    kwargs = {
+        "_redfish_host": "10.9.9.43",
+        "idrac_ip": "10.9.9.44",
+        "host": "downloads.example.test",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.43"
+    assert kwargs == {"host": "downloads.example.test"}
+
+
+def test_internal_dispatch_connection_key_removes_duplicate_host_arg():
+    """Duplicate public connection host values do not leak into command kwargs."""
+    kwargs = {
+        "_redfish_host": "10.9.9.43",
+        "idrac_ip": "10.9.9.44",
+        "host": "10.9.9.43",
+    }
+
+    value = RedfishManagerBase._pop_connection_value(
+        kwargs, "host", "idrac_ip", "_redfish_host")
+
+    assert value == "10.9.9.43"
+    assert kwargs == {}
+
+
+def test_dispatch_constructs_registered_commands_with_legacy_keywords():
+    """Registered commands with legacy-only constructors still dispatch safely."""
+
+    class LegacyConstructorCommand(
+            RedfishManagerBase,
+            scm_type=ApiRequestType.SystemQuery,
+            name="legacy-constructor-compat"):
+        constructed = None
+
+        def __init__(
+                self, idrac_ip, idrac_username, idrac_password, idrac_port,
+                insecure=True, is_http=False):
+            """Record legacy constructor kwargs and initialize the base manager.
+
+            :param idrac_ip: BMC host passed by dispatch.
+            :param idrac_username: BMC username passed by dispatch.
+            :param idrac_password: BMC password passed by dispatch.
+            :param idrac_port: BMC port passed by dispatch.
+            :param insecure: skip TLS verification flag.
+            :param is_http: plain HTTP transport flag.
+            :return: None.
+            """
+            self.__class__.constructed = {
+                "idrac_ip": idrac_ip,
+                "idrac_username": idrac_username,
+                "idrac_password": idrac_password,
+                "idrac_port": idrac_port,
+                "insecure": insecure,
+                "is_http": is_http,
+            }
+            super().__init__(
+                idrac_ip=idrac_ip,
+                idrac_username=idrac_username,
+                idrac_password=idrac_password,
+                idrac_port=idrac_port,
+                insecure=insecure,
+                is_http=is_http,
+            )
+
+        def execute(self, **kwargs):
+            """Return execution kwargs so dispatch leakage is visible.
+
+            :param kwargs: command arguments left after connection dispatch.
+            :return: command result wrapping the remaining kwargs.
+            """
+            return CommandResult(
+                data=kwargs, discovered=None, extra=None, error=None)
+
+        @staticmethod
+        def register_subcommand(cls):
+            """Unused test parser hook required by the command base class.
+
+            :param cls: command class.
+            :return: None because the test invokes the registry directly.
+            """
+            return None
+
+    result = RedfishManagerBase.invoke(
+        ApiRequestType.SystemQuery,
+        "legacy-constructor-compat",
+        host="10.9.9.45",
+        username="admin",
+        password="secret",
+        port=8443,
+        insecure=True,
+        is_http=False,
+        path="/redfish/v1/",
+    )
+
+    assert LegacyConstructorCommand.constructed == {
+        "idrac_ip": "10.9.9.45",
+        "idrac_username": "admin",
+        "idrac_password": "secret",
+        "idrac_port": 8443,
+        "insecure": True,
+        "is_http": False,
+    }
+    assert result.data == {"path": "/redfish/v1/"}
+
+    LegacyConstructorCommand.constructed = None
+    manager = SystemQuery(
+        host="10.9.9.46",
+        username="admin",
+        password="secret",
+        port=443,
+        insecure=True,
+    )
+    sync_result = manager.sync_invoke(
+        ApiRequestType.SystemQuery,
+        "legacy-constructor-compat",
+        path="/redfish/v1/Managers",
+    )
+
+    assert LegacyConstructorCommand.constructed == {
+        "idrac_ip": "10.9.9.46",
+        "idrac_username": "admin",
+        "idrac_password": "secret",
+        "idrac_port": 443,
+        "insecure": True,
+        "is_http": False,
+    }
+    assert sync_result.data == {"path": "/redfish/v1/Managers"}
 
 
 def test_two_connections_get_distinct_instances():

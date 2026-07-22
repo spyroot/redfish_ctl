@@ -12,6 +12,7 @@ from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
@@ -712,6 +713,7 @@ def test_exporter_env_file_loader_and_argv_secret_guard(tmp_path):
         "IDRAC_PASSWORD": "not-real",
         "IDRAC_PORT": "443",
     }
+    assert exporter_argv_uses_secret(["redfish_ctl", "--password", "not-real", "exporter"])
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password", "not-real", "exporter"])
     assert exporter_argv_uses_secret(["idrac_ctl", "--idrac_password=not-real", "exporter"])
     assert not exporter_argv_uses_secret(["idrac_ctl", "exporter"])
@@ -744,15 +746,44 @@ def test_exporter_env_file_supports_redfish_keys(tmp_path):
     assert args.idrac_password == "not-real"
     assert args.idrac_port == 443
 
+    canonical_args = argparse.Namespace(redfish_host="", redfish_username="root",
+                                        redfish_password="", redfish_port=443,
+                                        exporter_credential_file=str(env_file))
+    apply_exporter_env_file(canonical_args)
+    assert canonical_args.redfish_host == "203.0.113.10"
+    assert canonical_args.redfish_username == "admin"
+    assert canonical_args.redfish_password == "not-real"
+    assert canonical_args.redfish_port == 443
 
-def test_exporter_env_file_prefers_redfish_over_idrac(tmp_path):
-    """When a file carries both, REDFISH_* wins; IDRAC_* alone still works."""
+    dual_args = argparse.Namespace(redfish_host="", redfish_username="root",
+                                   redfish_password="", redfish_port=443,
+                                   idrac_ip="", idrac_username="root",
+                                   idrac_password="", idrac_port=443,
+                                   exporter_credential_file=str(env_file))
+    apply_exporter_env_file(dual_args)
+    assert dual_args.redfish_host == "203.0.113.10"
+    assert dual_args.idrac_ip == "203.0.113.10"
+    assert dual_args.redfish_username == "admin"
+    assert dual_args.idrac_username == "admin"
+    assert dual_args.redfish_password == "not-real"
+    assert dual_args.idrac_password == "not-real"
+    assert dual_args.redfish_port == 443
+    assert dual_args.idrac_port == 443
+
+
+def test_exporter_env_file_rejects_conflicting_redfish_and_idrac(tmp_path):
+    """Matching alias pairs are accepted; mismatched pairs fail closed."""
     both = tmp_path / "both.env"
-    both.write_text("REDFISH_IP=203.0.113.10\nIDRAC_IP=198.51.100.5\n")
+    both.write_text("REDFISH_IP=203.0.113.10\nIDRAC_IP=203.0.113.10\n")
     args = argparse.Namespace(idrac_ip="", idrac_username="root",
                               idrac_password="", idrac_port=443)
     apply_exporter_env_file(args, path=str(both))
-    assert args.idrac_ip == "203.0.113.10"  # REDFISH_* preferred
+    assert args.idrac_ip == "203.0.113.10"
+
+    conflict = tmp_path / "conflict.env"
+    conflict.write_text("REDFISH_IP=203.0.113.10\nIDRAC_IP=198.51.100.5\n")
+    with pytest.raises(ConfigurationConflict):
+        apply_exporter_env_file(args, path=str(conflict))
 
     legacy = tmp_path / "legacy.env"
     legacy.write_text("IDRAC_IP=198.51.100.5\n")

@@ -93,15 +93,19 @@ class RedfishManagerBase(RedfishManager):
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,
                  is_debug: Optional[bool] = False,
-                 log_level=logging.NOTSET):
+                 log_level=logging.NOTSET,
+                 host: Optional[str] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 port: Optional[int] = None):
         """Default constructor requires credentials.
            By default, the manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param idrac_ip: BMC management IP address
-        :param idrac_username: BMC username default is root
-        :param idrac_password: BMC password.
-        :param idrac_port: BMC TCP port (default 443); accepts an int or str.
+        :param idrac_ip: deprecated alias for ``host``.
+        :param idrac_username: deprecated alias for ``username``.
+        :param idrac_password: deprecated alias for ``password``.
+        :param idrac_port: deprecated alias for ``port``.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
@@ -109,11 +113,20 @@ class RedfishManagerBase(RedfishManager):
         :param is_http: use plain HTTP instead of HTTPS for requests when True.
         :param is_debug: when True, include exception tracebacks in error logs.
         :param log_level: logging level applied to this manager's logger.
+        :param host: BMC host or IP address.
+        :param username: BMC account username; defaults to root.
+        :param password: BMC account password.
+        :param port: BMC TCP port (default 443); accepts an int or str.
         """
-        super().__init__(redfish_ip=idrac_ip,
-                         redfish_username=idrac_username,
-                         redfish_password=idrac_password,
-                         redfish_port=idrac_port,
+        host = idrac_ip if host is None else host
+        username = idrac_username if username is None else username
+        password = idrac_password if password is None else password
+        port = idrac_port if port is None else port
+
+        super().__init__(redfish_ip=host,
+                         redfish_username=username,
+                         redfish_password=password,
+                         redfish_port=port,
                          insecure=insecure,
                          is_http=is_http,
                          x_auth=x_auth,
@@ -223,6 +236,14 @@ class RedfishManagerBase(RedfishManager):
         return self.redfish_ip
 
     @property
+    def host(self) -> str:
+        """BMC host address (canonical alias for :attr:`redfish_ip`).
+
+        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
+        """
+        return self.redfish_ip
+
+    @property
     def username(self) -> str:
         """BMC account username.
 
@@ -279,25 +300,64 @@ class RedfishManagerBase(RedfishManager):
         """
         return dict(cls._registry)
 
+    @staticmethod
+    def _pop_connection_value(
+            kwargs: dict, primary: str, legacy: str, internal: str):
+        """Pop a dispatch connection argument, accepting deprecated aliases.
+
+        :param kwargs: dispatch keyword arguments.
+        :param primary: canonical keyword name.
+        :param legacy: deprecated alias keyword name.
+        :param internal: private keyword used by sync dispatch to avoid
+            colliding with subcommand-local ``host`` or ``port`` arguments.
+        :return: the popped value.
+        :raises KeyError: when no connection key exists.
+        """
+        if internal in kwargs:
+            value = kwargs.pop(internal)
+            kwargs.pop(legacy, None)
+            if kwargs.get(primary) in (value, None):
+                kwargs.pop(primary, None)
+            return value
+
+        if primary in kwargs:
+            value = kwargs.pop(primary)
+            legacy_value = kwargs.pop(legacy, None)
+            if value is not None:
+                return value
+            if legacy_value is not None:
+                return legacy_value
+            return value
+
+        return kwargs.pop(legacy)
+
     @classmethod
     def invoke(cls,
                api_call: ApiRequestType,
                name: str, **kwargs) -> CommandResult:
         """Main interface uses to invoke a command.
+
         :param api_call: api request type is enum for each cmd.
         :param name: a name is key for a given api request type.
                       So we can register under same type sub-commands.
-        :param kwargs: args passed to command.
-        :return:
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: command result returned by the registered command.
         """
         z = cls._registry[api_call]
         if name not in z:
             raise UnsupportedAction(f"Unknown {name} command.")
         disp = z[name]
-        _idrac_ip = kwargs.pop("idrac_ip")
-        _username = kwargs.pop("username")
-        _password = kwargs.pop("password")
-        _port = kwargs.pop("port")
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -307,7 +367,7 @@ class RedfishManagerBase(RedfishManager):
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
         inst = disp(
-            idrac_ip=_idrac_ip,
+            idrac_ip=_host,
             idrac_username=_username,
             idrac_password=_password,
             idrac_port=_port,
@@ -325,19 +385,27 @@ class RedfishManagerBase(RedfishManager):
     async def async_invoke(
             cls, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
         """Main interface uses to invoke a command.
+
         :param api_call: api request type is enum for each cmd.
         :param name: a name.
-        :param kwargs: argument passed to command
-        :return: CommandResult
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: CommandResult.
         """
         z = cls._registry[api_call]
         disp = z[name]
         if name not in z:
             raise UnsupportedAction(f"Unknown {name} command.")
-        _idrac_ip = kwargs.pop("idrac_ip")
-        _username = kwargs.pop("username")
-        _password = kwargs.pop("password")
-        _port = kwargs.pop("port")
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -345,10 +413,10 @@ class RedfishManagerBase(RedfishManager):
             "redfish_query_one_param_per_uri", False
         )
         _redfish_cache = kwargs.pop("redfish_cache", None)
-        module_logger.debug(f"dispatching {name} to idrac port {_port}")
+        module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
-            idrac_ip=_idrac_ip,
+            idrac_ip=_host,
             idrac_username=_username,
             idrac_password=_password,
             idrac_port=_port,
@@ -446,9 +514,12 @@ class RedfishManagerBase(RedfishManager):
 
     def sync_invoke(self, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
         """Synchronous invocation of target command
+
         :param name: a name for command to differentiate sub-commands
         :param api_call: enum i.e. a type command that we need invoke
-        :param kwargs: arguments passed to a command
+        :param kwargs: command-specific arguments. The manager injects private
+            ``_redfish_*`` connection keys before dispatching to the registered
+            command constructor.
         :return: Return result depends on actual command,
                  encapsulated in generic CommandResult
         """
@@ -457,14 +528,14 @@ class RedfishManagerBase(RedfishManager):
         if len(self._password) == 0:
             raise ValueError("Password is empty string.")
         if len(self.redfish_ip) == 0:
-            raise ValueError("IDRAC IP is empty string.")
+            raise ValueError("Redfish host is empty string.")
 
         kwargs.update(
             {
-                "idrac_ip": self.redfish_ip,
-                "username": self._username,
-                "password": self._password,
-                "port": self._port,
+                "_redfish_host": self.redfish_ip,
+                "_redfish_username": self._username,
+                "_redfish_password": self._password,
+                "_redfish_port": self._port,
                 # forward the original "skip verification" intent; _is_verify_cert
                 # is the inverse (requests' verify flag), so flip it back here.
                 "insecure": not self._is_verify_cert,

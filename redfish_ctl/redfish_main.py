@@ -47,30 +47,13 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
+from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_manager_base import RedfishManagerBase
 from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
-
-
-def _env(*names, default=""):
-    """Return the first non-empty environment variable among ``names``.
-
-    Used to read the going-forward ``REDFISH_*`` endpoint/credential variables while
-    still honoring the legacy ``IDRAC_*`` names during the rename: pass the REDFISH_
-    name first, the IDRAC_ name second, so REDFISH_ wins when both are set.
-
-    :param default: value returned when none of the listed variables is set.
-    :return: the first non-empty environment variable value, or ``default``.
-    """
-    for name in names:
-        value = os.environ.get(name)
-        if value:
-            return value
-    return default
-
 
 try:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -86,6 +69,77 @@ logger = logging.getLogger(__name__)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
+
+_ROOT_CONNECTION_ARGS = {
+    "message_type",
+    "redfish_host",
+    "redfish_username",
+    "redfish_password",
+    "redfish_port",
+    "idrac_ip",
+    "idrac_username",
+    "idrac_password",
+    "idrac_port",
+    "_endpoint_cli_overrides",
+}
+
+_LEGACY_ENDPOINT_ATTRS = {
+    "idrac_ip": "redfish_host",
+    "idrac_username": "redfish_username",
+    "idrac_password": "redfish_password",
+    "idrac_port": "redfish_port",
+}
+
+class _EndpointAliasAction(argparse.Action):
+    """Argparse action that mirrors one option into canonical and legacy attrs."""
+
+    def __init__(
+            self, option_strings, dest, legacy_dest=None, endpoint_field=None,
+            **kwargs):
+        """Create a mirrored endpoint action.
+
+        :param option_strings: option spellings handled by this action.
+        :param dest: canonical argparse destination.
+        :param legacy_dest: legacy argparse destination to mirror.
+        :param endpoint_field: endpoint field this option explicitly overrides.
+        :param kwargs: additional argparse action options.
+        :return: None.
+        """
+        self.legacy_dest = legacy_dest
+        self.endpoint_field = endpoint_field
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Store the parsed value under both endpoint destination names.
+
+        :param parser: parser invoking the action.
+        :param namespace: namespace being populated.
+        :param values: parsed value for the option.
+        :param option_string: option spelling used by the caller.
+        :return: None. The namespace is updated in place.
+        """
+        setattr(namespace, self.dest, values)
+        if self.legacy_dest is not None:
+            setattr(namespace, self.legacy_dest, values)
+        if self.endpoint_field is not None:
+            overridden = set(
+                getattr(namespace, "_endpoint_cli_overrides", set()) or set()
+            )
+            overridden.add(self.endpoint_field)
+            setattr(namespace, "_endpoint_cli_overrides", overridden)
+
+
+def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
+    """Mirror endpoint attrs between canonical and legacy Namespace names.
+
+    :param args: parsed CLI namespace carrying root endpoint attrs.
+    :return: None. The namespace is updated in place.
+    """
+    for legacy_attr, canonical_attr in _LEGACY_ENDPOINT_ATTRS.items():
+        if hasattr(args, canonical_attr):
+            setattr(args, legacy_attr, getattr(args, canonical_attr))
+        elif hasattr(args, legacy_attr):
+            setattr(args, canonical_attr, getattr(args, legacy_attr))
 
 
 class TermColors:
@@ -293,7 +347,7 @@ def is_network_scan(args) -> bool:
 
     ``bmc-scan`` always scans a segment; ``discovery`` scans only when
     ``--network`` is given. Both find BMCs on a segment with no target host and
-    no credentials, so they must bypass the single-host IDRAC_IP/credential gate
+    no credentials, so they must bypass the single-host REDFISH_IP credential gate
     and the startup ``check_api_version()`` / vendor probe (which would connect
     to a host that scan mode does not have).
 
@@ -402,13 +456,13 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.setup_otlp("redfish-ctl")
 
     # the manager is the main interface main uses to interact with the BMC.
-    redfish_api = RedfishManagerBase(idrac_ip=cmd_args.idrac_ip,
-                               idrac_username=cmd_args.idrac_username,
-                               idrac_password=cmd_args.idrac_password,
-                               idrac_port=cmd_args.idrac_port,
-                               insecure=insecure,
-                               is_http=cmd_args.use_http,
-                               is_debug=cmd_args.debug)
+    redfish_api = RedfishManagerBase(host=cmd_args.redfish_host,
+                                     username=cmd_args.redfish_username,
+                                     password=cmd_args.redfish_password,
+                                     port=cmd_args.redfish_port,
+                                     insecure=insecure,
+                                     is_http=cmd_args.use_http,
+                                     is_debug=cmd_args.debug)
 
     # A network scan has no single target host, so skip the version handshake
     # (it would try to connect to a host we do not have).
@@ -428,8 +482,10 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
 
     try:
         cmd = command_name_to_cmd[cmd_args.subcommand]
-        arg_dict = dict((k, v) for k, v
-                        in vars(cmd_args).items() if k != "message_type")
+        arg_dict = dict(
+            (k, v) for k, v in vars(cmd_args).items()
+            if k not in _ROOT_CONNECTION_ARGS
+        )
 
         redfish_query = _redfish_query_from_args(cmd_args)
         if not connectionless_mode and not redfish_query.is_empty():
@@ -450,10 +506,10 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             # enforces. Segment scans and local catalog reads need no host.
             invoke_kwargs = dict(arg_dict)
             invoke_kwargs.update({
-                "idrac_ip": cmd_args.idrac_ip or "",
-                "username": cmd_args.idrac_username or "",
-                "password": cmd_args.idrac_password or "",
-                "port": cmd_args.idrac_port,
+                "_redfish_host": cmd_args.redfish_host or "",
+                "_redfish_username": cmd_args.redfish_username or "",
+                "_redfish_password": cmd_args.redfish_password or "",
+                "_redfish_port": cmd_args.redfish_port,
                 "insecure": insecure,
                 "is_http": cmd_args.use_http,
             })
@@ -554,6 +610,16 @@ def redfish_main_ctl():
     """
     """
     logger.setLevel(logging.ERROR)
+    endpoint_conflicts = set()
+    try:
+        endpoint = endpoint_defaults()
+    except ConfigurationConflict:
+        endpoint = endpoint_defaults(strict=False)
+        endpoint_conflicts = endpoint_conflict_fields()
+    except ValueError as err:
+        console_error_printer(f"Error: {err}")
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(
         prog="redfish_ctl", add_help=True,
         description='''redfish_ctl - a vendor-neutral command-line tool to drive server BMCs |n
@@ -566,30 +632,46 @@ def redfish_main_ctl():
                                              ''',
         formatter_class=CustomArgumentDefaultsHelpFormatter)
 
-    credentials = parser.add_argument_group('credentials', '# idrac credentials details.')
+    credentials = parser.add_argument_group('credentials', '# Redfish BMC credentials.')
 
-    # global args. Endpoint/credentials read the going-forward REDFISH_* env vars
-    # first, falling back to the legacy IDRAC_* names (both work during the rename).
+    # Root endpoint/credential flags. The deprecated --idrac_* spellings remain
+    # accepted as aliases, but the neutral spellings are shown first and stored
+    # separately from subcommand-local --host/--port options.
     credentials.add_argument(
-        '--idrac_ip', required=False, type=str,
-        default=_env('REDFISH_IP', 'IDRAC_IP'),
-        help="BMC ip address, by default "
+        '--host', '--idrac_ip', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_ip",
+        endpoint_field="host",
+        dest="redfish_host", default=endpoint.host,
+        help="BMC host or IP address, by default "
              "read from environment REDFISH_IP (or legacy IDRAC_IP).")
     credentials.add_argument(
-        '--idrac_username', required=False, type=str,
-        default=_env('REDFISH_USERNAME', 'IDRAC_USERNAME', default='root'),
+        '--username', '--idrac_username', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_username",
+        endpoint_field="username",
+        dest="redfish_username", default=endpoint.username,
         help="BMC username, by default "
              "read from environment REDFISH_USERNAME (or legacy IDRAC_USERNAME).")
     credentials.add_argument(
-        '--idrac_password', required=False, type=str,
-        default=_env('REDFISH_PASSWORD', 'IDRAC_PASSWORD'),
+        '--password', '--idrac_password', required=False, type=str,
+        action=_EndpointAliasAction, legacy_dest="idrac_password",
+        endpoint_field="password",
+        dest="redfish_password", default=endpoint.password,
         help="BMC password, by default "
              "read from environment REDFISH_PASSWORD (or legacy IDRAC_PASSWORD).")
     credentials.add_argument(
-        '--idrac_port', required=False, type=int,
-        default=int(_env('REDFISH_PORT', 'IDRAC_PORT', default='443')),
+        '--port', '--idrac_port', required=False, type=int,
+        action=_EndpointAliasAction, legacy_dest="idrac_port",
+        endpoint_field="port",
+        dest="redfish_port", default=endpoint.port,
         help="BMC port, by default "
              "read from environment REDFISH_PORT (or legacy IDRAC_PORT).")
+    parser.set_defaults(
+        idrac_ip=endpoint.host,
+        idrac_username=endpoint.username,
+        idrac_password=endpoint.password,
+        idrac_port=endpoint.port,
+        _endpoint_cli_overrides=set(),
+    )
     credentials.add_argument(
         '--insecure', action='store_true', required=False, default=False,
         help="skip TLS certificate verification (explicit form of the "
@@ -680,6 +762,18 @@ def redfish_main_ctl():
 
     cmd_dict = create_cmd_tree(parser)
     args = parser.parse_args()
+    _sync_legacy_endpoint_attrs(args)
+    unresolved_endpoint_conflicts = (
+        endpoint_conflicts - getattr(args, "_endpoint_cli_overrides", set())
+    )
+    if unresolved_endpoint_conflicts:
+        console_error_printer(
+            "Error: conflicting REDFISH_* and IDRAC_* endpoint environment "
+            "values; supply explicit CLI flags for "
+            f"{', '.join(sorted(unresolved_endpoint_conflicts))} or unset the "
+            "legacy aliases."
+        )
+        sys.exit(1)
     if args.debug:
         logger.setLevel(args.log)
 
@@ -687,42 +781,46 @@ def redfish_main_ctl():
         if exporter_argv_uses_secret(sys.argv):
             print(
                 "Please provide exporter credentials through environment "
-                "variables or --credential-file, not --idrac_password."
+                "variables or --credential-file, not --password/--idrac_password."
             )
             sys.exit(2)
         try:
             apply_exporter_env_file(args)
+            _sync_legacy_endpoint_attrs(args)
+        except ConfigurationConflict as err:
+            console_error_printer(f"Error: {err}")
+            sys.exit(1)
         except FileNotFoundError as fne:
             console_error_printer(f"Error:{fne}")
             sys.exit(1)
 
     # A network-segment scan (bmc-scan, or discovery --network) has no single
-    # target host and uses no credentials, so it skips the IDRAC_IP/credential
+    # target host and uses no credentials, so it skips the REDFISH_IP credential
     # gate that every host-targeted command requires.
     if (
         not is_network_scan(args)
         and not is_local_command(args)
         and not is_fleet_command(args)
     ):
-        if args.idrac_ip is None or len(args.idrac_ip) == 0:
+        if args.redfish_host is None or len(args.redfish_host) == 0:
             print(
-                "Please indicate the idrac ip. "
-                "--idrac_ip or set IDRAC_IP environment variable. "
-                "(export IDRAC_IP=ip_address)"
+                "Please indicate the Redfish host. "
+                "--host or set REDFISH_IP environment variable. "
+                "(export REDFISH_IP=ip_address)"
             )
             sys.exit(1)
-        if args.idrac_username is None or len(args.idrac_username) == 0:
+        if args.redfish_username is None or len(args.redfish_username) == 0:
             print(
-                "Please indicate the idrac username."
-                "--idrac_username or set IDRAC_USERNAME environment variable. "
-                "(export IDRAC_USERNAME=ip_address)"
+                "Please indicate the Redfish username."
+                "--username or set REDFISH_USERNAME environment variable. "
+                "(export REDFISH_USERNAME=root)"
             )
             sys.exit(1)
-        if args.idrac_password is None or len(args.idrac_password) == 0:
+        if args.redfish_password is None or len(args.redfish_password) == 0:
             print(
-                "Please indicate the idrac password. "
-                "--idrac_password or set IDRAC_PASSWORD environment."
-                "(export IDRAC_PASSWORD=ip_address)"
+                "Please indicate the Redfish password. "
+                "--password or set REDFISH_PASSWORD environment."
+                "(export REDFISH_PASSWORD=<password>)"
             )
             sys.exit(1)
     try:

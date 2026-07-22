@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 import warnings
+from dataclasses import dataclass
 from typing import Optional
 
 # A name whose value must never appear in an error message.
@@ -36,6 +37,30 @@ class ConfigurationConflict(RuntimeError):
     """
 
 
+@dataclass(frozen=True)
+class EndpointConfig:
+    """Resolved Redfish endpoint defaults from the process environment.
+
+    :param host: BMC host or IP address.
+    :param username: BMC account username.
+    :param password: BMC account password.
+    :param port: BMC TCP port.
+    """
+
+    host: str
+    username: str
+    password: str
+    port: int
+
+
+_ENDPOINT_ENV_NAMES = {
+    "host": ("REDFISH_IP", "IDRAC_IP"),
+    "username": ("REDFISH_USERNAME", "IDRAC_USERNAME"),
+    "password": ("REDFISH_PASSWORD", "IDRAC_PASSWORD"),
+    "port": ("REDFISH_PORT", "IDRAC_PORT"),
+}
+
+
 def _redacted(name: str, value: str) -> str:
     """Render ``name=value`` for an error, hiding secret values.
 
@@ -46,7 +71,9 @@ def _redacted(name: str, value: str) -> str:
     return f"{name}=<redacted>" if _SECRET_HINT.search(name) else f"{name}={value}"
 
 
-def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
+def env_first(
+        *names: str, default: Optional[str] = None,
+        strict: bool = True) -> Optional[str]:
     """Resolve one setting from its names, canonical first, conflict-aware.
 
     Legacy resolution, defined once (see specs/config/environment.yaml). Pass the
@@ -60,6 +87,9 @@ def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
 
     :param names: variable names for one setting, canonical first.
     :param default: value returned when none of ``names`` is set.
+    :param strict: when True, conflicting values raise
+        :class:`ConfigurationConflict`; when False, the canonical-first value is
+        returned so explicit CLI flags can still override parser defaults.
     :return: the resolved value, or ``default`` when none is set.
     :raises ConfigurationConflict: two names hold different values.
     """
@@ -67,6 +97,8 @@ def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
     if not present:
         return default
     if len({v.strip() for _, v in present}) > 1:
+        if not strict:
+            return present[0][1]
         lines = "\n".join(f"  {_redacted(n, v)}" for n, v in present)
         raise ConfigurationConflict(
             f"Configuration conflict:\n{lines}\n\nUse only {names[0]}.")
@@ -76,3 +108,43 @@ def env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
             f"{winner} is a deprecated alias for {names[0]}; set {names[0]} instead",
             DeprecationWarning, stacklevel=2)
     return value
+
+
+def endpoint_conflict_fields() -> set[str]:
+    """Return endpoint fields whose canonical and legacy env values disagree.
+
+    :return: field names with conflicting endpoint environment values.
+    """
+    conflicts: set[str] = set()
+    for field, names in _ENDPOINT_ENV_NAMES.items():
+        try:
+            env_first(*names)
+        except ConfigurationConflict:
+            conflicts.add(field)
+    return conflicts
+
+
+def endpoint_defaults(strict: bool = True) -> EndpointConfig:
+    """Return endpoint defaults from canonical env vars and legacy aliases.
+
+    The canonical REDFISH_* names are resolved first. Deprecated IDRAC_* names
+    remain accepted as aliases through :func:`env_first`.
+
+    :param strict: when True, conflicting env aliases raise; when False, the
+        canonical-first value is returned for parser defaults so explicit CLI
+        flags can still disambiguate.
+    :return: endpoint defaults for the root CLI parser.
+    :raises ConfigurationConflict: when canonical and legacy env vars disagree.
+    :raises ValueError: when REDFISH_PORT/IDRAC_PORT is not an integer.
+    """
+    return EndpointConfig(
+        host=env_first("REDFISH_IP", "IDRAC_IP", default="", strict=strict) or "",
+        username=env_first(
+            "REDFISH_USERNAME", "IDRAC_USERNAME",
+            default="root", strict=strict) or "",
+        password=env_first(
+            "REDFISH_PASSWORD", "IDRAC_PASSWORD",
+            default="", strict=strict) or "",
+        port=int(env_first(
+            "REDFISH_PORT", "IDRAC_PORT", default="443", strict=strict)),
+    )

@@ -46,6 +46,8 @@ What it does across the whole server lifecycle:
 > The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
 > backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
 > `IDRAC_IP`/`IDRAC_USERNAME`/`IDRAC_PASSWORD`/`IDRAC_PORT` env vars all keep working.
+> When both `REDFISH_*` and legacy `IDRAC_*` names are set for the same value, they must match;
+> different values fail closed so automation does not silently target the wrong BMC.
 
 Author: Mus <spyroot@gmail.com>
 
@@ -184,9 +186,10 @@ export REDFISH_PASSWORD='your-password'
 export REDFISH_PORT=443
 ```
 
-Any of these can be overridden per-invocation by a CLI flag. The flags keep their legacy names —
-`--idrac_ip`, `--idrac_username`, `--idrac_password`, `--idrac_port` — so existing scripts don't
-break; the `REDFISH_*` env vars above are the preferred way to configure the connection.
+Any of these can be overridden per-invocation by a CLI flag. The canonical flags are
+`--host`, `--username`, `--password`, and `--port`; the legacy aliases
+`--idrac_ip`, `--idrac_username`, `--idrac_password`, and `--idrac_port` still work for
+existing scripts.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.

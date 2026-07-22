@@ -355,6 +355,22 @@ class Singleton(type):
     _lock = threading.Lock()
 
     @staticmethod
+    def _alias_value(kwargs, legacy: str, primary: str, default):
+        """Return a connection value with constructor-compatible precedence.
+
+        :param kwargs: command constructor keyword arguments.
+        :param legacy: legacy connection keyword name.
+        :param primary: canonical connection keyword name.
+        :param default: value used when neither keyword is present.
+        :return: the constructor value for the connection field.
+        """
+        if primary in kwargs and kwargs[primary] is not None:
+            return kwargs[primary]
+        if legacy in kwargs:
+            return kwargs[legacy]
+        return default
+
+    @staticmethod
     def _connection_key(cls, args, kwargs):
         """Build the cache key fingerprinting a class and its BMC connection.
 
@@ -363,14 +379,19 @@ class Singleton(type):
         :param kwargs: keyword constructor arguments carrying the connection fields.
         :return: a tuple key; the password contributes only as a SHA-256 digest.
         """
-        password = str(kwargs.get("idrac_password", "") or "")
+        host = Singleton._alias_value(kwargs, "idrac_ip", "host", "")
+        username = Singleton._alias_value(kwargs, "idrac_username", "username", "")
+        password = str(
+            Singleton._alias_value(kwargs, "idrac_password", "password", "") or ""
+        )
+        port = Singleton._alias_value(kwargs, "idrac_port", "port", 443)
         return (
             cls,
             args,
-            kwargs.get("idrac_ip", ""),
-            kwargs.get("idrac_username", ""),
+            host,
+            username,
             hashlib.sha256(password.encode()).hexdigest(),
-            kwargs.get("idrac_port", 443),
+            port,
             bool(kwargs.get("is_http", False)),
             bool(kwargs.get("insecure", True)),
             str(kwargs.get("x_auth", "") or ""),
