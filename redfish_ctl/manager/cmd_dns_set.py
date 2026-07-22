@@ -166,7 +166,11 @@ class DnsSet(RedfishManagerBase,
                 "error": result.error,
             })
 
+        # Surface any per-target BMC error as the CommandResult error so it marks
+        # the operation span failed (the Redfish reason lands on the APM trace,
+        # not just the HTTP status on the client span).
+        errors = [item["error"] for item in applied if item["error"]]
         return CommandResult({
             "servers": normalized,
             "applied": applied,
-        }, None, None, None)
+        }, None, None, "; ".join(str(error) for error in errors) or None)

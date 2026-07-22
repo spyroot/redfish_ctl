@@ -111,3 +111,32 @@ def test_dns_set_clear_rejects_explicit_servers(redfish_mock_factory):
             servers=["8.8.8.8"], clear=True, interface_id="eth0", confirm=True)
 
     assert _mutating_requests(service) == []
+
+
+def test_dns_set_propagates_bmc_error_to_command_result(
+        redfish_mock_factory, monkeypatch):
+    """A failing PATCH surfaces on CommandResult.error so the operation span (and
+    the APM trace) carries the Redfish reason, not just the client-span HTTP status.
+    """
+    manager, service = redfish_mock_factory("supermicro")
+    _overlay_single_manager_with_eth0(service)
+
+    reason = ("The property 'StaticNameServers' with the requested value could not "
+              "be written because the value does not meet the constraints of the "
+              "implementation. (HTTP 400)")
+
+    def _failing_patch(self, resource, payload=None, do_async=False,
+                       data_type="json", expected_status=204, ignore_error_code=0):
+        return CommandResult(None, None, None, reason), "RedfishApiRespond.Failed"
+
+    monkeypatch.setattr(
+        "redfish_ctl.redfish_manager_base.RedfishManagerBase.base_patch",
+        _failing_patch)
+
+    result = manager.sync_invoke(
+        ApiRequestType.DnsSet, "dns-set",
+        servers=["999.999.999.999"], interface_id="eth0", confirm=True)
+
+    assert result.error is not None
+    assert "does not meet the constraints" in result.error
+    assert result.data["applied"][0]["error"] == reason
