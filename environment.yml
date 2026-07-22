@@ -20,6 +20,7 @@ dependencies:
   # Test + lint tooling
   - pytest>=7
   - requests-mock>=1.10
+  - numpy
   - ruff
   - mypy
   - twine
