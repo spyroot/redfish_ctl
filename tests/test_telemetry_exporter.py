@@ -574,7 +574,7 @@ def test_scrape_health_samples_report_success_and_duration():
         samples, "redfish_exporter_collector_supported", "nvlink-ports").value == 0
     errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
     assert len(errors) == 1
-    assert errors[0].metric_type == "cumulative_counter"
+    assert errors[0].metric_type == "counter"
     assert errors[0].dimensions["collector"] == "metric-reports"
     assert errors[0].dimensions["error"] == "timeout"
 
@@ -861,7 +861,7 @@ def test_prometheus_text_uses_catalog_counter_type():
         value=123,
         dimensions=build_identity_dimensions("172.25.230.29", vendor="supermicro")
         | {"fabric": "nvlink", "gpu": "GPU_0", "port": "NVLink_0"},
-        metric_type="cumulative_counter",
+        metric_type="counter",
         unit="By",
     )
 
@@ -885,7 +885,7 @@ def test_signalfx_body_uses_catalog_envelopes_and_dimensions():
             metric="hw.fabric.rx_bytes",
             value=123,
             dimensions=dims | {"fabric": "nvlink", "gpu": "GPU_0", "port": "NVLink_0"},
-            metric_type="cumulative_counter",
+            metric_type="counter",
             unit="By",
         ),
     ]
@@ -935,7 +935,7 @@ def test_metric_definition_catalog_registers_emitted_metrics():
         assert sample.unit == definition.unit
 
     dynamic = metric_definition("hw.gb300.memory_page_retirement_count")
-    assert dynamic.kind == "cumulative_counter"
+    assert dynamic.kind == "counter"
     assert dynamic.family == "gb300"
 
 

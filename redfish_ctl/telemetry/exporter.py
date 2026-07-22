@@ -262,7 +262,7 @@ _FABRIC_DIMS = _COMMON_DIMS + ("fabric", "system", "gpu", "port", "report")
 
 _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.power", unit="W", description="Power draw in watts."),
-    _definition("hw.energy_kwh", "cumulative_counter", "kWh",
+    _definition("hw.energy_kwh", "counter", "kWh",
                 "Cumulative energy consumed in kilowatt-hours."),
     _definition("hw.temperature", unit="Cel", description="Temperature in Celsius."),
     _definition("hw.voltage", unit="V", description="Voltage reading."),
@@ -272,7 +272,7 @@ _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.gpu.clock_mhz", unit="MHz", description="GPU operating clock.", family="gpu"),
     _definition("hw.gpu.compute.utilization", unit="%",
                 description="GPU compute engine utilization.", family="gpu"),
-    _definition("hw.gpu.throttle.duration_seconds", unit="s",
+    _definition("hw.gpu.throttle.duration_seconds", "counter", "s",
                 description="GPU throttle duration in seconds.", family="gpu"),
     _definition("hw.gpu.memory.bandwidth_utilization", unit="%",
                 description="GPU memory bandwidth utilization.", family="gpu"),
@@ -280,9 +280,9 @@ _STATIC_METRIC_DEFINITIONS = (
                 description="GPU memory capacity utilization.", family="gpu"),
     _definition("hw.gpu.memory.clock_mhz", unit="MHz",
                 description="GPU memory operating speed.", family="gpu"),
-    _definition("hw.gpu.memory.ecc_errors", "cumulative_counter", None,
+    _definition("hw.gpu.memory.ecc_errors", "counter", None,
                 "Cumulative GPU memory ECC error count.", family="gpu"),
-    _definition("hw.gpu.memory.row_remap_count", "cumulative_counter", None,
+    _definition("hw.gpu.memory.row_remap_count", "counter", None,
                 "Cumulative GPU memory row-remap count.", family="gpu"),
     _definition("hw.gpu.memory.row_remapping_failed", unit=None,
                 description="GPU memory row-remapping failure state.", family="gpu"),
@@ -324,76 +324,76 @@ _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.fabric.raw_tx_gbps", unit="Gbps",
                 description="Fabric raw transmit bandwidth.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_bytes", "cumulative_counter", "By",
+    _definition("hw.fabric.rx_bytes", "counter", "By",
                 "Cumulative fabric receive bytes.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_bytes", "cumulative_counter", "By",
+    _definition("hw.fabric.tx_bytes", "counter", "By",
                 "Cumulative fabric transmit bytes.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_bytes", "cumulative_counter", "By",
+    _definition("hw.fabric.vl15_tx_bytes", "counter", "By",
                 "Cumulative fabric VL15 transmit bytes.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_frames", "cumulative_counter", None,
+    _definition("hw.fabric.rx_frames", "counter", None,
                 "Cumulative fabric receive frames.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_frames", "cumulative_counter", None,
+    _definition("hw.fabric.tx_frames", "counter", None,
                 "Cumulative fabric transmit frames.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_packets", "cumulative_counter", None,
+    _definition("hw.fabric.vl15_tx_packets", "counter", None,
                 "Cumulative fabric VL15 transmit packets.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.crc_errors", "cumulative_counter", None,
+    _definition("hw.fabric.crc_errors", "counter", None,
                 "Cumulative fabric CRC errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.effective_errors", "cumulative_counter", None,
+    _definition("hw.fabric.effective_errors", "counter", None,
                 "Cumulative fabric effective errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.fec_errors", "cumulative_counter", None,
+    _definition("hw.fabric.fec_errors", "counter", None,
                 "Cumulative fabric FEC errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.malformed_packets", "cumulative_counter", None,
+    _definition("hw.fabric.malformed_packets", "counter", None,
                 "Cumulative malformed fabric packets.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_errors", "cumulative_counter", None,
+    _definition("hw.fabric.raw_errors", "counter", None,
                 "Cumulative fabric raw errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_errors", "cumulative_counter", None,
+    _definition("hw.fabric.rx_errors", "counter", None,
                 "Cumulative fabric receive errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_no_protocol_bytes", "cumulative_counter", "By",
+    _definition("hw.fabric.rx_no_protocol_bytes", "counter", "By",
                 "Cumulative receive bytes without protocol.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_remote_physical_errors", "cumulative_counter", None,
+    _definition("hw.fabric.rx_remote_physical_errors", "counter", None,
                 "Cumulative receive remote physical errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_switch_relay_errors", "cumulative_counter", None,
+    _definition("hw.fabric.rx_switch_relay_errors", "counter", None,
                 "Cumulative receive switch relay errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.symbol_errors", "cumulative_counter", None,
+    _definition("hw.fabric.symbol_errors", "counter", None,
                 "Cumulative fabric symbol errors.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_discards", "cumulative_counter", None,
+    _definition("hw.fabric.tx_discards", "counter", None,
                 "Cumulative fabric transmit discards.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_no_protocol_bytes", "cumulative_counter", "By",
+    _definition("hw.fabric.tx_no_protocol_bytes", "counter", "By",
                 "Cumulative transmit bytes without protocol.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_wait", "cumulative_counter", None,
+    _definition("hw.fabric.tx_wait", "counter", None,
                 "Cumulative fabric transmit wait events.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.intentional_link_down_count", "cumulative_counter", None,
+    _definition("hw.fabric.intentional_link_down_count", "counter", None,
                 "Cumulative intentional link-down count.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_down_count", "cumulative_counter", None,
+    _definition("hw.fabric.link_down_count", "counter", None,
                 "Cumulative link-down count.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_error_recovery_count", "cumulative_counter", None,
+    _definition("hw.fabric.link_error_recovery_count", "counter", None,
                 "Cumulative link error recovery count.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.unintentional_link_down_count", "cumulative_counter", None,
+    _definition("hw.fabric.unintentional_link_down_count", "counter", None,
                 "Cumulative unintentional link-down count.", family="fabric",
                 dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_dropped", "cumulative_counter", None,
+    _definition("hw.fabric.vl15_dropped", "counter", None,
                 "Cumulative fabric VL15 dropped packets.", family="fabric",
                 dimensions=_FABRIC_DIMS),
     _definition("hw.leak.state", description="Leak detector state.", family="chassis"),
@@ -463,7 +463,7 @@ _STATIC_METRIC_DEFINITIONS = (
     ),
     _definition(
         "redfish_exporter_collection_errors_total",
-        kind="cumulative_counter",
+        kind="counter",
         description="Cumulative telemetry collection errors.",
         family="exporter",
         dimensions=_COMMON_DIMS + ("collector", "error"),
@@ -512,12 +512,12 @@ def _infer_metric_kind(metric_name: str) -> str:
     """Infer the metric kind for generated metric families.
 
     :param metric_name: generated metric name.
-    :return: ``cumulative_counter`` for monotonic totals, else ``gauge``.
+    :return: ``counter`` for monotonic totals, else ``gauge``.
     """
     if metric_name in COUNTER_EXACT:
-        return "cumulative_counter"
+        return "counter"
     if any(metric_name.endswith(suffix) for suffix in COUNTER_SUFFIXES):
-        return "cumulative_counter"
+        return "counter"
     return "gauge"
 
 
@@ -1458,7 +1458,11 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     body = {"gauge": [], "counter": [], "cumulative_counter": []}
     for sample in samples:
         definition = metric_definition(sample.metric)
-        body[definition.kind].append({
+        envelope = (
+            "cumulative_counter" if definition.kind == "counter"
+            else definition.kind
+        )
+        body[envelope].append({
             "metric": sample.metric,
             "value": sample.value,
             "dimensions": dict(sample.dimensions),
@@ -1954,19 +1958,16 @@ def _sample(metric: str,
     :param metric: metric name.
     :param value: numeric sample value.
     :param dims: dimension mapping.
-    :param unit: optional unit annotation; coerced to str so a non-string BMC unit
-        cannot reach the OTLP mapper.
+    :param unit: source-provided unit annotation; the catalog's canonical unit wins.
     :param timestamp: optional sample timestamp.
-    :param metric_type: explicit sample type; when None it is derived from the metric
-        name (monotonic-counter names -> ``counter``, else ``gauge``) so Prometheus,
-        SignalFx, and OTLP all agree on the type. This is the single classifier point.
+    :param metric_type: optional caller classification, validated against the catalog.
     :return: the assembled MetricSample.
     """
     definition = metric_definition(metric)
-    if unit not in (None, definition.unit):
+    if metric_type is not None and metric_type != definition.kind:
         raise ValueError(
-            f"{metric} unit {unit!r} does not match catalog unit "
-            f"{definition.unit!r}")
+            f"{metric} type {metric_type!r} does not match catalog type "
+            f"{definition.kind!r}")
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
                         metric_type=definition.kind,

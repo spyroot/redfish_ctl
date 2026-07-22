@@ -19,10 +19,10 @@ def test_counter_classification():
     assert is_monotonic_counter("hw.fabric.crc_errors")
     assert is_monotonic_counter("hw.fabric.link_down_count")
     assert is_monotonic_counter("hw.energy_kwh")
-    assert metric_definition("hw.fabric.rx_bytes").kind == "cumulative_counter"
-    assert metric_definition("hw.fabric.crc_errors").kind == "cumulative_counter"
-    assert metric_definition("hw.fabric.link_down_count").kind == "cumulative_counter"
-    assert metric_definition("hw.energy_kwh").kind == "cumulative_counter"
+    assert metric_definition("hw.fabric.rx_bytes").kind == "counter"
+    assert metric_definition("hw.fabric.crc_errors").kind == "counter"
+    assert metric_definition("hw.fabric.link_down_count").kind == "counter"
+    assert metric_definition("hw.energy_kwh").kind == "counter"
     assert not is_monotonic_counter("hw.power")
     assert not is_monotonic_counter("hw.temperature")
     assert not is_monotonic_counter("hw.fabric.rx_gbps")   # a rate, not a total
