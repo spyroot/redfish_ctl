@@ -52,6 +52,7 @@ from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpForm
 from .redfish_manager_base import RedfishManagerBase
 from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
+from .telemetry import tracing
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
 
@@ -436,6 +437,34 @@ def is_fleet_command(args) -> bool:
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
+def _command_span_attributes(
+    args: argparse.Namespace,
+    *,
+    scan_mode: bool,
+    local_mode: bool,
+    fleet_mode: bool,
+) -> dict[str, str]:
+    """Return creation-time identity for a CLI command root span.
+
+    :param args: parsed CLI arguments.
+    :param scan_mode: whether the command scans a network rather than one BMC.
+    :param local_mode: whether the command reads only local data.
+    :param fleet_mode: whether the command manages multiple BMC connections.
+    :return: bounded operation-span attributes with a non-empty target scope.
+    """
+    address = str(getattr(args, "redfish_host", "") or "").strip()
+    if not address:
+        if fleet_mode:
+            address = "fleet"
+        elif scan_mode:
+            address = "network"
+        elif local_mode:
+            address = "local"
+        else:
+            address = "unknown"
+    return {"server.address": address}
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     """Main entry point.
 
@@ -456,113 +485,147 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # keys come from OTEL_RESOURCE_ATTRIBUTES. service.name defaults to the shared
     # redfish_ctl identity so spans and hw.* metrics land on one APM service node.
     if getattr(cmd_args, "otlp_traces", False):
-        from .telemetry import tracing
         tracing.setup_otlp()
-
-    # the manager is the main interface main uses to interact with the BMC.
-    redfish_api = RedfishManagerBase(host=cmd_args.redfish_host,
-                                     username=cmd_args.redfish_username,
-                                     password=cmd_args.redfish_password,
-                                     port=cmd_args.redfish_port,
-                                     insecure=insecure,
-                                     is_http=cmd_args.use_http,
-                                     is_debug=cmd_args.debug)
-
-    # A network scan has no single target host, so skip the version handshake
-    # (it would try to connect to a host we do not have).
-    scan_mode = is_network_scan(cmd_args)
-    local_mode = is_local_command(cmd_args)
-    fleet_mode = is_fleet_command(cmd_args)
-    connectionless_mode = scan_mode or local_mode or fleet_mode
-    if not connectionless_mode:
-        _ = redfish_api.check_api_version()
-
-    if cmd_args.verbose:
-        logger.info("verbose is set on")
 
     if cmd_args.subcommand not in command_name_to_cmd:
         console_error_printer("Error: Unknown command.")
         return
 
-    try:
-        cmd = command_name_to_cmd[cmd_args.subcommand]
-        arg_dict = dict(
-            (k, v) for k, v in vars(cmd_args).items()
-            if k not in _ROOT_CONNECTION_ARGS
-        )
+    cmd = command_name_to_cmd[cmd_args.subcommand]
+    scan_mode = is_network_scan(cmd_args)
+    local_mode = is_local_command(cmd_args)
+    fleet_mode = is_fleet_command(cmd_args)
+    connectionless_mode = scan_mode or local_mode or fleet_mode
+    span_attributes = _command_span_attributes(
+        cmd_args,
+        scan_mode=scan_mode,
+        local_mode=local_mode,
+        fleet_mode=fleet_mode,
+    )
 
-        redfish_query = _redfish_query_from_args(cmd_args)
-        if not connectionless_mode and not redfish_query.is_empty():
-            query_caps = get_vendor(redfish_api.redfish_vendor)
-            _validate_redfish_query_for_vendor(redfish_query, query_caps)
-            arg_dict["redfish_query"] = redfish_query
-            arg_dict["redfish_query_one_param_per_uri"] = (
-                query_caps.one_query_param_per_uri
+    with tracing.operation_span(
+        cmd.name,
+        parent_policy=tracing.SpanParentPolicy.ROOT,
+        attributes=span_attributes,
+    ) as command_span:
+        try:
+            redfish_api = RedfishManagerBase(
+                host=cmd_args.redfish_host,
+                username=cmd_args.redfish_username,
+                password=cmd_args.redfish_password,
+                port=cmd_args.redfish_port,
+                insecure=insecure,
+                is_http=cmd_args.use_http,
+                is_debug=cmd_args.debug,
+            )
+            if not connectionless_mode:
+                _ = redfish_api.check_api_version()
+
+            if cmd_args.verbose:
+                logger.info("verbose is set on")
+
+            arg_dict = dict(
+                (k, v) for k, v in vars(cmd_args).items()
+                if k not in _ROOT_CONNECTION_ARGS
             )
 
-        if cmd_args.verbose:
-            json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
+            redfish_query = _redfish_query_from_args(cmd_args)
+            if not connectionless_mode and not redfish_query.is_empty():
+                query_caps = get_vendor(redfish_api.redfish_vendor)
+                _validate_redfish_query_for_vendor(redfish_query, query_caps)
+                arg_dict["redfish_query"] = redfish_query
+                arg_dict["redfish_query_one_param_per_uri"] = (
+                    query_caps.one_query_param_per_uri
+                )
 
-        # invoke cmd
-        if connectionless_mode:
-            # Connectionless dispatch: inject empty connection fields (invoke
-            # pops them) without the non-empty credential check that sync_invoke
-            # enforces. Segment scans and local catalog reads need no host.
-            invoke_kwargs = dict(arg_dict)
-            invoke_kwargs.update({
-                "_redfish_host": cmd_args.redfish_host or "",
-                "_redfish_username": cmd_args.redfish_username or "",
-                "_redfish_password": cmd_args.redfish_password or "",
-                "_redfish_port": cmd_args.redfish_port,
-                "insecure": insecure,
-                "is_http": cmd_args.use_http,
-            })
-            command_result = redfish_api.invoke(cmd.type, cmd.name, **invoke_kwargs)
-        else:
-            command_result = redfish_api.sync_invoke(
-                cmd.type, cmd.name, **arg_dict
-            )
+            if cmd_args.verbose:
+                json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
 
-        if not connectionless_mode and redfish_api.redfish_vendor == "Dell":
-            if isinstance(command_result.data, dict):
-                command_result.data["idrac_version"] = redfish_api.idrac_manager_version
-                command_result.data["redfish_version"] = redfish_api.redfish_version
-            # if isinstance(command_result.data, list) and len(command_result.data) > 0:
-            #     command_result.data[0]["idrac_version"] = redfish_api.idrac_manager_version
-            #     command_result.data[0]["redfish_version"] = redfish_api.redfish_version
+            if connectionless_mode:
+                invoke_kwargs = dict(arg_dict)
+                invoke_kwargs.update({
+                    "_redfish_host": cmd_args.redfish_host or "",
+                    "_redfish_username": cmd_args.redfish_username or "",
+                    "_redfish_password": cmd_args.redfish_password or "",
+                    "_redfish_port": cmd_args.redfish_port,
+                    "insecure": insecure,
+                    "is_http": cmd_args.use_http,
+                })
+                command_result = redfish_api.invoke(
+                    cmd.type, cmd.name, **invoke_kwargs
+                )
+            else:
+                command_result = redfish_api.sync_invoke(
+                    cmd.type,
+                    cmd.name,
+                    _trace_operation_span=False,
+                    **arg_dict,
+                )
+            if not connectionless_mode and redfish_api.redfish_vendor == "Dell":
+                if isinstance(command_result.data, dict):
+                    command_result.data["idrac_version"] = (
+                        redfish_api.idrac_manager_version
+                    )
+                    command_result.data["redfish_version"] = (
+                        redfish_api.redfish_version
+                    )
 
-        if command_result.error is not None:
-            json_printer(command_result.data, cmd_args, colorized=cmd_args.nocolor)
-            if isinstance(command_result.error, JsonHttpError):
-                console_error_printer(command_result.error.json_error)
-            return
+            if command_result.error is not None:
+                tracing.record_result(command_span, command_result)
+                json_printer(
+                    command_result.data,
+                    cmd_args,
+                    colorized=cmd_args.nocolor,
+                )
+                if isinstance(command_result.error, JsonHttpError):
+                    console_error_printer(command_result.error.json_error)
+                return
 
-        processed_data = process_respond(cmd_args, command_result)
-        if json_printer:
-            json_printer(processed_data, cmd_args, colorized=cmd_args.nocolor)
+            processed_data = process_respond(cmd_args, command_result)
+            if json_printer:
+                json_printer(
+                    processed_data,
+                    cmd_args,
+                    colorized=cmd_args.nocolor,
+                )
+            tracing.record_success(command_span)
 
-    except RedfishException as redfish_err:
-        console_error_printer(f"Error: {redfish_err}")
-    except TaskIdUnavailable as tid:
-        console_error_printer(f"Error: {tid}")
-    except MissingResource as mr:
-        console_error_printer(f"Error: {mr}")
-    except InvalidJsonSpec as ijs:
-        console_error_printer(f"Error: {ijs}")
-    except ResourceNotFound as rnf:
-        console_error_printer(f"Error: {rnf}")
-    except InvalidArgument as ia:
-        console_error_printer(f"Error: {ia}")
-    except FailedDiscoverAction as fda:
-        console_error_printer(f"Error: {fda}")
-    except UnsupportedAction as ua:
-        console_error_printer(f"Error:{ua}")
-    except MissingMandatoryArguments as mmr:
-        console_error_printer(f"Error:{mmr}")
-    except FileNotFoundError as fne:
-        console_error_printer(f"Error:{fne}")
-    except UncommittedPendingChanges as upc:
-        console_error_printer(f"Error:{upc}")
+        except RedfishException as redfish_err:
+            tracing.record_exception(command_span, redfish_err)
+            console_error_printer(f"Error: {redfish_err}")
+        except TaskIdUnavailable as tid:
+            tracing.record_exception(command_span, tid)
+            console_error_printer(f"Error: {tid}")
+        except MissingResource as mr:
+            tracing.record_exception(command_span, mr)
+            console_error_printer(f"Error: {mr}")
+        except InvalidJsonSpec as ijs:
+            tracing.record_exception(command_span, ijs)
+            console_error_printer(f"Error: {ijs}")
+        except ResourceNotFound as rnf:
+            tracing.record_exception(command_span, rnf)
+            console_error_printer(f"Error: {rnf}")
+        except InvalidArgument as ia:
+            tracing.record_exception(command_span, ia)
+            console_error_printer(f"Error: {ia}")
+        except FailedDiscoverAction as fda:
+            tracing.record_exception(command_span, fda)
+            console_error_printer(f"Error: {fda}")
+        except UnsupportedAction as ua:
+            tracing.record_exception(command_span, ua)
+            console_error_printer(f"Error:{ua}")
+        except MissingMandatoryArguments as mmr:
+            tracing.record_exception(command_span, mmr)
+            console_error_printer(f"Error:{mmr}")
+        except FileNotFoundError as fne:
+            tracing.record_exception(command_span, fne)
+            console_error_printer(f"Error:{fne}")
+        except UncommittedPendingChanges as upc:
+            tracing.record_exception(command_span, upc)
+            console_error_printer(f"Error:{upc}")
+        except Exception as exc:
+            tracing.record_exception(command_span, exc)
+            raise
 
 
 def create_cmd_tree(arg_parser, debug=False) -> Dict:

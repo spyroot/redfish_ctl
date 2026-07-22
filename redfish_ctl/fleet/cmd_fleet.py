@@ -18,9 +18,10 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..telemetry import tracing
 
 
 @dataclass(frozen=True)
@@ -230,6 +231,38 @@ def read_node(node: FleetNode) -> dict[str, Any]:
         return _error_row(node, exc)
 
 
+def _read_node_with_span(
+    node: FleetNode,
+    coordinator_links: tuple[Any, ...],
+) -> dict[str, Any]:
+    """Read one fleet node inside an independent root linked to its coordinator.
+
+    :param node: fleet node to read.
+    :param coordinator_links: links captured from the fleet coordinator span.
+    :return: the node summary returned by :func:`read_node`.
+    """
+    with tracing.operation_span(
+        "fleet.node",
+        parent_policy=tracing.SpanParentPolicy.ROOT,
+        attributes={"server.address": node.address},
+        links=coordinator_links,
+    ) as span:
+        try:
+            result = read_node(node)
+        except Exception as exc:
+            tracing.record_exception(span, exc)
+            raise
+        if result.get("ok"):
+            tracing.record_success(span)
+        else:
+            tracing.record_error(
+                span,
+                str(result.get("error") or "fleet node read failed"),
+                "fleet_node_error",
+            )
+        return result
+
+
 def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]:
     """Fan out read-only status calls across inventory nodes.
 
@@ -244,9 +277,14 @@ def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]
 
     max_concurrency = max(1, min(int(concurrency or 1), len(nodes)))
     rows_by_index: dict[int, dict[str, Any]] = {}
+    coordinator_links = tracing.link_to_current_span()
     with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
         future_to_index = {
-            executor.submit(read_node, node): index
+            executor.submit(
+                _read_node_with_span,
+                node,
+                coordinator_links,
+            ): index
             for index, node in enumerate(nodes)
         }
         for future in as_completed(future_to_index):
