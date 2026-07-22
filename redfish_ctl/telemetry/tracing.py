@@ -261,15 +261,32 @@ def poll_task_span(links: Optional[list] = None) -> Iterator[Any]:
         "redfish.task.poll", kind=SpanKind.INTERNAL, links=links
     ) as span:
         yield span
+# Canonical Redfish top-level collection names, keyed by lowercase so the same
+# resource area maps to one family regardless of request-path casing (keeping
+# redfish.path_family low-cardinality). Unknown/OEM segments pass through as-is.
+_CANONICAL_FAMILIES = {
+    name.lower(): name for name in (
+        "Systems", "Chassis", "Managers", "Fabrics", "Storage",
+        "UpdateService", "TelemetryService", "SessionService", "AccountService",
+        "EventService", "CertificateService", "TaskService", "JobService",
+        "CompositionService", "LicenseService", "KeyService", "Registries",
+        "JsonSchemas", "PowerEquipment", "ThermalEquipment", "Cables",
+        "ResourceBlocks", "AggregationService",
+    )
+}
+
+
 def _path_family(path: str) -> str:
     """Low-cardinality Redfish resource family for a request path.
 
     Groups every BMC request span under its top-level Redfish collection
     (``Systems``, ``Chassis``, ``Managers``, ``UpdateService`` ...) so an APM
     backend can aggregate by resource area without per-instance cardinality.
-    The service root (``/redfish/v1``) maps to ``ServiceRoot``; a path that is
-    not under ``/redfish/<version>`` falls back to its first segment, and an
-    empty path maps to ``ServiceRoot``.
+    Known collections are canonicalized case-insensitively to their PascalCase
+    name so mixed-case paths do not fragment the family; unknown/OEM segments
+    pass through unchanged. The service root (``/redfish/v1``) maps to
+    ``ServiceRoot``; a path not under ``/redfish/<version>`` falls back to its
+    first segment, and an empty path maps to ``ServiceRoot``.
 
     :param path: URL path of a BMC request (for example
         ``/redfish/v1/Systems/System.Embedded.1``).
@@ -280,7 +297,14 @@ def _path_family(path: str) -> str:
         segments = segments[2:]
     if not segments:
         return "ServiceRoot"
-    return segments[0]
+    return _CANONICAL_FAMILIES.get(segments[0].lower(), segments[0])
+
+
+# Request-span attributes derived internally from the URL/method; a caller-
+# supplied attribute of the same key must not override them.
+_FIXED_SPAN_ATTRIBUTES = frozenset({
+    "peer.service", "server.address", "http.request.method", "redfish.path_family",
+})
 
 
 @contextlib.contextmanager
@@ -310,13 +334,14 @@ def client_span(
     with _TRACER.start_as_current_span(
         "redfish.bmc.request", kind=SpanKind.CLIENT
     ) as span:
+        # Fixed contract attributes: always present, never overridable by a
+        # caller-supplied attribute of the same key.
         span.set_attribute("peer.service", BMC_PEER_SERVICE)
-        if host:
-            span.set_attribute("server.address", host)
+        span.set_attribute("server.address", host or "unknown")
         span.set_attribute("http.request.method", method)
         span.set_attribute("redfish.path_family", _path_family(parts.path))
         for key, value in span_attributes.items():
-            if value is not None:
+            if value is not None and key not in _FIXED_SPAN_ATTRIBUTES:
                 span.set_attribute(key, value)
         yield span
 

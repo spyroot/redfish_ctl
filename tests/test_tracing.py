@@ -364,6 +364,11 @@ def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
     ("/redfish/v1/", "ServiceRoot"),
     ("", "ServiceRoot"),
     ("/api/custom/thing", "api"),
+    ("/redfish/v1/systems/System.Embedded.1", "Systems"),   # lower-case canonicalized
+    ("/redfish/v1/CHASSIS", "Chassis"),                     # upper-case canonicalized
+    ("/redfish/v1/Systems/", "Systems"),                    # trailing slash on collection
+    ("/redfish/v2/Managers", "Managers"),                   # future version segment stripped
+    ("/redfish/v1/Oem/Contoso/Widget", "Oem"),              # unknown/OEM segment preserved
 ])
 def test_path_family_groups_by_top_level_collection(path, expected):
     """_path_family collapses a request path to its low-cardinality Redfish family.
@@ -393,6 +398,36 @@ def test_client_span_sets_required_path_family(span_exporter):
     assert request_spans, "expected one redfish.bmc.request span"
     for span in request_spans:
         assert span.attributes.get("redfish.path_family") == "Systems"
+
+
+def test_client_span_fixed_attributes_are_not_overridable(span_exporter):
+    """Caller attributes never clobber the internally-derived contract keys.
+
+    A caller that passes a same-named attribute (path_family, method,
+    server.address, peer.service) must not override the value client_span
+    derives; server.address is present even when the URL has no host; and a
+    non-fixed attribute still passes through.
+    """
+    with tracing.client_span(
+            "https:///redfish/v1/Chassis",  # deliberately hostless
+            "GET",
+            attributes={
+                "redfish.path_family": "SPOOFED",
+                "http.request.method": "DELETE",
+                "server.address": "spoofed",
+                "peer.service": "notbmc",
+                "redfish.vendor": "Dell",
+            }):
+        pass
+    attrs = next(
+        dict(s.attributes) for s in span_exporter.get_finished_spans()
+        if s.name == "redfish.bmc.request"
+    )
+    assert attrs["redfish.path_family"] == "Chassis"
+    assert attrs["http.request.method"] == "GET"
+    assert attrs["peer.service"] == "bmc"
+    assert attrs["server.address"] == "unknown"   # hostless URL still sets it
+    assert attrs["redfish.vendor"] == "Dell"      # non-fixed attr passes through
 
 
 def test_span_contract_declares_every_emitted_request_attribute():
