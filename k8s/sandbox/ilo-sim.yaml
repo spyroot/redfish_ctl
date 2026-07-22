@@ -33,6 +33,8 @@ spec:
         - name: ilo-sim
           image: redfish-ctl-ilo-sim:local
           imagePullPolicy: IfNotPresent
+          workingDir: /tmp
+          command: ["python3", "/app/emulator.py"]
           ports:
             - name: https
               containerPort: 8443
@@ -59,9 +61,13 @@ spec:
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: runtime
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m
@@ -69,6 +75,9 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+      volumes:
+        - name: runtime
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
