@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
 from redfish_ctl.config import ConfigurationConflict
+
 from . import identity as identity_mod
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
