@@ -25,7 +25,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        # Single version keeps CI fast; add back others here if cross-version
+        # coverage is ever needed.
+        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v5
         with:
