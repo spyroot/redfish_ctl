@@ -2,6 +2,9 @@
 
 import argparse
 import json
+import threading
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -9,7 +12,7 @@ from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.telemetry.cmd_exporter import Exporter
@@ -27,6 +30,7 @@ from redfish_ctl.telemetry.exporter import (
     resolve_signalfx_token,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.identity import parse_dimension_pairs
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
 GB300_CORPUS = corpus_dir(
@@ -57,9 +61,28 @@ def _collector_metric(samples, metric, collector):
     return matches[0]
 
 
+def _start_http_server(handler_cls):
+    """Start a loopback HTTP server for redirect-safety tests."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, f"http://127.0.0.1:{server.server_port}"
+
+
 def _gb300_fixture_for_path(path):
     name = "_" + path.strip("/").replace("/", "_") + ".json"
     return GB300_INDEX.get(name.lower())
+
+
+def _duplicate_items(values):
+    """Return duplicate values while preserving first duplicate order."""
+    seen = set()
+    duplicates = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
 
 
 @pytest.fixture
@@ -99,6 +122,61 @@ def test_identity_dimensions_follow_nv72_slot_contract():
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "supermicro",
+        "service.name": "redfish_ctl",
+    }
+    assert "deployment.environment" not in dims
+    assert "deployment.environment.name" not in dims
+
+
+def test_identity_dimensions_add_deployment_environment_when_explicit():
+    """An explicit deployment environment adds the dashboard join dimensions."""
+    dims = build_identity_dimensions(
+        "172.25.230.29",
+        vendor="supermicro",
+        deployment_environment="NV72-GB300",
+    )
+
+    assert dims["deployment.environment"] == "nv72-gb300"
+    assert dims["deployment.environment.name"] == "nv72-gb300"
+
+
+def test_identity_dimensions_support_deployment_compat_modes():
+    """Deployment environment compatibility mode controls which join keys emit."""
+    deprecated = build_identity_dimensions(
+        "172.25.230.29",
+        deployment_environment="production",
+        deployment_environment_compat="deprecated",
+    )
+    stable = build_identity_dimensions(
+        "172.25.230.29",
+        deployment_environment="production",
+        deployment_environment_compat="stable",
+    )
+
+    assert "deployment.environment" in deprecated
+    assert "deployment.environment.name" not in deprecated
+    assert "deployment.environment" not in stable
+    assert stable["deployment.environment.name"] == "production"
+
+
+def test_identity_rejects_empty_unknown_and_secret_dimensions():
+    """Caller-supplied identity values fail closed before export starts."""
+    with pytest.raises(ValueError, match="concrete value"):
+        build_identity_dimensions("172.25.230.29", deployment_environment="unknown")
+    with pytest.raises(ValueError, match="secret"):
+        build_identity_dimensions(
+            "172.25.230.29",
+            extra_dimensions=["telemetry.source=https://example.invalid"],
+        )
+    with pytest.raises(ValueError, match="reserved"):
+        build_identity_dimensions("172.25.230.29", extra_dimensions=["model=bad"])
+
+
+def test_parse_dimension_pairs_accepts_valid_escape_hatch():
+    """Generic fixed dimensions allow bounded non-identity context."""
+    assert parse_dimension_pairs("telemetry.source=redfish,rack=row-a") == {
+        "telemetry.source": "redfish",
+        "rack": "row-a",
     }
 
 
@@ -108,6 +186,8 @@ def test_identity_options_resolve_from_environment(monkeypatch):
     monkeypatch.setenv("REDFISH_EXPORTER_BMC_OCTET_BASE", "10")
     monkeypatch.setenv("REDFISH_EXPORTER_SERVER_OCTET_BASE", "100")
     monkeypatch.setenv("REDFISH_EXPORTER_SERVER_SUBNET", "198.51.100")
+    monkeypatch.setenv("REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT", "NV72-GB300")
+    monkeypatch.setenv("REDFISH_EXPORTER_EXTRA_DIMENSIONS", "telemetry.source=redfish")
 
     dims = build_identity_dimensions(
         "203.0.113.29",
@@ -121,6 +201,10 @@ def test_identity_options_resolve_from_environment(monkeypatch):
         "server.address": "198.51.100.119",
         "bmc.ip": "203.0.113.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
+        "deployment.environment": "nv72-gb300",
+        "deployment.environment.name": "nv72-gb300",
+        "telemetry.source": "redfish",
     }
 
 
@@ -503,6 +587,7 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
         "source": "exporter",
         "collector": "metric-reports",
         "error": "timeout",
@@ -691,6 +776,10 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "deployment_environment": "staging",
+            "deployment_environment_compat": "stable",
+            "require_deployment_environment": True,
+            "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
 
@@ -701,6 +790,10 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
         "identity_bmc_octet_base": 20,
         "identity_server_octet_base": 100,
         "identity_server_subnet": "198.51.100",
+        "deployment_environment": "staging",
+        "deployment_environment_compat": "stable",
+        "require_deployment_environment": True,
+        "extra_dimensions": {"telemetry.source": "redfish"},
     }
 
 
@@ -728,13 +821,13 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         vendor="supermicro",
     )
 
-    gauges = result.data["gauge"]
-    metrics = {point["metric"] for point in gauges}
+    points = [point for envelope in result.data.values() for point in envelope]
+    metrics = {point["metric"] for point in points}
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes", "hw.leak.state"} <= metrics
     assert {"hw.scrape.ok", "hw.scrape.duration_seconds"} <= metrics
-    scrape_ok = next(point for point in gauges if point["metric"] == "hw.scrape.ok")
+    scrape_ok = next(point for point in points if point["metric"] == "hw.scrape.ok")
     scrape_duration = next(
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.scrape.duration_seconds"
     )
     assert scrape_ok["value"] == 1
@@ -748,7 +841,7 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "hw.gpu.throttle.duration_seconds",
         "hw.gpu.temperature",
     } <= metrics
-    leak_points = [point for point in gauges if point["metric"] == "hw.leak.state"]
+    leak_points = [point for point in points if point["metric"] == "hw.leak.state"]
     assert len(leak_points) == 4
     assert {point["value"] for point in leak_points} == {0.0}
     assert {point["dimensions"]["source"] for point in leak_points} == {"leak-detector"}
@@ -761,9 +854,9 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "Chassis_0_LeakDetector_1_ColdPlate",
         "Chassis_0_LeakDetector_1_Manifold",
     }
-    assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
+    assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in points)
     thermal_points = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.temperature"
         and point["dimensions"].get("source") == "thermal-subsystem"
     ]
@@ -792,6 +885,8 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "deployment_environment": "nv72-gb300",
+            "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
 
@@ -822,6 +917,9 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     first_dims = calls[0]["body"]["gauge"][0]["dimensions"]
     assert first_dims["host.name"] == "rack-a-slot9"
     assert first_dims["server.address"] == "198.51.100.109"
+    assert first_dims["deployment.environment"] == "nv72-gb300"
+    assert first_dims["deployment.environment.name"] == "nv72-gb300"
+    assert first_dims["telemetry.source"] == "redfish"
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):
@@ -926,23 +1024,23 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
         vendor="supermicro",
     )
 
-    gauges = result.data["gauge"]
+    points = [point for envelope in result.data.values() for point in envelope]
     processor_power = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.gpu.power"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Processor"
         and point["dimensions"].get("resource") == "GPU_0"
     ]
     memory_power = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.power"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Memory"
         and point["dimensions"].get("resource") == "GPU_0_DRAM_0"
     ]
     processor_energy = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.energy_kwh"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Processor"
@@ -957,6 +1055,114 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
         for request in requests
         if request.method in {"POST", "PATCH", "DELETE"}
     } == set()
+
+
+def test_redfish_response_cache_returns_isolated_payloads():
+    """Per-scrape cache hits do not expose caller mutations to later readers."""
+    cache = RedfishResponseCache()
+
+    data, allow = cache.get_or_load("root", lambda: ({"Members": []}, "GET"))
+    data["Members"].append({"@odata.id": "/redfish/v1/Changed"})
+
+    cached_data, cached_allow = cache.get_or_load(
+        "root",
+        lambda: pytest.fail("cache hit should not reload"),
+    )
+
+    assert allow == "GET"
+    assert cached_allow == "GET"
+    assert cached_data == {"Members": []}
+
+
+def test_redfish_response_cache_loader_failure_wakes_waiters():
+    """A failed first load releases waiters so they can retry without hanging."""
+    cache = RedfishResponseCache()
+    first_loader_started = threading.Event()
+    release_first_loader = threading.Event()
+    outcomes = []
+
+    def failing_loader():
+        first_loader_started.set()
+        release_first_loader.wait(timeout=1)
+        raise RuntimeError("boom")
+
+    def first_reader():
+        with pytest.raises(RuntimeError):
+            cache.get_or_load("root", failing_loader)
+
+    def second_reader():
+        outcomes.append(
+            cache.get_or_load("root", lambda: ({"Status": "OK"}, "GET")))
+
+    first = threading.Thread(target=first_reader)
+    first.start()
+    assert first_loader_started.wait(timeout=1)
+
+    second = threading.Thread(target=second_reader)
+    second.start()
+    release_first_loader.set()
+    first.join(timeout=1)
+    second.join(timeout=1)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert outcomes == [({"Status": "OK"}, "GET")]
+
+
+def test_base_query_cache_shares_full_payload_across_key_selectors(monkeypatch):
+    """Different root-key selectors reuse the same exact GET response."""
+    manager = RedfishManagerBase(
+        idrac_ip="mock-gb300",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+    cache = RedfishResponseCache()
+    requests = []
+
+    class Response:
+        status_code = 200
+        headers = {"Allow": "GET"}
+
+        @staticmethod
+        def json():
+            return {"Members": [], "Vendor": "supermicro"}
+
+    def api_get_call(req, hdr):
+        requests.append(req)
+        return Response()
+
+    monkeypatch.setattr(manager, "api_get_call", api_get_call)
+
+    members = manager.base_query(
+        "/redfish/v1/", key="Members", redfish_cache=cache)
+    vendor = manager.base_query(
+        "/redfish/v1/", key="Vendor", redfish_cache=cache)
+
+    assert members.data == []
+    assert vendor.data == "supermicro"
+    assert requests == ["https://mock-gb300/redfish/v1/"]
+
+
+def test_exporter_scrape_shares_exact_gets_across_collectors(gb300_exporter_manager):
+    """One exporter scrape reuses repeated ServiceRoot and collection GETs."""
+    manager, requests = gb300_exporter_manager
+
+    manager.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        label_bmc_ip="172.25.230.37",
+        vendor="supermicro",
+    )
+
+    get_urls = [
+        request.url for request in requests
+        if request.method == "GET"
+    ]
+
+    assert _duplicate_items(get_urls) == []
 
 
 def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkeypatch):
@@ -990,7 +1196,7 @@ def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkey
     assert calls[0]["body"] is result.data
     assert result.data["gauge"]
     assert result.extra["push_status"] == 200
-    assert result.extra["sample_count"] == len(result.data["gauge"])
+    assert result.extra["sample_count"] == sum(len(pts) for pts in result.data.values())
 
 
 def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkeypatch):
@@ -1046,6 +1252,9 @@ def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypat
     with pytest.raises(ValueError, match="v2/datapoint"):
         resolve_signalfx_ingest_url("https://ingest.us1.observability.splunkcloud.com")
 
+    with pytest.raises(ValueError, match="https"):
+        resolve_signalfx_ingest_url("http://ingest.us1.signalfx.com/v2/datapoint")
+
     monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
     with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
         resolve_signalfx_ingest_url()
@@ -1073,6 +1282,76 @@ def test_require_datapoint_url_accepts_both_hosts_needs_path():
         assert _require_datapoint_url(full) == full
     with pytest.raises(ValueError, match="v2/datapoint"):
         _require_datapoint_url("https://ingest.us1.observability.splunkcloud.com")
+    with pytest.raises(ValueError, match="https"):
+        _require_datapoint_url("http://ingest.us1.signalfx.com/v2/datapoint")
+
+
+def test_push_signalfx_rejects_non_https_ingest_url_before_open(monkeypatch):
+    """Token-bearing SignalFx ingest refuses HTTP before opening a request."""
+    opened = []
+
+    def fail_if_opened(*args, **kwargs):
+        opened.append((args, kwargs))
+        raise AssertionError("request should not open")
+
+    monkeypatch.setattr(exporter_mod, "_open_signalfx_request", fail_if_opened)
+
+    with pytest.raises(ValueError, match="https"):
+        exporter_mod.push_signalfx(
+            {"gauge": []},
+            "secret-token",
+            "http://ingest.us1.signalfx.com/v2/datapoint",
+        )
+
+    assert opened == []
+
+
+def test_signalfx_redirect_opener_does_not_replay_token():
+    """The no-redirect opener refuses 302 and never forwards X-SF-Token."""
+    origin_requests = []
+    target_requests = []
+
+    class TargetHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            target_requests.append(dict(self.headers.items()))
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, *args):
+            return
+
+    target_server, target_url = _start_http_server(TargetHandler)
+
+    class OriginHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            origin_requests.append(dict(self.headers.items()))
+            self.send_response(302)
+            self.send_header("Location", f"{target_url}/v2/datapoint")
+            self.end_headers()
+
+        def log_message(self, *args):
+            return
+
+    origin_server, origin_url = _start_http_server(OriginHandler)
+    try:
+        request = urllib.request.Request(
+            f"{origin_url}/v2/datapoint",
+            data=b"{}",
+            method="POST",
+            headers={"X-SF-Token": "secret-token"},
+        )
+
+        with pytest.raises(ValueError, match="refused redirect"):
+            exporter_mod._open_signalfx_request(request, timeout=2.0)
+
+        origin_headers = {k.lower(): v for k, v in origin_requests[0].items()}
+        assert origin_headers["x-sf-token"] == "secret-token"
+        assert target_requests == []
+    finally:
+        origin_server.shutdown()
+        target_server.shutdown()
+        origin_server.server_close()
+        target_server.server_close()
 
 
 def _report_row(source_property, value, report="HGX_HealthMetrics_0"):
