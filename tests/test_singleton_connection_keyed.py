@@ -17,9 +17,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests_mock as requests_mock_lib
 
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system import SystemQuery
 
 HOST_A = "10.9.9.1"

@@ -7,13 +7,13 @@ dead. These pin the success/raise mapping. No network.
 import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_exceptions import (
     RedfishException,
     RedfishForbidden,
     RedfishUnauthorized,
 )
 from redfish_ctl.redfish_manager import RedfishManager
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_respond_error import RedfishError
 from redfish_ctl.redfish_shared import RedfishApiRespond
 

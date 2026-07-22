@@ -10,7 +10,6 @@ import json
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import (
     REDFISH_API,
@@ -19,6 +18,7 @@ from ..idrac_shared import (
     RedfishApiRespond,
     Singleton,
 )
+from ..redfish_manager import CommandResult
 
 
 def _as_list(values) -> list[str]:

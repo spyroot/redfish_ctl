@@ -11,9 +11,9 @@ destructive, so the default invocation only previews the target and payload.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 _DEVICE_RECOVERY_ACTION = "#DellBIOSService.DeviceRecovery"
 _DELL_BIOS_SERVICE = "Oem/Dell/DellBIOSService"

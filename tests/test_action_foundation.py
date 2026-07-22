@@ -7,9 +7,9 @@ against tests/supermicro_fixtures/ through the real requests path; the mock
 records every POST so we can assert exactly what did (or did not) fire.
 """
 from redfish_ctl.actions.action_policy import Destructiveness, classify
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import RedfishApiRespond
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def _post_count(svc):

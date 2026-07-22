@@ -9,9 +9,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 _MAX_NTP_SERVERS = 4
 _MAX_LEGACY_NTP_SERVERS = 2

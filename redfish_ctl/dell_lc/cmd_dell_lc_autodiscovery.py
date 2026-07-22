@@ -12,9 +12,9 @@ targets with no ``--perform`` value and otherwise previews by default.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 _SERVICE_NAME = "DellLCService"
 _DEFAULT_SERVICE_URI = (

@@ -24,9 +24,9 @@ import re
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from .cmd_network_adapters import NetworkAdapters
 

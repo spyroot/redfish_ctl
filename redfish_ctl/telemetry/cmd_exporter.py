@@ -14,9 +14,9 @@ from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
-from ..redfish_manager import CommandResult, RedfishResponseCache
 from ..idrac_manager import IDracManager
 from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishResponseCache
 from . import exporter
 from .exporter import (
     build_identity_dimensions,

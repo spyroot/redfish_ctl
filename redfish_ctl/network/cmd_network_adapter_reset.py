@@ -14,9 +14,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import REDFISH_API, ApiRequestType, ResetType, Singleton
+from ..redfish_manager import CommandResult
 
 _NETWORK_ADAPTER_RESET_ACTION = "#NetworkAdapter.Reset"
 _RESET_TYPE_VALUES = frozenset(item.value for item in ResetType)

@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _IMPORT_FOREIGN_CONFIG_ACTION = "#DellRaidService.ImportForeignConfig"

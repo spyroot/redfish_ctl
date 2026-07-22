@@ -12,9 +12,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API
-from ..idrac_shared import REDFISH_JSON
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 

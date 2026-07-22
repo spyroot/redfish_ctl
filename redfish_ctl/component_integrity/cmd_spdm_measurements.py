@@ -15,9 +15,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _SPDM_ACTION = "#ComponentIntegrity.SPDMGetSignedMeasurements"

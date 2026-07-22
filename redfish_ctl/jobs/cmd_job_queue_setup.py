@@ -7,9 +7,9 @@ Examples:
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 _DELL_JOB_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
 _SETUP_JOB_QUEUE_ACTION = "#DellJobService.SetupJobQueue"

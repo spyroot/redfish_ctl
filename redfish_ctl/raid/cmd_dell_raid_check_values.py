@@ -13,9 +13,9 @@ from abc import abstractmethod
 from typing import Iterable, Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _CHECK_ACTION = "#DellRaidService.CheckVDValues"

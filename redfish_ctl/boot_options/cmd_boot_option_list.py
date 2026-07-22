@@ -30,9 +30,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import UnexpectedResponse
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 
 class BootOptionsList(IDracManager,

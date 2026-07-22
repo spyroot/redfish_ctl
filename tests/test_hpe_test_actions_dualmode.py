@@ -5,10 +5,10 @@ import pytest
 from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.oem.cmd_hpe_test_actions import HpeTestActions
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.oem.cmd_hpe_test_actions import HpeTestActions
+from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HPE_CORPUS = corpus_dir(REPO_ROOT / "tests" / "hpe_dl360_corpus.tar.gz", "10.43.3.209")

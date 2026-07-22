@@ -30,9 +30,9 @@ import argparse
 from abc import abstractmethod
 from typing import Any, Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 
 class SmcVirtualMediaMount(IDracManager,

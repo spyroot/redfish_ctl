@@ -9,14 +9,13 @@ redfish_ctl boot-source --dev NIC.Slot.8-1
 Author Mus spyroot@gmail.com
 """
 import asyncio
-
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
+from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 

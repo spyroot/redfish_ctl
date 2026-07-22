@@ -6,9 +6,9 @@ import requests
 
 from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_boot_options_list_returns_member_uris(redfish_api):

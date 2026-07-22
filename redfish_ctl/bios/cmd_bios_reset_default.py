@@ -14,9 +14,9 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _RESET_BIOS_ACTION = "#Bios.ResetBios"

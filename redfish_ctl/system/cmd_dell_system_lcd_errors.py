@@ -12,9 +12,9 @@ the target and payload without POSTing.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 _SHOW_ERRORS_ON_LCD_ACTION = "#DellSystemManagementService.ShowErrorsOnLCD"
 _DELL_SYSTEM_MANAGEMENT_SERVICE = "Oem/Dell/DellSystemManagementService"

@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.webui import catalog, server
 
 GB300_CORPUS = corpus_dir(

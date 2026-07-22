@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 

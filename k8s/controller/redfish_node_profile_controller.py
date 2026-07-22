@@ -16,8 +16,8 @@ try:  # pragma: no cover - exercised only in a deployed controller image.
 except ImportError:  # pragma: no cover - unit tests call the handler directly.
     kopf = None
 
-from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.telemetry import tracing
 
 REDFISH_GROUP = "redfish.ctl.dev"

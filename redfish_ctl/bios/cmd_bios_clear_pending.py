@@ -10,10 +10,10 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_shared import RedfishApiRespond
+from .. import ApiRequestType, CommandResult, IDracManager, Singleton
 from ..cmd_exceptions import FailedDiscoverAction
 from ..custom_argparser.customer_argdefault import BiosSubcommand
-from .. import IDracManager, ApiRequestType, Singleton, CommandResult
+from ..idrac_shared import RedfishApiRespond
 
 
 class BiosClearPending(IDracManager,

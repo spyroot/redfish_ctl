@@ -13,9 +13,9 @@ from vendor_corpus import corpus_dir
 import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
-from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,

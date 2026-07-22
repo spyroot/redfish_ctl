@@ -2,13 +2,13 @@
 import copy
 
 import pytest
+from test_roundtrip_budget import projected_walltime
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.network.cmd_network_adapter_reset import NetworkAdapterReset
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
-from test_roundtrip_budget import projected_walltime
+from redfish_ctl.network.cmd_network_adapter_reset import NetworkAdapterReset
+from redfish_ctl.redfish_manager import CommandResult
 
 ADAPTER = "IO_Board_0_CX8_0"
 ADAPTER_URI = f"/redfish/v1/Chassis/IO_Board_0/NetworkAdapters/{ADAPTER}"

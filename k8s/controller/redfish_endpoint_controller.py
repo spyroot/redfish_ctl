@@ -30,13 +30,13 @@ from redfish_ctl.api import (
     get_thermal,
 )
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.redfish_exceptions import (
     RedfishException,
     RedfishForbidden,
     RedfishUnauthorized,
 )
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.telemetry import tracing
 
 _LOGGER = logging.getLogger(__name__)

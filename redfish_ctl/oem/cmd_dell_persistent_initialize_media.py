@@ -15,9 +15,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..actions.action_policy import classify
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 _INITIALIZE_MEDIA_ACTION = "#DellPersistentStorageService.InitializeMedia"

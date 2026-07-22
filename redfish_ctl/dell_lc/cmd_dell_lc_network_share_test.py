@@ -14,9 +14,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton, TestNetworkShareReq
+from ..redfish_manager import CommandResult
 
 _TEST_NETWORK_SHARE_ACTION = "#DellLCService.TestNetworkShare"
 

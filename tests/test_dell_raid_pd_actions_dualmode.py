@@ -8,10 +8,10 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.raid.cmd_pd_state import DellRaidPhysicalDiskActions
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.raid.cmd_pd_state import DellRaidPhysicalDiskActions
+from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(

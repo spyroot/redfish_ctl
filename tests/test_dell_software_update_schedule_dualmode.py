@@ -10,9 +10,9 @@ from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.delloem.cmd_dell_software_update_schedule import (
     DellSoftwareUpdateSchedule,
 )
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz",

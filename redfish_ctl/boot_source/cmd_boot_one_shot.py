@@ -25,8 +25,6 @@ from ..cmd_exceptions import (
     UnexpectedResponse,
     UnsupportedAction,
 )
-from ..redfish_exceptions import RedfishException
-from ..redfish_manager import CommandResult
 from ..idrac_manager import IDracManager
 from ..idrac_shared import (
     ApiRequestType,
@@ -34,6 +32,8 @@ from ..idrac_shared import (
     RedfishApiRespond,
     Singleton,
 )
+from ..redfish_exceptions import RedfishException
+from ..redfish_manager import CommandResult
 
 _BOOT_TARGET_ALIASES = {
     "Cd": ("Cd", "CD/DVD", "UsbCd", "UefiCd", "UefiUsbCd"),

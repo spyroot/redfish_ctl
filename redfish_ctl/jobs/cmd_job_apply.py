@@ -14,10 +14,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, CliJobTypes, JobState
-from ..idrac_shared import RedfishApiRespond
-from ..idrac_shared import ResetType
-from ..idrac_shared import Singleton, ApiRequestType
+from ..idrac_shared import (
+    REDFISH_API,
+    ApiRequestType,
+    CliJobTypes,
+    JobState,
+    RedfishApiRespond,
+    ResetType,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
 
 

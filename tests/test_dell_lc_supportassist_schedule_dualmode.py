@@ -10,9 +10,9 @@ from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_schedule import (
     DellLcSupportAssistSchedule,
 )
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"

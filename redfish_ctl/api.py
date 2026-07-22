@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Protocol
 
-from .redfish_manager import CommandResult
 from .idrac_shared import ApiRequestType
+from .redfish_manager import CommandResult
 
 
 class SyncInvoker(Protocol):

@@ -6,9 +6,9 @@ import pytest
 import requests
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType, RedfishApiRespond
+from redfish_ctl.redfish_manager import CommandResult
 
 _X10_VM_UNSUPPORTED = "standard VirtualMedia endpoint is not implemented on this BMC"
 

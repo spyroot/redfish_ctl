@@ -1,10 +1,10 @@
 """Dual-mode tests for Dell card-service CSR generation actions."""
 
 from redfish_ctl.actions.action_policy import classify
-from redfish_ctl.oem.cmd_dell_card_csr import DellCardCsr
-from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.oem.cmd_dell_card_csr import DellCardCsr
+from redfish_ctl.redfish_manager import CommandResult
 
 SERVICE_URI = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DelliDRACCardService"
 FACTORY_ACTION = "#DelliDRACCardService.FactoryIdentityCertificateGenerateCSR"
