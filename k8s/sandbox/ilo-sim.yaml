@@ -29,12 +29,33 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+      initContainers:
+        - name: init-runtime-certs
+          image: redfish-ctl-ilo-sim:local
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - touch /certs/server.crt /certs/server.key
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: runtime-certs
+              mountPath: /certs
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
       containers:
         - name: ilo-sim
           image: redfish-ctl-ilo-sim:local
           imagePullPolicy: IfNotPresent
-          workingDir: /tmp
-          command: ["python3", "/app/emulator.py"]
           ports:
             - name: https
               containerPort: 8443
@@ -66,8 +87,12 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-            - name: runtime
-              mountPath: /tmp
+            - name: runtime-certs
+              mountPath: /app/server.crt
+              subPath: server.crt
+            - name: runtime-certs
+              mountPath: /app/server.key
+              subPath: server.key
           resources:
             requests:
               cpu: 50m
@@ -76,7 +101,7 @@ spec:
               cpu: 500m
               memory: 512Mi
       volumes:
-        - name: runtime
+        - name: runtime-certs
           emptyDir: {}
 ---
 apiVersion: v1

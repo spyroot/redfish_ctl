@@ -345,10 +345,14 @@ class Exporter(IDracManager,
         discovered = getattr(self, "_derived_service_instance_id", None)
         if discovered is not None:
             return discovered
-        discovered = self._discover_service_instance_id(
-            redfish_cache,
-            do_async=do_async,
-        )
+        try:
+            discovered = self._discover_service_instance_id(
+                redfish_cache,
+                do_async=do_async,
+            )
+        except Exception as exc:  # an unreachable/malformed BMC must not crash the scrape
+            logger.debug("service.instance.id discovery failed: %s", exc)
+            discovered = None
         if discovered is not None:
             self._derived_service_instance_id = discovered
             return discovered

@@ -630,6 +630,10 @@ def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
         return CommandResult([], None, None, None)
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+    # Identity discovery reads the Managers/Chassis collections via base_query;
+    # stub it so the offline scrape never reaches the network.
+    monkeypatch.setattr(
+        manager, "base_query", lambda *a, **k: CommandResult({}, None, None, None))
 
     samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
 
@@ -655,6 +659,12 @@ def test_exporter_collect_samples_unreachable_bmc_reports_down(monkeypatch):
         raise TimeoutError("timed out reading the BMC")
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    def fake_base_query(*_a, **_k):
+        """Identity discovery also times out on a fully unreachable BMC."""
+        raise TimeoutError("timed out reading the BMC")
+
+    monkeypatch.setattr(manager, "base_query", fake_base_query)
 
     samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
 

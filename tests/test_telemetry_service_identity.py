@@ -8,11 +8,11 @@ import uuid
 from pathlib import Path
 
 import pytest
+from redfish_ctl.idrac_shared import REDFISH_API
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.redfish_manager import RedfishResponseCache
-from redfish_ctl.redfish_manager_shared import REDFISH_API
 from redfish_ctl.telemetry import identity, tracing
 from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
