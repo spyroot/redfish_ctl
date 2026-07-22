@@ -182,6 +182,12 @@ def install_termination_flush() -> None:
     import signal
 
     def _raise_on_sigterm(signum, _frame):
+        """Convert SIGTERM into SystemExit so the stack unwinds and spans flush.
+
+        :param signum: the delivered signal number (SIGTERM).
+        :param _frame: the interrupted stack frame (unused).
+        :raises SystemExit: always, to unwind up to main's finally.
+        """
         raise SystemExit(128 + signum)
 
     try:

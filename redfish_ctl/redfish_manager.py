@@ -919,7 +919,12 @@ class RedfishManager:
             return None, None
 
         def _coerce(enum_cls, value):
-            """Return the enum member for value, or None when value is not a member."""
+            """Return the enum member for a wire value, or None if not a member.
+
+            :param enum_cls: the enum class to coerce into (TaskState / TaskStatus).
+            :param value: the raw wire value read from the #Task body.
+            :return: the matching enum member, or None when value is not a member.
+            """
             try:
                 return enum_cls(value)
             except ValueError:
