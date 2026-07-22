@@ -425,10 +425,17 @@ class RedfishManagerBase(RedfishManager):
         )
         inst._redfish_query = _redfish_query
         inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
-        if _redfish_cache is None:
-            return inst.execute(**kwargs)
-        with redfish_response_cache_scope(_redfish_cache):
-            return inst.execute(**kwargs)
+        # Operation root span named by the command (matches sync_invoke) so an
+        # async command's BMC client spans nest into ONE trace instead of
+        # surfacing as orphan "redfish.bmc.request" root traces in APM.
+        with tracing.operation_span(name) as span:
+            if _redfish_cache is None:
+                result = inst.execute(**kwargs)
+            else:
+                with redfish_response_cache_scope(_redfish_cache):
+                    result = inst.execute(**kwargs)
+            tracing.record_result(span, result)
+            return result
 
     async def api_async_get_call(self, loop, req, hdr: Dict):
         """Make api asynced requests either with x-auth authentication

@@ -155,6 +155,30 @@ def test_async_mutating_verbs_emit_client_bmc_spans(span_exporter, redfish_mock)
     assert _client_span_attrs(spans, "DELETE")
 
 
+def test_async_command_emits_operation_root_span(span_exporter, redfish_mock):
+    """The async dispatch path opens the command's operation ROOT span too.
+
+    Regression for a live-observed gap: async_invoke dispatched a command without
+    the operation_span that sync_invoke has, so an async command's BMC client
+    spans surfaced as orphan ``redfish.bmc.request`` root traces in APM instead of
+    nesting under one ``<command>`` trace. The root span must be present.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(
+            redfish_mock.async_invoke(
+                ApiRequestType.SystemQuery, "system_query",
+                host="mock-idrac", username="root", password="mock", port=443,
+                insecure=True, is_http=False))
+    finally:
+        loop.close()
+
+    assert isinstance(result, CommandResult)
+    names = [s.name for s in span_exporter.get_finished_spans()]
+    assert "system_query" in names, (
+        f"async path missing operation root span; got {names}")
+
+
 def test_invoke_action_adds_action_metadata_to_post_span(
     span_exporter,
     redfish_mock_factory,
