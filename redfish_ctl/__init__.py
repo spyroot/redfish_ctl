@@ -81,6 +81,7 @@ from .pci.cmd_pci import *
 from .manager.cmd_manager import *
 from .manager.cmd_manager_network import *
 from .manager.cmd_ntp_set import *
+from .manager.cmd_dns_set import *
 from .manager.cmd_manager_reset import *
 
 

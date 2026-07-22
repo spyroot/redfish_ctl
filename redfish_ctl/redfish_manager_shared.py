@@ -204,6 +204,7 @@ class ApiRequestType(Enum):
     ManagerQuery = auto()
     ManagerNetworkProtocol = auto()
     NtpSet = auto()
+    DnsSet = auto()
     IdentifyLed = auto()
     ManagerReset = auto()
 
