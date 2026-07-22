@@ -819,7 +819,7 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "hw.gpu.throttle.duration_seconds",
         "hw.gpu.temperature",
     } <= metrics
-    leak_points = [point for point in gauges if point["metric"] == "hw.leak.state"]
+    leak_points = [point for point in points if point["metric"] == "hw.leak.state"]
     assert len(leak_points) == 4
     assert {point["value"] for point in leak_points} == {0.0}
     assert {point["dimensions"]["source"] for point in leak_points} == {"leak-detector"}
@@ -832,9 +832,9 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         "Chassis_0_LeakDetector_1_ColdPlate",
         "Chassis_0_LeakDetector_1_Manifold",
     }
-    assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in gauges)
+    assert all(REQUIRED_DIMS <= set(point["dimensions"]) for point in points)
     thermal_points = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.temperature"
         and point["dimensions"].get("source") == "thermal-subsystem"
     ]
@@ -1002,23 +1002,23 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
         vendor="supermicro",
     )
 
-    gauges = result.data["gauge"]
+    points = [point for envelope in result.data.values() for point in envelope]
     processor_power = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.gpu.power"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Processor"
         and point["dimensions"].get("resource") == "GPU_0"
     ]
     memory_power = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.power"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Memory"
         and point["dimensions"].get("resource") == "GPU_0_DRAM_0"
     ]
     processor_energy = [
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.energy_kwh"
         and point["dimensions"].get("source") == "environment"
         and point["dimensions"].get("resource_type") == "Processor"
