@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.telemetry.cmd_exporter import Exporter
@@ -61,6 +62,17 @@ def _collector_metric(samples, metric, collector):
 def _gb300_fixture_for_path(path):
     name = "_" + path.strip("/").replace("/", "_") + ".json"
     return GB300_INDEX.get(name.lower())
+
+
+def _duplicate_items(values):
+    """Return duplicate values while preserving first duplicate order."""
+    seen = set()
+    duplicates = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
 
 
 @pytest.fixture
@@ -1033,6 +1045,114 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
         for request in requests
         if request.method in {"POST", "PATCH", "DELETE"}
     } == set()
+
+
+def test_redfish_response_cache_returns_isolated_payloads():
+    """Per-scrape cache hits do not expose caller mutations to later readers."""
+    cache = RedfishResponseCache()
+
+    data, allow = cache.get_or_load("root", lambda: ({"Members": []}, "GET"))
+    data["Members"].append({"@odata.id": "/redfish/v1/Changed"})
+
+    cached_data, cached_allow = cache.get_or_load(
+        "root",
+        lambda: pytest.fail("cache hit should not reload"),
+    )
+
+    assert allow == "GET"
+    assert cached_allow == "GET"
+    assert cached_data == {"Members": []}
+
+
+def test_redfish_response_cache_loader_failure_wakes_waiters():
+    """A failed first load releases waiters so they can retry without hanging."""
+    cache = RedfishResponseCache()
+    first_loader_started = threading.Event()
+    release_first_loader = threading.Event()
+    outcomes = []
+
+    def failing_loader():
+        first_loader_started.set()
+        release_first_loader.wait(timeout=1)
+        raise RuntimeError("boom")
+
+    def first_reader():
+        with pytest.raises(RuntimeError):
+            cache.get_or_load("root", failing_loader)
+
+    def second_reader():
+        outcomes.append(
+            cache.get_or_load("root", lambda: ({"Status": "OK"}, "GET")))
+
+    first = threading.Thread(target=first_reader)
+    first.start()
+    assert first_loader_started.wait(timeout=1)
+
+    second = threading.Thread(target=second_reader)
+    second.start()
+    release_first_loader.set()
+    first.join(timeout=1)
+    second.join(timeout=1)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert outcomes == [({"Status": "OK"}, "GET")]
+
+
+def test_base_query_cache_shares_full_payload_across_key_selectors(monkeypatch):
+    """Different root-key selectors reuse the same exact GET response."""
+    manager = RedfishManagerBase(
+        idrac_ip="mock-gb300",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+    cache = RedfishResponseCache()
+    requests = []
+
+    class Response:
+        status_code = 200
+        headers = {"Allow": "GET"}
+
+        @staticmethod
+        def json():
+            return {"Members": [], "Vendor": "supermicro"}
+
+    def api_get_call(req, hdr):
+        requests.append(req)
+        return Response()
+
+    monkeypatch.setattr(manager, "api_get_call", api_get_call)
+
+    members = manager.base_query(
+        "/redfish/v1/", key="Members", redfish_cache=cache)
+    vendor = manager.base_query(
+        "/redfish/v1/", key="Vendor", redfish_cache=cache)
+
+    assert members.data == []
+    assert vendor.data == "supermicro"
+    assert requests == ["https://mock-gb300/redfish/v1/"]
+
+
+def test_exporter_scrape_shares_exact_gets_across_collectors(gb300_exporter_manager):
+    """One exporter scrape reuses repeated ServiceRoot and collection GETs."""
+    manager, requests = gb300_exporter_manager
+
+    manager.sync_invoke(
+        ApiRequestType.Exporter,
+        "exporter",
+        once=True,
+        exporter_output="signalfx",
+        label_bmc_ip="172.25.230.37",
+        vendor="supermicro",
+    )
+
+    get_urls = [
+        request.url for request in requests
+        if request.method == "GET"
+    ]
+
+    assert _duplicate_items(get_urls) == []
 
 
 def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkeypatch):
