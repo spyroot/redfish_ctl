@@ -9,11 +9,13 @@ from pathlib import Path
 
 import pytest
 
+from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.redfish_manager import RedfishResponseCache
-from redfish_ctl.telemetry import identity
+from redfish_ctl.telemetry import identity, tracing
 from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
+    CollectorResult,
     MetricSample,
     render_prometheus_text,
     to_signalfx_body,
@@ -230,6 +232,108 @@ def test_exporter_discovers_instance_id_in_sync_and_async_modes(do_async):
         "HA256S016142",
     ))
     assert observed_modes and set(observed_modes) == {do_async}
+
+
+def test_identity_discovery_propagates_transient_transport_errors(monkeypatch):
+    """An absent optional resource is tolerated while a timeout aborts discovery."""
+    command = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def missing(*_args, **_kwargs):
+        """Model an optional Redfish identity path returning HTTP 404."""
+        raise ResourceNotFound("optional identity resource absent")
+
+    monkeypatch.setattr(command, "base_query", missing)
+    assert command._identity_resource(
+        "/redfish/v1/Managers", RedfishResponseCache(), False) == {}
+
+    def timeout(*_args, **_kwargs):
+        """Model a transient transport error that discovery must propagate."""
+        raise TimeoutError("transient Redfish timeout")
+
+    monkeypatch.setattr(command, "base_query", timeout)
+    with pytest.raises(TimeoutError, match="transient Redfish timeout"):
+        command._identity_resource(
+            "/redfish/v1/Managers", RedfishResponseCache(), False)
+
+
+def test_process_fallback_is_stable_while_discovery_retries(monkeypatch):
+    """A fallback remains stable but is replaced once stable BMC identity appears."""
+    command = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+    stable = str(uuid.uuid5(identity.SERVICE_INSTANCE_NAMESPACE, "BMC-SERIAL"))
+    discoveries = iter((None, None, stable))
+    calls = []
+
+    def discover(_cache, do_async=False):
+        """Return a stable source only after two fallback scrapes."""
+        calls.append(do_async)
+        return next(discoveries)
+
+    monkeypatch.setattr(command, "_discover_service_instance_id", discover)
+    first = command._default_service_instance_id(RedfishResponseCache())
+    second = command._default_service_instance_id(RedfishResponseCache())
+    third = command._default_service_instance_id(RedfishResponseCache())
+    fourth = command._default_service_instance_id(RedfishResponseCache())
+
+    assert uuid.UUID(first)
+    assert second == first
+    assert third == stable
+    assert fourth == stable
+    assert calls == [False, False, False]
+
+
+def test_otlp_trace_flag_reaches_resolved_exporter_identity(monkeypatch):
+    """Exporter execution forwards the parsed trace flag to identity setup."""
+    command = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+    observed = {}
+    collect_samples = command.collect_samples
+
+    def collect(*_args, **kwargs):
+        """Capture options forwarded by exporter execution."""
+        observed["forwarded"] = kwargs["otlp_traces"]
+        return []
+
+    monkeypatch.setattr(command, "collect_samples", collect)
+    command.execute(once=True, exporter_output="prometheus", otlp_traces=True)
+    assert observed == {"forwarded": True}
+
+    stable = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
+
+    def collector(_api_type, name, _extractor, **_kwargs):
+        """Return an empty supported scrape surface without live BMC access."""
+        return CollectorResult(name, supported=False, success=True,
+                               duration_seconds=0.0)
+
+    monkeypatch.setattr(command, "_invoke_collector", collector)
+    monkeypatch.setattr(
+        tracing,
+        "setup_otlp",
+        lambda service_name, attrs: observed.update(
+            service_name=service_name,
+            attributes=attrs,
+        ),
+    )
+    collect_samples(
+        vendor="dell",
+        service_instance_id=stable,
+        otlp_traces=True,
+    )
+    assert observed["service_name"] == "redfish_ctl"
+    assert observed["attributes"]["service.instance.id"] == stable
 
 
 def test_service_identity_env_alias_conflict_fails_closed(monkeypatch):

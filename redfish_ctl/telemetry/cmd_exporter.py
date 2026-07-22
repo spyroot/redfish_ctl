@@ -16,6 +16,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
+from ..cmd_exceptions import ResourceNotFound
 from ..idrac_manager import IDracManager
 from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult, RedfishResponseCache
@@ -216,6 +217,7 @@ class Exporter(IDracManager,
         :param redfish_cache: current scrape response cache.
         :param do_async: whether the caller selected asynchronous queries.
         :return: resource mapping or an empty mapping.
+        :raises Exception: transport and non-404 failures from the Redfish query.
         """
         try:
             result = self.base_query(
@@ -223,7 +225,7 @@ class Exporter(IDracManager,
                 do_async=do_async,
                 redfish_cache=redfish_cache,
             )
-        except Exception:
+        except ResourceNotFound:
             return {}
         return result.data if isinstance(result.data, dict) else {}
 
@@ -261,7 +263,7 @@ class Exporter(IDracManager,
     def _discover_service_instance_id(
             self,
             redfish_cache: RedfishResponseCache,
-            do_async: bool = False) -> str:
+            do_async: bool = False) -> Optional[str]:
         """Derive a stable global service instance UUID from Redfish identity.
 
         Source precedence is Manager UUID, BMC/DC-SCM chassis serial, burned-in
@@ -269,7 +271,8 @@ class Exporter(IDracManager,
 
         :param redfish_cache: current scrape response cache.
         :param do_async: whether the caller selected asynchronous queries.
-        :return: canonical service.instance.id UUID text.
+        :return: canonical service.instance.id UUID text, or None when no stable
+            source is available.
         """
         managers_collection = self._identity_resource(
             REDFISH_API.IDRAC_MANAGER, redfish_cache, do_async)
@@ -281,6 +284,11 @@ class Exporter(IDracManager,
             ))
 
         manager_uuids = [resource.get("UUID") for _, resource in manager_resources]
+        instance_id = exporter.identity_mod.service_instance_id_from_sources(
+            manager_uuids=manager_uuids,
+        )
+        if instance_id is not None:
+            return instance_id
 
         chassis_collection = self._identity_resource(
             REDFISH_API.Chassis, redfish_cache, do_async)
@@ -293,8 +301,12 @@ class Exporter(IDracManager,
         chassis_resources.sort(key=self._chassis_identity_rank)
         chassis_serials = [resource.get("SerialNumber")
                            for _, resource in chassis_resources]
+        instance_id = exporter.identity_mod.service_instance_id_from_sources(
+            chassis_serials=chassis_serials,
+        )
+        if instance_id is not None:
+            return instance_id
 
-        permanent_macs = []
         mac_addresses = []
         for _, manager in manager_resources:
             collection_uri = self._identity_link(manager, "EthernetInterfaces")
@@ -305,21 +317,49 @@ class Exporter(IDracManager,
             for interface_uri in sorted(self._members(collection)):
                 interface = self._identity_resource(
                     interface_uri, redfish_cache, do_async)
-                permanent_macs.append(interface.get("PermanentMACAddress"))
+                instance_id = exporter.identity_mod.service_instance_id_from_sources(
+                    permanent_macs=[interface.get("PermanentMACAddress")],
+                )
+                if instance_id is not None:
+                    return instance_id
                 mac_addresses.append(interface.get("MACAddress"))
 
-        instance_id = exporter.identity_mod.service_instance_id_from_sources(
-            manager_uuids=manager_uuids,
-            chassis_serials=chassis_serials,
-            permanent_macs=permanent_macs,
+        return exporter.identity_mod.service_instance_id_from_sources(
             mac_addresses=mac_addresses,
         )
-        if instance_id is not None:
-            return instance_id
-        logger.warning(
-            "No stable Redfish service instance identity was available; "
-            "using a random UUID for this process")
-        return str(uuid.uuid4())
+
+    def _default_service_instance_id(
+            self,
+            redfish_cache: RedfishResponseCache,
+            do_async: bool = False) -> str:
+        """Return a stable discovered ID or a retryable process fallback.
+
+        A discovered BMC identity is cached permanently. A random fallback is
+        also process-stable, but discovery is retried on later scrapes so a
+        transient read failure cannot pin the fallback for the process lifetime.
+
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: canonical service.instance.id UUID text.
+        """
+        discovered = getattr(self, "_derived_service_instance_id", None)
+        if discovered is not None:
+            return discovered
+        discovered = self._discover_service_instance_id(
+            redfish_cache,
+            do_async=do_async,
+        )
+        if discovered is not None:
+            self._derived_service_instance_id = discovered
+            return discovered
+        fallback = getattr(self, "_fallback_service_instance_id", None)
+        if fallback is None:
+            fallback = str(uuid.uuid4())
+            self._fallback_service_instance_id = fallback
+            logger.warning(
+                "No stable Redfish service instance identity was available; "
+                "using a random UUID while discovery is retried")
+        return fallback
 
     def _invoke_rows(self, api_type: ApiRequestType, name: str, **kwargs) -> list:
         """Invoke another read-only command and tolerate absent resources.
@@ -672,15 +712,12 @@ class Exporter(IDracManager,
             service_criticality=service_criticality,
         )
         if identity_options["service_instance_id"] is None:
-            derived_instance_id = getattr(
-                self, "_derived_service_instance_id", None)
-            if derived_instance_id is None:
-                derived_instance_id = self._discover_service_instance_id(
+            identity_options["service_instance_id"] = (
+                self._default_service_instance_id(
                     redfish_cache,
                     do_async=do_async,
                 )
-                self._derived_service_instance_id = derived_instance_id
-            identity_options["service_instance_id"] = derived_instance_id
+            )
         telemetry_identity = build_telemetry_identity(
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor, redfish_cache=redfish_cache),
