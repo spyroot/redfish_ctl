@@ -21,6 +21,7 @@ dependencies:
   - pytest>=7
   - requests-mock>=1.10
   - numpy
+  - make
   - ruff
   - mypy
   - twine
