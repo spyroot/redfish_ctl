@@ -47,13 +47,6 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
-from .redfish_manager import (
-    CommandResult,
-    RedfishManager,
-    active_redfish_response_cache,
-    redfish_response_cache_scope,
-)
 from .idrac_shared import (
     REDFISH_API,
     REDFISH_JSON,
@@ -70,8 +63,15 @@ from .idrac_shared import (
     ScheduleJobType,
 )
 from .idrac_shared import ResetType as ResetType
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .idrac_task_state import IdracTaskState, IdracTaskStatus
+from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
+from .redfish_manager import (
+    CommandResult,
+    RedfishManager,
+    active_redfish_response_cache,
+    redfish_response_cache_scope,
+)
+from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
@@ -553,8 +553,13 @@ class IDracManager(RedfishManager):
             redfish_cache = active_redfish_response_cache()
             if redfish_cache is not None:
                 kwargs["redfish_cache"] = redfish_cache
-        # Operation root span named by the command (no-op unless tracing is on);
-        # nested sync_invoke calls nest under it to form the trace waterfall.
+        # Operation root span named by the command (no-op unless tracing is on).
+        # When main already opened the operation root, nest under it instead of
+        # opening a second same-named root (the call stack IS the span tree); main
+        # records the result on that root. Only root here for direct/standalone
+        # callers (tests, nested tooling) where no operation span is active yet.
+        if tracing.current_span() is not None:
+            return self.invoke(api_call, name, **kwargs)
         with tracing.operation_span(name) as span:
             result = self.invoke(api_call, name, **kwargs)
             tracing.record_result(span, result)
