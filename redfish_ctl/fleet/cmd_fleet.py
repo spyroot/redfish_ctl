@@ -18,9 +18,9 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
+from ..redfish_manager import CommandResult
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
 from ..telemetry import tracing
 
 
