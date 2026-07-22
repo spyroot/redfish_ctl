@@ -37,6 +37,7 @@ from redfish_ctl.telemetry.exporter import (
 from redfish_ctl.telemetry.identity import parse_dimension_pairs
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
+TEST_SERVICE_INSTANCE_ID = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
 GB300_CORPUS = corpus_dir(
     Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
@@ -745,7 +746,11 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _single_metric(samples, "redfish_exporter_scrape_success").value == 0
     assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 1
@@ -791,7 +796,11 @@ def test_exporter_collect_samples_treats_unsupported_collectors_as_healthy(
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _single_metric(samples, "redfish_exporter_scrape_success").value == 1
     assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 0
@@ -826,7 +835,11 @@ def test_exporter_collect_samples_classifies_malformed_collector_payload(
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _collector_metric(
         samples, "redfish_exporter_collector_success", "sensors").value == 0
