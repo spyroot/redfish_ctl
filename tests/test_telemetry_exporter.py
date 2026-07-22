@@ -290,6 +290,37 @@ def test_mapper_emits_chassis_gpu_and_fabric_samples():
     assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
 
 
+@pytest.mark.parametrize(
+    "reading_type, reading_units, metric, catalog_unit",
+    [
+        ("Temperature", "Celsius", "hw.temperature", "Cel"),
+        ("Rotational", "RevolutionsPerMinute", "hw.fan_speed", "RPM"),
+        ("Voltage", "Volts", "hw.voltage", "V"),
+    ],
+)
+def test_sensor_mapper_normalizes_vendor_unit_spellings(
+        reading_type, reading_units, metric, catalog_unit):
+    """Vendor unit spellings cannot abort a scrape or change catalog units."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[{
+            "Chassis": "Chassis_0",
+            "Name": f"{reading_type} Sensor",
+            "Reading": 24.0,
+            "ReadingUnits": reading_units,
+            "ReadingType": reading_type,
+        }],
+        nvlink_rows=[],
+        metric_report_rows=[],
+    )
+
+    sample = next(sample for sample in samples if sample.metric == metric)
+    assert sample.unit == catalog_unit
+
+
 def test_mapper_emits_thermal_subsystem_zone_temperatures():
     """ThermalSubsystem rows become granular temperature samples."""
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
