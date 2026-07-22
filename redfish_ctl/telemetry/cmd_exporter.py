@@ -172,7 +172,8 @@ class Exporter(IDracManager,
         cmd_parser.add_argument(
             "--service-instance-id", dest="service_instance_id", default=None, type=str,
             help="stable identity for this one exporter process, not a per-BMC metric "
-                 "label; raw tokens become UUIDv5. Also "
+                 "label; raw tokens become UUIDv5. Set a unique override for each "
+                 "parallel process scraping the same BMC. Also "
                  "REDFISH_EXPORTER_SERVICE_INSTANCE_ID")
         cmd_parser.add_argument(
             "--service-version", dest="service_version", default=None, type=str,

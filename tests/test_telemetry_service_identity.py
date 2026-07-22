@@ -145,6 +145,13 @@ def test_service_instance_id_preserves_uuid_and_wraps_raw_token():
         uuid.uuid5(identity.SERVICE_INSTANCE_NAMESPACE, "rack-a-exporter"))
 
 
+def test_explicit_instance_ids_distinguish_parallel_processes():
+    """Parallel processes can override the BMC-derived default with unique tokens."""
+    first = _telemetry_identity(service_instance_id="rack-a-exporter-1")
+    second = _telemetry_identity(service_instance_id="rack-a-exporter-2")
+    assert first.service_instance_id != second.service_instance_id
+
+
 def test_service_instance_source_precedence_skips_placeholders_and_local_macs():
     """Discovery skips placeholders before selecting the first stable source class."""
     result = identity.service_instance_id_from_sources(

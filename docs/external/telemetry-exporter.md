@@ -207,6 +207,13 @@ and `service_criticality` inside the `identity` object. Their canonical environm
 `REDFISH_EXPORTER_SERVICE_VERSION`, and `REDFISH_EXPORTER_SERVICE_CRITICALITY`, each defined by
 `specs/config/environment.yaml`.
 
+The default derivation assumes the supported deployment contract of one exporter process per BMC,
+which keeps the instance identity stable across process restarts and BMC address changes. An
+active-active deployment that intentionally runs multiple exporter processes against the same BMC
+must assign each process a distinct `--service-instance-id`. If a canonical environment setting and
+its deprecated `IDRAC_EXPORTER_*` alias disagree, startup fails unless an explicit CLI or config-file
+value selects the intended setting.
+
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
 falls back to the reported sensor name.

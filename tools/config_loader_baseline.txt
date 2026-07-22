@@ -31,8 +31,8 @@ redfish_ctl/redfish_manager.py:360
 redfish_ctl/redfish_manager.py:362
 redfish_ctl/redfish_manager.py:389
 redfish_ctl/redfish_manager_base.py:499
-redfish_ctl/telemetry/cmd_exporter.py:996
 redfish_ctl/telemetry/cmd_exporter.py:997
+redfish_ctl/telemetry/cmd_exporter.py:998
 redfish_ctl/telemetry/exporter.py:1159
 redfish_ctl/telemetry/exporter.py:1175
 redfish_ctl/telemetry/exporter.py:281
