@@ -261,6 +261,26 @@ def poll_task_span(links: Optional[list] = None) -> Iterator[Any]:
         "redfish.task.poll", kind=SpanKind.INTERNAL, links=links
     ) as span:
         yield span
+def _path_family(path: str) -> str:
+    """Low-cardinality Redfish resource family for a request path.
+
+    Groups every BMC request span under its top-level Redfish collection
+    (``Systems``, ``Chassis``, ``Managers``, ``UpdateService`` ...) so an APM
+    backend can aggregate by resource area without per-instance cardinality.
+    The service root (``/redfish/v1``) maps to ``ServiceRoot``; a path that is
+    not under ``/redfish/<version>`` falls back to its first segment, and an
+    empty path maps to ``ServiceRoot``.
+
+    :param path: URL path of a BMC request (for example
+        ``/redfish/v1/Systems/System.Embedded.1``).
+    :return: the stable, low-cardinality family label (never empty).
+    """
+    segments = [seg for seg in path.split("/") if seg]
+    if len(segments) >= 2 and segments[0] == "redfish":
+        segments = segments[2:]
+    if not segments:
+        return "ServiceRoot"
+    return segments[0]
 
 
 @contextlib.contextmanager
@@ -282,7 +302,8 @@ def client_span(
         return
     from opentelemetry.trace import SpanKind
 
-    host = urlsplit(url).hostname or ""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
     span_attributes = dict(_CLIENT_ATTRIBUTES.get())
     if attributes:
         span_attributes.update(attributes)
@@ -293,6 +314,7 @@ def client_span(
         if host:
             span.set_attribute("server.address", host)
         span.set_attribute("http.request.method", method)
+        span.set_attribute("redfish.path_family", _path_family(parts.path))
         for key, value in span_attributes.items():
             if value is not None:
                 span.set_attribute(key, value)

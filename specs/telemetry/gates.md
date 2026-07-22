@@ -42,7 +42,7 @@ Each span test asserts:
 * `server.address` or the agreed `bmc.ip` attribute is present.
 * HTTP method and status are present.
 * Exceptions and timeouts set the span error status.
-* `redfish.action` is present only for Actions.
+* `redfish.action.*` attributes (`name`, `type`, `target`, `level`) are present only for Actions.
 * No request or response body is captured.
 * One physical BMC request produces one span — not one span in the helper and another in its caller.
 
