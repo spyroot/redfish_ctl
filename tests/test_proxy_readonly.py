@@ -412,6 +412,7 @@ def test_proxy_metrics_response_is_json_safe():
                 "node": "slot9",
                 "sensor": "Inlet_Temp",
                 "server.address": "192.0.2.49",
+                "service.name": "redfish_ctl",
                 "source": "sensor",
                 "vendor": "supermicro",
             },

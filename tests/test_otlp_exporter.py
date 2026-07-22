@@ -43,7 +43,8 @@ def test_resolve_config_prefers_flags_then_metric_then_generic_env(monkeypatch):
 
 def _samples():
     dims = {"host.name": "gb300-poc1-slot1", "server.address": "10.0.0.41",
-            "bmc.ip": "10.0.0.21", "node": "slot1", "vendor": "supermicro"}
+            "bmc.ip": "10.0.0.21", "node": "slot1", "vendor": "supermicro",
+            "deployment.environment.name": "nv72-gb300"}
     return [
         MetricSample("hw.power", 512.0, dict(dims), unit="W"),
         MetricSample("hw.gpu.power", 700.0, {**dims, "gpu": "GPU_0"}, unit="W"),
@@ -63,7 +64,8 @@ def test_metrics_data_maps_contract():
 
     res = dict(rm.resource.attributes)
     assert res["service.name"] == "redfish_ctl"
-    for key in ("host.name", "server.address", "bmc.ip", "node", "vendor"):
+    for key in ("host.name", "server.address", "bmc.ip", "node", "vendor",
+                "deployment.environment.name"):
         assert key in res
 
     metrics = {m.name: m for m in rm.scope_metrics[0].metrics}
@@ -73,6 +75,7 @@ def test_metrics_data_maps_contract():
     assert isinstance(metrics["hw.power"].data, Gauge)
     dp = metrics["hw.power"].data.data_points[0]
     assert "host.name" not in dp.attributes and "bmc.ip" not in dp.attributes
+    assert "deployment.environment.name" not in dp.attributes
 
     # Per-metric dims stay on the datapoint.
     gpu_dp = metrics["hw.gpu.power"].data.data_points[0]

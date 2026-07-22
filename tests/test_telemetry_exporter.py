@@ -27,6 +27,7 @@ from redfish_ctl.telemetry.exporter import (
     resolve_signalfx_token,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.identity import parse_dimension_pairs
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
 GB300_CORPUS = corpus_dir(
@@ -99,6 +100,61 @@ def test_identity_dimensions_follow_nv72_slot_contract():
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "supermicro",
+        "service.name": "redfish_ctl",
+    }
+    assert "deployment.environment" not in dims
+    assert "deployment.environment.name" not in dims
+
+
+def test_identity_dimensions_add_deployment_environment_when_explicit():
+    """An explicit deployment environment adds the dashboard join dimensions."""
+    dims = build_identity_dimensions(
+        "172.25.230.29",
+        vendor="supermicro",
+        deployment_environment="NV72-GB300",
+    )
+
+    assert dims["deployment.environment"] == "nv72-gb300"
+    assert dims["deployment.environment.name"] == "nv72-gb300"
+
+
+def test_identity_dimensions_support_deployment_compat_modes():
+    """Deployment environment compatibility mode controls which join keys emit."""
+    deprecated = build_identity_dimensions(
+        "172.25.230.29",
+        deployment_environment="production",
+        deployment_environment_compat="deprecated",
+    )
+    stable = build_identity_dimensions(
+        "172.25.230.29",
+        deployment_environment="production",
+        deployment_environment_compat="stable",
+    )
+
+    assert "deployment.environment" in deprecated
+    assert "deployment.environment.name" not in deprecated
+    assert "deployment.environment" not in stable
+    assert stable["deployment.environment.name"] == "production"
+
+
+def test_identity_rejects_empty_unknown_and_secret_dimensions():
+    """Caller-supplied identity values fail closed before export starts."""
+    with pytest.raises(ValueError, match="concrete value"):
+        build_identity_dimensions("172.25.230.29", deployment_environment="unknown")
+    with pytest.raises(ValueError, match="secret"):
+        build_identity_dimensions(
+            "172.25.230.29",
+            extra_dimensions=["telemetry.source=https://example.invalid"],
+        )
+    with pytest.raises(ValueError, match="reserved"):
+        build_identity_dimensions("172.25.230.29", extra_dimensions=["model=bad"])
+
+
+def test_parse_dimension_pairs_accepts_valid_escape_hatch():
+    """Generic fixed dimensions allow bounded non-identity context."""
+    assert parse_dimension_pairs("telemetry.source=redfish,rack=row-a") == {
+        "telemetry.source": "redfish",
+        "rack": "row-a",
     }
 
 
@@ -108,6 +164,8 @@ def test_identity_options_resolve_from_environment(monkeypatch):
     monkeypatch.setenv("REDFISH_EXPORTER_BMC_OCTET_BASE", "10")
     monkeypatch.setenv("REDFISH_EXPORTER_SERVER_OCTET_BASE", "100")
     monkeypatch.setenv("REDFISH_EXPORTER_SERVER_SUBNET", "198.51.100")
+    monkeypatch.setenv("REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT", "NV72-GB300")
+    monkeypatch.setenv("REDFISH_EXPORTER_EXTRA_DIMENSIONS", "telemetry.source=redfish")
 
     dims = build_identity_dimensions(
         "203.0.113.29",
@@ -121,6 +179,10 @@ def test_identity_options_resolve_from_environment(monkeypatch):
         "server.address": "198.51.100.119",
         "bmc.ip": "203.0.113.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
+        "deployment.environment": "nv72-gb300",
+        "deployment.environment.name": "nv72-gb300",
+        "telemetry.source": "redfish",
     }
 
 
@@ -503,6 +565,7 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
         "source": "exporter",
         "collector": "metric-reports",
         "error": "timeout",
@@ -691,6 +754,10 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "deployment_environment": "staging",
+            "deployment_environment_compat": "stable",
+            "require_deployment_environment": True,
+            "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
 
@@ -701,6 +768,10 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
         "identity_bmc_octet_base": 20,
         "identity_server_octet_base": 100,
         "identity_server_subnet": "198.51.100",
+        "deployment_environment": "staging",
+        "deployment_environment_compat": "stable",
+        "require_deployment_environment": True,
+        "extra_dimensions": {"telemetry.source": "redfish"},
     }
 
 
@@ -792,6 +863,8 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
             "bmc_octet_base": 20,
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
+            "deployment_environment": "nv72-gb300",
+            "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
 
@@ -822,6 +895,9 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     first_dims = calls[0]["body"]["gauge"][0]["dimensions"]
     assert first_dims["host.name"] == "rack-a-slot9"
     assert first_dims["server.address"] == "198.51.100.109"
+    assert first_dims["deployment.environment"] == "nv72-gb300"
+    assert first_dims["deployment.environment.name"] == "nv72-gb300"
+    assert first_dims["telemetry.source"] == "redfish"
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):
