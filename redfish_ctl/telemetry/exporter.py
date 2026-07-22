@@ -815,6 +815,7 @@ def _gpu_metric_report_sample(
                 dims | {"property": GPU_THROTTLE_PROPERTIES[prop_name]},
                 "s",
                 row.get("Timestamp"),
+                metric_type="counter",  # cumulative throttle time, not a gauge
             )
 
     if source == "memory":
@@ -999,21 +1000,25 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
 
 
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint gauge envelope.
+    """Wrap samples in the SignalFx /v2/datapoint envelope, keyed by metric type.
+
+    A ``counter`` metric_type is a monotonic cumulative counter, so it goes under the
+    SignalFx ``cumulative_counter`` envelope (matching the Prometheus ``counter`` type
+    and the OTLP monotonic Sum); everything else is a ``gauge``. This keeps the stored
+    Splunk metric type consistent with the other backends.
 
     :param samples: metric samples to wrap.
-    :return: SignalFx ``/v2/datapoint`` body with a ``gauge`` list.
+    :return: SignalFx ``/v2/datapoint`` body with ``gauge`` and/or ``cumulative_counter`` lists.
     """
-    return {
-        "gauge": [
-            {
-                "metric": sample.metric,
-                "value": sample.value,
-                "dimensions": dict(sample.dimensions),
-            }
-            for sample in samples
-        ]
-    }
+    body: dict[str, list[dict]] = {}
+    for sample in samples:
+        envelope = "cumulative_counter" if sample.metric_type == "counter" else "gauge"
+        body.setdefault(envelope, []).append({
+            "metric": sample.metric,
+            "value": sample.value,
+            "dimensions": dict(sample.dimensions),
+        })
+    return body
 
 
 def _require_datapoint_url(ingest_url: str) -> str:
@@ -1423,20 +1428,28 @@ def _sample(metric: str,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None,
-            metric_type: str = "gauge") -> MetricSample:
+            metric_type: Optional[str] = None) -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
     :param value: numeric sample value.
     :param dims: dimension mapping.
-    :param unit: optional unit annotation.
+    :param unit: optional unit annotation; coerced to str so a non-string BMC unit
+        cannot reach the OTLP mapper.
     :param timestamp: optional sample timestamp.
-    :param metric_type: Prometheus/OpenMetrics sample type.
+    :param metric_type: explicit sample type; when None it is derived from the metric
+        name (monotonic-counter names -> ``counter``, else ``gauge``) so Prometheus,
+        SignalFx, and OTLP all agree on the type. This is the single classifier point.
     :return: the assembled MetricSample.
     """
+    if metric_type is None:
+        from . import otlp
+        metric_type = "counter" if otlp.is_monotonic_counter(metric) else "gauge"
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
-                        metric_type=metric_type, unit=unit, timestamp=timestamp)
+                        metric_type=metric_type,
+                        unit=(str(unit) if unit is not None else None),
+                        timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
@@ -1451,7 +1464,7 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
         if value not in (None, "")
     }
     for key in REQUIRED_DIMENSIONS:
-        dims.setdefault(key, str(identity.get(key, "unknown")))
+        dims.setdefault(key, str(identity.get(key) or "unknown"))
     for key, value in extra.items():
         if value not in (None, ""):
             dims[key] = str(value)

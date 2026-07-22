@@ -48,7 +48,8 @@ def _samples():
     return [
         MetricSample("hw.power", 512.0, dict(dims), unit="W"),
         MetricSample("hw.gpu.power", 700.0, {**dims, "gpu": "GPU_0"}, unit="W"),
-        MetricSample("hw.fabric.rx_bytes", 12345.0, {**dims, "port": "NVLink_0"}, unit="By"),
+        MetricSample("hw.fabric.rx_bytes", 12345.0, {**dims, "port": "NVLink_0"}, unit="By",
+                     metric_type="counter"),
     ]
 
 
