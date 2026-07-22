@@ -209,10 +209,19 @@ def test_kopf_handler_wraps_node_profile_reconcile_in_controller_span(
     """Each node-profile reconcile gets a root span with BMC identity."""
     module = _load_controller_module()
     spans: list[FakeSpan] = []
+    span_calls = []
 
     @contextlib.contextmanager
-    def fake_operation_span(name: str):
+    def fake_operation_span(
+        name: str,
+        *,
+        parent_policy=None,
+        attributes=None,
+        links=(),
+    ):
+        span_calls.append((parent_policy, dict(attributes or {}), tuple(links)))
         span = FakeSpan(name)
+        span.attributes.update(attributes or {})
         spans.append(span)
         yield span
 
@@ -245,6 +254,20 @@ def test_kopf_handler_wraps_node_profile_reconcile_in_controller_span(
     assert patch["status"]["dryRun"] is True
     assert len(spans) == 1
     assert spans[0].name == "k8s.redfish_node_profile.reconcile"
+    parent_policy = getattr(module.tracing, "SpanParentPolicy", None)
+    assert parent_policy is not None
+    assert span_calls == [
+        (
+            parent_policy.ROOT,
+            {
+                "server.address": "mock-bmc",
+                "k8s.namespace.name": "default",
+                "k8s.resource.name": "profile-a",
+                "k8s.resource.kind": "RedfishNodeProfile",
+            },
+            (),
+        )
+    ]
     assert spans[0].attributes == {
         "server.address": "mock-bmc",
         "k8s.namespace.name": "default",

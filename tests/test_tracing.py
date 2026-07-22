@@ -14,11 +14,16 @@ cleanly when the OpenTelemetry SDK (the ``[otlp]`` extra) is not installed.
 Author Mus <spyroot@gmail.com>
 """
 import asyncio
+import contextlib
 import json
+from types import SimpleNamespace
 
 import pytest
 
+from redfish_ctl import redfish_main
 from redfish_ctl.firmware.cmd_firmware_update import FirmwareUpdate
+from redfish_ctl.fleet import cmd_fleet
+from redfish_ctl.fleet.cmd_fleet import FleetNode
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.telemetry import tracing
@@ -352,3 +357,272 @@ def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
         tracing.setup_otlp()
     finally:
         tracing.disable_tracing()
+
+
+def test_operation_span_parent_policies_are_explicit(span_exporter):
+    """ROOT, CHILD, and ENSURE produce the declared parent relationships."""
+    parent_policy = getattr(tracing, "SpanParentPolicy", None)
+    assert parent_policy is not None, "operation spans need an explicit parent policy"
+
+    with pytest.raises(RuntimeError, match="active parent"):
+        with tracing.operation_span(
+            "child-without-parent",
+            parent_policy=parent_policy.CHILD,
+        ):
+            pass
+
+    with tracing._TRACER.start_as_current_span("ambient") as ambient:
+        ambient_id = ambient.get_span_context().span_id
+        with tracing.operation_span(
+            "forced-root",
+            parent_policy=parent_policy.ROOT,
+            attributes={"server.address": "root.example.test"},
+        ):
+            pass
+        with tracing.operation_span(
+            "required-child",
+            parent_policy=parent_policy.CHILD,
+        ):
+            pass
+        with tracing.operation_span(
+            "ensured-child",
+            parent_policy=parent_policy.ENSURE,
+        ):
+            pass
+
+    with tracing.operation_span(
+        "ensured-root",
+        parent_policy=parent_policy.ENSURE,
+    ):
+        pass
+
+    spans = {span.name: span for span in span_exporter.get_finished_spans()}
+    assert spans["forced-root"].parent is None
+    assert spans["forced-root"].attributes["server.address"] == "root.example.test"
+    assert spans["required-child"].parent.span_id == ambient_id
+    assert spans["ensured-child"].parent.span_id == ambient_id
+    assert spans["ensured-root"].parent is None
+
+
+def test_operation_span_root_accepts_creation_time_links(span_exporter):
+    """An independent root records coordinator links supplied at creation."""
+    parent_policy = getattr(tracing, "SpanParentPolicy", None)
+    assert parent_policy is not None, "operation spans need an explicit parent policy"
+    from opentelemetry.trace import Link
+
+    with tracing._TRACER.start_as_current_span("coordinator") as coordinator:
+        coordinator_context = coordinator.get_span_context()
+        with tracing.operation_span(
+            "linked-root",
+            parent_policy=parent_policy.ROOT,
+            attributes={"server.address": "node.example.test"},
+            links=(Link(coordinator_context),),
+        ):
+            pass
+
+    linked = next(
+        span for span in span_exporter.get_finished_spans()
+        if span.name == "linked-root"
+    )
+    assert linked.parent is None
+    assert linked.links[0].context.span_id == coordinator_context.span_id
+    assert linked.attributes["server.address"] == "node.example.test"
+
+
+def test_client_span_passes_sampler_attributes_at_creation(monkeypatch):
+    """Known request attributes reach the tracer before sampling begins."""
+    calls = []
+
+    class RecordingSpan:
+        """Minimal writable span used by the recording tracer."""
+
+        def set_attribute(self, key, value):
+            pass
+
+    class RecordingTracer:
+        """Capture arguments passed to ``start_as_current_span``."""
+
+        @contextlib.contextmanager
+        def start_as_current_span(self, name, **kwargs):
+            calls.append((name, kwargs))
+            yield RecordingSpan()
+
+    monkeypatch.setattr(tracing, "_TRACER", RecordingTracer())
+    with tracing.client_span(
+        "https://bmc.example.test/redfish/v1/Systems/1",
+        "GET",
+        attributes={"redfish.vendor": "example"},
+    ):
+        pass
+
+    name, kwargs = calls[0]
+    assert name == "redfish.bmc.request"
+    assert kwargs["attributes"] == {
+        "peer.service": "bmc",
+        "server.address": "bmc.example.test",
+        "http.request.method": "GET",
+        "redfish.vendor": "example",
+    }
+    assert kwargs["record_exception"] is False
+    assert kwargs["set_status_on_exception"] is False
+
+
+def test_cli_command_has_one_root_for_the_complete_lifecycle(
+    span_exporter,
+    monkeypatch,
+):
+    """Preflight, dispatch, Dell enrichment, and rendering share one CLI root."""
+    render_span_ids = []
+
+    class FakeManager:
+        """Emit one tagged CLIENT span at each BMC lifecycle phase."""
+
+        redfish_vendor = "Dell"
+
+        def __init__(self, **kwargs):
+            self.host = kwargs["host"]
+
+        @staticmethod
+        def _request(phase):
+            with tracing.client_span(
+                f"https://bmc.example.test/redfish/v1/{phase}",
+                "GET",
+                attributes={"test.phase": phase},
+            ):
+                pass
+
+        def check_api_version(self):
+            self._request("preflight")
+            return True
+
+        def sync_invoke(self, api_call, name, **kwargs):
+            def execute():
+                self._request("command")
+                return CommandResult({"value": 1}, None, None, None)
+
+            if kwargs.pop("_trace_operation_span", True):
+                with tracing.operation_span(name) as span:
+                    result = execute()
+                    tracing.record_result(span, result)
+                    return result
+            return execute()
+
+        @property
+        def idrac_manager_version(self):
+            self._request("idrac-version")
+            return "7.0"
+
+        @property
+        def redfish_version(self):
+            self._request("redfish-version")
+            return "1.20.0"
+
+    def fake_process_response(_args, result):
+        from opentelemetry.trace import get_current_span
+
+        render_span_ids.append(get_current_span().get_span_context().span_id)
+        return result.data
+
+    def fake_json_printer(_data, _args, colorized=False):
+        from opentelemetry.trace import get_current_span
+
+        render_span_ids.append(get_current_span().get_span_context().span_id)
+
+    monkeypatch.setattr(redfish_main, "RedfishManagerBase", FakeManager)
+    monkeypatch.setattr(redfish_main, "process_respond", fake_process_response)
+    monkeypatch.setattr(redfish_main, "json_printer", fake_json_printer)
+
+    args = SimpleNamespace(
+        redfish_host="bmc.example.test",
+        redfish_username="root",
+        redfish_password="mock",
+        redfish_port=443,
+        verify_ssl=False,
+        use_http=False,
+        debug=False,
+        otlp_traces=False,
+        verbose=False,
+        nocolor=True,
+        subcommand="system",
+    )
+    command = SimpleNamespace(type=ApiRequestType.SystemQuery, name="system_query")
+    redfish_main.main(args, {"system": command})
+
+    spans = span_exporter.get_finished_spans()
+    roots = [span for span in spans if span.parent is None]
+    assert [span.name for span in roots] == ["system_query"]
+    root = roots[0]
+    assert root.attributes["server.address"] == "bmc.example.test"
+
+    clients = [span for span in spans if span.name == "redfish.bmc.request"]
+    assert {span.attributes["test.phase"] for span in clients} == {
+        "preflight",
+        "command",
+        "idrac-version",
+        "redfish-version",
+    }
+    assert all(span.parent.span_id == root.context.span_id for span in clients)
+    assert render_span_ids == [root.context.span_id, root.context.span_id]
+
+
+def test_fleet_nodes_are_independent_roots_linked_to_coordinator(
+    span_exporter,
+    monkeypatch,
+):
+    """Each fleet node gets a linked root instead of inheriting thread context."""
+    parent_policy = getattr(tracing, "SpanParentPolicy", None)
+    assert parent_policy is not None, "operation spans need an explicit parent policy"
+    nodes = tuple(
+        FleetNode(
+            name=f"node-{index}",
+            address=f"bmc-{index}.example.test",
+            username="root",
+            password="mock",
+            port=443,
+            insecure=True,
+            use_http=False,
+        )
+        for index in range(2)
+    )
+
+    def fake_read_node(node):
+        with tracing.client_span(
+            f"https://{node.address}/redfish/v1/Systems/1",
+            "GET",
+        ):
+            pass
+        return {
+            "name": node.name,
+            "address": node.address,
+            "ok": True,
+            "powerState": "On",
+            "health": "OK",
+            "state": "Enabled",
+            "sensors": {"count": 0},
+            "temperature": {"count": 0, "max_celsius": None},
+            "error": None,
+        }
+
+    monkeypatch.setattr(cmd_fleet, "read_node", fake_read_node)
+    with tracing.operation_span(
+        "fleet",
+        parent_policy=parent_policy.ROOT,
+        attributes={"server.address": "fleet"},
+    ) as coordinator:
+        coordinator_id = coordinator.get_span_context().span_id
+        result = cmd_fleet.read_fleet(nodes, concurrency=2)
+
+    assert result["summary"] == {"total": 2, "ok": 2, "failed": 0}
+    spans = span_exporter.get_finished_spans()
+    node_roots = [span for span in spans if span.name == "fleet.node"]
+    assert len(node_roots) == 2
+    assert all(span.parent is None for span in node_roots)
+    assert {span.attributes["server.address"] for span in node_roots} == {
+        node.address for node in nodes
+    }
+    assert all(span.links[0].context.span_id == coordinator_id for span in node_roots)
+
+    node_ids = {span.context.span_id for span in node_roots}
+    clients = [span for span in spans if span.name == "redfish.bmc.request"]
+    assert len(clients) == 2
+    assert {span.parent.span_id for span in clients} == node_ids
