@@ -110,5 +110,11 @@ def test_conda_environment_includes_make_build_tools() -> None:
     environment_text = (REPO_ROOT / "environment.yml").read_text(encoding="utf-8")
 
     assert "  - twine" in environment_text
+
+
+def test_conda_environment_includes_otlp_extra_dependencies() -> None:
+    """The GB300 conda image should carry the dependencies needed for OTLP export."""
+    environment_text = (REPO_ROOT / "environment.yml").read_text(encoding="utf-8")
+
     assert "opentelemetry-sdk>=1.20" in environment_text
     assert "opentelemetry-exporter-otlp>=1.20" in environment_text
