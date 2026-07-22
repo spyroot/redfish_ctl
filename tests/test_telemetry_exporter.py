@@ -799,13 +799,13 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         vendor="supermicro",
     )
 
-    gauges = result.data["gauge"]
-    metrics = {point["metric"] for point in gauges}
+    points = [point for envelope in result.data.values() for point in envelope]
+    metrics = {point["metric"] for point in points}
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes", "hw.leak.state"} <= metrics
     assert {"hw.scrape.ok", "hw.scrape.duration_seconds"} <= metrics
-    scrape_ok = next(point for point in gauges if point["metric"] == "hw.scrape.ok")
+    scrape_ok = next(point for point in points if point["metric"] == "hw.scrape.ok")
     scrape_duration = next(
-        point for point in gauges
+        point for point in points
         if point["metric"] == "hw.scrape.duration_seconds"
     )
     assert scrape_ok["value"] == 1
@@ -1066,7 +1066,7 @@ def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkey
     assert calls[0]["body"] is result.data
     assert result.data["gauge"]
     assert result.extra["push_status"] == 200
-    assert result.extra["sample_count"] == len(result.data["gauge"])
+    assert result.extra["sample_count"] == sum(len(pts) for pts in result.data.values())
 
 
 def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkeypatch):
