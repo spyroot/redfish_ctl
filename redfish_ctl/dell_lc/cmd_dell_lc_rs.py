@@ -8,12 +8,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class GetRemoteRssAPIStatus(RedfishManagerBase,
+class GetRemoteRssAPIStatus(IDracManager,
                             scm_type=ApiRequestType.RemoteServicesRssAPIStatus,
                             name='dell_lc_rs_status',
                             metaclass=Singleton):

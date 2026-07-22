@@ -3,8 +3,8 @@
 from redfish_ctl.actions.action_policy import classify
 from redfish_ctl.oem.cmd_dell_card_csr import DellCardCsr
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 SERVICE_URI = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DelliDRACCardService"
 FACTORY_ACTION = "#DelliDRACCardService.FactoryIdentityCertificateGenerateCSR"
@@ -157,7 +157,7 @@ def test_dell_card_csr_reports_missing_action(redfish_api, redfish_service):
 
 def test_dell_card_csr_registration_and_policy():
     """The command is registered and the CSR actions are reversible."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellCardCsr]["dell-card-csr"] is DellCardCsr
     assert classify(FACTORY_ACTION).value == "reversible"
     assert classify(SEKM_ACTION).value == "reversible"

@@ -15,8 +15,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton, TestNetworkShareReq
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton, TestNetworkShareReq
 
 _TEST_NETWORK_SHARE_ACTION = "#DellLCService.TestNetworkShare"
 
@@ -32,7 +32,7 @@ def _link(data, key):
     return link.get("@odata.id") if isinstance(link, dict) else None
 
 
-class DellLcNetworkShareTest(RedfishManagerBase,
+class DellLcNetworkShareTest(IDracManager,
                              scm_type=ApiRequestType.DellLcNetworkShareTest,
                              name="dell-lc-network-share-test",
                              metaclass=Singleton):

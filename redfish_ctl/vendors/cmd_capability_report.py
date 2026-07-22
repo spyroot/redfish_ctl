@@ -10,13 +10,13 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from .report import capability_report
 
 
-class CapabilityReport(RedfishManagerBase,
+class CapabilityReport(IDracManager,
                        scm_type=ApiRequestType.CapabilityReport,
                        name="capability-report",
                        metaclass=Singleton):

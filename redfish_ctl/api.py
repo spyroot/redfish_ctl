@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Protocol
 
 from .redfish_manager import CommandResult
-from .redfish_manager_shared import ApiRequestType
+from .idrac_shared import ApiRequestType
 
 
 class SyncInvoker(Protocol):

@@ -14,7 +14,7 @@ from redfish_ctl.accounts.cmd_account_manage import (
     build_create_payload,
     build_update_payload,
 )
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_build_create_payload():

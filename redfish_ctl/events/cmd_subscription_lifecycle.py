@@ -11,8 +11,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import (
+from ..idrac_manager import IDracManager
+from ..idrac_shared import (
     REDFISH_API,
     ApiRequestType,
     HTTPMethod,
@@ -39,7 +39,7 @@ def _as_list(values) -> list[str]:
     return normalized
 
 
-class _SubscriptionBase(RedfishManagerBase):
+class _SubscriptionBase(IDracManager):
     """Shared EventService subscription helpers."""
 
     @staticmethod

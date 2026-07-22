@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 # The controller + drive the Storage fixture's Drives navigation list points at.

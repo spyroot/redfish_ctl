@@ -6,7 +6,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_main import create_cmd_tree
 from redfish_ctl.redfish_manager import CommandResult
 

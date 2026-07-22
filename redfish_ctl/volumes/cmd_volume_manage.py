@@ -11,8 +11,8 @@ from typing import Iterable, Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 _CHECK_CONSISTENCY_ACTION = "#Volume.CheckConsistency"
 
@@ -81,7 +81,7 @@ def build_volume_payload(name: str, raid_type: str, drive_uris: list[str]) -> di
     }
 
 
-class _VolumeMutationBase(RedfishManagerBase):
+class _VolumeMutationBase(IDracManager):
     """Shared Storage/Volume collection helpers for guarded mutations."""
 
     def _storage(self, controller: str, do_async: bool = False) -> dict:

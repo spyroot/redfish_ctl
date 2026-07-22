@@ -88,7 +88,7 @@ def _accessed_on(node: ast.Attribute) -> str | None:
 def _enum_member_truthiness_findings() -> list:
     """Every ``<variable>.Success``-style access in the package.
 
-    Enum classes are CamelCase (``RedfishApiRespond``, ``TaskStatus``), so a
+    Enum classes are CamelCase (``RedfishApiRespond``, ``IdracTaskStatus``), so a
     member fetched from a capitalized name is a legitimate class reference;
     fetched from a lowercase name it is a respond value being misused.
     """
@@ -141,7 +141,7 @@ def _unguarded_direct_mutation_findings() -> list[str]:
     """Direct write helpers in command modules without an explicit guard arg."""
     findings = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        if path.name == "redfish_manager_base.py":
+        if path.name == "idrac_manager.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         parents = _parent_map(tree)

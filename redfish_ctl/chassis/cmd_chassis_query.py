@@ -9,17 +9,17 @@ Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
 from typing import Optional
-from ..redfish_manager_shared import REDFISH_API
+from ..idrac_shared import REDFISH_API
 from ..redfish_manager import CommandResult
 from ..cmd_exceptions import FailedDiscoverAction
 from ..cmd_exceptions import InvalidArgument
 from ..cmd_exceptions import UnsupportedAction
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
-from ..redfish_manager_shared import REDFISH_JSON
+from ..idrac_manager import IDracManager
+from ..idrac_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_shared import REDFISH_JSON
 
 
-class ChassisQuery(RedfishManagerBase,
+class ChassisQuery(IDracManager,
                    scm_type=ApiRequestType.ChassisQuery,
                    name='chassis_service_query',
                    metaclass=Singleton):

@@ -11,8 +11,8 @@ from redfish_ctl.actions.action_policy import classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.oem.cmd_dell_card_key_management import DellCardKeyManagement
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -45,7 +45,7 @@ def dell_corpus_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-xr8620t",
                 idrac_username="root",
                 idrac_password="mock",
@@ -227,7 +227,7 @@ def test_dell_card_key_management_exposes_policy_and_cli_entrypoint():
     assert classify(DISABLE_SEKM_TYPE).value == "destructive"
     assert classify(REKEY_TYPE).value == "destructive"
 
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellCardKeyManagement][
         "dell-card-key-management"
     ] is DellCardKeyManagement

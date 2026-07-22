@@ -19,12 +19,12 @@ from datetime import datetime
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class JobList(RedfishManagerBase,
+class JobList(IDracManager,
               scm_type=ApiRequestType.Jobs,
               name='jobs_sources_query',
               metaclass=Singleton):

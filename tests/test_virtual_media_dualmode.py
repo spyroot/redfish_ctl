@@ -7,15 +7,15 @@ import requests
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType, RedfishApiRespond
 
 _X10_VM_UNSUPPORTED = "standard VirtualMedia endpoint is not implemented on this BMC"
 
 
 def _force_x10_standard_vm_501(monkeypatch):
     """Make only the resolved X10 standard VirtualMedia collection return 501."""
-    original_get = RedfishManagerBase.api_get_call
+    original_get = IDracManager.api_get_call
 
     def x10_vm_501(self, request_uri, headers=None, **kwargs):
         if "/redfish/v1/Managers/1/VM1?" in request_uri:
@@ -26,7 +26,7 @@ def _force_x10_standard_vm_501(monkeypatch):
             return response
         return original_get(self, request_uri, headers, **kwargs)
 
-    monkeypatch.setattr(RedfishManagerBase, "api_get_call", x10_vm_501)
+    monkeypatch.setattr(IDracManager, "api_get_call", x10_vm_501)
 
 
 def test_virtual_media_query_returns_collection(redfish_api):
@@ -229,11 +229,11 @@ def test_virtual_media_commands_report_missing_collection(
     redfish_mock, monkeypatch, api_call, name, kwargs
 ):
     """Commands report missing VirtualMedia as a command error, not a traceback."""
-    monkeypatch.setattr(RedfishManagerBase, "idrac_manage_servers", property(lambda self: ""))
+    monkeypatch.setattr(IDracManager, "idrac_manage_servers", property(lambda self: ""))
     monkeypatch.setattr(redfish_mock, "discover_manager_ids", lambda: [])
     monkeypatch.setattr(redfish_mock, "discover_computer_system_ids", lambda: [])
-    monkeypatch.setattr(RedfishManagerBase, "discover_manager_ids", lambda self: [])
-    monkeypatch.setattr(RedfishManagerBase, "discover_computer_system_ids", lambda self: [])
+    monkeypatch.setattr(IDracManager, "discover_manager_ids", lambda self: [])
+    monkeypatch.setattr(IDracManager, "discover_computer_system_ids", lambda self: [])
 
     result = redfish_mock.sync_invoke(api_call, name, **kwargs)
 
@@ -250,7 +250,7 @@ def test_virtual_media_insert_uses_manager_action_target(
     """insert_vm uses the discovered Manager VirtualMedia action target."""
     manager, service = redfish_mock_factory("supermicro")
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -287,7 +287,7 @@ def test_virtual_media_eject_uses_hydrated_manager_action_target(
     service._overlay[device_path] = device_state
     service._overlay[device_path.lower()] = device_state
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -312,7 +312,7 @@ def test_virtual_media_insert_posts_action_payload(
 ):
     """virtual_disk_insert POSTs to the member InsertMedia action target."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )
@@ -347,7 +347,7 @@ def test_virtual_media_eject_posts_action_payload(
 ):
     """virtual_disk_eject POSTs an empty body to the member EjectMedia target."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )

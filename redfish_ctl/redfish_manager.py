@@ -348,7 +348,7 @@ class RedfishManager:
         semantics of the GET itself are unchanged. Tunable via env:
         ``REDFISH_HTTP_POOL`` (pool size), ``REDFISH_HTTP_RETRIES``,
         ``REDFISH_HTTP_BACKOFF`` (legacy ``IDRAC_HTTP_*`` still honored).
-        Inherited by RedfishManagerBase.
+        Inherited by IDracManager.
 
         :return: the cached keep-alive ``requests.Session``.
         """

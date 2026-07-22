@@ -1,6 +1,6 @@
 """Main entry for redfish_ctl
 
-The main routine for redfish_ctl; the tool leverages the RedfishManagerBase class.
+The main routine for redfish_ctl; the tool leverages the IDracManager class.
 to interact with a Redfish BMC.
 
 Each command registered dynamically and dispatch to respected execute method
@@ -49,8 +49,8 @@ from .cmd_exceptions import (
 from .cmd_utils import save_if_needed
 from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .redfish_manager_base import RedfishManagerBase
-from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
+from .idrac_manager import IDracManager
+from .idrac_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
@@ -460,7 +460,7 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.setup_otlp()
 
     # the manager is the main interface main uses to interact with the BMC.
-    redfish_api = RedfishManagerBase(host=cmd_args.redfish_host,
+    redfish_api = IDracManager(host=cmd_args.redfish_host,
                                      username=cmd_args.redfish_username,
                                      password=cmd_args.redfish_password,
                                      port=cmd_args.redfish_port,
@@ -572,7 +572,7 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
     :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
-    redfish_api = RedfishManagerBase()
+    redfish_api = IDracManager()
     command_name_to_cmd = {}
     commands_registry = redfish_api.get_registry()
     command_name = collections.namedtuple("Command", "type name")

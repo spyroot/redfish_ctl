@@ -12,12 +12,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Sensors(RedfishManagerBase,
+class Sensors(IDracManager,
               scm_type=ApiRequestType.Sensors,
               name='sensors',
               metaclass=Singleton):

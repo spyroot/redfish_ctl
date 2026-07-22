@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -54,7 +54,7 @@ def test_dell_lc_status_commands_post_empty_payload_to_action(
         assert task_id == redfish_service.JOB_ID
         return task_state
 
-    monkeypatch.setattr(RedfishManagerBase, "fetch_task", fetch_task)
+    monkeypatch.setattr(IDracManager, "fetch_task", fetch_task)
 
     result = redfish_mock.sync_invoke(request_type, command_name)
 

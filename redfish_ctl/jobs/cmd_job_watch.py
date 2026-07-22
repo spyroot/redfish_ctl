@@ -13,12 +13,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class JobWatch(RedfishManagerBase,
+class JobWatch(IDracManager,
                scm_type=ApiRequestType.JobWatch,
                name='job_watch',
                metaclass=Singleton):

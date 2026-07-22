@@ -13,15 +13,15 @@ import time
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, CliJobTypes, JobState
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import ResetType
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, CliJobTypes, JobState
+from ..idrac_shared import RedfishApiRespond
+from ..idrac_shared import ResetType
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class JobApply(RedfishManagerBase,
+class JobApply(IDracManager,
                scm_type=ApiRequestType.JobApply,
                name='job_apply',
                metaclass=Singleton):

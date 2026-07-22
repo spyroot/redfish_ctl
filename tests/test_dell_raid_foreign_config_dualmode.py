@@ -9,8 +9,8 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.raid.cmd_dell_raid_foreign_config import DellRaidForeignConfigActions
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -34,7 +34,7 @@ def dell_corpus_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-raid-foreign-config",
                 idrac_username="root",
                 idrac_password="mock",
@@ -206,7 +206,7 @@ def test_dell_raid_foreign_config_missing_action_reports_available(dell_corpus_m
 
 def test_dell_raid_foreign_config_policy_and_registry_are_wired():
     """The command is registered and its foreign actions use the strongest guard."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellRaidForeignConfigActions][
         "dell-raid-foreign-config"
     ] is DellRaidForeignConfigActions

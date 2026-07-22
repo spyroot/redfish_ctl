@@ -2,7 +2,7 @@
 import json
 
 from redfish_ctl.discovery.cmd_discovery import Discovery
-from redfish_ctl.redfish_manager_shared import ApiRequestType, Singleton
+from redfish_ctl.idrac_shared import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult
 
 

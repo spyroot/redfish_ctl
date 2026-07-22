@@ -14,8 +14,8 @@ import redfish_ctl.telemetry.exporter as exporter_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,
@@ -103,7 +103,7 @@ def gb300_exporter_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",
@@ -1142,7 +1142,7 @@ def test_redfish_response_cache_loader_failure_wakes_waiters():
 
 def test_base_query_cache_shares_full_payload_across_key_selectors(monkeypatch):
     """Different root-key selectors reuse the same exact GET response."""
-    manager = RedfishManagerBase(
+    manager = IDracManager(
         idrac_ip="mock-gb300",
         idrac_username="root",
         idrac_password="mock",

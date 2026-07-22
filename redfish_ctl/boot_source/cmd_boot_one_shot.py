@@ -27,8 +27,8 @@ from ..cmd_exceptions import (
 )
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import (
+from ..idrac_manager import IDracManager
+from ..idrac_shared import (
     ApiRequestType,
     BootSourceOverrideMode,
     RedfishApiRespond,
@@ -55,7 +55,7 @@ _RESET_ERRORS = (
 )
 
 
-class BootOneShot(RedfishManagerBase,
+class BootOneShot(IDracManager,
                   scm_type=ApiRequestType.BootOneShot,
                   name='boot_one_shot',
                   metaclass=Singleton):

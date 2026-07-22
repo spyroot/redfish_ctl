@@ -15,8 +15,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 _SERVICE_NAME = "DellLCService"
 _DEFAULT_SERVICE_URI = (
@@ -35,7 +35,7 @@ _ACTION_SPECS = {
 
 
 class DellLcSupportAssistSchedule(
-        RedfishManagerBase,
+        IDracManager,
         scm_type=ApiRequestType.DellLcSupportAssistSchedule,
         name="dell-lc-supportassist-schedule",
         metaclass=Singleton):

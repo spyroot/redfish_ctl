@@ -12,8 +12,8 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.component_integrity.cmd_spdm_measurements import SpdmMeasurements
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 _BMC_RESOURCE = "/redfish/v1/ComponentIntegrity/HGX_ERoT_BMC_0"
 _BMC_TARGET = (
@@ -223,7 +223,7 @@ def test_spdm_measurements_rejects_invalid_measurement_index():
 
 def test_spdm_measurements_exposes_cli_entrypoint():
     """The spdm-measurements command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.SpdmMeasurements]["spdm-measurements"] is (
         SpdmMeasurements
     )

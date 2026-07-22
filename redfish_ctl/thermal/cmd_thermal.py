@@ -9,12 +9,12 @@ metrics (temperature readings), and fan inventory.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Thermal(RedfishManagerBase,
+class Thermal(IDracManager,
               scm_type=ApiRequestType.Thermal,
               name="thermal",
               metaclass=Singleton):

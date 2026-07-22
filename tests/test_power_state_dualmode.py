@@ -1,6 +1,6 @@
-"""Dual-mode tests for RedfishManagerBase power-state reads."""
+"""Dual-mode tests for IDracManager power-state reads."""
 
-from redfish_ctl.redfish_manager_shared import PowerState
+from redfish_ctl.idrac_shared import PowerState
 
 
 def test_power_state_reads_chassis_power_state(redfish_api):

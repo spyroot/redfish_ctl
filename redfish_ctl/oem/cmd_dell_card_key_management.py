@@ -17,8 +17,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _SERVICE_NAME = "DelliDRACCardService"
@@ -79,7 +79,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellCardKeyManagement(RedfishManagerBase,
+class DellCardKeyManagement(IDracManager,
                             scm_type=ApiRequestType.DellCardKeyManagement,
                             name="dell-card-key-management",
                             metaclass=Singleton):

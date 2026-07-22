@@ -16,7 +16,7 @@ from redfish_ctl.api import (
     get_system,
     get_thermal,
 )
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
     build_identity_dimensions,

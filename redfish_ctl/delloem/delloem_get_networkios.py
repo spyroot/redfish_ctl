@@ -6,13 +6,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import RedfishApiRespond
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class GetNetworkIsoAttachStatus(RedfishManagerBase,
+class GetNetworkIsoAttachStatus(IDracManager,
                                 scm_type=ApiRequestType.GetNetworkIsoAttachStatus,
                                 name='net_ios_attach_status',
                                 metaclass=Singleton):

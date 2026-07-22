@@ -6,7 +6,7 @@ test_net_scan.py. All network I/O is mocked — no real hosts are touched.
 """
 import requests
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 class _Resp:

@@ -12,8 +12,8 @@ from redfish_ctl.oem.cmd_dell_persistent_partition import (
     DellPersistentPartitionActions,
 )
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -52,7 +52,7 @@ def dell_persistent_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-persistent",
                 idrac_username="root",
                 idrac_password="mock",
@@ -308,7 +308,7 @@ def test_dell_vflash_partition_rejects_out_of_range_index(dell_persistent_mock):
 
 def test_dell_vflash_partition_is_registered_and_classified():
     """The command is registered and Dell partition actions are classified."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellPersistentPartitionActions][
         "dell-vflash-partition"
     ] is DellPersistentPartitionActions

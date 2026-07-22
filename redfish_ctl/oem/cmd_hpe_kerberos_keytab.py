@@ -21,8 +21,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _IMPORT_KEYTAB_ACTION = "#HpeiLOAccountService.ImportKerberosKeytab"
@@ -30,7 +30,7 @@ _KEYTAB_FIELD = "KerberosKeytab"
 
 
 class HpeKerberosKeytabImport(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.HpeKerberosKeytabImport,
     name="hpe-kerberos-keytab-import",
     metaclass=Singleton,

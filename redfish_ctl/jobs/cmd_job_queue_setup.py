@@ -8,15 +8,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 _DELL_JOB_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
 _SETUP_JOB_QUEUE_ACTION = "#DellJobService.SetupJobQueue"
 
 
 class DellJobQueueSetup(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellJobQueueSetup,
     name="dell-job-queue-setup",
     metaclass=Singleton,

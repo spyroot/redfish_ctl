@@ -19,13 +19,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class MetricReports(RedfishManagerBase,
+class MetricReports(IDracManager,
                     scm_type=ApiRequestType.MetricReports,
                     name='metric-reports',
                     metaclass=Singleton):

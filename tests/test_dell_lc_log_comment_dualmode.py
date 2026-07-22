@@ -8,8 +8,8 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.dell_lc.cmd_dell_lc_log_comment import DellLcLogComment
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
@@ -34,7 +34,7 @@ def _fixture_for_path(path):
 def dell_lc_manager():
     """Serve the committed Dell corpus over requests-mock.
 
-    :return: tuple of RedfishManagerBase and recorded requests list.
+    :return: tuple of IDracManager and recorded requests list.
     """
     requests_mock = pytest.importorskip("requests_mock")
     requests = []
@@ -59,7 +59,7 @@ def dell_lc_manager():
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-dell-lc",
             idrac_username="root",
             idrac_password="mock",
@@ -200,7 +200,7 @@ def test_lc_log_comment_reports_missing_action_without_post(redfish_mock):
 
 def test_lc_log_comment_exposes_cli_entrypoint():
     """The dell-lc-log-comment command is wired into the package registry."""
-    registry = RedfishManagerBase._registry
+    registry = IDracManager._registry
     assert registry[ApiRequestType.DellLcLogComment]["dell-lc-log-comment"] is (
         DellLcLogComment
     )

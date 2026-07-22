@@ -10,13 +10,13 @@ linked EnvironmentMetrics resource.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class EnvironmentMetrics(RedfishManagerBase,
+class EnvironmentMetrics(IDracManager,
                          scm_type=ApiRequestType.EnvironmentMetrics,
                          name="environment-metrics",
                          metaclass=Singleton):

@@ -3,7 +3,7 @@
 Synthesizes System.Boot + BootOptions + VirtualMedia into a boot/OS-state view.
 Verified on the GB300 corpus (full BootOptions) and HPE iLO (boot mode/order).
 """
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_boot_state_supermicro(redfish_mock_factory):

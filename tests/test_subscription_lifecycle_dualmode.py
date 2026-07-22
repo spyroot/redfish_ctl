@@ -16,8 +16,8 @@ from redfish_ctl.events.cmd_subscription_lifecycle import (
     SubscriptionDelete,
 )
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"
 SUBSCRIPTION_ONE_PATH = f"{SUBSCRIPTIONS_PATH}/1"
@@ -509,7 +509,7 @@ def test_subscription_commands_fail_closed_without_subscription_collection(
 
 def test_subscription_commands_expose_cli_entrypoints():
     """The subscription lifecycle commands are wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
 
     create_type = _request_type("SubscriptionCreate")
     delete_type = _request_type("SubscriptionDelete")

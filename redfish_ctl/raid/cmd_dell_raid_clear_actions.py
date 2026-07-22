@@ -16,8 +16,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _CLEAR_PRESERVED_CACHE_ACTION = "#DellRaidService.ClearControllerPreservedCache"
@@ -50,7 +50,7 @@ _ACTION_SPECS = {
 
 
 class DellRaidClearActions(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellRaidClearActions,
     name="dell-raid-clear-actions",
     metaclass=Singleton,

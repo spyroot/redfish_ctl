@@ -11,15 +11,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import RedfishApiRespond
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class AttributeClearPending(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.AttributeClearPending,
     name='clear_pending',
     metaclass=Singleton):

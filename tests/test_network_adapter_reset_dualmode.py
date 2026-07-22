@@ -6,8 +6,8 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.network.cmd_network_adapter_reset import NetworkAdapterReset
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from test_roundtrip_budget import projected_walltime
 
 ADAPTER = "IO_Board_0_CX8_0"
@@ -224,7 +224,7 @@ def test_network_adapter_reset_validates_type_without_allowables(gb300_corpus_mo
 
 def test_network_adapter_reset_exposes_cli_entrypoint():
     """The network-adapter-reset command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.NetworkAdapterReset]["network-adapter-reset"] is (
         NetworkAdapterReset
     )

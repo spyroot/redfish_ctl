@@ -20,8 +20,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 _DELL_LC_EXPORTS = {
     "complete-lc-log": "#DellLCService.ExportCompleteLCLog",
@@ -36,7 +36,7 @@ _DELL_LC_EXPORTS = {
 }
 
 
-class DellLcExport(RedfishManagerBase,
+class DellLcExport(IDracManager,
                    scm_type=ApiRequestType.DellLcExport,
                    name="dell-lc-export",
                    metaclass=Singleton):

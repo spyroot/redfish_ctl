@@ -14,11 +14,11 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument
 from ..cmd_utils import from_json_spec
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 
 
-class DellNetworkAttributes(RedfishManagerBase,
+class DellNetworkAttributes(IDracManager,
                             scm_type=ApiRequestType.DellNetworkAttributes,
                             name="dell-network-attributes",
                             metaclass=Singleton):

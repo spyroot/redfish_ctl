@@ -4,8 +4,8 @@ import json
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.security.cmd_secure_boot import SecureBootResetKeys
 
@@ -155,7 +155,7 @@ def test_secure_boot_reset_keys_rejects_unadvertised_reset_type_without_post(
 
 def test_secure_boot_reset_keys_exposes_cli_entrypoint():
     """The guarded reset command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.SecureBootResetKeys][
         "secure-boot-reset-keys"
     ] is SecureBootResetKeys

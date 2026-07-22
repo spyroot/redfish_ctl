@@ -4,8 +4,8 @@ import json
 import pytest
 
 from redfish_ctl.compute.cmd_update import UpdateCompute  # noqa: F401
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -14,7 +14,7 @@ def test_compute_query_returns_system_settings_for_610_plus_in_mock_mode(
 ):
     """compute-query returns the ComputerSystem Settings resource on iDRAC 6.10+."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "idrac_manager_version",
         property(lambda self: "6.10.00.00"),
     )
@@ -41,7 +41,7 @@ def test_compute_query_uses_system_resource_before_610(
 ):
     """compute-query reads the ComputerSystem resource before the Settings URI is available."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "idrac_manager_version",
         property(lambda self: "6.00.00.00"),
     )
@@ -66,7 +66,7 @@ def test_compute_update_uses_system_resource_before_610_without_mutating(
 ):
     """compute-update reads the ComputerSystem resource before the Settings URI is available."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "idrac_manager_version",
         property(lambda self: "6.00.00.00"),
     )
@@ -96,7 +96,7 @@ def test_compute_update_uses_settings_resource_after_610_without_mutating(
 ):
     """compute-update reads the ComputerSystem Settings resource on iDRAC 7.x and 8.x."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "idrac_manager_version",
         property(lambda self: manager_version),
     )
@@ -129,7 +129,7 @@ def test_compute_update_reads_system_resource_for_pre_610_idrac(
 ):
     """compute-update reads the ComputerSystem resource before iDRAC 6.10."""
     monkeypatch.setattr(
-        RedfishManagerBase,
+        IDracManager,
         "idrac_manager_version",
         property(lambda self: "6.00.00.00"),
     )

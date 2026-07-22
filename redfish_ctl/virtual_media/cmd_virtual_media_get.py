@@ -27,12 +27,12 @@ from typing import Optional
 from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishJson
 
 
-class VirtualMediaGet(RedfishManagerBase,
+class VirtualMediaGet(IDracManager,
                       scm_type=ApiRequestType.VirtualMediaGet,
                       name='virtual_disk_query',
                       metaclass=Singleton):

@@ -44,7 +44,7 @@ settings:
 
   protocol.request_timeout:
     type: duration
-    status: implemented       # env wired at redfish_manager_base.py via env_first
+    status: implemented       # env wired at idrac_manager.py via env_first
     cli:
       flag: --request-timeout  # proposed flag; env is live today
     env:

@@ -19,8 +19,8 @@ from unittest import TestCase
 import pytest
 
 from redfish_ctl import save_if_needed
-from redfish_ctl.redfish_manager_base import CommandResult, RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import CommandResult, IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_exceptions import RedfishException
 from redfish_ctl.redfish_shared import RedfishJson
 
@@ -39,11 +39,11 @@ class TestUpdateAttribute(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> RedfishManagerBase:
+    def setUpClass(cls) -> IDracManager:
         """Setup required envs.
         :return:
         """
-        redfish_api = RedfishManagerBase(idrac_ip=os.environ.get('IDRAC_IP', ''),
+        redfish_api = IDracManager(idrac_ip=os.environ.get('IDRAC_IP', ''),
                                    idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
                                    idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
                                    insecure=True,

@@ -10,13 +10,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_shared import RedfishApiRespond
+from ..idrac_shared import RedfishApiRespond
 from ..cmd_exceptions import FailedDiscoverAction
 from ..custom_argparser.customer_argdefault import BiosSubcommand
-from .. import RedfishManagerBase, ApiRequestType, Singleton, CommandResult
+from .. import IDracManager, ApiRequestType, Singleton, CommandResult
 
 
-class BiosClearPending(RedfishManagerBase,
+class BiosClearPending(IDracManager,
                        scm_type=ApiRequestType.BiosClearPending,
                        name='clear_pending',
                        metaclass=Singleton):

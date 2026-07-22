@@ -11,7 +11,7 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.logs.cmd_log_clear import LogClear
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 _IML_CLEAR_TARGET = "/redfish/v1/Systems/1/LogServices/IML/Actions/LogService.ClearLog"
 

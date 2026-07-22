@@ -21,7 +21,7 @@ from redfish_ctl.api import (
     TemperatureReading,
     ThermalStatus,
 )
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.idrac_manager import IDracManager
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER_MODULE = REPO_ROOT / "k8s" / "controller" / "redfish_endpoint_controller.py"
@@ -193,7 +193,7 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",

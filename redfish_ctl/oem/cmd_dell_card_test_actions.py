@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellCardTestActions(RedfishManagerBase,
+class DellCardTestActions(IDracManager,
                           scm_type=ApiRequestType.DellCardTestActions,
                           name="dell-card-test-actions",
                           metaclass=Singleton):

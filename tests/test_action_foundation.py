@@ -8,8 +8,8 @@ records every POST so we can assert exactly what did (or did not) fire.
 """
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import RedfishApiRespond
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import RedfishApiRespond
 
 
 def _post_count(svc):
@@ -100,7 +100,7 @@ def test_request_log_payload_redacts_sensitive_fields():
         ],
     }
 
-    redacted = RedfishManagerBase._redact_sensitive_payload(payload)
+    redacted = IDracManager._redact_sensitive_payload(payload)
 
     assert redacted["Password"] == "********"
     assert redacted["Nested"]["OldPassword"] == "********"

@@ -15,8 +15,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 
 _ACTION_TYPE = "#DellLCService.UpdateOSAppHealthData"
 _ACTION_NAME = "UpdateOSAppHealthData"
@@ -27,7 +27,7 @@ _DEFAULT_SERVICE_URI = (
 _DEFAULT_UPDATE_TYPES = ("Automatic",)
 
 
-class DellLcOsHealthUpdate(RedfishManagerBase,
+class DellLcOsHealthUpdate(IDracManager,
                            scm_type=ApiRequestType.DellLcOsHealthUpdate,
                            name="dell-lc-os-health-update",
                            metaclass=Singleton):

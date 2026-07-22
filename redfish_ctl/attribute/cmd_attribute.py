@@ -17,14 +17,14 @@ from typing import Optional
 
 from ..cmd_utils import find_ids
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class AttributesQuery(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.AttributesQuery,
     name='attribute_inventory',
     metaclass=Singleton):

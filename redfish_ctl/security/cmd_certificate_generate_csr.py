@@ -16,14 +16,14 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _GENERATE_CSR_ACTION = "#CertificateService.GenerateCSR"
 
 
-class CertificateGenerateCSR(RedfishManagerBase,
+class CertificateGenerateCSR(IDracManager,
                              scm_type=ApiRequestType.CertificateGenerateCSR,
                              name="cert_gen_csr",
                              metaclass=Singleton):

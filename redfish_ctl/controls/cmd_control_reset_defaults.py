@@ -16,13 +16,13 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 
 _CONTROL_RESET_ACTION = "#Control.ResetToDefaults"
 
 
-class ControlResetDefaults(RedfishManagerBase,
+class ControlResetDefaults(IDracManager,
                            scm_type=ApiRequestType.ControlResetDefaults,
                            name="control-reset-defaults",
                            metaclass=Singleton):

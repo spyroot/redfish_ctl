@@ -16,8 +16,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _IMPORT_FOREIGN_CONFIG_ACTION = "#DellRaidService.ImportForeignConfig"
@@ -52,7 +52,7 @@ _ACTION_SPECS = {
 
 
 class DellRaidForeignConfigActions(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellRaidForeignConfigActions,
     name="dell-raid-foreign-config",
     metaclass=Singleton,

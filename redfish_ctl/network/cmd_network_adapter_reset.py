@@ -15,8 +15,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, ResetType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, ResetType, Singleton
 
 _NETWORK_ADAPTER_RESET_ACTION = "#NetworkAdapter.Reset"
 _RESET_TYPE_VALUES = frozenset(item.value for item in ResetType)
@@ -26,7 +26,7 @@ class _DiscoveryError(RuntimeError):
     """Raised when required reset discovery reads fail."""
 
 
-class NetworkAdapterReset(RedfishManagerBase,
+class NetworkAdapterReset(IDracManager,
                           scm_type=ApiRequestType.NetworkAdapterReset,
                           name="network-adapter-reset",
                           metaclass=Singleton):

@@ -15,8 +15,8 @@ from collections.abc import Callable, Mapping
 from typing import Optional
 
 from ..redfish_manager import CommandResult, RedfishResponseCache
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from . import exporter
 from .exporter import (
     build_identity_dimensions,
@@ -30,7 +30,7 @@ from .exporter import (
 )
 
 
-class Exporter(RedfishManagerBase,
+class Exporter(IDracManager,
                scm_type=ApiRequestType.Exporter,
                name='exporter',
                metaclass=Singleton):

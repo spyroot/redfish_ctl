@@ -1,4 +1,4 @@
-"""iDRAC RedfishManagerBase test suite
+"""iDRAC IDracManager test suite
 
 Author Mus spyroot@gmail.com
 """
@@ -9,8 +9,8 @@ from unittest import TestCase
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.redfish_manager_base import CommandResult, RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import CommandResult, IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 img_location = "http://10.241.7.99/ph4-rt-refresh_adj_offline_testnf_os4_flex21.iso"
 
@@ -26,8 +26,8 @@ class TestVirtualMedia(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> RedfishManagerBase:
-        redfish_api = RedfishManagerBase(
+    def setUpClass(cls) -> IDracManager:
+        redfish_api = IDracManager(
             idrac_ip=os.environ.get('IDRAC_IP', ''),
             idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
             idrac_password=os.environ.get('IDRAC_PASSWORD', ''),

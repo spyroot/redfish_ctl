@@ -5,8 +5,8 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.oem.cmd_nvidia_debug_token import NvidiaDebugToken
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 _TOKEN_RESOURCE = "/redfish/v1/Systems/HGX_Baseboard_0/Oem/Nvidia/CPUDebugToken"
 _GENERATE_TARGET = (
@@ -180,7 +180,7 @@ def test_nvidia_debug_token_missing_target_reports_without_post(
 
 def test_nvidia_debug_token_exposes_cli_entrypoint():
     """The nvidia-debug-token command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.NvidiaDebugToken]["nvidia-debug-token"] is (
         NvidiaDebugToken
     )

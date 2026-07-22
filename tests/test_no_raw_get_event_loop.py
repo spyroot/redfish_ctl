@@ -54,7 +54,7 @@ def test_no_module_uses_raw_get_event_loop():
 
 @pytest.mark.parametrize("layer", [
     "redfish_ctl/redfish_manager.py",
-    "redfish_ctl/redfish_manager_base.py",
+    "redfish_ctl/idrac_manager.py",
 ])
 def test_helper_available_across_layers(layer):
     """_event_loop must be resolvable from the generic layer and the base — it

@@ -21,8 +21,8 @@ from typing import Optional
 from ..actions.action_policy import classify
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _LICENSE_MANAGEMENT_FALLBACK = (
@@ -97,7 +97,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellLicenseActions(RedfishManagerBase,
+class DellLicenseActions(IDracManager,
                          scm_type=ApiRequestType.DellLicenseActions,
                          name="dell-license-actions",
                          metaclass=Singleton):

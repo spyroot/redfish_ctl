@@ -1,4 +1,4 @@
-"""iDRAC RedfishManagerBase test suite
+"""iDRAC IDracManager test suite
 
 Author Mus spyroot@gmail.com
 """
@@ -9,8 +9,8 @@ from unittest import TestCase
 
 import pytest
 
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import PowerState
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import PowerState
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
@@ -24,8 +24,8 @@ class BasicManagerTest(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> RedfishManagerBase:
-        redfish_api = RedfishManagerBase(
+    def setUpClass(cls) -> IDracManager:
+        redfish_api = IDracManager(
             idrac_ip=os.environ.get('IDRAC_IP', ''),
             idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
             idrac_password=os.environ.get('IDRAC_PASSWORD', ''),

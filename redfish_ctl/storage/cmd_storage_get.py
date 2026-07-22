@@ -22,12 +22,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import Singleton, ApiRequestType
 from ..redfish_manager import CommandResult
 
 
-class StorageView(RedfishManagerBase,
+class StorageView(IDracManager,
                   scm_type=ApiRequestType.StorageViewQuery,
                   name='storage_get',
                   metaclass=Singleton):

@@ -25,13 +25,13 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 from .cmd_network_adapters import NetworkAdapters
 
 # The package does ``from .network.cmd_nic_firmware import *``; keep that to the
-# command class so re-exported imports (CommandResult, RedfishManagerBase, enums)
+# command class so re-exported imports (CommandResult, IDracManager, enums)
 # do not leak into the top-level ``redfish_ctl`` namespace. ``network_class`` stays
 # importable directly (``from ...cmd_nic_firmware import network_class``).
 __all__ = ["NicFirmware"]
@@ -65,7 +65,7 @@ def network_class(text: Optional[str]) -> Optional[str]:
     return None
 
 
-class NicFirmware(RedfishManagerBase,
+class NicFirmware(IDracManager,
                   scm_type=ApiRequestType.NicFirmware,
                   name='nic-firmware',
                   metaclass=Singleton):

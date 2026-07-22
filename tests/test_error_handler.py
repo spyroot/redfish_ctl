@@ -13,7 +13,7 @@ from redfish_ctl.redfish_exceptions import (
     RedfishUnauthorized,
 )
 from redfish_ctl.redfish_manager import RedfishManager
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_respond_error import RedfishError
 from redfish_ctl.redfish_shared import RedfishApiRespond
 
@@ -51,11 +51,11 @@ class _WriteResp:
 
 
 def _base_manager():
-    """Return an offline RedfishManagerBase (the mutation-path host).
+    """Return an offline IDracManager (the mutation-path host).
 
-    :return: a RedfishManagerBase instance that makes no BMC contact.
+    :return: a IDracManager instance that makes no BMC contact.
     """
-    return RedfishManagerBase(
+    return IDracManager(
         idrac_ip="mock", idrac_username="root", idrac_password="x",
         insecure=True, is_debug=False)
 
@@ -123,7 +123,7 @@ def test_write_path_405_returns_error_with_envelope():
     from self._redfish_error), so the non-raising return contract is unchanged."""
     manager = _base_manager()
     result = manager.read_api_respond(_WriteResp(405, _DMTF_ERROR_BODY), expected=204)
-    # compare by member name: the base uses redfish_manager_shared.RedfishApiRespond,
+    # compare by member name: the base uses idrac_shared.RedfishApiRespond,
     # a distinct enum from redfish_shared's, so identity comparison would fail.
     assert result.name == "Error"
     assert isinstance(manager._redfish_error, RedfishError)

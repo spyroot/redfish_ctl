@@ -1,6 +1,6 @@
 """Dual-mode tests for the manager reset command."""
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType, JobState
+from redfish_ctl.idrac_shared import ApiRequestType, JobState
 from redfish_ctl.manager.cmd_manager_reset import ManagerReset
 from redfish_ctl.redfish_manager import CommandResult
 

@@ -22,7 +22,7 @@ from redfish_ctl.cmd_exceptions import (
 from redfish_ctl.redfish_exceptions import RedfishForbidden
 from redfish_ctl.redfish_main import json_printer
 from redfish_ctl.redfish_manager import RedfishManager
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_respond_error import RedfishError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -671,11 +671,11 @@ def test_default_error_handler_raises_resource_not_found_with_parsed_dmtf_error(
 
 
 def _base_manager():
-    """Return a RedfishManagerBase instance - the class every command subclasses.
+    """Return a IDracManager instance - the class every command subclasses.
 
-    :return: an offline RedfishManagerBase (no BMC contact).
+    :return: an offline IDracManager (no BMC contact).
     """
-    return RedfishManagerBase(
+    return IDracManager(
         idrac_ip="mock", idrac_username="root", idrac_password="x",
         insecure=True, is_debug=False)
 
@@ -695,7 +695,7 @@ def _base_manager():
     ],
 )
 def test_base_default_error_handler_preserves_dmtf_envelope(status_code, exc_type):
-    """Every command subclasses RedfishManagerBase, so ITS default_error_handler -
+    """Every command subclasses IDracManager, so ITS default_error_handler -
     not the parent RedfishManager's - is the real command error path. For every
     error code it must raise the parsed RedfishError envelope (status, error.code,
     every @Message.ExtendedInfo), never a generic string, per the Redfish error
@@ -822,7 +822,7 @@ def test_http_error_command_results_are_parser_backed():
     offenders = []
     parser_modules = {
         "redfish_manager.py",
-        "redfish_manager_base.py",
+        "idrac_manager.py",
         "redfish_respond.py",
         "redfish_respond_error.py",
     }

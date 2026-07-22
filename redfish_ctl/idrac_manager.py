@@ -1,4 +1,4 @@
-"""RedfishManagerBase
+"""IDracManager
 
 redfish_ctl interacts with any Redfish-capable BMC (Dell iDRAC, Supermicro,
 HPE iLO, and generic DMTF Redfish) via the REST API interface.
@@ -54,7 +54,7 @@ from .redfish_manager import (
     active_redfish_response_cache,
     redfish_response_cache_scope,
 )
-from .redfish_manager_shared import (
+from .idrac_shared import (
     REDFISH_API,
     REDFISH_JSON,
     ApiRequestType,
@@ -69,17 +69,17 @@ from .redfish_manager_shared import (
     RedfishApiRespond,
     ScheduleJobType,
 )
-from .redfish_manager_shared import ResetType as ResetType
+from .idrac_shared import ResetType as ResetType
 from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
-from .redfish_task_state import TaskState, TaskStatus
+from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .telemetry import tracing
 
-module_logger = logging.getLogger('redfish_ctl.redfish_manager_base')
+module_logger = logging.getLogger('redfish_ctl.idrac_manager')
 
 
-class RedfishManagerBase(RedfishManager):
+class IDracManager(RedfishManager):
     """
-    RedfishManagerBase Class, interact with a Redfish endpoint via REST API interface
+    IDracManager Class, interact with a Redfish endpoint via REST API interface
     """
 
     _registry = {t: {} for t in ApiRequestType}
@@ -191,19 +191,19 @@ class RedfishManagerBase(RedfishManager):
         # mapping a task state string to enum
         # without doing any string if else branches.
         self._task_state_mapping = {
-            "New": TaskState.New,
-            "Running": TaskState.Starting,
-            "Starting": TaskState.Starting,
-            "Suspended": TaskState.Suspended,
-            "Interrupted": TaskState.Interrupted,
-            "Pending": TaskState.Pending,
-            "Stopping": TaskState.Stopping,
-            "Completed": TaskState.Completed,
-            "Killed": TaskState.Killed,
-            "Exception": TaskState.Exception,
-            "Service": TaskState.Service,
-            "Canceling": TaskState.Canceling,
-            "Cancelled": TaskState.Cancelled
+            "New": IdracTaskState.New,
+            "Running": IdracTaskState.Starting,
+            "Starting": IdracTaskState.Starting,
+            "Suspended": IdracTaskState.Suspended,
+            "Interrupted": IdracTaskState.Interrupted,
+            "Pending": IdracTaskState.Pending,
+            "Stopping": IdracTaskState.Stopping,
+            "Completed": IdracTaskState.Completed,
+            "Killed": IdracTaskState.Killed,
+            "Exception": IdracTaskState.Exception,
+            "Service": IdracTaskState.Service,
+            "Canceling": IdracTaskState.Canceling,
+            "Cancelled": IdracTaskState.Cancelled
         }
 
         # mapping from cli to job types
@@ -216,9 +216,9 @@ class RedfishManagerBase(RedfishManager):
 
         # mapping from string to task status enum
         self._task_status_mapping = {
-            "ok": TaskStatus.Ok,
-            "warning": TaskStatus.Warning,
-            "critical": TaskStatus.Critical
+            "ok": IdracTaskStatus.Ok,
+            "warning": IdracTaskStatus.Warning,
+            "critical": IdracTaskStatus.Critical
         }
 
         self._redfish_error = None
@@ -597,14 +597,16 @@ class RedfishManagerBase(RedfishManager):
 
         return old_value
 
-    def get_task_state(self, resp: requests.models.Response) -> Tuple[TaskState, TaskStatus]:
+    def get_task_state(
+            self, resp: requests.models.Response
+    ) -> Tuple[IdracTaskState, IdracTaskStatus]:
         """Parse response and return task state and status,
         if resp has no json payload and JSONDecodeError raised , return Unknown state.
 
-        if Task Status or TaskState absent from response UnexpectedResponse raised.
+        if the TaskStatus or TaskState key is absent from the response, UnexpectedResponse is raised.
 
         :param resp: a requests.models.Response object.
-        :return:  redfish_ctl.TaskState and redfish_ctl.TaskStatus
+        :return:  redfish_ctl.IdracTaskState and redfish_ctl.IdracTaskStatus
         :raise  redfish_ctl.UnexpectedResponse: If the response body does not
             contain a task state.
         """
@@ -614,7 +616,7 @@ class RedfishManagerBase(RedfishManager):
             self.logger.error(
                 f"failed parse response to get a task state. {str(json_err)}"
             )
-            return TaskState.Unknown, TaskStatus.Warning
+            return IdracTaskState.Unknown, IdracTaskStatus.Warning
 
         # dodge case
         if REDFISH_JSON.TaskStatus not in resp_data or REDFISH_JSON.TaskState not in resp_data:
@@ -632,7 +634,8 @@ class RedfishManagerBase(RedfishManager):
                    task_id: str,
                    sleep_time: Optional[int] = 10,
                    wait_for: Optional[int] = 0,
-                   wait_for_state: Optional[TaskState] = TaskState.Unknown) -> TaskState:
+                   wait_for_state: Optional[IdracTaskState] = IdracTaskState.Unknown,
+                   ) -> IdracTaskState:
 
         """Synchronous fetch a job from the BMC and wait for job completion.
 
@@ -688,7 +691,7 @@ class RedfishManagerBase(RedfishManager):
         # in case server will ask to wait.
         retry_after = 0
         # initial state we don't know
-        task_state = TaskState.Unknown
+        task_state = IdracTaskState.Unknown
         with tqdm(total=100) as pbar:
             while True:
                 # /redfish/v1/TaskService/Tasks/{TaskId}
@@ -734,7 +737,8 @@ class RedfishManagerBase(RedfishManager):
 
                     # update description so caller see.
                     pbar.set_description(task_state.value)
-                    if task_status == TaskStatus.Critical or task_status == TaskStatus.Warning:
+                    if (task_status == IdracTaskStatus.Critical
+                            or task_status == IdracTaskStatus.Warning):
                         # we bounce, if status not ok
                         break
 
@@ -1367,7 +1371,7 @@ class RedfishManagerBase(RedfishManager):
         # error.code, @Message.ExtendedInfo), never a flattened string. 405/409
         # keep returning RedfishApiRespond.Error (the caller reads the envelope
         # from self._redfish_error), so the return contract is unchanged.
-        self._redfish_error = RedfishManagerBase.parse_error(response)
+        self._redfish_error = IDracManager.parse_error(response)
         if 300 <= response.status_code < 500:
             if response.status_code == 400:
                 raise RedfishException(self._redfish_error)
@@ -1506,11 +1510,11 @@ class RedfishManagerBase(RedfishManager):
                 if key_text in sensitive_exact or key_text.endswith(sensitive_suffixes):
                     redacted[key] = "********"
                 else:
-                    redacted[key] = RedfishManagerBase._redact_sensitive_payload(value)
+                    redacted[key] = IDracManager._redact_sensitive_payload(value)
             return redacted
         if isinstance(payload, list):
             return [
-                RedfishManagerBase._redact_sensitive_payload(value)
+                IDracManager._redact_sensitive_payload(value)
                 for value in payload
             ]
         return payload

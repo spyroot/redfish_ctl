@@ -16,7 +16,7 @@ import ast
 from pathlib import Path
 
 import redfish_ctl
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 PACKAGE_DIR = Path(redfish_ctl.__file__).resolve().parent
 

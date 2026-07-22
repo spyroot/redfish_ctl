@@ -9,8 +9,8 @@ from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.raid.cmd_dell_raid_check_values import DellRaidCheckValues
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz",
@@ -66,7 +66,7 @@ def dell_raid_manager_factory():
         started.append(mocker)
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-dell-raid",
             idrac_username="root",
             idrac_password="mock",
@@ -246,7 +246,7 @@ def test_dell_raid_check_values_policy_and_registry():
     """CheckVDValues is classified read-only and the command is registered."""
     assert classify("#DellRaidService.CheckVDValues") is Destructiveness.READ_ONLY
 
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellRaidCheckValues][
         "dell-raid-check-values"
     ] is DellRaidCheckValues

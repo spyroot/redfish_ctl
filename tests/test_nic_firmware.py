@@ -12,8 +12,8 @@ import json
 import pytest
 
 from redfish_ctl.network.cmd_nic_firmware import network_class
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 @pytest.mark.parametrize(
@@ -62,7 +62,7 @@ def _run_nic_firmware(routes):
     requests_mock = pytest.importorskip("requests_mock")
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=_serve(routes))
-        mgr = RedfishManagerBase(idrac_ip="mock", idrac_username="root", idrac_password="x",
+        mgr = IDracManager(idrac_ip="mock", idrac_username="root", idrac_password="x",
                                  insecure=True, is_debug=False)
         return mgr.sync_invoke(ApiRequestType.NicFirmware, "nic-firmware").data
 

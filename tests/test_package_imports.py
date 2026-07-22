@@ -28,16 +28,16 @@ def test_module_imports(module_name: str):
 def test_bios_change_command_is_registered():
     """The de-duplicated bios change module still exposes its command class."""
     from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
-    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    from redfish_ctl.idrac_manager import IDracManager
 
-    assert issubclass(BiosChangeSettings, RedfishManagerBase)
+    assert issubclass(BiosChangeSettings, IDracManager)
 
 
 @pytest.mark.parametrize("old", ["redfish_ctl.idrac_manager", "redfish_ctl.idrac_shared"])
 def test_old_idrac_module_names_no_longer_resolve(old):
     """The iDRAC-named base modules were hard-renamed to neutral names with no
-    aliases (idrac_manager -> redfish_manager_base, idrac_shared ->
-    redfish_manager_shared). The old import paths must no longer resolve, guarding
+    aliases (idrac_manager -> idrac_manager, idrac_shared ->
+    idrac_shared). The old import paths must no longer resolve, guarding
     against a reintroduction of the pre-rename names."""
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module(old)

@@ -8,8 +8,8 @@ from typing import Optional
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 from .cmd_exceptions import InvalidArgument
-from .redfish_manager_base import RedfishManagerBase
-from .redfish_manager_shared import ApiRequestType, Singleton
+from .idrac_manager import IDracManager
+from .idrac_shared import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
@@ -64,7 +64,7 @@ def _normalize_redfish_uri(uri: str) -> str:
 
 
 class RawGet(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.RawGet,
     name="raw_get",
     metaclass=Singleton,

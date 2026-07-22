@@ -18,8 +18,8 @@ from typing import Optional
 from ..actions.action_policy import classify
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _SERVICE_FALLBACK = (
@@ -187,7 +187,7 @@ _FLAG_NAMES = {
 }
 
 
-class DellPersistentPartitionActions(RedfishManagerBase,
+class DellPersistentPartitionActions(IDracManager,
                                      scm_type=ApiRequestType.DellPersistentPartitionActions,
                                      name="dell-vflash-partition",
                                      metaclass=Singleton):

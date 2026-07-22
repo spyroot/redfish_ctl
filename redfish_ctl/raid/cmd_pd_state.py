@@ -14,8 +14,8 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _CHANGE_PD_STATE_ACTION = "#DellRaidService.ChangePDState"
@@ -58,7 +58,7 @@ _ACTION_SPECS = {
 
 
 class DellRaidPhysicalDiskActions(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellRaidPhysicalDiskActions,
     name="dell-raid-pd-actions",
     metaclass=Singleton,

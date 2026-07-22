@@ -16,14 +16,14 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _SPDM_ACTION = "#ComponentIntegrity.SPDMGetSignedMeasurements"
 
 
-class SpdmMeasurements(RedfishManagerBase,
+class SpdmMeasurements(IDracManager,
                        scm_type=ApiRequestType.SpdmMeasurements,
                        name="spdm-measurements",
                        metaclass=Singleton):

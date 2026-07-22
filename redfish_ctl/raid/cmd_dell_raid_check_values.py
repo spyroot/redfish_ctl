@@ -14,8 +14,8 @@ from typing import Iterable, Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_shared import RedfishApi
 
 _CHECK_ACTION = "#DellRaidService.CheckVDValues"
@@ -35,7 +35,7 @@ def _as_list(values: Optional[Iterable[str]]) -> list[str]:
     return [str(value) for value in values]
 
 
-class DellRaidCheckValues(RedfishManagerBase,
+class DellRaidCheckValues(IDracManager,
                           scm_type=ApiRequestType.DellRaidCheckValues,
                           name="dell-raid-check-values",
                           metaclass=Singleton):

@@ -7,8 +7,8 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.controls.cmd_control_reset_defaults import ControlResetDefaults
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from test_roundtrip_budget import projected_walltime
 
 _CONTROL_URI = "/redfish/v1/Chassis/HGX_GPU_0/Controls/ClockLimit_0"
@@ -252,7 +252,7 @@ def test_control_reset_defaults_missing_target_reports_without_post(
 
 def test_control_reset_defaults_exposes_cli_entrypoint():
     """The control-reset-defaults command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.ControlResetDefaults][
         "control-reset-defaults"
     ] is ControlResetDefaults

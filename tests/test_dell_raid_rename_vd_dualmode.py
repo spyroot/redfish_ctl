@@ -10,8 +10,8 @@ from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.raid.cmd_dell_raid_rename_vd import DellRaidRenameVD
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
@@ -73,7 +73,7 @@ def dell_raid_manager_factory():
         started.append(mocker)
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-dell-raid",
             idrac_username="root",
             idrac_password="mock",
@@ -229,7 +229,7 @@ def test_dell_raid_rename_vd_policy_and_registry():
     """RenameVD is classified and the command is registered."""
     assert classify("#DellRaidService.RenameVD") is Destructiveness.DESTRUCTIVE
 
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellRaidRenameVD][
         "dell-raid-rename-vd"
     ] is DellRaidRenameVD

@@ -9,12 +9,12 @@ its detector state plus any linked leak policies.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class LeakDetectors(RedfishManagerBase,
+class LeakDetectors(IDracManager,
                     scm_type=ApiRequestType.LeakDetectors,
                     name="leak-detectors",
                     metaclass=Singleton):

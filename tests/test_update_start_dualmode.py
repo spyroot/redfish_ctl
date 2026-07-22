@@ -1,8 +1,8 @@
 """Dual-mode-style tests for the guarded update-start command."""
 
 from redfish_ctl.firmware.cmd_update_start import UpdateStart
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 UPDATE_SERVICE_PATH = "/redfish/v1/UpdateService"
@@ -124,7 +124,7 @@ def test_update_start_reports_missing_action(redfish_api, redfish_service):
 
 def test_update_start_is_registered():
     """The update-start command is wired into the command registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.UpdateStart]["update-start"] is UpdateStart
 
     cmd_parser, cmd_name, cmd_help = UpdateStart.register_subcommand(UpdateStart)
