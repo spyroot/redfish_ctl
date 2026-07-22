@@ -351,6 +351,70 @@ def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
     }
 
 
+def test_endpoint_reconcile_emits_real_span_tree(monkeypatch) -> None:
+    """The reconcile emits ONE real root span with the four BMC-identity attrs, and
+    the BMC call nests as a CLIENT child under it.
+
+    The sibling test above uses a fake operation_span and a fully mocked
+    poll_endpoint, so it never emits a BMC span and cannot prove nesting. This
+    drives the real reconcile through an in-memory exporter with a poll_endpoint
+    that emits a real client span, and asserts the emitted span TREE (one root, the
+    identity attributes, the BMC request nested under the root, no orphans).
+    """
+    pytest.importorskip("opentelemetry.sdk.trace")
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+
+    module = _load_controller_module()
+    provider = TracerProvider()
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    module.tracing.enable_tracing(provider.get_tracer("redfish_ctl.test"))
+
+    def fake_poll_endpoint(spec, credentials=None, manager_factory=None, polled_at=None):
+        # Stand in for the manager's BMC GET: one CLIENT span, no network.
+        with module.tracing.client_span("https://mock-bmc:8443/redfish/v1", "GET"):
+            pass
+        return {
+            "powerState": "On",
+            "health": "OK",
+            "temperature": {"count": 1, "maxCelsius": 24.4},
+            "lastPolled": "2026-07-10T14:50:00Z",
+        }
+
+    monkeypatch.setattr(module, "poll_endpoint", fake_poll_endpoint)
+    try:
+        module.poll_redfish_endpoint(
+            spec={"address": "https://mock-bmc:8443"},
+            body={},
+            namespace="default",
+            name="node-a",
+            logger=None,
+            patch={},
+            force=True,
+        )
+    finally:
+        module.tracing.disable_tracing()
+
+    spans = exporter.get_finished_spans()
+    roots = [s for s in spans if s.parent is None]
+    assert len(roots) == 1, [s.name for s in spans]
+    root = roots[0]
+    assert root.name == "k8s.redfish_endpoint.reconcile"
+    assert root.attributes.get("server.address") == "mock-bmc"
+    assert root.attributes.get("k8s.namespace.name") == "default"
+    assert root.attributes.get("k8s.resource.name") == "node-a"
+    assert root.attributes.get("k8s.resource.kind") == "RedfishEndpoint"
+
+    clients = [s for s in spans if s.name == "redfish.bmc.request"]
+    assert len(clients) == 1
+    assert clients[0].parent is not None, "orphan BMC span"
+    assert clients[0].parent.span_id == root.context.span_id, "BMC span not under reconcile root"
+
+
 def test_sensor_health_falls_back_when_system_health_absent() -> None:
     """Sensor health gives the status a useful fallback when system health is missing."""
     module = _load_controller_module()
