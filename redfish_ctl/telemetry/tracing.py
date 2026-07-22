@@ -30,6 +30,7 @@ _TRACER: Any = None
 _OTLP_SETUP_SERVICE_NAME: str | None = None
 # The TracerProvider setup_otlp built; kept so shutdown() can force_flush it (G6).
 _PROVIDER: Any = None
+_OTLP_SETUP_RESOURCE_ATTRIBUTES: tuple[tuple[str, str], ...] | None = None
 
 # The single downstream node name for every BMC. Setting peer.service (not just
 # server.address) is what makes an APM backend render one inferred "bmc" node
@@ -93,8 +94,13 @@ def setup_otlp(service_name: Optional[str] = None,
     """
     from .identity import DEFAULT_SERVICE_NAME
     resolved_service_name = str(service_name or "").strip() or DEFAULT_SERVICE_NAME
-    global _OTLP_SETUP_SERVICE_NAME
-    if _TRACER is not None and _OTLP_SETUP_SERVICE_NAME == resolved_service_name:
+    resolved_resource_attrs = _trace_resource_attrs(
+        resolved_service_name, resource_attrs)
+    resource_fingerprint = tuple(sorted(resolved_resource_attrs.items()))
+    global _OTLP_SETUP_SERVICE_NAME, _OTLP_SETUP_RESOURCE_ATTRIBUTES
+    if (_TRACER is not None
+            and _OTLP_SETUP_SERVICE_NAME == resolved_service_name
+            and _OTLP_SETUP_RESOURCE_ATTRIBUTES == resource_fingerprint):
         return
     try:
         from opentelemetry.sdk.resources import Resource
@@ -120,20 +126,21 @@ def setup_otlp(service_name: Optional[str] = None,
             ) from exc
 
     provider = TracerProvider(
-        resource=Resource.create(
-            _trace_resource_attrs(resolved_service_name, resource_attrs)))
+        resource=Resource.create(resolved_resource_attrs))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     enable_tracing(provider.get_tracer("redfish_ctl"))
     global _PROVIDER
     _PROVIDER = provider
     _OTLP_SETUP_SERVICE_NAME = resolved_service_name
+    _OTLP_SETUP_RESOURCE_ATTRIBUTES = resource_fingerprint
 
 
 def disable_tracing() -> None:
     """Turn tracing off (used by tests to restore the default no-op state)."""
-    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _PROVIDER
+    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _OTLP_SETUP_RESOURCE_ATTRIBUTES, _PROVIDER
     _TRACER = None
     _OTLP_SETUP_SERVICE_NAME = None
+    _OTLP_SETUP_RESOURCE_ATTRIBUTES = None
     _PROVIDER = None
 
 
@@ -151,10 +158,11 @@ def shutdown(timeout: float = 5.0) -> None:
     :param timeout: maximum seconds to wait for the flush (the shutdown budget).
     :return: None.
     """
-    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _PROVIDER
+    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _OTLP_SETUP_RESOURCE_ATTRIBUTES, _PROVIDER
     provider = _PROVIDER
     _TRACER = None
     _OTLP_SETUP_SERVICE_NAME = None
+    _OTLP_SETUP_RESOURCE_ATTRIBUTES = None
     _PROVIDER = None
     if provider is None:
         return

@@ -308,6 +308,11 @@ def test_setup_otlp_is_idempotent_when_already_configured(monkeypatch):
     """A second controller module import must not rebuild the OTLP pipeline."""
     tracing.enable_tracing(object())
     monkeypatch.setattr(tracing, "_OTLP_SETUP_SERVICE_NAME", "redfish-controller")
+    monkeypatch.setattr(
+        tracing,
+        "_OTLP_SETUP_RESOURCE_ATTRIBUTES",
+        (("service.name", "redfish-controller"),),
+    )
     try:
         tracing.setup_otlp("redfish-controller")
     finally:
@@ -320,11 +325,19 @@ def test_trace_resource_attrs_carries_service_name_and_merges_identity():
     attrs = tracing._trace_resource_attrs(
         "redfish_ctl",
         {"deployment.environment": "nv72-gb300",
-         "deployment.environment.name": "nv72-gb300"},
+         "deployment.environment.name": "nv72-gb300",
+         "service.namespace": "hardware",
+         "service.instance.id": "cb0377f1-e3b9-4da9-9275-71825b2c6434",
+         "service.version": "2.0.0",
+         "service.criticality": "critical"},
     )
     assert attrs["service.name"] == "redfish_ctl"
     assert attrs["deployment.environment"] == "nv72-gb300"
     assert attrs["deployment.environment.name"] == "nv72-gb300"
+    assert attrs["service.namespace"] == "hardware"
+    assert attrs["service.instance.id"] == "cb0377f1-e3b9-4da9-9275-71825b2c6434"
+    assert attrs["service.version"] == "2.0.0"
+    assert attrs["service.criticality"] == "critical"
 
 
 def test_trace_resource_attrs_skips_none_and_stringifies():
@@ -348,6 +361,11 @@ def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
     assert DEFAULT_SERVICE_NAME == "redfish_ctl"
     tracing.enable_tracing(object())
     monkeypatch.setattr(tracing, "_OTLP_SETUP_SERVICE_NAME", DEFAULT_SERVICE_NAME)
+    monkeypatch.setattr(
+        tracing,
+        "_OTLP_SETUP_RESOURCE_ATTRIBUTES",
+        (("service.name", DEFAULT_SERVICE_NAME),),
+    )
     try:
         tracing.setup_otlp()
     finally:

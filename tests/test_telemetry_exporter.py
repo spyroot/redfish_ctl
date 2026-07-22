@@ -4,6 +4,7 @@ import argparse
 import json
 import threading
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -757,7 +758,9 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         samples, "redfish_exporter_collector_success", "metric-reports").value == 0
     errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
     assert len(errors) == 1
-    assert errors[0].dimensions == {
+    error_dimensions = dict(errors[0].dimensions)
+    assert uuid.UUID(error_dimensions.pop("service.instance.id"))
+    assert error_dimensions == {
         "host.name": "gb300-poc1-slot9",
         "node": "slot9",
         "server.address": "172.25.230.49",
@@ -1077,6 +1080,11 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
             "deployment_environment": "staging",
             "deployment_environment_compat": "stable",
             "require_deployment_environment": True,
+            "service_name": "redfish-fleet",
+            "service_namespace": "hardware",
+            "service_instance_id": "rack-a-exporter",
+            "service_version": "2.0.0",
+            "service_criticality": "critical",
             "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
@@ -1091,6 +1099,11 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
         "deployment_environment": "staging",
         "deployment_environment_compat": "stable",
         "require_deployment_environment": True,
+        "service_name": "redfish-fleet",
+        "service_namespace": "hardware",
+        "service_instance_id": "rack-a-exporter",
+        "service_version": "2.0.0",
+        "service_criticality": "critical",
         "extra_dimensions": {"telemetry.source": "redfish"},
     }
 
@@ -1187,6 +1200,11 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
             "deployment_environment": "nv72-gb300",
+            "service_name": "redfish-fleet",
+            "service_namespace": "hardware",
+            "service_instance_id": "rack-a-exporter",
+            "service_version": "2.0.0",
+            "service_criticality": "critical",
             "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
@@ -1221,6 +1239,8 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     assert first_dims["deployment.environment"] == "nv72-gb300"
     assert first_dims["deployment.environment.name"] == "nv72-gb300"
     assert first_dims["telemetry.source"] == "redfish"
+    assert first_dims["service.name"] == "redfish-fleet"
+    assert not (set(exporter_mod.identity_mod.RESOURCE_ONLY_DIMENSIONS) & set(first_dims))
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):

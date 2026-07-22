@@ -2,23 +2,42 @@
 
 from __future__ import annotations
 
-import os
 import re
+import uuid
+import warnings
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Optional
+
+from redfish_ctl.config import exporter_identity_env
 
 DimensionSource = Optional[Mapping | Iterable[str] | str]
 
 IDENTITY_DIMENSIONS = ("host.name", "node", "server.address", "bmc.ip", "vendor")
 SERVICE_NAME_DIM = "service.name"
 DEFAULT_SERVICE_NAME = "redfish_ctl"
+SERVICE_NAMESPACE_DIM = "service.namespace"
+SERVICE_INSTANCE_ID_DIM = "service.instance.id"
+SERVICE_VERSION_DIM = "service.version"
+SERVICE_CRITICALITY_DIM = "service.criticality"
+SERVICE_INSTANCE_NAMESPACE = uuid.UUID("4d63009a-8d0f-11ee-aad7-4c796ed8e320")
+RESOURCE_ONLY_DIMENSIONS = (
+    SERVICE_NAMESPACE_DIM,
+    SERVICE_INSTANCE_ID_DIM,
+    SERVICE_VERSION_DIM,
+    SERVICE_CRITICALITY_DIM,
+)
 DEPLOYMENT_ENVIRONMENT_DIM = "deployment.environment"
 DEPLOYMENT_ENVIRONMENT_NAME_DIM = "deployment.environment.name"
 DEPLOYMENT_DIMENSIONS = (DEPLOYMENT_ENVIRONMENT_DIM, DEPLOYMENT_ENVIRONMENT_NAME_DIM)
 # service.name (the logical service name) and the deployment keys are process-scoped
 # identity: emitted as dimensions on every plane AND lifted to OTLP resource attributes
 # (stripped from OTLP datapoints to avoid a double-emit).
-RESOURCE_DIMENSIONS = IDENTITY_DIMENSIONS + (SERVICE_NAME_DIM,) + DEPLOYMENT_DIMENSIONS
+RESOURCE_DIMENSIONS = (
+    IDENTITY_DIMENSIONS
+    + (SERVICE_NAME_DIM,)
+    + DEPLOYMENT_DIMENSIONS
+    + RESOURCE_ONLY_DIMENSIONS
+)
 
 _DIMENSION_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,127}$")
 _DEPLOYMENT_ENV_RE = re.compile(r"^[a-z0-9._-]{1,63}$")
@@ -28,47 +47,12 @@ _MISSING_DEPLOYMENT_SENTINELS = {"unknown", "none", "null", "n-a", "na"}
 _COMPAT_MODES = {"both", "deprecated", "stable"}
 _RESERVED_EXTRA_DIMENSIONS = set(IDENTITY_DIMENSIONS) | set(DEPLOYMENT_DIMENSIONS) | {
     SERVICE_NAME_DIM,
+    *RESOURCE_ONLY_DIMENSIONS,
     "deployment",
     "model",
 }
 _TRUTHY = {"1", "true", "yes", "on"}
 _FALSY = {"0", "false", "no", "off"}
-
-_IDENTITY_ENV_KEYS = {
-    "host_prefix": ("REDFISH_EXPORTER_HOST_PREFIX", "IDRAC_EXPORTER_HOST_PREFIX"),
-    "bmc_octet_base": (
-        "REDFISH_EXPORTER_BMC_OCTET_BASE",
-        "IDRAC_EXPORTER_BMC_OCTET_BASE",
-    ),
-    "server_octet_base": (
-        "REDFISH_EXPORTER_SERVER_OCTET_BASE",
-        "IDRAC_EXPORTER_SERVER_OCTET_BASE",
-    ),
-    "server_subnet": (
-        "REDFISH_EXPORTER_SERVER_SUBNET",
-        "IDRAC_EXPORTER_SERVER_SUBNET",
-    ),
-    "deployment_environment": (
-        "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT",
-        "IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT",
-    ),
-    "deployment_environment_compat": (
-        "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT",
-        "IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT",
-    ),
-    "require_deployment_environment": (
-        "REDFISH_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT",
-        "IDRAC_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT",
-    ),
-    "extra_dimensions": (
-        "REDFISH_EXPORTER_EXTRA_DIMENSIONS",
-        "IDRAC_EXPORTER_EXTRA_DIMENSIONS",
-    ),
-    "service_name": (
-        "REDFISH_EXPORTER_SERVICE_NAME",
-        "IDRAC_EXPORTER_SERVICE_NAME",
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -85,6 +69,10 @@ class TelemetryIdentity:
     require_deployment_environment: bool = False
     extra_dimensions: Mapping[str, str] = field(default_factory=dict)
     service_name: str = DEFAULT_SERVICE_NAME
+    service_namespace: Optional[str] = None
+    service_instance_id: Optional[str] = None
+    service_version: Optional[str] = None
+    service_criticality: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Normalize and validate caller-controlled identity fields."""
@@ -107,6 +95,29 @@ class TelemetryIdentity:
         )
         object.__setattr__(
             self, "service_name", _normalize_service_name(self.service_name))
+        object.__setattr__(
+            self,
+            "service_namespace",
+            _normalize_optional_service_attribute(
+                self.service_namespace, SERVICE_NAMESPACE_DIM),
+        )
+        object.__setattr__(
+            self,
+            "service_instance_id",
+            canonical_service_instance_id(self.service_instance_id),
+        )
+        object.__setattr__(
+            self,
+            "service_version",
+            _normalize_optional_service_attribute(
+                self.service_version, SERVICE_VERSION_DIM),
+        )
+        object.__setattr__(
+            self,
+            "service_criticality",
+            _normalize_optional_service_attribute(
+                self.service_criticality, SERVICE_CRITICALITY_DIM),
+        )
 
     def dimensions(self) -> dict[str, str]:
         """Return fixed dimensions projected onto every metric sample.
@@ -126,6 +137,14 @@ class TelemetryIdentity:
                 dims[DEPLOYMENT_ENVIRONMENT_DIM] = self.deployment_environment
             if self.deployment_environment_compat in {"both", "stable"}:
                 dims[DEPLOYMENT_ENVIRONMENT_NAME_DIM] = self.deployment_environment
+        for key, value in (
+            (SERVICE_NAMESPACE_DIM, self.service_namespace),
+            (SERVICE_INSTANCE_ID_DIM, self.service_instance_id),
+            (SERVICE_VERSION_DIM, self.service_version),
+            (SERVICE_CRITICALITY_DIM, self.service_criticality),
+        ):
+            if value is not None:
+                dims[key] = value
         dims.update(self.extra_dimensions)
         return dims
 
@@ -149,7 +168,11 @@ def build_legacy_gb300_identity(
         deployment_environment_compat: str = "both",
         require_deployment_environment: bool = False,
         extra_dimensions: DimensionSource = None,
-        service_name: str = DEFAULT_SERVICE_NAME) -> TelemetryIdentity:
+        service_name: str = DEFAULT_SERVICE_NAME,
+        service_namespace: Optional[str] = None,
+        service_instance_id: Optional[str] = None,
+        service_version: Optional[str] = None,
+        service_criticality: Optional[str] = None) -> TelemetryIdentity:
     """Build the compatibility identity strategy used by existing GB300 deploys.
 
     :param bmc_ip: BMC address or label used as the telemetry source identity.
@@ -163,6 +186,10 @@ def build_legacy_gb300_identity(
     :param require_deployment_environment: whether missing deployment labels fail.
     :param extra_dimensions: additional fixed ``KEY=VALUE`` dimensions to validate.
     :param service_name: OTel service.name (logical service name) emitted on every sample.
+    :param service_namespace: optional OTel service namespace resource attribute.
+    :param service_instance_id: optional stable service instance token or UUID.
+    :param service_version: optional service component version.
+    :param service_criticality: optional service operational-importance value.
     :return: validated telemetry identity for a single exporter instance.
     """
     bmc = _validate_bmc_label(bmc_ip)
@@ -195,6 +222,10 @@ def build_legacy_gb300_identity(
         require_deployment_environment=require_deployment_environment,
         extra_dimensions=parse_dimension_pairs(extra_dimensions),
         service_name=service_name,
+        service_namespace=service_namespace,
+        service_instance_id=service_instance_id,
+        service_version=service_version,
+        service_criticality=service_criticality,
     )
 
 
@@ -209,7 +240,11 @@ def build_identity_dimensions(
         deployment_environment_compat: str = "both",
         require_deployment_environment: bool = False,
         extra_dimensions: DimensionSource = None,
-        service_name: str = DEFAULT_SERVICE_NAME) -> dict[str, str]:
+        service_name: str = DEFAULT_SERVICE_NAME,
+        service_namespace: Optional[str] = None,
+        service_instance_id: Optional[str] = None,
+        service_version: Optional[str] = None,
+        service_criticality: Optional[str] = None) -> dict[str, str]:
     """Return the fixed join dimensions required on every exported series.
 
     :param bmc_ip: BMC address or label used as the telemetry source identity.
@@ -223,6 +258,10 @@ def build_identity_dimensions(
     :param require_deployment_environment: whether missing deployment labels fail.
     :param extra_dimensions: additional fixed ``KEY=VALUE`` dimensions to validate.
     :param service_name: OTel service.name (logical service name) emitted on every sample.
+    :param service_namespace: optional OTel service namespace resource attribute.
+    :param service_instance_id: optional stable service instance token or UUID.
+    :param service_version: optional service component version.
+    :param service_criticality: optional service operational-importance value.
     :return: dimension mapping applied to every exported metric sample.
     """
     return build_legacy_gb300_identity(
@@ -237,6 +276,10 @@ def build_identity_dimensions(
         require_deployment_environment=require_deployment_environment,
         extra_dimensions=extra_dimensions,
         service_name=service_name,
+        service_namespace=service_namespace,
+        service_instance_id=service_instance_id,
+        service_version=service_version,
+        service_criticality=service_criticality,
     ).dimensions()
 
 
@@ -249,7 +292,11 @@ def resolve_identity_options(
         deployment_environment_compat: Optional[str] = None,
         require_deployment_environment: Optional[bool] = None,
         extra_dimensions: DimensionSource = None,
-        service_name: Optional[str] = None) -> dict:
+        service_name: Optional[str] = None,
+        service_namespace: Optional[str] = None,
+        service_instance_id: Optional[str] = None,
+        service_version: Optional[str] = None,
+        service_criticality: Optional[str] = None) -> dict:
     """Resolve exporter identity options from args/config, env, and defaults.
 
     :param host_prefix: explicit host-name prefix override.
@@ -261,56 +308,64 @@ def resolve_identity_options(
     :param require_deployment_environment: explicit missing-label failure policy.
     :param extra_dimensions: explicit additional fixed dimensions.
     :param service_name: explicit OTel service.name override; defaults to 'redfish_ctl'.
+    :param service_namespace: explicit OTel service namespace.
+    :param service_instance_id: explicit stable service instance token or UUID.
+    :param service_version: explicit service component version.
+    :param service_criticality: explicit operational-importance value.
     :return: keyword arguments for :func:`build_identity_dimensions`.
     """
+    explicit_values = {
+        "host_prefix": host_prefix,
+        "bmc_octet_base": bmc_octet_base,
+        "server_octet_base": server_octet_base,
+        "server_subnet": server_subnet,
+        "deployment_environment": deployment_environment,
+        "deployment_environment_compat": deployment_environment_compat,
+        "require_deployment_environment": require_deployment_environment,
+        "extra_dimensions": extra_dimensions,
+        "service_name": service_name,
+        "service_namespace": service_namespace,
+        "service_instance_id": service_instance_id,
+        "service_version": service_version,
+        "service_criticality": service_criticality,
+    }
+    overridden = tuple(
+        key for key, value in explicit_values.items()
+        if _non_empty(value) is not None
+    )
+    env = exporter_identity_env(overridden)
     resolved_host_prefix = _first_non_empty(
-        host_prefix,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["host_prefix"]),
-        "gb300-poc1",
-    )
+        host_prefix, env["host_prefix"], "gb300-poc1")
     resolved_bmc_octet_base = _first_non_empty(
-        bmc_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["bmc_octet_base"]),
-        20,
-    )
+        bmc_octet_base, env["bmc_octet_base"], 20)
     resolved_server_octet_base = _first_non_empty(
-        server_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_octet_base"]),
-        40,
-    )
+        server_octet_base, env["server_octet_base"], 40)
     resolved_server_subnet = _first_non_empty(
-        server_subnet,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_subnet"]),
-    )
+        server_subnet, env["server_subnet"])
     resolved_deployment_environment = _first_non_empty(
-        deployment_environment,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["deployment_environment"]),
-    )
+        deployment_environment, env["deployment_environment"])
     resolved_deployment_environment_compat = _first_non_empty(
         deployment_environment_compat,
-        *(
-            os.environ.get(name)
-            for name in _IDENTITY_ENV_KEYS["deployment_environment_compat"]
-        ),
+        env["deployment_environment_compat"],
         "both",
     )
     resolved_require_deployment_environment = _first_non_empty(
         require_deployment_environment,
-        *(
-            os.environ.get(name)
-            for name in _IDENTITY_ENV_KEYS["require_deployment_environment"]
-        ),
+        env["require_deployment_environment"],
         False,
     )
     resolved_extra_dimensions = _first_non_empty(
-        extra_dimensions,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["extra_dimensions"]),
-    )
+        extra_dimensions, env["extra_dimensions"])
     resolved_service_name = _first_non_empty(
-        service_name,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["service_name"]),
-        DEFAULT_SERVICE_NAME,
-    )
+        service_name, env["service_name"], DEFAULT_SERVICE_NAME)
+    resolved_service_namespace = _first_non_empty(
+        service_namespace, env["service_namespace"])
+    resolved_service_instance_id = _first_non_empty(
+        service_instance_id, env["service_instance_id"])
+    resolved_service_version = _first_non_empty(
+        service_version, env["service_version"])
+    resolved_service_criticality = _first_non_empty(
+        service_criticality, env["service_criticality"])
     return {
         "host_prefix": str(resolved_host_prefix),
         "bmc_octet_base": _coerce_int(resolved_bmc_octet_base, "bmc_octet_base"),
@@ -329,6 +384,10 @@ def resolve_identity_options(
         ),
         "extra_dimensions": parse_dimension_pairs(resolved_extra_dimensions),
         "service_name": str(resolved_service_name),
+        "service_namespace": resolved_service_namespace,
+        "service_instance_id": resolved_service_instance_id,
+        "service_version": resolved_service_version,
+        "service_criticality": resolved_service_criticality,
     }
 
 
@@ -376,7 +435,11 @@ def common_sample_dimensions(samples: Iterable) -> dict[str, str]:
         first = next(iterator)
     except StopIteration:
         return {}
-    common = dict(first.dimensions)
+    common = {
+        key: value
+        for key, value in first.dimensions.items()
+        if key not in RESOURCE_ONLY_DIMENSIONS
+    }
     for sample in iterator:
         for key in list(common):
             if sample.dimensions.get(key) != common[key]:
@@ -418,11 +481,170 @@ def _normalize_service_name(value) -> str:
     text = str(value).strip()
     if not text:
         return DEFAULT_SERVICE_NAME
-    if len(text) > 255:
-        raise ValueError("service.name must be at most 255 characters")
-    if _looks_secret(text):
-        raise ValueError("service.name must not contain secret material")
+    _validate_service_attribute(text, SERVICE_NAME_DIM)
+    _warn_high_cardinality(text, SERVICE_NAME_DIM)
     return text
+
+
+def _normalize_optional_service_attribute(value, field_name: str) -> Optional[str]:
+    """Normalize an optional OTel service resource attribute.
+
+    :param value: raw attribute value.
+    :param field_name: semantic-convention attribute name for diagnostics.
+    :return: validated text, or None when unset.
+    """
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    _validate_service_attribute(text, field_name)
+    _warn_high_cardinality(text, field_name)
+    return text
+
+
+def _validate_service_attribute(value: str, field_name: str) -> None:
+    """Validate one OTel service identity attribute without logging its value.
+
+    :param value: stripped attribute value.
+    :param field_name: semantic-convention attribute name for diagnostics.
+    :raises ValueError: when the value violates the bounded identity contract.
+    """
+    if len(value) > 255:
+        raise ValueError(f"{field_name} must be at most 255 characters")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError(f"{field_name} must be valid UTF-8") from exc
+    if not value.isprintable() or any(character.isspace() for character in value):
+        raise ValueError(f"{field_name} must be printable and contain no whitespace")
+    if _looks_secret(value):
+        raise ValueError(f"{field_name} must not contain secret material")
+
+
+def canonical_service_instance_id(value) -> Optional[str]:
+    """Return a canonical UUID for a caller or Redfish instance token.
+
+    Existing UUIDs retain their identity. Other stable tokens are mapped through
+    the service-instance UUIDv5 namespace defined by the implementation spec.
+
+    :param value: stable instance token or UUID.
+    :return: canonical UUID text, or None when unset.
+    """
+    text = _normalize_optional_service_attribute(value, SERVICE_INSTANCE_ID_DIM)
+    if text is None:
+        return None
+    try:
+        return str(uuid.UUID(text))
+    except ValueError:
+        return str(uuid.uuid5(SERVICE_INSTANCE_NAMESPACE, text))
+
+
+def service_instance_id_from_sources(
+        manager_uuids: Iterable = (),
+        chassis_serials: Iterable = (),
+        permanent_macs: Iterable = (),
+        mac_addresses: Iterable = ()) -> Optional[str]:
+    """Resolve the first stable service instance source in Redfish precedence.
+
+    :param manager_uuids: Manager UUID candidates in deterministic order.
+    :param chassis_serials: BMC or DC-SCM chassis serial candidates.
+    :param permanent_macs: burned-in management-interface MAC candidates.
+    :param mac_addresses: configurable management-interface MAC candidates.
+    :return: canonical UUIDv5 text, or None when no stable source is valid.
+    """
+    for candidate in manager_uuids:
+        source = _manager_uuid_source(candidate)
+        if source is not None:
+            return str(uuid.uuid5(SERVICE_INSTANCE_NAMESPACE, source))
+    for candidate in chassis_serials:
+        if _valid_inherent_identity(candidate):
+            return str(uuid.uuid5(
+                SERVICE_INSTANCE_NAMESPACE,
+                str(candidate).strip(),
+            ))
+    for candidates in (permanent_macs, mac_addresses):
+        for candidate in candidates:
+            source = _global_mac_source(candidate)
+            if source is not None:
+                return str(uuid.uuid5(SERVICE_INSTANCE_NAMESPACE, source))
+    return None
+
+
+def _manager_uuid_source(value) -> Optional[str]:
+    """Return canonical Manager UUID text, excluding invalid placeholders.
+
+    :param value: Redfish Manager UUID candidate.
+    :return: canonical lowercase UUID or None.
+    """
+    if not _valid_inherent_identity(value):
+        return None
+    try:
+        candidate = uuid.UUID(str(value).strip())
+    except ValueError:
+        return None
+    return str(candidate) if candidate.int else None
+
+
+def _valid_inherent_identity(value) -> bool:
+    """Return whether a UUID or serial is concrete rather than a placeholder.
+
+    :param value: Redfish UUID or serial candidate.
+    :return: True for a usable inherent identity value.
+    """
+    text = str(value or "").strip()
+    if not text or _looks_secret(text):
+        return False
+    lowered = re.sub(r"[\s._-]+", " ", text.lower()).strip()
+    if lowered in {
+        "default string",
+        "to be filled by o e m",
+        "n a",
+        "na",
+        "none",
+        "null",
+        "unknown",
+    } or text.startswith("$"):
+        return False
+    compact = re.sub(r"[^0-9a-z]", "", text.lower())
+    if compact.startswith("0x"):
+        compact = compact[2:]
+    return bool(compact) and any(character != "0" for character in compact)
+
+
+def _global_mac_source(value) -> Optional[str]:
+    """Return canonical globally administered unicast MAC text.
+
+    :param value: Redfish MACAddress or PermanentMACAddress value.
+    :return: lowercase colon-delimited MAC or None.
+    """
+    text = re.sub(r"[:-]", "", str(value or "").strip())
+    if not re.fullmatch(r"[0-9A-Fa-f]{12}", text):
+        return None
+    octets = bytes.fromhex(text)
+    if octets in {b"\x00" * 6, b"\xff" * 6} or octets[0] & 0x03:
+        return None
+    return ":".join(f"{octet:02x}" for octet in octets)
+
+
+def _warn_high_cardinality(value: str, field_name: str) -> None:
+    """Warn without values when a long non-UUID identity may be unstable.
+
+    :param value: validated identity value.
+    :param field_name: semantic-convention attribute name for diagnostics.
+    """
+    if len(value) < 32:
+        return
+    try:
+        uuid.UUID(value)
+        return
+    except ValueError:
+        pass
+    warnings.warn(
+        f"{field_name} resembles a high-cardinality token; ensure it is stable",
+        RuntimeWarning,
+        stacklevel=3,
+    )
 
 
 def _validate_extra_dimension(key: str, value: str) -> None:

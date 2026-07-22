@@ -63,6 +63,63 @@ _ENDPOINT_ENV_NAMES = {
     "port": ("REDFISH_PORT", "IDRAC_PORT"),
 }
 
+# Exporter identity environment names are defined here so telemetry callers do
+# not read process environment state outside the canonical configuration loader.
+_EXPORTER_IDENTITY_ENV_NAMES = {
+    "host_prefix": (
+        "REDFISH_EXPORTER_HOST_PREFIX",
+        "IDRAC_EXPORTER_HOST_PREFIX",
+    ),
+    "bmc_octet_base": (
+        "REDFISH_EXPORTER_BMC_OCTET_BASE",
+        "IDRAC_EXPORTER_BMC_OCTET_BASE",
+    ),
+    "server_octet_base": (
+        "REDFISH_EXPORTER_SERVER_OCTET_BASE",
+        "IDRAC_EXPORTER_SERVER_OCTET_BASE",
+    ),
+    "server_subnet": (
+        "REDFISH_EXPORTER_SERVER_SUBNET",
+        "IDRAC_EXPORTER_SERVER_SUBNET",
+    ),
+    "deployment_environment": (
+        "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT",
+        "IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT",
+    ),
+    "deployment_environment_compat": (
+        "REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT",
+        "IDRAC_EXPORTER_DEPLOYMENT_ENVIRONMENT_COMPAT",
+    ),
+    "require_deployment_environment": (
+        "REDFISH_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT",
+        "IDRAC_EXPORTER_REQUIRE_DEPLOYMENT_ENVIRONMENT",
+    ),
+    "extra_dimensions": (
+        "REDFISH_EXPORTER_EXTRA_DIMENSIONS",
+        "IDRAC_EXPORTER_EXTRA_DIMENSIONS",
+    ),
+    "service_name": (
+        "REDFISH_EXPORTER_SERVICE_NAME",
+        "IDRAC_EXPORTER_SERVICE_NAME",
+    ),
+    "service_namespace": (
+        "REDFISH_EXPORTER_SERVICE_NAMESPACE",
+        "IDRAC_EXPORTER_SERVICE_NAMESPACE",
+    ),
+    "service_instance_id": (
+        "REDFISH_EXPORTER_SERVICE_INSTANCE_ID",
+        "IDRAC_EXPORTER_SERVICE_INSTANCE_ID",
+    ),
+    "service_version": (
+        "REDFISH_EXPORTER_SERVICE_VERSION",
+        "IDRAC_EXPORTER_SERVICE_VERSION",
+    ),
+    "service_criticality": (
+        "REDFISH_EXPORTER_SERVICE_CRITICALITY",
+        "IDRAC_EXPORTER_SERVICE_CRITICALITY",
+    ),
+}
+
 
 def _redacted(name: str, value: str) -> str:
     """Render ``name=value`` for an error, hiding secret values.
@@ -176,3 +233,20 @@ def endpoint_defaults(strict: bool = True) -> EndpointConfig:
         port=int(env_first(
             "REDFISH_PORT", "IDRAC_PORT", default="443", strict=strict)),
     )
+
+
+def exporter_identity_env(
+        overridden: tuple[str, ...] = ()) -> dict[str, Optional[str]]:
+    """Return conflict-aware environment values for exporter identity.
+
+    Each canonical ``REDFISH_EXPORTER_*`` setting and its deprecated
+    ``IDRAC_EXPORTER_*`` alias are defined by ``specs/config/environment.yaml``.
+
+    :param overridden: options explicitly supplied by CLI or config file.
+    :return: identity option names mapped to their configured value or None.
+    :raises ConfigurationConflict: when a canonical name and alias disagree.
+    """
+    return {
+        option: env_first(*names, strict=option not in overridden)
+        for option, names in _EXPORTER_IDENTITY_ENV_NAMES.items()
+    }

@@ -456,7 +456,8 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # OTLP ingest with an X-SF-Token header); deployment.environment and other resource
     # keys come from OTEL_RESOURCE_ATTRIBUTES. service.name defaults to the shared
     # redfish_ctl identity so spans and hw.* metrics land on one APM service node.
-    if getattr(cmd_args, "otlp_traces", False):
+    if (getattr(cmd_args, "otlp_traces", False)
+            and getattr(cmd_args, "subcommand", None) != "exporter"):
         tracing.setup_otlp()
         tracing.install_termination_flush()
 
