@@ -5,7 +5,8 @@ mapped onto the OTLP data model so ``redfish_ctl`` drops into an existing
 OpenTelemetry pipeline as just another producer:
 
 * identity dimensions (``host.name``/``server.address``/``bmc.ip``/``node``/
-  ``vendor``) become OTel **resource** attributes; the remaining per-metric
+  ``vendor``/``deployment.environment``/``deployment.environment.name``)
+  become OTel **resource** attributes when present; the remaining per-metric
   dimensions (``gpu``/``port``/``chassis``/``system``/``index``) become
   **datapoint** attributes;
 * monotonic cumulative counters (fabric byte/frame/error/packet/discard/count
@@ -23,13 +24,16 @@ import os
 import time
 from typing import Callable, Iterable, Optional
 
+from .identity import RESOURCE_DIMENSIONS
+
 # Identity dims that describe the emitting host -> OTel resource attributes.
-RESOURCE_DIM_KEYS = ("host.name", "server.address", "bmc.ip", "node", "vendor")
+RESOURCE_DIM_KEYS = RESOURCE_DIMENSIONS
 
 # A metric is a monotonic cumulative counter (OTLP Sum) when its name ends with
 # one of these suffixes, or is total energy. Everything else is a Gauge.
 _COUNTER_SUFFIXES = (
     "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
+    "_total", "_dropped",
 )
 _COUNTER_EXACT = frozenset({"hw.energy_kwh"})
 
@@ -83,11 +87,14 @@ def _resource_attrs(samples, service_name: str) -> dict:
     :param service_name: value for the ``service.name`` resource attribute.
     :return: dict of OTel resource attributes.
     """
-    attrs = {"service.name": service_name}
+    attrs: dict = {}
     for sample in samples:
         for key in RESOURCE_DIM_KEYS:
             if key in sample.dimensions and key not in attrs:
                 attrs[key] = sample.dimensions[key]
+    # service.name rides the samples' dimensions now; the param is only a fallback
+    # for samples that predate the identity carrying it.
+    attrs.setdefault("service.name", service_name)
     return attrs
 
 
@@ -124,7 +131,9 @@ def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ct
     grouped: dict[str, dict] = {}
     for sample in samples:
         dp_attrs = {k: v for k, v in sample.dimensions.items() if k not in RESOURCE_DIM_KEYS}
-        entry = grouped.setdefault(sample.metric, {"unit": sample.unit, "points": []})
+        entry = grouped.setdefault(
+            sample.metric,
+            {"unit": sample.unit, "metric_type": sample.metric_type, "points": []})
         entry["points"].append(NumberDataPoint(
             attributes=dp_attrs,
             start_time_unix_nano=ts,
@@ -134,7 +143,10 @@ def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ct
 
     metrics = []
     for name, entry in grouped.items():
-        if is_monotonic_counter(name):
+        # Trust the sample's declared metric_type (the single classifier, set at
+        # _sample construction) so OTLP agrees with Prometheus/SignalFx instead of
+        # re-deriving from the name.
+        if entry["metric_type"] == "counter":
             data = Sum(
                 data_points=entry["points"],
                 aggregation_temporality=AggregationTemporality.CUMULATIVE,

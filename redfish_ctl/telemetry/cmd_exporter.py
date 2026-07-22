@@ -138,6 +138,26 @@ class Exporter(RedfishManagerBase,
             default=None, type=str,
             help="server.address subnet override for derived identity dimensions")
         cmd_parser.add_argument(
+            "--deployment-environment", dest="deployment_environment",
+            default=None, type=str,
+            help="deployment environment join dimension, e.g. production or nv72-gb300")
+        cmd_parser.add_argument(
+            "--deployment-environment-compat", dest="deployment_environment_compat",
+            default=None, choices=("both", "deprecated", "stable"),
+            help="emit deployment.environment, deployment.environment.name, or both")
+        cmd_parser.add_argument(
+            "--require-deployment-environment", dest="require_deployment_environment",
+            action="store_true", default=None,
+            help="fail startup when no deployment environment is configured")
+        cmd_parser.add_argument(
+            "--dimension", dest="extra_dimensions", action="append", default=None,
+            help="fixed validated KEY=VALUE dimension to add to every telemetry sample")
+        cmd_parser.add_argument(
+            "--service-name", dest="service_name", default=None, type=str,
+            help="OTel service.name (logical service name) emitted on every series as a "
+                 "dimension/label and the OTLP resource attribute; override only, defaults "
+                 "to 'redfish_ctl'. Also REDFISH_EXPORTER_SERVICE_NAME")
+        cmd_parser.add_argument(
             "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
             help="OTLP collector endpoint for --output otlp; defaults to "
                  "OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -461,7 +481,12 @@ class Exporter(RedfishManagerBase,
                         identity_host_prefix: Optional[str] = None,
                         identity_bmc_octet_base: Optional[int] = None,
                         identity_server_octet_base: Optional[int] = None,
-                        identity_server_subnet: Optional[str] = None) -> list:
+                        identity_server_subnet: Optional[str] = None,
+                        deployment_environment: Optional[str] = None,
+                        deployment_environment_compat: Optional[str] = None,
+                        require_deployment_environment: Optional[bool] = None,
+                        extra_dimensions: Optional[Mapping | list[str]] = None,
+                        service_name: Optional[str] = None) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -473,6 +498,11 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param deployment_environment: deployment environment join dimension.
+        :param deployment_environment_compat: deployment environment key compatibility mode.
+        :param require_deployment_environment: when True, fail if the environment is absent.
+        :param extra_dimensions: fixed validated dimensions applied to every sample.
+        :param service_name: OTel service.name (logical service name) emitted on every sample.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
@@ -482,6 +512,11 @@ class Exporter(RedfishManagerBase,
             bmc_octet_base=identity_bmc_octet_base,
             server_octet_base=identity_server_octet_base,
             server_subnet=identity_server_subnet,
+            deployment_environment=deployment_environment,
+            deployment_environment_compat=deployment_environment_compat,
+            require_deployment_environment=require_deployment_environment,
+            extra_dimensions=extra_dimensions,
+            service_name=service_name,
         )
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
@@ -604,6 +639,11 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base: Optional[int] = None,
                 identity_server_octet_base: Optional[int] = None,
                 identity_server_subnet: Optional[str] = None,
+                deployment_environment: Optional[str] = None,
+                deployment_environment_compat: Optional[str] = None,
+                require_deployment_environment: Optional[bool] = None,
+                extra_dimensions: Optional[list[str]] = None,
+                service_name: Optional[str] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
@@ -639,6 +679,12 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param deployment_environment: deployment environment join dimension.
+        :param deployment_environment_compat: deployment environment key compatibility mode.
+        :param require_deployment_environment: when True, fail if the environment is absent.
+        :param extra_dimensions: fixed validated dimensions applied to every sample.
+        :param service_name: OTel service.name (logical service name) emitted on every
+            series; defaults to 'redfish_ctl'.
         :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
@@ -669,6 +715,14 @@ class Exporter(RedfishManagerBase,
             "identity_server_octet_base", identity_server_octet_base)
         identity_server_subnet = option(
             "identity_server_subnet", identity_server_subnet)
+        deployment_environment = option(
+            "deployment_environment", deployment_environment)
+        deployment_environment_compat = option(
+            "deployment_environment_compat", deployment_environment_compat)
+        require_deployment_environment = option(
+            "require_deployment_environment", require_deployment_environment)
+        extra_dimensions = option("extra_dimensions", extra_dimensions)
+        service_name = option("service_name", service_name)
 
         def collect_current_samples():
             """Collect samples with the resolved exporter identity options.
@@ -684,6 +738,11 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base=identity_bmc_octet_base,
                 identity_server_octet_base=identity_server_octet_base,
                 identity_server_subnet=identity_server_subnet,
+                deployment_environment=deployment_environment,
+                deployment_environment_compat=deployment_environment_compat,
+                require_deployment_environment=require_deployment_environment,
+                extra_dimensions=extra_dimensions,
+                service_name=service_name,
             )
 
         if exporter_output == "otlp":
@@ -743,15 +802,9 @@ class Exporter(RedfishManagerBase,
                         "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
                         "or SPLUNK_API_TOKEN)")
                 metric_names = sorted({sample.metric for sample in samples})
-                # Scope the readback to this host's MTS via its unique identity
-                # dimension, so a neighbor pushing the same metric is not mistaken
-                # for this host's series.
-                dimensions = {}
-                for sample in samples:
-                    host = sample.dimensions.get("host.name")
-                    if host:
-                        dimensions = {"host.name": host}
-                        break
+                # Scope readback by all fixed dimensions common to this scrape,
+                # including deployment.environment when configured.
+                dimensions = exporter.common_sample_dimensions(samples)
                 readback_start = time.monotonic()
                 readback = exporter.verify_signalfx_readback(
                     realm, api_token, metric_names, dimensions)
