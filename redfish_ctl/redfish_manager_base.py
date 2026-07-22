@@ -48,7 +48,12 @@ from .cmd_exceptions import (
 )
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
-from .redfish_manager import CommandResult, RedfishManager
+from .redfish_manager import (
+    CommandResult,
+    RedfishManager,
+    active_redfish_response_cache,
+    redfish_response_cache_scope,
+)
 from .redfish_manager_shared import (
     REDFISH_API,
     REDFISH_JSON,
@@ -359,6 +364,7 @@ class RedfishManagerBase(RedfishManager):
         _redfish_query_one_param_per_uri = kwargs.pop(
             "redfish_query_one_param_per_uri", False
         )
+        _redfish_cache = kwargs.pop("redfish_cache", None)
 
         inst = disp(
             idrac_ip=_host,
@@ -371,7 +377,10 @@ class RedfishManagerBase(RedfishManager):
         inst._redfish_query = _redfish_query
         inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
 
-        return inst.execute(**kwargs)
+        if _redfish_cache is None:
+            return inst.execute(**kwargs)
+        with redfish_response_cache_scope(_redfish_cache):
+            return inst.execute(**kwargs)
 
     async def async_invoke(
             cls, api_call: ApiRequestType, name: str, **kwargs) -> CommandResult:
@@ -403,6 +412,7 @@ class RedfishManagerBase(RedfishManager):
         _redfish_query_one_param_per_uri = kwargs.pop(
             "redfish_query_one_param_per_uri", False
         )
+        _redfish_cache = kwargs.pop("redfish_cache", None)
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
@@ -415,7 +425,10 @@ class RedfishManagerBase(RedfishManager):
         )
         inst._redfish_query = _redfish_query
         inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
-        return inst.execute(**kwargs)
+        if _redfish_cache is None:
+            return inst.execute(**kwargs)
+        with redfish_response_cache_scope(_redfish_cache):
+            return inst.execute(**kwargs)
 
     async def api_async_get_call(self, loop, req, hdr: Dict):
         """Make api asynced requests either with x-auth authentication
@@ -529,6 +542,10 @@ class RedfishManagerBase(RedfishManager):
                 "is_http": self._is_http,
             }
         )
+        if "redfish_cache" not in kwargs:
+            redfish_cache = active_redfish_response_cache()
+            if redfish_cache is not None:
+                kwargs["redfish_cache"] = redfish_cache
         # Operation root span named by the command (no-op unless tracing is on);
         # nested sync_invoke calls nest under it to form the trace waterfall.
         with tracing.operation_span(name) as span:

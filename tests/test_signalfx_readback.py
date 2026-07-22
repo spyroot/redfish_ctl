@@ -10,23 +10,34 @@ Author Mus spyroot@gmail.com
 import json
 from unittest import mock
 
+import pytest
+
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter import (
+    MetricSample,
     build_readback_result,
+    common_sample_dimensions,
     signalfx_metric_readback,
     verify_signalfx_readback,
 )
+
+_NOW = 1_700_000_000_000
 
 
 class _FakeResp:
     """Minimal urlopen context-manager double."""
 
-    def __init__(self, payload):
+    def __init__(self, payload, headers=None):
         self._payload = json.dumps(payload).encode()
+        self.headers = headers or {}
 
     def read(self):
         """Return the encoded body."""
         return self._payload
+
+    def getheader(self, name, default=None):
+        """Return a fake response header."""
+        return self.headers.get(name, default)
 
     def __enter__(self):
         return self
@@ -39,24 +50,58 @@ def test_readback_counts_visible_series():
     """A metric with time series in MTS reports count>0 and the newest stamp."""
     payload = {"count": 2, "results": [
         {"lastUpdated": 1700000000000}, {"lastUpdated": 1700000009000}]}
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp(payload)):
+    with mock.patch.object(exporter, "_open_signalfx_request", return_value=_FakeResp(payload)):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
-    assert out == {"count": 2, "newest_ms": 1700000009000}
+    assert out == {"count": 2, "newest_ms": 1700000009000, "server_ms": 0}
+
+
+def test_readback_records_server_date_header():
+    """The MTS HTTP Date header is captured as the readback server clock."""
+    payload = {"count": 1, "results": [{"lastUpdated": _NOW}]}
+    headers = {"Date": "Tue, 14 Nov 2023 22:13:20 GMT"}
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           return_value=_FakeResp(payload, headers)):
+        out = signalfx_metric_readback("us1", "tok", "hw.power")
+    assert out["server_ms"] == _NOW
 
 
 def test_readback_zero_when_not_ingested():
     """The #363 case: POST succeeded but MTS shows no series -> count 0."""
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp({"count": 0, "results": []})):
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           return_value=_FakeResp({"count": 0, "results": []})):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
-    assert out == {"count": 0, "newest_ms": 0}
+    assert out == {"count": 0, "newest_ms": 0, "server_ms": 0}
 
 
 def test_verify_readback_covers_each_metric():
     """verify_signalfx_readback returns a per-metric readback for every name."""
-    with mock.patch("urllib.request.urlopen", return_value=_FakeResp({"count": 1, "results": [{"created": 5}]})):
+    with mock.patch.object(
+            exporter, "_open_signalfx_request",
+            return_value=_FakeResp({"count": 1, "results": [{"created": 5}]})):
         out = verify_signalfx_readback("us1", "tok", ["hw.power", "hw.temperature"])
     assert set(out) == {"hw.power", "hw.temperature"}
     assert all(v["count"] == 1 for v in out.values())
+
+
+def test_readback_uses_no_redirect_token_request():
+    """MTS readback sends the token through the redirect-disabled request helper."""
+    captured = []
+
+    def refuse_redirect(request, timeout):
+        captured.append((request, timeout))
+        raise ValueError("SignalFx request refused redirect")
+
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           side_effect=refuse_redirect):
+        with pytest.raises(ValueError, match="refused redirect"):
+            signalfx_metric_readback("us1", "api-token", "hw.power")
+
+    assert len(captured) == 1
+    request, timeout = captured[0]
+    assert timeout == 20.0
+    assert request.full_url.startswith("https://api.us1.signalfx.com/v2/metrictimeseries?")
+    headers = {key.lower(): value for key, value in request.header_items()}
+    assert headers["x-sf-token"] == "api-token"
 
 
 def test_readback_scopes_query_by_dimension():
@@ -67,7 +112,36 @@ def test_readback_scopes_query_by_dimension():
     assert exporter._mts_query("hw.power") == 'sf_metric:"hw.power"'
 
 
-_NOW = 1_700_000_000_000
+def test_readback_query_escapes_quotes_and_backslashes():
+    """Dimension values are escaped before they enter the MTS query language."""
+    query = exporter._mts_query(
+        'hw."power"',
+        {"host.name": r'slot\"1'},
+    )
+    assert query == 'sf_metric:"hw.\\"power\\"" AND host.name:"slot\\\\\\"1"'
+
+
+def test_common_sample_dimensions_keep_deployment_join_keys():
+    """Readback scopes by fixed join dimensions and drops metric-specific ones."""
+    dims = {
+        "host.name": "gb300-poc1-slot9",
+        "node": "slot9",
+        "server.address": "172.25.230.49",
+        "bmc.ip": "172.25.230.29",
+        "vendor": "supermicro",
+        "deployment.environment": "nv72-gb300",
+        "deployment.environment.name": "nv72-gb300",
+    }
+    samples = [
+        MetricSample("hw.power", 1, dims | {"source": "environment"}),
+        MetricSample("hw.temperature", 2, dims | {"source": "sensor"}),
+    ]
+
+    common = common_sample_dimensions(samples)
+
+    assert common["deployment.environment.name"] == "nv72-gb300"
+    assert common["host.name"] == "gb300-poc1-slot9"
+    assert "source" not in common
 
 
 def test_verdict_ok_when_series_fresh():
@@ -79,6 +153,7 @@ def test_verdict_ok_when_series_fresh():
         ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
     assert error is None
     assert summary["metrics_fresh"] == 2 and summary["missing_metrics"] == []
+    assert summary["clock_source"] == "caller"
 
 
 def test_verdict_errors_when_a_metric_is_absent():
@@ -101,3 +176,49 @@ def test_verdict_errors_on_stale_series():
         ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
     assert error is not None
     assert summary["metrics_fresh"] == 0 and summary["missing_metrics"] == ["hw.power"]
+
+
+def test_verdict_uses_readback_server_clock_when_now_omitted():
+    """Server-clock freshness does not flip when the exporter host clock is skewed."""
+    readback = {
+        "hw.power": {
+            "count": 1,
+            "newest_ms": _NOW,
+            "server_ms": _NOW + 1000,
+        }
+    }
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30})
+    assert error is None
+    assert summary["clock_source"] == "signalfx_http_date"
+    assert summary["readback_now_ms"] == _NOW + 1000
+    assert summary["metrics_fresh"] == 1
+
+
+def test_verdict_fails_closed_without_server_or_caller_clock():
+    """Freshness cannot be proven if neither caller nor API server time exists."""
+    readback = {"hw.power": {"count": 1, "newest_ms": _NOW, "server_ms": 0}}
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30})
+    assert error is not None and "server time" in error
+    assert summary["clock_source"] == "unavailable"
+    assert summary["missing_metrics"] == ["hw.power"]
+
+
+def test_verdict_freshness_window_is_configurable():
+    """A wider freshness window can be requested without changing the clock source."""
+    readback = {
+        "hw.power": {
+            "count": 1,
+            "newest_ms": _NOW - 1200,
+            "server_ms": _NOW,
+        }
+    }
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30},
+        freshness_ms=1500)
+    assert error is None
+    assert summary["freshness_ms"] == 1500

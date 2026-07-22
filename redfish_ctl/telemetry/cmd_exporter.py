@@ -14,7 +14,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishResponseCache
 from ..redfish_manager_base import RedfishManagerBase
 from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from . import exporter
@@ -115,6 +115,10 @@ class Exporter(RedfishManagerBase,
                  "Splunk MTS and report a compact canary result; a POST returning 200 "
                  "is not treated as proof the datapoints were ingested (issue #363)")
         cmd_parser.add_argument(
+            "--readback-freshness-seconds", dest="readback_freshness_seconds",
+            default=900.0, type=float,
+            help="freshness window for --verify-readback, in seconds; default 900")
+        cmd_parser.add_argument(
             "--signalfx-realm", dest="signalfx_realm", default=None, type=str,
             help="Splunk Observability realm for readback; defaults to SPLUNK_O11Y_REALM")
         cmd_parser.add_argument(
@@ -137,6 +141,26 @@ class Exporter(RedfishManagerBase,
             "--identity-server-subnet", dest="identity_server_subnet",
             default=None, type=str,
             help="server.address subnet override for derived identity dimensions")
+        cmd_parser.add_argument(
+            "--deployment-environment", dest="deployment_environment",
+            default=None, type=str,
+            help="deployment environment join dimension, e.g. production or nv72-gb300")
+        cmd_parser.add_argument(
+            "--deployment-environment-compat", dest="deployment_environment_compat",
+            default=None, choices=("both", "deprecated", "stable"),
+            help="emit deployment.environment, deployment.environment.name, or both")
+        cmd_parser.add_argument(
+            "--require-deployment-environment", dest="require_deployment_environment",
+            action="store_true", default=None,
+            help="fail startup when no deployment environment is configured")
+        cmd_parser.add_argument(
+            "--dimension", dest="extra_dimensions", action="append", default=None,
+            help="fixed validated KEY=VALUE dimension to add to every telemetry sample")
+        cmd_parser.add_argument(
+            "--service-name", dest="service_name", default=None, type=str,
+            help="OTel service.name (logical service name) emitted on every series as a "
+                 "dimension/label and the OTLP resource attribute; override only, defaults "
+                 "to 'redfish_ctl'. Also REDFISH_EXPORTER_SERVICE_NAME")
         cmd_parser.add_argument(
             "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
             help="OTLP collector endpoint for --output otlp; defaults to "
@@ -324,17 +348,24 @@ class Exporter(RedfishManagerBase,
                           api_type: ApiRequestType,
                           name: str,
                           extract_rows: Callable[[object], list],
+                          redfish_cache: Optional[RedfishResponseCache] = None,
                           **kwargs) -> exporter.CollectorResult:
         """Invoke a registered read-only collector and return its result model.
 
         :param api_type: ApiRequestType of the collector command.
         :param name: registered command name and collector label.
         :param extract_rows: callable that extracts the collector row list.
+        :param redfish_cache: optional per-scrape cache shared by collectors.
         :return: CollectorResult for the collector.
         """
         return self._collect_result(
             name,
-            lambda: self.sync_invoke(api_type, name, **kwargs),
+            lambda: self.sync_invoke(
+                api_type,
+                name,
+                redfish_cache=redfish_cache,
+                **kwargs,
+            ),
             extract_rows,
         )
 
@@ -423,16 +454,25 @@ class Exporter(RedfishManagerBase,
             return data
         return self._environment_rows(do_async=do_async)
 
-    def _vendor_label(self, vendor: Optional[str]) -> str:
+    def _vendor_label(self,
+                      vendor: Optional[str],
+                      redfish_cache: Optional[RedfishResponseCache] = None) -> str:
         """Return a stable lower-case vendor label.
 
         :param vendor: explicit vendor override; when falsy the vendor is auto-detected.
+        :param redfish_cache: optional per-scrape cache for the ServiceRoot read.
         :return: the vendor label, or ``"unknown"`` when neither is available.
         """
         if vendor:
             return vendor
         try:
-            detected = self.redfish_vendor
+            if redfish_cache is None:
+                detected = self.redfish_vendor
+            else:
+                service_root = self.base_query(
+                    "/redfish/v1/", redfish_cache=redfish_cache).data
+                detected = service_root.get("Vendor", "") \
+                    if isinstance(service_root, dict) else ""
         except Exception:
             detected = ""
         return detected or "unknown"
@@ -445,7 +485,12 @@ class Exporter(RedfishManagerBase,
                         identity_host_prefix: Optional[str] = None,
                         identity_bmc_octet_base: Optional[int] = None,
                         identity_server_octet_base: Optional[int] = None,
-                        identity_server_subnet: Optional[str] = None) -> list:
+                        identity_server_subnet: Optional[str] = None,
+                        deployment_environment: Optional[str] = None,
+                        deployment_environment_compat: Optional[str] = None,
+                        require_deployment_environment: Optional[bool] = None,
+                        extra_dimensions: Optional[Mapping | list[str]] = None,
+                        service_name: Optional[str] = None) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -457,18 +502,29 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param deployment_environment: deployment environment join dimension.
+        :param deployment_environment_compat: deployment environment key compatibility mode.
+        :param require_deployment_environment: when True, fail if the environment is absent.
+        :param extra_dimensions: fixed validated dimensions applied to every sample.
+        :param service_name: OTel service.name (logical service name) emitted on every sample.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
+        redfish_cache = RedfishResponseCache()
         identity_options = exporter.resolve_identity_options(
             host_prefix=identity_host_prefix,
             bmc_octet_base=identity_bmc_octet_base,
             server_octet_base=identity_server_octet_base,
             server_subnet=identity_server_subnet,
+            deployment_environment=deployment_environment,
+            deployment_environment_compat=deployment_environment_compat,
+            require_deployment_environment=require_deployment_environment,
+            extra_dimensions=extra_dimensions,
+            service_name=service_name,
         )
         identity = build_identity_dimensions(
             label_bmc_ip or self.idrac_ip,
-            vendor=self._vendor_label(vendor),
+            vendor=self._vendor_label(vendor, redfish_cache=redfish_cache),
             **identity_options,
         )
         collector_results = [
@@ -476,12 +532,14 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.EnvironmentMetrics,
                 "environment-metrics",
                 self._extract_environment_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
             ),
             self._invoke_collector(
                 ApiRequestType.Thermal,
                 "thermal",
                 self._extract_thermal_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -489,6 +547,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.Sensors,
                 "sensors",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -496,6 +555,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.NvLinkPorts,
                 "nvlink-ports",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -503,6 +563,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.MetricReports,
                 "metric-reports",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -510,12 +571,14 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.LeakDetectors,
                 "leak-detectors",
                 self._extract_leak_detector_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
             ),
             self._invoke_collector(
                 ApiRequestType.NetworkAdapters,
                 "network-adapters",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -523,6 +586,7 @@ class Exporter(RedfishManagerBase,
                 ApiRequestType.ComponentIntegrity,
                 "component-integrity",
                 self._extract_list_rows,
+                redfish_cache=redfish_cache,
                 do_async=do_async,
                 do_expanded=do_expanded,
             ),
@@ -573,12 +637,18 @@ class Exporter(RedfishManagerBase,
                 signalfx_token: Optional[str] = None,
                 signalfx_token_file: Optional[str] = None,
                 verify_readback: Optional[bool] = False,
+                readback_freshness_seconds: Optional[float] = 900.0,
                 signalfx_realm: Optional[str] = None,
                 signalfx_api_token_env: Optional[str] = None,
                 identity_host_prefix: Optional[str] = None,
                 identity_bmc_octet_base: Optional[int] = None,
                 identity_server_octet_base: Optional[int] = None,
                 identity_server_subnet: Optional[str] = None,
+                deployment_environment: Optional[str] = None,
+                deployment_environment_compat: Optional[str] = None,
+                require_deployment_environment: Optional[bool] = None,
+                extra_dimensions: Optional[list[str]] = None,
+                service_name: Optional[str] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
                 **kwargs) -> CommandResult:
@@ -606,6 +676,7 @@ class Exporter(RedfishManagerBase,
         :param verify_readback: when True, a --once SignalFx push reads the metric
             time series back from Splunk MTS and returns a compact canary result;
             a POST returning 200 is not treated as proof of ingestion.
+        :param readback_freshness_seconds: freshness window for readback verdicts.
         :param signalfx_realm: Splunk Observability realm for readback; resolved
             from SPLUNK_O11Y_REALM when None.
         :param signalfx_api_token_env: env var holding the Splunk API (read) token
@@ -614,6 +685,12 @@ class Exporter(RedfishManagerBase,
         :param identity_bmc_octet_base: BMC last-octet base override for slot math.
         :param identity_server_octet_base: server last-octet base override.
         :param identity_server_subnet: server.address subnet override.
+        :param deployment_environment: deployment environment join dimension.
+        :param deployment_environment_compat: deployment environment key compatibility mode.
+        :param require_deployment_environment: when True, fail if the environment is absent.
+        :param extra_dimensions: fixed validated dimensions applied to every sample.
+        :param service_name: OTel service.name (logical service name) emitted on every
+            series; defaults to 'redfish_ctl'.
         :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
@@ -637,6 +714,16 @@ class Exporter(RedfishManagerBase,
         signalfx_token_env = option("signalfx_token_env", signalfx_token_env)
         signalfx_token = option("signalfx_token", signalfx_token)
         signalfx_token_file = option("signalfx_token_file", signalfx_token_file)
+        readback_freshness_seconds = option(
+            "readback_freshness_seconds", readback_freshness_seconds)
+        freshness_seconds = (
+            900.0
+            if readback_freshness_seconds in (None, "")
+            else float(readback_freshness_seconds)
+        )
+        readback_freshness_ms = int(freshness_seconds * 1000)
+        if readback_freshness_ms <= 0:
+            raise ValueError("--readback-freshness-seconds must be greater than 0")
         identity_host_prefix = option("identity_host_prefix", identity_host_prefix)
         identity_bmc_octet_base = option(
             "identity_bmc_octet_base", identity_bmc_octet_base)
@@ -644,6 +731,14 @@ class Exporter(RedfishManagerBase,
             "identity_server_octet_base", identity_server_octet_base)
         identity_server_subnet = option(
             "identity_server_subnet", identity_server_subnet)
+        deployment_environment = option(
+            "deployment_environment", deployment_environment)
+        deployment_environment_compat = option(
+            "deployment_environment_compat", deployment_environment_compat)
+        require_deployment_environment = option(
+            "require_deployment_environment", require_deployment_environment)
+        extra_dimensions = option("extra_dimensions", extra_dimensions)
+        service_name = option("service_name", service_name)
 
         def collect_current_samples():
             """Collect samples with the resolved exporter identity options.
@@ -659,6 +754,11 @@ class Exporter(RedfishManagerBase,
                 identity_bmc_octet_base=identity_bmc_octet_base,
                 identity_server_octet_base=identity_server_octet_base,
                 identity_server_subnet=identity_server_subnet,
+                deployment_environment=deployment_environment,
+                deployment_environment_compat=deployment_environment_compat,
+                require_deployment_environment=require_deployment_environment,
+                extra_dimensions=extra_dimensions,
+                service_name=service_name,
             )
 
         if exporter_output == "otlp":
@@ -718,15 +818,9 @@ class Exporter(RedfishManagerBase,
                         "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
                         "or SPLUNK_API_TOKEN)")
                 metric_names = sorted({sample.metric for sample in samples})
-                # Scope the readback to this host's MTS via its unique identity
-                # dimension, so a neighbor pushing the same metric is not mistaken
-                # for this host's series.
-                dimensions = {}
-                for sample in samples:
-                    host = sample.dimensions.get("host.name")
-                    if host:
-                        dimensions = {"host.name": host}
-                        break
+                # Scope readback by all fixed dimensions common to this scrape,
+                # including deployment.environment when configured.
+                dimensions = exporter.common_sample_dimensions(samples)
                 readback_start = time.monotonic()
                 readback = exporter.verify_signalfx_readback(
                     realm, api_token, metric_names, dimensions)
@@ -734,7 +828,7 @@ class Exporter(RedfishManagerBase,
                 summary, error = exporter.build_readback_result(
                     status, ingest_url, len(samples), metric_names, readback,
                     {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms},
-                    int(time.time() * 1000))
+                    freshness_ms=readback_freshness_ms)
                 return CommandResult(summary, None, summary, error)
             samples = collect_current_samples()
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"

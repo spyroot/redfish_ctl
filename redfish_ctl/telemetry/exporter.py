@@ -12,13 +12,20 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
 from redfish_ctl.config import ConfigurationConflict
+from . import identity as identity_mod
 
-REQUIRED_DIMENSIONS = ("host.name", "node", "server.address", "bmc.ip", "vendor")
+REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
+build_identity_dimensions = identity_mod.build_identity_dimensions
+common_sample_dimensions = identity_mod.common_sample_dimensions
+parse_dimension_pairs = identity_mod.parse_dimension_pairs
+resolve_identity_options = identity_mod.resolve_identity_options
 SENSOR_METRIC = {
     "Temperature": ("hw.temperature", "sensor"),
     "Rotational": ("hw.fan_speed", "fan"),
@@ -132,6 +139,55 @@ SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
 
 
+class _SignalFxNoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Fail closed instead of forwarding token-bearing SignalFx requests."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """Reject an HTTP redirect before urllib can replay the request.
+
+        :param req: original urllib request object.
+        :param fp: response file object supplied by urllib.
+        :param code: redirect HTTP status code.
+        :param msg: redirect HTTP status message.
+        :param headers: redirect response headers.
+        :param newurl: URL urllib would otherwise follow.
+        :return: never returns; raises :class:`ValueError`.
+        :raises ValueError: always, so credential headers stay on the original host.
+        """
+        raise ValueError("SignalFx request refused redirect")
+
+
+def _open_signalfx_request(request: urllib.request.Request, timeout: float):
+    """Open a SignalFx request without following redirects.
+
+    SignalFx ingest and readback tokens are sent as ``X-SF-Token``. urllib's
+    default opener follows redirects and can replay that custom header to the
+    redirected host, so token-bearing requests must use a redirect-disabled
+    opener.
+
+    :param request: prepared urllib request for SignalFx ingest or readback.
+    :param timeout: HTTP timeout in seconds.
+    :return: urllib response object suitable for use as a context manager.
+    :raises ValueError: if the server returns a redirect response.
+    """
+    opener = urllib.request.build_opener(_SignalFxNoRedirectHandler)
+    return opener.open(request, timeout=timeout)
+
+
+def _require_https_url(url: str, label: str) -> urllib.parse.ParseResult:
+    """Return a parsed URL when it is HTTPS, else raise a clear error.
+
+    :param url: URL string to validate.
+    :param label: human-readable name for error messages.
+    :return: parsed URL for a non-empty HTTPS URL with a network location.
+    :raises ValueError: when the URL is missing a host or does not use HTTPS.
+    """
+    parsed = urllib.parse.urlparse(url or "")
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        raise ValueError(f"{label} must use https; got {url!r}")
+    return parsed
+
+
 @dataclass(frozen=True)
 class MetricSample:
     """One vendor-neutral telemetry sample ready for export."""
@@ -156,46 +212,6 @@ class CollectorResult:
     error_kind: Optional[str] = None
 
 
-def build_identity_dimensions(
-        bmc_ip: str,
-        vendor: str = "unknown",
-        host_prefix: str = "gb300-poc1",
-        bmc_octet_base: int = 20,
-        server_octet_base: int = 40,
-        server_subnet: Optional[str] = None) -> dict[str, str]:
-    """Return the fixed join dimensions required on every exported series.
-
-    :param bmc_ip: BMC management IP; its final octet derives the slot/node.
-    :param vendor: hardware vendor label; lowercased into the ``vendor`` dimension.
-    :param host_prefix: prefix for the derived ``host.name`` (``<prefix>-slot<n>``).
-    :param bmc_octet_base: BMC last-octet offset subtracted to compute the slot number.
-    :param server_octet_base: host last-octet offset added to the slot for ``server.address``.
-    :param server_subnet: override for the first three octets of ``server.address``;
-        defaults to the BMC subnet.
-    :return: dict of ``host.name``, ``node``, ``server.address``, ``bmc.ip`` and
-        ``vendor`` dimensions.
-    """
-    bmc = str(bmc_ip or "unknown")
-    parts = bmc.split(".")
-    if len(parts) == 4 and parts[-1].isdigit():
-        slot = int(parts[-1]) - bmc_octet_base
-        subnet = server_subnet or ".".join(parts[:3])
-        node = f"slot{slot}"
-        host = f"{host_prefix}-{node}"
-        server = f"{subnet}.{server_octet_base + slot}"
-    else:
-        node = "unknown"
-        host = bmc
-        server = "unknown"
-    return {
-        "host.name": host,
-        "node": node,
-        "server.address": server,
-        "bmc.ip": bmc,
-        "vendor": str(vendor or "unknown").lower(),
-    }
-
-
 # Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
 # the legacy IDRAC_* keys still work as a fallback during the rename.
 _EXPORTER_CRED_KEYS = frozenset({
@@ -206,23 +222,6 @@ _EXPORTER_CONFIG_FILE_ENVS = (
     "REDFISH_EXPORTER_CONFIG_FILE",
     "IDRAC_EXPORTER_CONFIG_FILE",
 )
-_IDENTITY_ENV_KEYS = {
-    "host_prefix": ("REDFISH_EXPORTER_HOST_PREFIX", "IDRAC_EXPORTER_HOST_PREFIX"),
-    "bmc_octet_base": (
-        "REDFISH_EXPORTER_BMC_OCTET_BASE",
-        "IDRAC_EXPORTER_BMC_OCTET_BASE",
-    ),
-    "server_octet_base": (
-        "REDFISH_EXPORTER_SERVER_OCTET_BASE",
-        "IDRAC_EXPORTER_SERVER_OCTET_BASE",
-    ),
-    "server_subnet": (
-        "REDFISH_EXPORTER_SERVER_SUBNET",
-        "IDRAC_EXPORTER_SERVER_SUBNET",
-    ),
-}
-
-
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
@@ -268,20 +267,6 @@ def _first_non_empty(*values):
         if cleaned is not None:
             return cleaned
     return None
-
-
-def _coerce_int(value, field_name: str) -> int:
-    """Coerce an integer config field with a targeted error message.
-
-    :param value: value to coerce.
-    :param field_name: field name included in validation errors.
-    :return: coerced integer value.
-    :raises ValueError: when the value cannot be parsed as an integer.
-    """
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer; got {value!r}") from exc
 
 
 def _config_path(path: Optional[str] = None) -> Optional[str]:
@@ -365,6 +350,19 @@ def exporter_config_options(path: Optional[str] = None) -> dict:
             config, "identity", "identity_server_octet_base", "server_octet_base"),
         "identity_server_subnet": _config_value(
             config, "identity", "identity_server_subnet", "server_subnet"),
+        "deployment_environment": _config_value(
+            config, "identity", "deployment_environment", "deployment_environment"),
+        "deployment_environment_compat": _config_value(
+            config, "identity", "deployment_environment_compat",
+            "deployment_environment_compat"),
+        "require_deployment_environment": _config_value(
+            config, "identity", "require_deployment_environment",
+            "require_deployment_environment"),
+        "extra_dimensions": _first_non_empty(
+            _config_value(config, "identity", "extra_dimensions", "extra_dimensions"),
+            config.get("dimensions"),
+            config.get("extra_dimensions"),
+        ),
     }
     return {
         key: value
@@ -439,51 +437,6 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
             value = int(value) if is_port else value
             for target_attr in attrs:
                 setattr(args, target_attr, value)
-
-
-def resolve_identity_options(
-        host_prefix: Optional[str] = None,
-        bmc_octet_base: Optional[int] = None,
-        server_octet_base: Optional[int] = None,
-        server_subnet: Optional[str] = None) -> dict:
-    """Resolve exporter identity dimension options from args, env, and defaults.
-
-    :param host_prefix: explicit ``host.name`` prefix override.
-    :param bmc_octet_base: explicit BMC last-octet base used to derive slot.
-    :param server_octet_base: explicit server last-octet base used to derive host IP.
-    :param server_subnet: explicit server subnet for ``server.address``.
-    :return: keyword arguments for :func:`build_identity_dimensions`.
-    """
-    resolved_host_prefix = _first_non_empty(
-        host_prefix,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["host_prefix"]),
-        "gb300-poc1",
-    )
-    resolved_bmc_octet_base = _first_non_empty(
-        bmc_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["bmc_octet_base"]),
-        20,
-    )
-    resolved_server_octet_base = _first_non_empty(
-        server_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_octet_base"]),
-        40,
-    )
-    resolved_server_subnet = _first_non_empty(
-        server_subnet,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_subnet"]),
-    )
-    return {
-        "host_prefix": str(resolved_host_prefix),
-        "bmc_octet_base": _coerce_int(resolved_bmc_octet_base, "bmc_octet_base"),
-        "server_octet_base": _coerce_int(
-            resolved_server_octet_base, "server_octet_base"),
-        "server_subnet": (
-            str(resolved_server_subnet)
-            if resolved_server_subnet is not None
-            else None
-        ),
-    }
 
 
 def build_metric_samples(
@@ -934,6 +887,7 @@ def _gpu_metric_report_sample(
                 dims | {"property": GPU_THROTTLE_PROPERTIES[prop_name]},
                 "s",
                 row.get("Timestamp"),
+                metric_type="counter",  # cumulative throttle time, not a gauge
             )
 
     if source == "memory":
@@ -1118,21 +1072,25 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
 
 
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint gauge envelope.
+    """Wrap samples in the SignalFx /v2/datapoint envelope, keyed by metric type.
+
+    A ``counter`` metric_type is a monotonic cumulative counter, so it goes under the
+    SignalFx ``cumulative_counter`` envelope (matching the Prometheus ``counter`` type
+    and the OTLP monotonic Sum); everything else is a ``gauge``. This keeps the stored
+    Splunk metric type consistent with the other backends.
 
     :param samples: metric samples to wrap.
-    :return: SignalFx ``/v2/datapoint`` body with a ``gauge`` list.
+    :return: SignalFx ``/v2/datapoint`` body with ``gauge`` and/or ``cumulative_counter`` lists.
     """
-    return {
-        "gauge": [
-            {
-                "metric": sample.metric,
-                "value": sample.value,
-                "dimensions": dict(sample.dimensions),
-            }
-            for sample in samples
-        ]
-    }
+    body: dict[str, list[dict]] = {}
+    for sample in samples:
+        envelope = "cumulative_counter" if sample.metric_type == "counter" else "gauge"
+        body.setdefault(envelope, []).append({
+            "metric": sample.metric,
+            "value": sample.value,
+            "dimensions": dict(sample.dimensions),
+        })
+    return body
 
 
 def _require_datapoint_url(ingest_url: str) -> str:
@@ -1150,7 +1108,8 @@ def _require_datapoint_url(ingest_url: str) -> str:
     :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
     :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
     """
-    if SIGNALFX_DATAPOINT_PATH not in (ingest_url or ""):
+    parsed = _require_https_url(ingest_url, "SignalFx ingest URL")
+    if parsed.path.rstrip("/") != SIGNALFX_DATAPOINT_PATH:
         raise ValueError(
             "SignalFx ingest URL must be the full datapoint endpoint ending in "
             f"{SIGNALFX_DATAPOINT_PATH} (e.g. "
@@ -1217,7 +1176,7 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
     :return: the HTTP status code of the POST response.
     :raises ValueError: if ``ingest_url`` is not a full datapoint endpoint.
     """
-    _require_datapoint_url(ingest_url)
+    ingest_url = _require_datapoint_url(ingest_url)
     data = json.dumps(body).encode()
     req = urllib.request.Request(
         ingest_url,
@@ -1225,7 +1184,7 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
         method="POST",
         headers={"Content-Type": "application/json", "X-SF-Token": token},
     )
-    with urllib.request.urlopen(req, timeout=timeout) as response:
+    with _open_signalfx_request(req, timeout=timeout) as response:
         return response.status
 
 
@@ -1240,10 +1199,19 @@ def _mts_query(metric: str, dimensions: Optional[Mapping] = None) -> str:
     :param dimensions: dimension key->value pairs to AND into the query.
     :return: the SignalFx search query string.
     """
-    terms = [f'sf_metric:"{metric}"']
+    terms = [f'sf_metric:"{_escape_mts_value(metric)}"']
     for key, value in sorted((dimensions or {}).items()):
-        terms.append(f'{key}:"{value}"')
+        terms.append(f'{key}:"{_escape_mts_value(value)}"')
     return " AND ".join(terms)
+
+
+def _escape_mts_value(value) -> str:
+    """Escape a value for a Splunk Observability MTS search term.
+
+    :param value: raw metric or dimension value.
+    :return: escaped string representation.
+    """
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
 
 
 def signalfx_metric_readback(
@@ -1262,15 +1230,18 @@ def signalfx_metric_readback(
     :param metric: SignalFx metric name to look up.
     :param dimensions: dimension key->value pairs to scope the query to one entity.
     :param timeout: HTTP timeout in seconds.
-    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>}``.
+    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>,
+        "server_ms": <response Date header in ms, 0 if unavailable>}``.
     :raises ValueError: when the API answers with a non-JSON body.
     """
     query = urllib.parse.urlencode(
         {"query": _mts_query(metric, dimensions), "limit": 50,
          "orderBy": "-sf_updatedOnMs"})
     url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
+    _require_https_url(url, "SignalFx readback URL")
     request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with _open_signalfx_request(request, timeout=timeout) as response:
+        server_ms = _response_date_ms(response)
         raw = response.read()
     try:
         data = json.loads(raw)
@@ -1283,7 +1254,11 @@ def signalfx_metric_readback(
             stamp = row.get(key)
             if isinstance(stamp, (int, float)) and stamp > newest:
                 newest = int(stamp)
-    return {"count": int(data.get("count") or len(results)), "newest_ms": newest}
+    return {
+        "count": int(data.get("count") or len(results)),
+        "newest_ms": newest,
+        "server_ms": server_ms,
+    }
 
 
 def verify_signalfx_readback(
@@ -1296,7 +1271,7 @@ def verify_signalfx_readback(
     :param metrics: metric names to confirm (the names that were pushed).
     :param dimensions: dimension key->value pairs scoping the query to this host.
     :param timeout: per-query HTTP timeout in seconds.
-    :return: ``{metric: {"count": int, "newest_ms": int}}`` for each metric.
+    :return: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` for each metric.
     """
     return {metric: signalfx_metric_readback(realm, api_token, metric, dimensions, timeout)
             for metric in sorted(set(metrics))}
@@ -1304,7 +1279,7 @@ def verify_signalfx_readback(
 
 def build_readback_result(
         push_status: int, ingest_url: str, sample_count: int, metric_names: list,
-        readback: dict, timing_ms: dict, now_ms: int,
+        readback: dict, timing_ms: dict, now_ms: Optional[int] = None,
         freshness_ms: int = 900000) -> tuple:
     """Build the compact canary summary and verdict from a readback.
 
@@ -1318,16 +1293,31 @@ def build_readback_result(
     :param ingest_url: the ingest URL that was POSTed to.
     :param sample_count: number of samples scraped and pushed.
     :param metric_names: the distinct metric names that were pushed.
-    :param readback: ``{metric: {"count": int, "newest_ms": int}}`` from MTS.
+    :param readback: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` from MTS.
     :param timing_ms: ``{"scrape": int, "push": int, "readback": int}`` durations.
-    :param now_ms: current wall-clock time in ms, for the freshness window.
+    :param now_ms: current wall-clock time in ms, for the freshness window. When
+        omitted, freshness is anchored to the Splunk API response server time.
     :param freshness_ms: how recent ``newest_ms`` must be to count as this push.
     :return: ``(summary_dict, error_or_None)`` -- the compact result and verdict.
     """
-    fresh = sorted(
-        name for name, series in readback.items()
-        if series["count"] > 0 and series["newest_ms"] >= now_ms - freshness_ms)
+    anchor_ms = now_ms
+    clock_source = "caller"
+    if anchor_ms is None:
+        anchor_ms = _readback_server_ms(readback)
+        clock_source = "signalfx_http_date" if anchor_ms is not None else "unavailable"
+
+    if anchor_ms is None:
+        fresh = []
+    else:
+        fresh = sorted(
+            name for name, series in readback.items()
+            if series["count"] > 0 and series["newest_ms"] >= anchor_ms - freshness_ms)
     missing = sorted(set(metric_names) - set(fresh))
+    clock_error = None
+    if anchor_ms is None:
+        clock_error = (
+            "SignalFx readback did not include server time, so freshness cannot be "
+            "verified without trusting the local exporter clock")
     summary = {
         "push_status": push_status,
         "ingest_url": ingest_url,
@@ -1338,12 +1328,64 @@ def build_readback_result(
         "readback": readback,
         "timing_ms": timing_ms,
         "freshness_ms": freshness_ms,
+        "readback_now_ms": anchor_ms,
+        "clock_source": clock_source,
     }
-    error = None if not missing else (
-        f"SignalFx POST returned {push_status} but {len(missing)} of "
-        f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
-        "MTS -- the POST succeeded yet the datapoints were not ingested")
+    if clock_error:
+        error = clock_error
+    elif missing:
+        error = (
+            f"SignalFx POST returned {push_status} but {len(missing)} of "
+            f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
+            "MTS -- the POST succeeded yet the datapoints were not ingested")
+    else:
+        error = None
     return summary, error
+
+
+def _response_date_ms(response) -> int:
+    """Return the HTTP Date header as epoch milliseconds, or 0 if absent.
+
+    :param response: urllib response object from the MTS readback request.
+    :return: epoch milliseconds parsed from the Date header, or 0 when absent.
+    """
+    header = None
+    getheader = getattr(response, "getheader", None)
+    if callable(getheader):
+        header = getheader("Date")
+    if not header:
+        headers = getattr(response, "headers", None)
+        getter = getattr(headers, "get", None)
+        if callable(getter):
+            header = getter("Date")
+    if not header:
+        return 0
+    try:
+        parsed = parsedate_to_datetime(str(header))
+    except (TypeError, ValueError):
+        return 0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp() * 1000)
+
+
+def _readback_server_ms(readback: Mapping) -> Optional[int]:
+    """Return the newest server timestamp reported by readback API responses.
+
+    :param readback: per-metric readback summaries from Splunk MTS.
+    :return: newest server timestamp in milliseconds, or None when unavailable.
+    """
+    stamps = []
+    for series in readback.values():
+        if not isinstance(series, Mapping):
+            continue
+        try:
+            stamp = int(series.get("server_ms") or 0)
+        except (TypeError, ValueError):
+            continue
+        if stamp > 0:
+            stamps.append(stamp)
+    return max(stamps) if stamps else None
 
 
 def _report_signalfx_loop_error(exc: Exception) -> None:
@@ -1533,20 +1575,28 @@ def _sample(metric: str,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None,
-            metric_type: str = "gauge") -> MetricSample:
+            metric_type: Optional[str] = None) -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
     :param value: numeric sample value.
     :param dims: dimension mapping.
-    :param unit: optional unit annotation.
+    :param unit: optional unit annotation; coerced to str so a non-string BMC unit
+        cannot reach the OTLP mapper.
     :param timestamp: optional sample timestamp.
-    :param metric_type: Prometheus/OpenMetrics sample type.
+    :param metric_type: explicit sample type; when None it is derived from the metric
+        name (monotonic-counter names -> ``counter``, else ``gauge``) so Prometheus,
+        SignalFx, and OTLP all agree on the type. This is the single classifier point.
     :return: the assembled MetricSample.
     """
+    if metric_type is None:
+        from . import otlp
+        metric_type = "counter" if otlp.is_monotonic_counter(metric) else "gauge"
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
-                        metric_type=metric_type, unit=unit, timestamp=timestamp)
+                        metric_type=metric_type,
+                        unit=(str(unit) if unit is not None else None),
+                        timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
@@ -1555,7 +1605,13 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
     :param identity: fixed join dimensions to seed the result.
     :return: dimension mapping with the required dims plus any non-empty extras.
     """
-    dims = {key: str(identity.get(key, "unknown")) for key in REQUIRED_DIMENSIONS}
+    dims = {
+        str(key): str(value)
+        for key, value in identity.items()
+        if value not in (None, "")
+    }
+    for key in REQUIRED_DIMENSIONS:
+        dims.setdefault(key, str(identity.get(key) or "unknown"))
     for key, value in extra.items():
         if value not in (None, ""):
             dims[key] = str(value)
