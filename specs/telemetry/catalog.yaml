@@ -62,6 +62,7 @@ metrics:
   - {name: hw.component_integrity.enabled, kind: gauge, prometheus_name: hw.component_integrity.enabled, family: component}
   - {name: hw.scrape.ok, kind: gauge, prometheus_name: hw.scrape.ok, family: scrape}
   - {name: hw.scrape.duration_seconds, kind: gauge, unit: s, prometheus_name: hw.scrape.duration_seconds, family: scrape}
+  - {name: hw.bmc.up, kind: gauge, prometheus_name: hw.bmc.up, family: scrape}
   - {name: redfish_exporter_scrape_success, kind: gauge, prometheus_name: redfish_exporter_scrape_success, family: exporter}
   - {name: redfish_exporter_scrape_partial, kind: gauge, prometheus_name: redfish_exporter_scrape_partial, family: exporter}
   - {name: redfish_exporter_scrape_duration_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_scrape_duration_seconds, family: exporter}

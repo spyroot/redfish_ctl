@@ -407,6 +407,9 @@ _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.scrape.duration_seconds", unit="s",
                 description="Exporter scrape duration.", family="scrape",
                 liveness="scrape"),
+    _definition("hw.bmc.up",
+                description="Per-BMC 0/1 liveness gauge (1 reachable, 0 unreachable).",
+                family="scrape", liveness="scrape"),
     _definition(
         "redfish_exporter_scrape_success",
         description="Whether the latest scrape completed without a supported collector failure.",
