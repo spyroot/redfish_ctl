@@ -21,16 +21,23 @@ from redfish_ctl.telemetry.exporter import (
     verify_signalfx_readback,
 )
 
+_NOW = 1_700_000_000_000
+
 
 class _FakeResp:
     """Minimal urlopen context-manager double."""
 
-    def __init__(self, payload):
+    def __init__(self, payload, headers=None):
         self._payload = json.dumps(payload).encode()
+        self.headers = headers or {}
 
     def read(self):
         """Return the encoded body."""
         return self._payload
+
+    def getheader(self, name, default=None):
+        """Return a fake response header."""
+        return self.headers.get(name, default)
 
     def __enter__(self):
         return self
@@ -45,7 +52,17 @@ def test_readback_counts_visible_series():
         {"lastUpdated": 1700000000000}, {"lastUpdated": 1700000009000}]}
     with mock.patch.object(exporter, "_open_signalfx_request", return_value=_FakeResp(payload)):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
-    assert out == {"count": 2, "newest_ms": 1700000009000}
+    assert out == {"count": 2, "newest_ms": 1700000009000, "server_ms": 0}
+
+
+def test_readback_records_server_date_header():
+    """The MTS HTTP Date header is captured as the readback server clock."""
+    payload = {"count": 1, "results": [{"lastUpdated": _NOW}]}
+    headers = {"Date": "Tue, 14 Nov 2023 22:13:20 GMT"}
+    with mock.patch.object(exporter, "_open_signalfx_request",
+                           return_value=_FakeResp(payload, headers)):
+        out = signalfx_metric_readback("us1", "tok", "hw.power")
+    assert out["server_ms"] == _NOW
 
 
 def test_readback_zero_when_not_ingested():
@@ -53,7 +70,7 @@ def test_readback_zero_when_not_ingested():
     with mock.patch.object(exporter, "_open_signalfx_request",
                            return_value=_FakeResp({"count": 0, "results": []})):
         out = signalfx_metric_readback("us1", "tok", "hw.power")
-    assert out == {"count": 0, "newest_ms": 0}
+    assert out == {"count": 0, "newest_ms": 0, "server_ms": 0}
 
 
 def test_verify_readback_covers_each_metric():
@@ -127,9 +144,6 @@ def test_common_sample_dimensions_keep_deployment_join_keys():
     assert "source" not in common
 
 
-_NOW = 1_700_000_000_000
-
-
 def test_verdict_ok_when_series_fresh():
     """All pushed metrics have a fresh series -> no error."""
     readback = {"hw.power": {"count": 1, "newest_ms": _NOW - 1000},
@@ -139,6 +153,7 @@ def test_verdict_ok_when_series_fresh():
         ["hw.power", "hw.temp"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
     assert error is None
     assert summary["metrics_fresh"] == 2 and summary["missing_metrics"] == []
+    assert summary["clock_source"] == "caller"
 
 
 def test_verdict_errors_when_a_metric_is_absent():
@@ -161,3 +176,49 @@ def test_verdict_errors_on_stale_series():
         ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30}, _NOW)
     assert error is not None
     assert summary["metrics_fresh"] == 0 and summary["missing_metrics"] == ["hw.power"]
+
+
+def test_verdict_uses_readback_server_clock_when_now_omitted():
+    """Server-clock freshness does not flip when the exporter host clock is skewed."""
+    readback = {
+        "hw.power": {
+            "count": 1,
+            "newest_ms": _NOW,
+            "server_ms": _NOW + 1000,
+        }
+    }
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30})
+    assert error is None
+    assert summary["clock_source"] == "signalfx_http_date"
+    assert summary["readback_now_ms"] == _NOW + 1000
+    assert summary["metrics_fresh"] == 1
+
+
+def test_verdict_fails_closed_without_server_or_caller_clock():
+    """Freshness cannot be proven if neither caller nor API server time exists."""
+    readback = {"hw.power": {"count": 1, "newest_ms": _NOW, "server_ms": 0}}
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30})
+    assert error is not None and "server time" in error
+    assert summary["clock_source"] == "unavailable"
+    assert summary["missing_metrics"] == ["hw.power"]
+
+
+def test_verdict_freshness_window_is_configurable():
+    """A wider freshness window can be requested without changing the clock source."""
+    readback = {
+        "hw.power": {
+            "count": 1,
+            "newest_ms": _NOW - 1200,
+            "server_ms": _NOW,
+        }
+    }
+    summary, error = build_readback_result(
+        200, "https://ingest.us1.observability.splunkcloud.com/v2/datapoint", 1,
+        ["hw.power"], readback, {"scrape": 10, "push": 20, "readback": 30},
+        freshness_ms=1500)
+    assert error is None
+    assert summary["freshness_ms"] == 1500

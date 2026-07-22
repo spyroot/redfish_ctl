@@ -115,6 +115,10 @@ class Exporter(RedfishManagerBase,
                  "Splunk MTS and report a compact canary result; a POST returning 200 "
                  "is not treated as proof the datapoints were ingested (issue #363)")
         cmd_parser.add_argument(
+            "--readback-freshness-seconds", dest="readback_freshness_seconds",
+            default=900.0, type=float,
+            help="freshness window for --verify-readback, in seconds; default 900")
+        cmd_parser.add_argument(
             "--signalfx-realm", dest="signalfx_realm", default=None, type=str,
             help="Splunk Observability realm for readback; defaults to SPLUNK_O11Y_REALM")
         cmd_parser.add_argument(
@@ -633,6 +637,7 @@ class Exporter(RedfishManagerBase,
                 signalfx_token: Optional[str] = None,
                 signalfx_token_file: Optional[str] = None,
                 verify_readback: Optional[bool] = False,
+                readback_freshness_seconds: Optional[float] = 900.0,
                 signalfx_realm: Optional[str] = None,
                 signalfx_api_token_env: Optional[str] = None,
                 identity_host_prefix: Optional[str] = None,
@@ -671,6 +676,7 @@ class Exporter(RedfishManagerBase,
         :param verify_readback: when True, a --once SignalFx push reads the metric
             time series back from Splunk MTS and returns a compact canary result;
             a POST returning 200 is not treated as proof of ingestion.
+        :param readback_freshness_seconds: freshness window for readback verdicts.
         :param signalfx_realm: Splunk Observability realm for readback; resolved
             from SPLUNK_O11Y_REALM when None.
         :param signalfx_api_token_env: env var holding the Splunk API (read) token
@@ -708,6 +714,16 @@ class Exporter(RedfishManagerBase,
         signalfx_token_env = option("signalfx_token_env", signalfx_token_env)
         signalfx_token = option("signalfx_token", signalfx_token)
         signalfx_token_file = option("signalfx_token_file", signalfx_token_file)
+        readback_freshness_seconds = option(
+            "readback_freshness_seconds", readback_freshness_seconds)
+        freshness_seconds = (
+            900.0
+            if readback_freshness_seconds in (None, "")
+            else float(readback_freshness_seconds)
+        )
+        readback_freshness_ms = int(freshness_seconds * 1000)
+        if readback_freshness_ms <= 0:
+            raise ValueError("--readback-freshness-seconds must be greater than 0")
         identity_host_prefix = option("identity_host_prefix", identity_host_prefix)
         identity_bmc_octet_base = option(
             "identity_bmc_octet_base", identity_bmc_octet_base)
@@ -812,7 +828,7 @@ class Exporter(RedfishManagerBase,
                 summary, error = exporter.build_readback_result(
                     status, ingest_url, len(samples), metric_names, readback,
                     {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms},
-                    int(time.time() * 1000))
+                    freshness_ms=readback_freshness_ms)
                 return CommandResult(summary, None, summary, error)
             samples = collect_current_samples()
             data = (to_signalfx_body(samples) if exporter_output == "signalfx"
