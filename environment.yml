@@ -29,5 +29,8 @@ dependencies:
   # Optional TUI ("tui" extra in setup.py): pretty tables for redfish-discover.
   - rich>=13
   - pip:
+      # Mirror the "otlp" extra so the GB300 conda image carries the exporter.
+      - opentelemetry-sdk>=1.20
+      - opentelemetry-exporter-otlp>=1.20
       # Install redfish_ctl itself (and anything not on conda-forge) via pip.
       - -e .
