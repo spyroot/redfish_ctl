@@ -31,3 +31,8 @@ dependencies:
   - pip:
       # Install redfish_ctl itself (and anything not on conda-forge) via pip.
       - -e .
+      # OTLP span/metric exporter (mirrors setup.py extras_require["otlp"]) so the
+      # container image can emit traces to Splunk without a start-time install.
+      # The Dockerfile strips only the "- -e ." line, so this survives into the
+      # built conda env; agent containers then run redfish_ctl --otlp-traces.
+      - opentelemetry-exporter-otlp-proto-http>=1.20
