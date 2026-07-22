@@ -33,11 +33,20 @@ def test_bios_change_command_is_registered():
     assert issubclass(BiosChangeSettings, IDracManager)
 
 
-@pytest.mark.parametrize("old", ["redfish_ctl.idrac_manager", "redfish_ctl.idrac_shared"])
-def test_old_idrac_module_names_no_longer_resolve(old):
-    """The iDRAC-named base modules were hard-renamed to neutral names with no
-    aliases (idrac_manager -> idrac_manager, idrac_shared ->
-    idrac_shared). The old import paths must no longer resolve, guarding
-    against a reintroduction of the pre-rename names."""
+@pytest.mark.parametrize(
+    "removed",
+    [
+        "redfish_ctl.redfish_manager_base",
+        "redfish_ctl.redfish_manager_shared",
+        "redfish_ctl.redfish_task_state",
+    ],
+)
+def test_removed_neutral_base_names_no_longer_resolve(removed):
+    """The Dell base layer uses vendor-honest names again: idrac_manager.py,
+    idrac_shared.py, and idrac_task_state.py. The transient neutral names
+    (redfish_manager_base, redfish_manager_shared, redfish_task_state) were
+    removed with no alias. Their import paths must no longer resolve, guarding
+    against reintroducing the inverted naming where the Dell child class
+    masqueraded as the generic base."""
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module(old)
+        importlib.import_module(removed)
