@@ -8,12 +8,16 @@ Author Mus spyroot@gmail.com
 
 import asyncio
 import collections
+import contextvars
+import copy
 import functools
 import logging
 import re
+import threading
 from abc import abstractmethod
+from contextlib import contextmanager
 from functools import cached_property
-from typing import Dict, Optional
+from typing import Any, Callable, Dict, Hashable, Optional
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -43,6 +47,89 @@ from .telemetry import tracing
 """Each command encapsulate result in named tuple"""
 CommandResult = collections.namedtuple("cmd_result",
                                        ("data", "discovered", "extra", "error"))
+
+
+class RedfishResponseCache:
+    """Per-operation cache for parsed read-only Redfish GET responses."""
+
+    def __init__(self):
+        """Initialize an empty thread-safe response cache."""
+        self._condition = threading.Condition()
+        self._values = {}
+        self._inflight = set()
+
+    @staticmethod
+    def _clone(value):
+        """Return an isolated copy of cached response data.
+
+        :param value: cached value to isolate for the caller.
+        :return: a deep copy of ``value``.
+        """
+        return copy.deepcopy(value)
+
+    def get_or_load(
+            self,
+            key: Hashable,
+            loader: Callable[[], tuple[Any, Any]]) -> tuple[Any, Any]:
+        """Return cached data for ``key`` or load it once.
+
+        Concurrent callers for the same key wait for the first loader instead
+        of issuing duplicate BMC GETs. Returned payloads are copied so callers
+        can annotate rows without mutating the cached response.
+
+        :param key: immutable cache key for the exact GET request shape.
+        :param loader: callable that returns ``(data, allow_header)``.
+        :return: cached or freshly loaded ``(data, allow_header)``.
+        """
+        with self._condition:
+            if key in self._values:
+                return self._clone(self._values[key])
+            while key in self._inflight:
+                self._condition.wait()
+                if key in self._values:
+                    return self._clone(self._values[key])
+            self._inflight.add(key)
+
+        try:
+            value = loader()
+        except BaseException:
+            with self._condition:
+                self._inflight.discard(key)
+                self._condition.notify_all()
+            raise
+
+        stored = self._clone(value)
+        with self._condition:
+            self._values[key] = stored
+            self._inflight.discard(key)
+            self._condition.notify_all()
+            return self._clone(stored)
+
+
+_REDFISH_RESPONSE_CACHE = contextvars.ContextVar(
+    "redfish_response_cache", default=None)
+
+
+def active_redfish_response_cache():
+    """Return the cache active for the current call context, if any.
+
+    :return: active RedfishResponseCache for this context, or None.
+    """
+    return _REDFISH_RESPONSE_CACHE.get()
+
+
+@contextmanager
+def redfish_response_cache_scope(cache):
+    """Temporarily bind a response cache to the current call context.
+
+    :param cache: RedfishResponseCache to bind while the context is active.
+    :return: context manager yielding ``cache``.
+    """
+    token = _REDFISH_RESPONSE_CACHE.set(cache)
+    try:
+        yield cache
+    finally:
+        _REDFISH_RESPONSE_CACHE.reset(token)
 
 
 class RedfishManager:
@@ -502,10 +589,43 @@ class RedfishManager:
 
         logging.debug(f"Sending request to {r}")
 
-        if not do_async:
+        def select_payload(payload):
+            """Apply the optional root key selector to a copied payload.
+
+            :param payload: parsed response payload copied out of the cache.
+            :return: selected root value when requested, else ``payload``.
+            """
+            if (
+                isinstance(payload, dict)
+                and key is not None
+                and len(key) > 0
+                and key in payload
+            ):
+                return payload[key]
+            return payload
+
+        def load_response() -> tuple[object, object]:
+            """Load and parse one Redfish GET response.
+
+            :return: tuple of parsed payload and the HTTP Allow header.
+            """
             response = self.api_get_call(r, headers)
             self.query_counter += 1
             self.default_error_handler(response)
+            allow = response.headers.get("Allow")
+            payload = response.json()
+            return payload, allow
+
+        cache = kwargs.get("redfish_cache", None)
+        if cache is None:
+            cache = active_redfish_response_cache()
+        if not do_async:
+            if cache is not None and filename is None:
+                data, allow_header = cache.get_or_load(
+                    (r, data_type), load_response)
+            else:
+                data, allow_header = load_response()
+            data = select_payload(data)
         else:
             loop = self._event_loop()
             response = loop.run_until_complete(
@@ -513,12 +633,9 @@ class RedfishManager:
                     r, headers
                 )
             )
-
-        allow_header = response.headers.get("Allow")
-
-        data = response.json()
-        if key is not None and len(key) > 0 and key in data:
-            data = data[key]
+            allow_header = response.headers.get("Allow")
+            data = response.json()
+            data = select_payload(data)
 
         save_if_needed(filename, data)
         return CommandResult(data, None, allow_header, None)

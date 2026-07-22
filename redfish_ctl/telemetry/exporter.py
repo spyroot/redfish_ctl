@@ -16,7 +16,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-REQUIRED_DIMENSIONS = ("host.name", "node", "server.address", "bmc.ip", "vendor")
+from . import identity as identity_mod
+
+REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
+build_identity_dimensions = identity_mod.build_identity_dimensions
+common_sample_dimensions = identity_mod.common_sample_dimensions
+parse_dimension_pairs = identity_mod.parse_dimension_pairs
+resolve_identity_options = identity_mod.resolve_identity_options
 SENSOR_METRIC = {
     "Temperature": ("hw.temperature", "sensor"),
     "Rotational": ("hw.fan_speed", "fan"),
@@ -203,46 +209,6 @@ class CollectorResult:
     error_kind: Optional[str] = None
 
 
-def build_identity_dimensions(
-        bmc_ip: str,
-        vendor: str = "unknown",
-        host_prefix: str = "gb300-poc1",
-        bmc_octet_base: int = 20,
-        server_octet_base: int = 40,
-        server_subnet: Optional[str] = None) -> dict[str, str]:
-    """Return the fixed join dimensions required on every exported series.
-
-    :param bmc_ip: BMC management IP; its final octet derives the slot/node.
-    :param vendor: hardware vendor label; lowercased into the ``vendor`` dimension.
-    :param host_prefix: prefix for the derived ``host.name`` (``<prefix>-slot<n>``).
-    :param bmc_octet_base: BMC last-octet offset subtracted to compute the slot number.
-    :param server_octet_base: host last-octet offset added to the slot for ``server.address``.
-    :param server_subnet: override for the first three octets of ``server.address``;
-        defaults to the BMC subnet.
-    :return: dict of ``host.name``, ``node``, ``server.address``, ``bmc.ip`` and
-        ``vendor`` dimensions.
-    """
-    bmc = str(bmc_ip or "unknown")
-    parts = bmc.split(".")
-    if len(parts) == 4 and parts[-1].isdigit():
-        slot = int(parts[-1]) - bmc_octet_base
-        subnet = server_subnet or ".".join(parts[:3])
-        node = f"slot{slot}"
-        host = f"{host_prefix}-{node}"
-        server = f"{subnet}.{server_octet_base + slot}"
-    else:
-        node = "unknown"
-        host = bmc
-        server = "unknown"
-    return {
-        "host.name": host,
-        "node": node,
-        "server.address": server,
-        "bmc.ip": bmc,
-        "vendor": str(vendor or "unknown").lower(),
-    }
-
-
 # Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
 # the legacy IDRAC_* keys still work as a fallback during the rename.
 _EXPORTER_CRED_KEYS = frozenset({
@@ -253,23 +219,6 @@ _EXPORTER_CONFIG_FILE_ENVS = (
     "REDFISH_EXPORTER_CONFIG_FILE",
     "IDRAC_EXPORTER_CONFIG_FILE",
 )
-_IDENTITY_ENV_KEYS = {
-    "host_prefix": ("REDFISH_EXPORTER_HOST_PREFIX", "IDRAC_EXPORTER_HOST_PREFIX"),
-    "bmc_octet_base": (
-        "REDFISH_EXPORTER_BMC_OCTET_BASE",
-        "IDRAC_EXPORTER_BMC_OCTET_BASE",
-    ),
-    "server_octet_base": (
-        "REDFISH_EXPORTER_SERVER_OCTET_BASE",
-        "IDRAC_EXPORTER_SERVER_OCTET_BASE",
-    ),
-    "server_subnet": (
-        "REDFISH_EXPORTER_SERVER_SUBNET",
-        "IDRAC_EXPORTER_SERVER_SUBNET",
-    ),
-}
-
-
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
@@ -315,20 +264,6 @@ def _first_non_empty(*values):
         if cleaned is not None:
             return cleaned
     return None
-
-
-def _coerce_int(value, field_name: str) -> int:
-    """Coerce an integer config field with a targeted error message.
-
-    :param value: value to coerce.
-    :param field_name: field name included in validation errors.
-    :return: coerced integer value.
-    :raises ValueError: when the value cannot be parsed as an integer.
-    """
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer; got {value!r}") from exc
 
 
 def _config_path(path: Optional[str] = None) -> Optional[str]:
@@ -412,6 +347,19 @@ def exporter_config_options(path: Optional[str] = None) -> dict:
             config, "identity", "identity_server_octet_base", "server_octet_base"),
         "identity_server_subnet": _config_value(
             config, "identity", "identity_server_subnet", "server_subnet"),
+        "deployment_environment": _config_value(
+            config, "identity", "deployment_environment", "deployment_environment"),
+        "deployment_environment_compat": _config_value(
+            config, "identity", "deployment_environment_compat",
+            "deployment_environment_compat"),
+        "require_deployment_environment": _config_value(
+            config, "identity", "require_deployment_environment",
+            "require_deployment_environment"),
+        "extra_dimensions": _first_non_empty(
+            _config_value(config, "identity", "extra_dimensions", "extra_dimensions"),
+            config.get("dimensions"),
+            config.get("extra_dimensions"),
+        ),
     }
     return {
         key: value
@@ -466,51 +414,6 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         if current in ("", None, "root") or is_password:
             value = values[key]
             setattr(args, attr, int(value) if attr == "idrac_port" else value)
-
-
-def resolve_identity_options(
-        host_prefix: Optional[str] = None,
-        bmc_octet_base: Optional[int] = None,
-        server_octet_base: Optional[int] = None,
-        server_subnet: Optional[str] = None) -> dict:
-    """Resolve exporter identity dimension options from args, env, and defaults.
-
-    :param host_prefix: explicit ``host.name`` prefix override.
-    :param bmc_octet_base: explicit BMC last-octet base used to derive slot.
-    :param server_octet_base: explicit server last-octet base used to derive host IP.
-    :param server_subnet: explicit server subnet for ``server.address``.
-    :return: keyword arguments for :func:`build_identity_dimensions`.
-    """
-    resolved_host_prefix = _first_non_empty(
-        host_prefix,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["host_prefix"]),
-        "gb300-poc1",
-    )
-    resolved_bmc_octet_base = _first_non_empty(
-        bmc_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["bmc_octet_base"]),
-        20,
-    )
-    resolved_server_octet_base = _first_non_empty(
-        server_octet_base,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_octet_base"]),
-        40,
-    )
-    resolved_server_subnet = _first_non_empty(
-        server_subnet,
-        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["server_subnet"]),
-    )
-    return {
-        "host_prefix": str(resolved_host_prefix),
-        "bmc_octet_base": _coerce_int(resolved_bmc_octet_base, "bmc_octet_base"),
-        "server_octet_base": _coerce_int(
-            resolved_server_octet_base, "server_octet_base"),
-        "server_subnet": (
-            str(resolved_server_subnet)
-            if resolved_server_subnet is not None
-            else None
-        ),
-    }
 
 
 def build_metric_samples(
@@ -961,6 +864,7 @@ def _gpu_metric_report_sample(
                 dims | {"property": GPU_THROTTLE_PROPERTIES[prop_name]},
                 "s",
                 row.get("Timestamp"),
+                metric_type="counter",  # cumulative throttle time, not a gauge
             )
 
     if source == "memory":
@@ -1145,21 +1049,25 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
 
 
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint gauge envelope.
+    """Wrap samples in the SignalFx /v2/datapoint envelope, keyed by metric type.
+
+    A ``counter`` metric_type is a monotonic cumulative counter, so it goes under the
+    SignalFx ``cumulative_counter`` envelope (matching the Prometheus ``counter`` type
+    and the OTLP monotonic Sum); everything else is a ``gauge``. This keeps the stored
+    Splunk metric type consistent with the other backends.
 
     :param samples: metric samples to wrap.
-    :return: SignalFx ``/v2/datapoint`` body with a ``gauge`` list.
+    :return: SignalFx ``/v2/datapoint`` body with ``gauge`` and/or ``cumulative_counter`` lists.
     """
-    return {
-        "gauge": [
-            {
-                "metric": sample.metric,
-                "value": sample.value,
-                "dimensions": dict(sample.dimensions),
-            }
-            for sample in samples
-        ]
-    }
+    body: dict[str, list[dict]] = {}
+    for sample in samples:
+        envelope = "cumulative_counter" if sample.metric_type == "counter" else "gauge"
+        body.setdefault(envelope, []).append({
+            "metric": sample.metric,
+            "value": sample.value,
+            "dimensions": dict(sample.dimensions),
+        })
+    return body
 
 
 def _require_datapoint_url(ingest_url: str) -> str:
@@ -1268,10 +1176,19 @@ def _mts_query(metric: str, dimensions: Optional[Mapping] = None) -> str:
     :param dimensions: dimension key->value pairs to AND into the query.
     :return: the SignalFx search query string.
     """
-    terms = [f'sf_metric:"{metric}"']
+    terms = [f'sf_metric:"{_escape_mts_value(metric)}"']
     for key, value in sorted((dimensions or {}).items()):
-        terms.append(f'{key}:"{value}"')
+        terms.append(f'{key}:"{_escape_mts_value(value)}"')
     return " AND ".join(terms)
+
+
+def _escape_mts_value(value) -> str:
+    """Escape a value for a Splunk Observability MTS search term.
+
+    :param value: raw metric or dimension value.
+    :return: escaped string representation.
+    """
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
 
 
 def signalfx_metric_readback(
@@ -1562,20 +1479,28 @@ def _sample(metric: str,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None,
-            metric_type: str = "gauge") -> MetricSample:
+            metric_type: Optional[str] = None) -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
     :param value: numeric sample value.
     :param dims: dimension mapping.
-    :param unit: optional unit annotation.
+    :param unit: optional unit annotation; coerced to str so a non-string BMC unit
+        cannot reach the OTLP mapper.
     :param timestamp: optional sample timestamp.
-    :param metric_type: Prometheus/OpenMetrics sample type.
+    :param metric_type: explicit sample type; when None it is derived from the metric
+        name (monotonic-counter names -> ``counter``, else ``gauge``) so Prometheus,
+        SignalFx, and OTLP all agree on the type. This is the single classifier point.
     :return: the assembled MetricSample.
     """
+    if metric_type is None:
+        from . import otlp
+        metric_type = "counter" if otlp.is_monotonic_counter(metric) else "gauge"
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
-                        metric_type=metric_type, unit=unit, timestamp=timestamp)
+                        metric_type=metric_type,
+                        unit=(str(unit) if unit is not None else None),
+                        timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
@@ -1584,7 +1509,13 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
     :param identity: fixed join dimensions to seed the result.
     :return: dimension mapping with the required dims plus any non-empty extras.
     """
-    dims = {key: str(identity.get(key, "unknown")) for key in REQUIRED_DIMENSIONS}
+    dims = {
+        str(key): str(value)
+        for key, value in identity.items()
+        if value not in (None, "")
+    }
+    for key in REQUIRED_DIMENSIONS:
+        dims.setdefault(key, str(identity.get(key) or "unknown"))
     for key, value in extra.items():
         if value not in (None, ""):
             dims[key] = str(value)

@@ -14,7 +14,9 @@ import pytest
 
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter import (
+    MetricSample,
     build_readback_result,
+    common_sample_dimensions,
     signalfx_metric_readback,
     verify_signalfx_readback,
 )
@@ -91,6 +93,38 @@ def test_readback_scopes_query_by_dimension():
     assert exporter._mts_query("hw.power", {"host.name": "slot1"}) == (
         'sf_metric:"hw.power" AND host.name:"slot1"')
     assert exporter._mts_query("hw.power") == 'sf_metric:"hw.power"'
+
+
+def test_readback_query_escapes_quotes_and_backslashes():
+    """Dimension values are escaped before they enter the MTS query language."""
+    query = exporter._mts_query(
+        'hw."power"',
+        {"host.name": r'slot\"1'},
+    )
+    assert query == 'sf_metric:"hw.\\"power\\"" AND host.name:"slot\\\\\\"1"'
+
+
+def test_common_sample_dimensions_keep_deployment_join_keys():
+    """Readback scopes by fixed join dimensions and drops metric-specific ones."""
+    dims = {
+        "host.name": "gb300-poc1-slot9",
+        "node": "slot9",
+        "server.address": "172.25.230.49",
+        "bmc.ip": "172.25.230.29",
+        "vendor": "supermicro",
+        "deployment.environment": "nv72-gb300",
+        "deployment.environment.name": "nv72-gb300",
+    }
+    samples = [
+        MetricSample("hw.power", 1, dims | {"source": "environment"}),
+        MetricSample("hw.temperature", 2, dims | {"source": "sensor"}),
+    ]
+
+    common = common_sample_dimensions(samples)
+
+    assert common["deployment.environment.name"] == "nv72-gb300"
+    assert common["host.name"] == "gb300-poc1-slot9"
+    assert "source" not in common
 
 
 _NOW = 1_700_000_000_000
