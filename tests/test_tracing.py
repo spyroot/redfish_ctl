@@ -288,3 +288,43 @@ def test_setup_otlp_is_idempotent_when_already_configured(monkeypatch):
         tracing.setup_otlp("redfish-controller")
     finally:
         tracing.disable_tracing()
+
+
+def test_trace_resource_attrs_carries_service_name_and_merges_identity():
+    """The trace Resource always carries service.name and merges caller identity keys,
+    so redfish spans and hw.* metrics correlate on deployment.environment in Splunk."""
+    attrs = tracing._trace_resource_attrs(
+        "redfish_ctl",
+        {"deployment.environment": "nv72-gb300",
+         "deployment.environment.name": "nv72-gb300"},
+    )
+    assert attrs["service.name"] == "redfish_ctl"
+    assert attrs["deployment.environment"] == "nv72-gb300"
+    assert attrs["deployment.environment.name"] == "nv72-gb300"
+
+
+def test_trace_resource_attrs_skips_none_and_stringifies():
+    """None extras are dropped and values are stringified for the OTLP Resource."""
+    attrs = tracing._trace_resource_attrs("redfish_ctl", {"absent": None, "port": 5})
+    assert "absent" not in attrs
+    assert attrs["port"] == "5"
+
+
+def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
+    """setup_otlp() with no argument resolves service.name to the shared redfish_ctl
+    identity (unified with metrics) — the old 'redfish-ctl' split-brain default is gone.
+
+    Proven offline via the idempotency early-return: pre-seeding the guard with
+    redfish_ctl makes a no-arg setup_otlp() return before any SDK import. If the default
+    were still 'redfish-ctl' the names would differ, the guard would miss, and it would
+    try to build the pipeline and raise without the [otlp] extra installed.
+    """
+    from redfish_ctl.telemetry.identity import DEFAULT_SERVICE_NAME
+
+    assert DEFAULT_SERVICE_NAME == "redfish_ctl"
+    tracing.enable_tracing(object())
+    monkeypatch.setattr(tracing, "_OTLP_SETUP_SERVICE_NAME", DEFAULT_SERVICE_NAME)
+    try:
+        tracing.setup_otlp()
+    finally:
+        tracing.disable_tracing()

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import contextlib
 from contextvars import ContextVar
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Mapping, Optional
 from urllib.parse import urlsplit
 
 # Set by enable_tracing(); None means tracing is off and every helper no-ops.
@@ -46,24 +46,52 @@ def enable_tracing(tracer: Any) -> None:
     _TRACER = tracer
 
 
-def setup_otlp(service_name: str = "redfish-ctl") -> None:
+def _trace_resource_attrs(service_name: str,
+                          resource_attrs: Optional[Mapping[str, str]] = None) -> dict:
+    """Build the OTLP trace Resource attributes for a redfish_ctl run.
+
+    The OpenTelemetry SDK additionally merges ``OTEL_RESOURCE_ATTRIBUTES`` from the
+    environment into the Resource, so ``deployment.environment`` and other identity
+    keys can be supplied at deploy time (no code change) and still correlate traces
+    with the exporter's ``hw.*`` metrics on the shared identity keys.
+
+    :param service_name: the ``service.name`` resource attribute (the APM service-map node).
+    :param resource_attrs: optional extra resource attributes to merge; ``None`` values are skipped.
+    :return: a resource-attribute dict carrying a non-empty ``service.name``.
+    """
+    attrs = {"service.name": str(service_name)}
+    for key, value in (resource_attrs or {}).items():
+        if value is None:
+            continue
+        attrs[str(key)] = str(value)
+    return attrs
+
+
+def setup_otlp(service_name: Optional[str] = None,
+               resource_attrs: Optional[Mapping[str, str]] = None) -> None:
     """Install an OTLP span pipeline and enable tracing.
 
     Builds a ``TracerProvider`` + ``BatchSpanProcessor`` + ``OTLPSpanExporter``
-    and turns tracing on. The exporter resolves its endpoint from the standard
-    ``OTEL_EXPORTER_OTLP_*`` environment itself, so the ``/v1/traces`` path is
-    appended correctly for a generic endpoint (do not pre-pass one here).
+    and turns tracing on. The exporter resolves its endpoint and headers from the
+    standard ``OTEL_EXPORTER_OTLP_*`` environment; point them at the Splunk O11y
+    OTLP ingest (``OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`` = the ingest trace URL,
+    ``OTEL_EXPORTER_OTLP_HEADERS`` = ``X-SF-Token=<access-token>``), so no endpoint
+    is hard-coded here.
 
     Requires the OpenTelemetry SDK + OTLP exporter (the ``[otlp]`` extra);
-    raises a clear error otherwise. ``service.name`` becomes the APM service
-    map node.
+    raises a clear error otherwise.
 
     :param service_name: value for the ``service.name`` resource attribute (the APM
-        service-map node name).
+        service-map node); defaults to the shared ``redfish_ctl`` identity so traces
+        and ``hw.*`` metrics land on one service node. An empty value falls back to it.
+    :param resource_attrs: optional extra resource attributes (e.g. deployment.environment)
+        merged into the trace Resource so traces carry the same identity keys as metrics.
     :raises RuntimeError: when the OpenTelemetry SDK or an OTLP exporter is not installed.
     """
+    from .identity import DEFAULT_SERVICE_NAME
+    resolved_service_name = str(service_name or "").strip() or DEFAULT_SERVICE_NAME
     global _OTLP_SETUP_SERVICE_NAME
-    if _TRACER is not None and _OTLP_SETUP_SERVICE_NAME == service_name:
+    if _TRACER is not None and _OTLP_SETUP_SERVICE_NAME == resolved_service_name:
         return
     try:
         from opentelemetry.sdk.resources import Resource
@@ -88,10 +116,12 @@ def setup_otlp(service_name: str = "redfish-ctl") -> None:
                 "Install redfish_ctl[otlp]."
             ) from exc
 
-    provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+    provider = TracerProvider(
+        resource=Resource.create(
+            _trace_resource_attrs(resolved_service_name, resource_attrs)))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     enable_tracing(provider.get_tracer("redfish_ctl"))
-    _OTLP_SETUP_SERVICE_NAME = service_name
+    _OTLP_SETUP_SERVICE_NAME = resolved_service_name
 
 
 def disable_tracing() -> None:
