@@ -33,6 +33,7 @@ RESOURCE_DIM_KEYS = RESOURCE_DIMENSIONS
 # one of these suffixes, or is total energy. Everything else is a Gauge.
 _COUNTER_SUFFIXES = (
     "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
+    "_total", "_dropped",
 )
 _COUNTER_EXACT = frozenset({"hw.energy_kwh"})
 
@@ -130,7 +131,9 @@ def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ct
     grouped: dict[str, dict] = {}
     for sample in samples:
         dp_attrs = {k: v for k, v in sample.dimensions.items() if k not in RESOURCE_DIM_KEYS}
-        entry = grouped.setdefault(sample.metric, {"unit": sample.unit, "points": []})
+        entry = grouped.setdefault(
+            sample.metric,
+            {"unit": sample.unit, "metric_type": sample.metric_type, "points": []})
         entry["points"].append(NumberDataPoint(
             attributes=dp_attrs,
             start_time_unix_nano=ts,
@@ -140,7 +143,10 @@ def metrics_data_from_samples(samples: Iterable, service_name: str = "redfish_ct
 
     metrics = []
     for name, entry in grouped.items():
-        if is_monotonic_counter(name):
+        # Trust the sample's declared metric_type (the single classifier, set at
+        # _sample construction) so OTLP agrees with Prometheus/SignalFx instead of
+        # re-deriving from the name.
+        if entry["metric_type"] == "counter":
             data = Sum(
                 data_points=entry["points"],
                 aggregation_temporality=AggregationTemporality.CUMULATIVE,
