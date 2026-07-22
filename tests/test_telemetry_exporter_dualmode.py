@@ -1,7 +1,7 @@
 """Dual-mode smoke tests for the telemetry exporter command."""
 
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_exporter_once_returns_prometheus_metrics_from_mock_reads(

@@ -4,8 +4,8 @@ import pytest
 
 from redfish_ctl.chassis.cmd_asset_tag_set import AssetTagSet
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_shared import ApiRequestType, RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType, RedfishApiRespond
 
 
 def _request_type():

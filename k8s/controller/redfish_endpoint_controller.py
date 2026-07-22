@@ -30,13 +30,13 @@ from redfish_ctl.api import (
     get_thermal,
 )
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.redfish_exceptions import (
     RedfishException,
     RedfishForbidden,
     RedfishUnauthorized,
 )
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.telemetry import tracing
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ ManagerFactory = Callable[..., Any]
 
 #: Manager class the handler builds per poll. Indirected through a module global
 #: so tests can substitute a fake BMC facade without a real network.
-MANAGER_FACTORY: ManagerFactory = RedfishManagerBase
+MANAGER_FACTORY: ManagerFactory = IDracManager
 
 
 def _utc_now() -> datetime:
@@ -558,7 +558,7 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 def _close_manager(manager: Any) -> None:
     """Best-effort close of the manager's pooled HTTP session.
 
-    ``RedfishManagerBase`` lazily caches a keep-alive ``requests.Session`` (with
+    ``IDracManager`` lazily caches a keep-alive ``requests.Session`` (with
     its urllib3 connection pool) in ``_session_cache``. The controller builds one
     manager per poll, so at fleet scale unclosed sessions would leak sockets/FDs.
 
@@ -643,7 +643,7 @@ def poll_endpoint(
     spec: Mapping[str, Any],
     *,
     credentials: Mapping[str, str] | None = None,
-    manager_factory: ManagerFactory = RedfishManagerBase,
+    manager_factory: ManagerFactory = IDracManager,
     polled_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Read a BMC through the facade and return a status patch payload.

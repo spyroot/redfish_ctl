@@ -14,9 +14,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _ASSIGN_SPARE_ACTION = "#DellRaidService.AssignSpare"
@@ -29,7 +29,7 @@ _SYSTEM_FALLBACK = f"{RedfishApi.Version}/Systems/System.Embedded.1"
 _SERVICE_SUFFIX = "Oem/Dell/DellRaidService"
 
 
-class DellRaidSpareActions(RedfishManagerBase,
+class DellRaidSpareActions(IDracManager,
                            scm_type=ApiRequestType.DellRaidSpareActions,
                            name="dell-raid-spare",
                            metaclass=Singleton):
@@ -230,7 +230,7 @@ class DellRaidSpareActions(RedfishManagerBase,
         :param service: DellRaidService resource body.
         :return: mapping keyed by ``assign`` and ``unassign`` when advertised.
         """
-        targets = RedfishManagerBase._flatten_action_targets(service)
+        targets = IDracManager._flatten_action_targets(service)
         return {
             label: {"action": full, "target": targets[full]}
             for label, full in _ACTION_TYPES.items()

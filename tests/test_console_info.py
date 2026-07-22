@@ -3,7 +3,7 @@
 Reports the Manager's SerialConsole/GraphicalConsole/CommandShell capability
 (not a live stream). Verified on the HPE iLO and GB300 corpora.
 """
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_console_info_ilo(redfish_mock_factory):

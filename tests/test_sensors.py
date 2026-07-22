@@ -4,7 +4,7 @@ Runs against the Supermicro GB300 fixtures (Chassis BMC_0 -> Sensors) through
 the real requests path, proving the command navigates by links and returns
 readings on a non-Dell host.
 """
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_sensors_reads_chassis_sensors(redfish_mock_factory):

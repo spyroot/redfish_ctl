@@ -1,6 +1,6 @@
 """Concurrency contract for the read-only web explorer server.
 
-The explorer shares ONE ``RedfishManagerBase`` across every request (lazily
+The explorer shares ONE ``IDracManager`` across every request (lazily
 built once, cached on the handler class). That manager wraps a
 ``requests.Session``, which is not thread-safe: two concurrent ``/api/invoke``
 POSTs that both call ``sync_invoke`` on the same session can interleave and

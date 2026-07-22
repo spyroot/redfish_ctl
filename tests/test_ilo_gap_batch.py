@@ -12,7 +12,7 @@ coverage audit flagged as missing or Dell-locked:
 Dell backward-compat for the reroutes is covered by the existing dual-mode tests,
 which still pass.
 """
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_logs_reads_ilo_entries(redfish_mock_factory):

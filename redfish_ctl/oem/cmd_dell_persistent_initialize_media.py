@@ -15,9 +15,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..actions.action_policy import classify
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _INITIALIZE_MEDIA_ACTION = "#DellPersistentStorageService.InitializeMedia"
@@ -28,7 +28,7 @@ _DEFAULT_SERVICE_URI = (
 
 
 class DellPersistentInitializeMedia(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellPersistentInitializeMedia,
     name="dell-persistent-initialize-media",
     metaclass=Singleton,

@@ -9,9 +9,9 @@ from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_status import (
     DellLcSupportAssistStatus,
 )
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -45,7 +45,7 @@ def dell_lc_corpus_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-lc-supportassist",
                 idrac_username="root",
                 idrac_password="mock",
@@ -170,7 +170,7 @@ def test_dell_lc_supportassist_status_missing_target_reports_without_post(
 
 def test_dell_lc_supportassist_status_exposes_cli_entrypoint():
     """The command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert (
         registry[ApiRequestType.DellLcSupportAssistStatus][
             "dell-lc-supportassist-status"

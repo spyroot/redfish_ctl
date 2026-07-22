@@ -11,8 +11,8 @@ from types import SimpleNamespace
 import pytest
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.proxy import NodeConfig, NodeRegistry, ReadOnlyProxy, create_app
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry.exporter import MetricSample
@@ -57,7 +57,7 @@ def gb300_corpus_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-gb300",
             idrac_username="root",
             idrac_password="mock",

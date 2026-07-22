@@ -31,17 +31,17 @@ import asyncio
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed, find_ids, from_json_spec
-from ..custom_argparser.customer_argdefault import BiosSubcommand
-from ..custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API
-from ..redfish_manager_shared import REDFISH_JSON
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..cmd_utils import find_ids, from_json_spec, save_if_needed
+from ..custom_argparser.customer_argdefault import (
+    BiosSubcommand,
+    CustomArgumentDefaultsHelpFormatter,
+)
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BiosQuery(RedfishManagerBase,
+class BiosQuery(IDracManager,
                 scm_type=ApiRequestType.BiosQuery,
                 name='bios_inventory',
                 metaclass=Singleton):

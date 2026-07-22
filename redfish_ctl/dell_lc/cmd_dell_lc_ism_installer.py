@@ -12,9 +12,9 @@ default; it POSTs only when ``--confirm`` is supplied.
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _ACTION = "#DellLCService.ExposeiSMInstallerToHostOS"
 _ACTION_NAME = "ExposeiSMInstallerToHostOS"
@@ -25,7 +25,7 @@ _SERVICE_FALLBACKS = (
 
 
 class DellLcIsmInstaller(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellLcIsmInstaller,
     name="dell-lc-ism-installer",
     metaclass=Singleton,

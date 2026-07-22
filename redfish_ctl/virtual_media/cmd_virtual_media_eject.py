@@ -14,12 +14,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
 
 
-class VirtualMediaEject(RedfishManagerBase,
+class VirtualMediaEject(IDracManager,
                         scm_type=ApiRequestType.VirtualMediaEject,
                         name='virtual_disk_eject',
                         metaclass=Singleton):

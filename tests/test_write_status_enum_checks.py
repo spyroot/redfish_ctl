@@ -19,7 +19,7 @@ from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
 from redfish_ctl.bios.cmd_change_boot_order import ChangeBootOrder
 from redfish_ctl.boot_source.cmd_update import BootSourceUpdate
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate
-from redfish_ctl.redfish_manager_shared import RedfishApiRespond
+from redfish_ctl.idrac_shared import RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system_import import ImportSystemConfig
 

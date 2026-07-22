@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlsplit
 
-from ..redfish_manager_base import RedfishManagerBase
+from ..idrac_manager import IDracManager
 from .catalog import CATALOG, catalog_json, resolve
 
 
@@ -39,7 +39,7 @@ def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
     Only allow-listed read commands are dispatched; an unknown name raises KeyError
     as a guard against invoking any mutating action.
 
-    :param manager: RedfishManagerBase used to dispatch the command.
+    :param manager: IDracManager used to dispatch the command.
     :param command: allow-listed read command name from the catalog.
     :return: ``{"ok": True, "data": ...}`` on success, or
         ``{"ok": False, "error": ..., "data": ...}`` on a command error.
@@ -195,7 +195,7 @@ class _Handler(BaseHTTPRequestHandler):
     # serializes the actual command invocations so concurrent POSTs can't
     # interleave on that session and return each other's payloads.
     invoke_lock = threading.Lock()
-    manager_factory = None  # callable[[], RedfishManagerBase]
+    manager_factory = None  # callable[[], IDracManager]
     target_label = ""
 
     def log_message(self, *_a: Any) -> None:
@@ -205,7 +205,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _get_manager(self) -> Any:
         """Return the shared manager, building it once under the manager lock.
 
-        :return: the lazily constructed RedfishManagerBase instance.
+        :return: the lazily constructed IDracManager instance.
         """
         with self.manager_lock:
             if self.__class__.manager is None:
@@ -281,7 +281,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def make_manager_factory():
-    """Build a factory that constructs the tool's RedfishManagerBase from env/flags.
+    """Build a factory that constructs the tool's IDracManager from env/flags.
 
     :return: tuple of (manager factory callable, ``"address:port"`` target label).
     """
@@ -291,12 +291,12 @@ def make_manager_factory():
     port = int(_env_first("REDFISH_PORT", "IDRAC_PORT", default="443"))
     scheme = _env_first("REDFISH_SCHEME", default="https")
 
-    def factory() -> RedfishManagerBase:
-        """Construct a RedfishManagerBase from the captured connection settings.
+    def factory() -> IDracManager:
+        """Construct a IDracManager from the captured connection settings.
 
-        :return: a new RedfishManagerBase for the configured BMC.
+        :return: a new IDracManager for the configured BMC.
         """
-        return RedfishManagerBase(
+        return IDracManager(
             idrac_ip=address,
             idrac_username=username,
             idrac_password=password,

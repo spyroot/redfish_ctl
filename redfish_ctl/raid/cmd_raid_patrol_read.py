@@ -11,9 +11,9 @@ default and only POSTs when ``--confirm`` is supplied.
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _PATROL_ACTIONS = {
     "start": "#DellRaidService.StartPatrolRead",
@@ -21,7 +21,7 @@ _PATROL_ACTIONS = {
 }
 
 
-class DellRaidPatrolRead(RedfishManagerBase,
+class DellRaidPatrolRead(IDracManager,
                          scm_type=ApiRequestType.DellRaidPatrolRead,
                          name="dell-raid-patrol-read",
                          metaclass=Singleton):

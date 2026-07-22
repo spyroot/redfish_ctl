@@ -6,10 +6,10 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.raid.cmd_dell_raid_blink import DellRaidBlink
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -36,7 +36,7 @@ def dell_raid_manager():
         mocker.post(requests_mock.ANY, text=service.post_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-raid",
                 idrac_username="root",
                 idrac_password="mock",
@@ -195,7 +195,7 @@ def test_dell_raid_blink_missing_target_reports_without_post(
 
 def test_dell_raid_blink_is_registered():
     """The dell-raid-blink command is wired into the registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellRaidBlink]["dell-raid-blink"] is DellRaidBlink
 
     cmd_parser, cmd_name, cmd_help = (

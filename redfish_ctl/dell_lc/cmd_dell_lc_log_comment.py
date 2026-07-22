@@ -14,9 +14,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _LC_LOG_COMMENT_ACTION = "#DellLCService.InsertCommentInLCLog"
@@ -26,7 +26,7 @@ _STANDARD_LC_SERVICE = (
 _LEGACY_LC_SERVICE = f"{RedfishApi.Version}/Dell/Managers/iDRAC.Embedded.1/DellLCService"
 
 
-class DellLcLogComment(RedfishManagerBase,
+class DellLcLogComment(IDracManager,
                        scm_type=ApiRequestType.DellLcLogComment,
                        name="dell-lc-log-comment",
                        metaclass=Singleton):

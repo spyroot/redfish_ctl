@@ -4,8 +4,8 @@ import json
 
 import pytest
 
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 TELEMETRY_SERVICE = "/redfish/v1/TelemetryService"
 RESET_ACTION = "#TelemetryService.ResetMetricReportDefinitionsToDefaults"

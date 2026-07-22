@@ -14,15 +14,15 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _START_UPDATE_ACTION = "#UpdateService.StartUpdate"
 
 
-class UpdateStart(RedfishManagerBase,
+class UpdateStart(IDracManager,
                   scm_type=ApiRequestType.UpdateStart,
                   name="update-start",
                   metaclass=Singleton):

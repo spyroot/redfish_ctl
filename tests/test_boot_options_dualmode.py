@@ -6,9 +6,9 @@ import requests
 
 from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
 from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def test_boot_options_list_returns_member_uris(redfish_api):
@@ -30,7 +30,7 @@ def test_boot_options_list_returns_member_uris(redfish_api):
 def test_boot_options_list_404_non_json_raises_resource_not_found(
         redfish_api, monkeypatch):
     """Plain-text 404 BootOptions responses raise cleanly without JSON traceback."""
-    original_api_get_call = RedfishManagerBase.api_get_call
+    original_api_get_call = IDracManager.api_get_call
 
     def api_get_call(self, request, headers=None):
         """Return the X10-style non-JSON BootOptions failure.
@@ -48,7 +48,7 @@ def test_boot_options_list_404_non_json_raises_resource_not_found(
         response.headers["Content-Type"] = "text/plain"
         return response
 
-    monkeypatch.setattr(RedfishManagerBase, "api_get_call", api_get_call)
+    monkeypatch.setattr(IDracManager, "api_get_call", api_get_call)
 
     with pytest.raises(ResourceNotFound):
         redfish_api.sync_invoke(

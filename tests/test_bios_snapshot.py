@@ -7,7 +7,7 @@ Vendor-neutral (reads standard Bios.Attributes); verified on HPE + Supermicro.
 import json
 import tempfile
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_bios_snapshot_named_attribute(redfish_mock_factory):

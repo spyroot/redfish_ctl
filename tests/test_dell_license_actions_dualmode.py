@@ -8,10 +8,10 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.licenses.cmd_dell_license_actions import DellLicenseActions
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
@@ -45,7 +45,7 @@ def _fixture_for_path(path):
 def dell_license_action_manager():
     """Serve the committed Dell corpus over requests-mock.
 
-    :return: tuple of RedfishManagerBase and recorded requests list.
+    :return: tuple of IDracManager and recorded requests list.
     """
     requests_mock = pytest.importorskip("requests_mock")
     requests = []
@@ -70,7 +70,7 @@ def dell_license_action_manager():
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-dell-license-actions",
             idrac_username="root",
             idrac_password="mock",
@@ -345,7 +345,7 @@ def test_dell_license_missing_action_reports_available(
 
 def test_dell_license_actions_policy_and_registry():
     """The Dell license actions are guarded and the command self-registers."""
-    registry = RedfishManagerBase.get_registry()
+    registry = IDracManager.get_registry()
 
     assert classify(DELETE_ACTION) is Destructiveness.DESTRUCTIVE
     assert classify(EXPORT_SHARE_ACTION) is Destructiveness.DESTRUCTIVE

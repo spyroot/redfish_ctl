@@ -12,13 +12,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
-from ..redfish_manager import CommandResult
 from ..cmd_utils import find_ids
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult
 
 
-class ConvertNoneRaid(RedfishManagerBase,
+class ConvertNoneRaid(IDracManager,
                       scm_type=ApiRequestType.ConvertNoneRaid,
                       name='convert_none_raid',
                       metaclass=Singleton):

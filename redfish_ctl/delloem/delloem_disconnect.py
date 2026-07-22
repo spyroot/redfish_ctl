@@ -9,13 +9,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class DellOemDisconnect(RedfishManagerBase,
+class DellOemDisconnect(IDracManager,
                         scm_type=ApiRequestType.DellOemDisconnect,
                         name='delloem_disconnect',
                         metaclass=Singleton):

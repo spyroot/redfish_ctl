@@ -15,9 +15,9 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _SERVICE_NAME = "DelliDRACCardService"
@@ -52,7 +52,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellCardCsr(RedfishManagerBase,
+class DellCardCsr(IDracManager,
                   scm_type=ApiRequestType.DellCardCsr,
                   name="dell-card-csr",
                   metaclass=Singleton):

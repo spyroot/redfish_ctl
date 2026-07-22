@@ -9,18 +9,17 @@ redfish_ctl boot-source --dev NIC.Slot.8-1
 Author Mus spyroot@gmail.com
 """
 import asyncio
-
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..cmd_utils import save_if_needed
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootSource(RedfishManagerBase,
+class BootSource(IDracManager,
                  scm_type=ApiRequestType.QueryBootOption,
                  name='boot_source_query',
                  metaclass=Singleton):

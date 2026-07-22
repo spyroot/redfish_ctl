@@ -14,9 +14,9 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _ACTION_TYPE = "#DelliDRACCardService.TestSEKMServerConnection"
 _ACTION_NAME = "TestSEKMServerConnection"
@@ -27,7 +27,7 @@ _DEFAULT_SERVICE_URI = (
 _DEFAULT_ALLOWED_SERVER_TYPES = ("Primary", "Secondary")
 
 
-class DellCardSekmTest(RedfishManagerBase,
+class DellCardSekmTest(IDracManager,
                        scm_type=ApiRequestType.DellCardSekmTest,
                        name="dell-card-sekm-test",
                        metaclass=Singleton):

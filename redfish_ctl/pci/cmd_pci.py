@@ -16,13 +16,13 @@ from typing import Optional
 from tqdm import tqdm
 
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
 
-class PciDeviceQuery(RedfishManagerBase,
+class PciDeviceQuery(IDracManager,
                      scm_type=ApiRequestType.PciDeviceQuery,
                      name='pci_device_query',
                      metaclass=Singleton):

@@ -25,8 +25,8 @@ import pytest
 
 import redfish_ctl
 from redfish_ctl import save_if_needed
-from redfish_ctl.redfish_manager_base import CommandResult, RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import CommandResult, IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 
 logging.basicConfig()
 log = logging.getLogger("LOG")
@@ -40,8 +40,8 @@ class TestBios(TestCase):
     redfish_api = None
 
     @classmethod
-    def setUpClass(cls) -> RedfishManagerBase:
-        redfish_api = RedfishManagerBase(
+    def setUpClass(cls) -> IDracManager:
+        redfish_api = IDracManager(
             idrac_ip=os.environ.get('IDRAC_IP', ''),
             idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
             idrac_password=os.environ.get('IDRAC_PASSWORD', ''),

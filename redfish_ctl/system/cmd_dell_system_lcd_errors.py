@@ -12,15 +12,15 @@ the target and payload without POSTing.
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _SHOW_ERRORS_ON_LCD_ACTION = "#DellSystemManagementService.ShowErrorsOnLCD"
 _DELL_SYSTEM_MANAGEMENT_SERVICE = "Oem/Dell/DellSystemManagementService"
 
 
-class DellSystemLcdErrors(RedfishManagerBase,
+class DellSystemLcdErrors(IDracManager,
                           scm_type=ApiRequestType.DellSystemLcdErrors,
                           name="dell-system-lcd-errors",
                           metaclass=Singleton):

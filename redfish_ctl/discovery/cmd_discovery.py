@@ -18,9 +18,9 @@ from typing import Optional
 
 import requests
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import env_first
 
 # Upper bound on how deep recursive_discovery will walk below a top-level
@@ -69,7 +69,7 @@ def _write_json_atomic(path: str, payload: dict) -> None:
 LOG_ENTRY_MEMBER_RE = re.compile(r"/LogServices/[^/]+/Entries/.+")
 
 
-class Discovery(RedfishManagerBase,
+class Discovery(IDracManager,
                 scm_type=ApiRequestType.Discovery,
                 name='discovery',
                 metaclass=Singleton):

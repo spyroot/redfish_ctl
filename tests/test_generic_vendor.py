@@ -4,7 +4,7 @@ Uses DMTF's public-rackmount1 mockup (tests/generic_fixtures/) — a fourth,
 vendor-agnostic shape with id `Systems/437XR1138R2` — as an independent check
 that discovery and the link-navigated commands make no vendor assumptions.
 """
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 
 
 def test_generic_discovery(redfish_mock_factory):

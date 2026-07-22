@@ -17,14 +17,13 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
 class AttributesUpdate(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.AttributesUpdate,
     name='attribute_update',
     metaclass=Singleton):

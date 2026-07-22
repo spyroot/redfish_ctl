@@ -11,14 +11,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgumentFormat
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API
-from ..redfish_manager_shared import REDFISH_JSON
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class QueryAccount(RedfishManagerBase,
+class QueryAccount(IDracManager,
                    scm_type=ApiRequestType.QueryAccount,
                    name='query_account',
                    metaclass=Singleton):

@@ -11,15 +11,15 @@ destructive, so the default invocation only previews the target and payload.
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _DEVICE_RECOVERY_ACTION = "#DellBIOSService.DeviceRecovery"
 _DELL_BIOS_SERVICE = "Oem/Dell/DellBIOSService"
 
 
-class DellBiosDeviceRecovery(RedfishManagerBase,
+class DellBiosDeviceRecovery(IDracManager,
                              scm_type=ApiRequestType.DellBiosDeviceRecovery,
                              name="dell-bios-device-recovery",
                              metaclass=Singleton):

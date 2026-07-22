@@ -15,13 +15,13 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import find_ids
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
 class ConvertToRaid(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.ConvertToRaid,
     name='convert_none_raid',
     metaclass=Singleton):

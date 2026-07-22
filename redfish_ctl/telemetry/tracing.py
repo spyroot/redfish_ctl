@@ -20,6 +20,7 @@ Author Mus <spyroot@gmail.com>
 from __future__ import annotations
 
 import contextlib
+import logging
 from contextvars import ContextVar
 from typing import Any, Callable, Iterator, Mapping, Optional
 from urllib.parse import urlsplit
@@ -27,6 +28,8 @@ from urllib.parse import urlsplit
 # Set by enable_tracing(); None means tracing is off and every helper no-ops.
 _TRACER: Any = None
 _OTLP_SETUP_SERVICE_NAME: str | None = None
+# The TracerProvider setup_otlp built; kept so shutdown() can force_flush it (G6).
+_PROVIDER: Any = None
 
 # The single downstream node name for every BMC. Setting peer.service (not just
 # server.address) is what makes an APM backend render one inferred "bmc" node
@@ -121,14 +124,76 @@ def setup_otlp(service_name: Optional[str] = None,
             _trace_resource_attrs(resolved_service_name, resource_attrs)))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     enable_tracing(provider.get_tracer("redfish_ctl"))
+    global _PROVIDER
+    _PROVIDER = provider
     _OTLP_SETUP_SERVICE_NAME = resolved_service_name
 
 
 def disable_tracing() -> None:
     """Turn tracing off (used by tests to restore the default no-op state)."""
-    global _TRACER, _OTLP_SETUP_SERVICE_NAME
+    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _PROVIDER
     _TRACER = None
     _OTLP_SETUP_SERVICE_NAME = None
+    _PROVIDER = None
+
+
+def shutdown(timeout: float = 5.0) -> None:
+    """Flush and shut down the span pipeline within a bounded time (G6).
+
+    Called from main's ``finally`` so every exit path — normal return, exception,
+    SIGINT (``KeyboardInterrupt``), and SIGTERM (via ``install_termination_flush``)
+    — unwinds up the call stack through the ``with`` span exits and flushes the
+    finished spans here at the top. Bounds the flush by ``timeout`` so a blocked
+    exporter cannot hang CLI shutdown, and logs (never raises) flush/shutdown
+    errors so export stays best-effort and never crashes the CLI on the way out.
+    Idempotent and a no-op when tracing is off.
+
+    :param timeout: maximum seconds to wait for the flush (the shutdown budget).
+    :return: None.
+    """
+    global _TRACER, _OTLP_SETUP_SERVICE_NAME, _PROVIDER
+    provider = _PROVIDER
+    _TRACER = None
+    _OTLP_SETUP_SERVICE_NAME = None
+    _PROVIDER = None
+    if provider is None:
+        return
+    try:
+        provider.force_flush(timeout_millis=int(timeout * 1000))
+    except Exception as exc:  # best-effort export; never crash the CLI on exit
+        logging.getLogger(__name__).debug("span force_flush failed: %s", exc)
+    try:
+        provider.shutdown()
+    except Exception as exc:
+        logging.getLogger(__name__).debug("span provider shutdown failed: %s", exc)
+
+
+def install_termination_flush() -> None:
+    """Make SIGTERM unwind the stack so spans flush on termination (G6).
+
+    SIGINT already raises ``KeyboardInterrupt`` (which unwinds through the ``with``
+    span exits up to main's ``finally``); SIGTERM by default aborts the process
+    without unwinding, so nothing flushes. Installing a handler that raises
+    ``SystemExit`` converts SIGTERM into the same upward unwind, so the flush in
+    ``shutdown()`` runs. Only installable from the main thread; ignored elsewhere.
+
+    :return: None.
+    """
+    import signal
+
+    def _raise_on_sigterm(signum, _frame):
+        """Convert SIGTERM into SystemExit so the stack unwinds and spans flush.
+
+        :param signum: the delivered signal number (SIGTERM).
+        :param _frame: the interrupted stack frame (unused).
+        :raises SystemExit: always, to unwind up to main's finally.
+        """
+        raise SystemExit(128 + signum)
+
+    try:
+        signal.signal(signal.SIGTERM, _raise_on_sigterm)
+    except (ValueError, OSError):  # not the main thread / no SIGTERM on platform
+        pass
 
 
 def is_enabled() -> bool:
@@ -151,6 +216,50 @@ def operation_span(name: str) -> Iterator[Any]:
     from opentelemetry.trace import SpanKind
 
     with _TRACER.start_as_current_span(name, kind=SpanKind.INTERNAL) as span:
+        yield span
+
+
+def current_span() -> Optional[Any]:
+    """Return the currently-active span, or None when tracing is off / no span.
+
+    The call stack IS the span tree, so this lets a lower frame record a
+    result/exception on the operation root, and lets ``sync_invoke`` detect it is
+    already inside an operation root (opened by ``main``) and skip opening a
+    redundant second one.
+
+    :return: the active span, or None when tracing is off or no span is current.
+    """
+    if _TRACER is None:
+        return None
+    from opentelemetry import trace
+
+    span = trace.get_current_span()
+    return span if span.get_span_context().is_valid else None
+
+
+@contextlib.contextmanager
+def poll_task_span(links: Optional[list] = None) -> Iterator[Any]:
+    """INTERNAL span covering one task-poll loop; BMC checks nest as CLIENT children.
+
+    The poll loop is a single call-stack frame, so every ``client_span`` opened
+    inside this context (each ``api_get_call``) becomes a child automatically — the
+    OpenTelemetry context IS the call stack, so no parent tracking is needed. The
+    caller sets the ``poll.*`` and ``redfish.task.state`` attributes on the yielded
+    span as the loop runs. A ``None`` yield means tracing is off.
+
+    :param links: optional list of ``opentelemetry.trace.Link`` to the initiating
+        request span (the Action/POST that created the task); ``None`` until that
+        initiating context is threaded through.
+    :return: context manager yielding the poll span, or None when tracing is off.
+    """
+    if _TRACER is None:
+        yield None
+        return
+    from opentelemetry.trace import SpanKind
+
+    with _TRACER.start_as_current_span(
+        "redfish.task.poll", kind=SpanKind.INTERNAL, links=links
+    ) as span:
         yield span
 
 

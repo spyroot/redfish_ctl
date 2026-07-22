@@ -5,10 +5,10 @@ import pytest
 from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.oem.cmd_hpe_test_actions import HpeTestActions
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HPE_CORPUS = corpus_dir(REPO_ROOT / "tests" / "hpe_dl360_corpus.tar.gz", "10.43.3.209")
@@ -29,7 +29,7 @@ def hpe_corpus_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-hpe-dl360",
                 idrac_username="root",
                 idrac_password="mock",
@@ -150,7 +150,7 @@ def test_hpe_test_action_missing_target_reports_without_post(redfish_mock_factor
 
 def test_hpe_test_actions_exposes_cli_entrypoint():
     """The hpe-test-actions command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.HpeTestActions]["hpe-test-actions"] is (
         HpeTestActions
     )

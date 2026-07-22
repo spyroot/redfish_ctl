@@ -12,9 +12,9 @@ targets with no ``--perform`` value and otherwise previews by default.
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _SERVICE_NAME = "DellLCService"
 _DEFAULT_SERVICE_URI = (
@@ -36,7 +36,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellLcAutoDiscovery(RedfishManagerBase,
+class DellLcAutoDiscovery(IDracManager,
                           scm_type=ApiRequestType.DellLcAutoDiscovery,
                           name="dell-lc-autodiscovery",
                           metaclass=Singleton):

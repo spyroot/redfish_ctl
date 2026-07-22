@@ -30,12 +30,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import UnexpectedResponse
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 
-class BootOptionsList(RedfishManagerBase,
+class BootOptionsList(IDracManager,
                       scm_type=ApiRequestType.BootOptions,
                       name='boot_sources_query',
                       metaclass=Singleton):

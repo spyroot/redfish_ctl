@@ -15,9 +15,9 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 
 @dataclass(frozen=True)
@@ -47,7 +47,7 @@ _ACTION_SPECS = {
 
 
 class DellLcSupportAssistStatus(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellLcSupportAssistStatus,
     name="dell-lc-supportassist-status",
     metaclass=Singleton,

@@ -28,16 +28,24 @@ def test_module_imports(module_name: str):
 def test_bios_change_command_is_registered():
     """The de-duplicated bios change module still exposes its command class."""
     from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
-    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    from redfish_ctl.idrac_manager import IDracManager
 
-    assert issubclass(BiosChangeSettings, RedfishManagerBase)
+    assert issubclass(BiosChangeSettings, IDracManager)
 
 
-@pytest.mark.parametrize("old", ["redfish_ctl.idrac_manager", "redfish_ctl.idrac_shared"])
-def test_old_idrac_module_names_no_longer_resolve(old):
-    """The iDRAC-named base modules were hard-renamed to neutral names with no
-    aliases (idrac_manager -> redfish_manager_base, idrac_shared ->
-    redfish_manager_shared). The old import paths must no longer resolve, guarding
-    against a reintroduction of the pre-rename names."""
+@pytest.mark.parametrize(
+    "removed",
+    [
+        "redfish_ctl.redfish_manager_base",
+        "redfish_ctl.redfish_manager_shared",
+    ],
+)
+def test_removed_neutral_base_names_no_longer_resolve(removed):
+    """The Dell base-layer modules use vendor-honest names again: idrac_manager.py
+    and idrac_shared.py. The transient neutral names redfish_manager_base and
+    redfish_manager_shared were removed with no alias, so their import paths must no
+    longer resolve -- guarding against reintroducing the inverted naming where the
+    Dell child class masqueraded as the generic base. redfish_task_state.py exists
+    again as the DMTF-generic TaskState module, so it is intentionally not listed."""
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module(old)
+        importlib.import_module(removed)

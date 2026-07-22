@@ -6,7 +6,7 @@ import pytest
 from redfish_ctl.chassis.cmd_chasis_reset import ChassisReset
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
 from redfish_ctl.cmd_exceptions import FailedDiscoverAction, InvalidArgumentFormat
-from redfish_ctl.redfish_manager_shared import ApiRequestType, PowerState, RedfishAction
+from redfish_ctl.idrac_shared import ApiRequestType, PowerState, RedfishAction
 from redfish_ctl.redfish_manager import CommandResult
 
 

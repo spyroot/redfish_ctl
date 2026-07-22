@@ -7,7 +7,7 @@ the explorer can never invoke a mutating action (power, BIOS write, RAID, media,
 firmware flash) even if asked. Heavy commands (full sensor/telemetry walks) are
 flagged so the UI can warn before a long call.
 
-Grounded in the live registry (``RedfishManagerBase._registry``); every (api, command)
+Grounded in the live registry (``IDracManager._registry``); every (api, command)
 pair below is a real registered command.
 """
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..redfish_manager_shared import ApiRequestType
+from ..idrac_shared import ApiRequestType
 
 
 @dataclass(frozen=True)

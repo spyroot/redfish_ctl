@@ -4,8 +4,8 @@ import json
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 _CONTROLLER = "RAID.Integrated.1-1"
 _STORAGE_PATH = f"/redfish/v1/Systems/System.Embedded.1/Storage/{_CONTROLLER}"

@@ -1,6 +1,6 @@
 """Main entry for redfish_ctl
 
-The main routine for redfish_ctl; the tool leverages the RedfishManagerBase class.
+The main routine for redfish_ctl; the tool leverages the IDracManager class.
 to interact with a Redfish BMC.
 
 Each command registered dynamically and dispatch to respected execute method
@@ -49,9 +49,10 @@ from .cmd_exceptions import (
 from .cmd_utils import save_if_needed
 from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from .redfish_manager_base import RedfishManagerBase
-from .redfish_manager_shared import RedfishAction, RedfishActionEncoder
+from .idrac_manager import IDracManager
+from .idrac_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
+from .telemetry import tracing
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
 
@@ -456,11 +457,11 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # keys come from OTEL_RESOURCE_ATTRIBUTES. service.name defaults to the shared
     # redfish_ctl identity so spans and hw.* metrics land on one APM service node.
     if getattr(cmd_args, "otlp_traces", False):
-        from .telemetry import tracing
         tracing.setup_otlp()
+        tracing.install_termination_flush()
 
     # the manager is the main interface main uses to interact with the BMC.
-    redfish_api = RedfishManagerBase(host=cmd_args.redfish_host,
+    redfish_api = IDracManager(host=cmd_args.redfish_host,
                                      username=cmd_args.redfish_username,
                                      password=cmd_args.redfish_password,
                                      port=cmd_args.redfish_port,
@@ -468,24 +469,55 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
                                      is_http=cmd_args.use_http,
                                      is_debug=cmd_args.debug)
 
-    # A network scan has no single target host, so skip the version handshake
-    # (it would try to connect to a host we do not have).
-    scan_mode = is_network_scan(cmd_args)
-    local_mode = is_local_command(cmd_args)
-    fleet_mode = is_fleet_command(cmd_args)
-    connectionless_mode = scan_mode or local_mode or fleet_mode
+    connectionless_mode = (
+        is_network_scan(cmd_args)
+        or is_local_command(cmd_args)
+        or is_fleet_command(cmd_args)
+    )
+
+    if cmd_args.subcommand not in command_name_to_cmd:
+        console_error_printer("Error: Unknown command.")
+        return
+    cmd = command_name_to_cmd[cmd_args.subcommand]
+
+    # One operation ROOT span named by the command (static, resolved via the
+    # register chain); preflight, dispatch, and post-processing all nest under it,
+    # so there are no orphan roots. The finally flushes finished spans as the
+    # stack unwinds on every exit path -- normal return, exception, SIGINT, and
+    # SIGTERM (see install_termination_flush). Everything is a no-op when tracing
+    # is off.
+    try:
+        with tracing.operation_span(cmd.name) as root_span:
+            _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span)
+    finally:
+        tracing.shutdown()
+
+
+def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
+    """Execute one resolved command inside the operation root span opened by main.
+
+    Split out of ``main`` so the version handshake, dispatch, and Dell
+    post-processing all run inside the single ``operation_span`` (no orphan
+    roots). Exceptions are recorded on ``root_span`` here because they are handled
+    (printed) locally and would otherwise never reach the span.
+
+    :param cmd: the resolved ``(type, name)`` command from the register chain.
+    :param cmd_args: parsed CLI arguments.
+    :param redfish_api: the manager used to talk to the BMC.
+    :param insecure: True when TLS certificate verification is skipped.
+    :param connectionless_mode: True for scan/local/fleet commands (no BMC host).
+    :param root_span: the operation root span, or None when tracing is off.
+    :return: None.
+    """
+    # Version handshake / vendor probe -- the root's first CLIENT child. A network
+    # scan has no single target host, so it is skipped.
     if not connectionless_mode:
         _ = redfish_api.check_api_version()
 
     if cmd_args.verbose:
         logger.info("verbose is set on")
 
-    if cmd_args.subcommand not in command_name_to_cmd:
-        console_error_printer("Error: Unknown command.")
-        return
-
     try:
-        cmd = command_name_to_cmd[cmd_args.subcommand]
         arg_dict = dict(
             (k, v) for k, v in vars(cmd_args).items()
             if k not in _ROOT_CONNECTION_ARGS
@@ -531,6 +563,8 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             #     command_result.data[0]["idrac_version"] = redfish_api.idrac_manager_version
             #     command_result.data[0]["redfish_version"] = redfish_api.redfish_version
 
+        tracing.record_result(root_span, command_result)
+
         if command_result.error is not None:
             json_printer(command_result.data, cmd_args, colorized=cmd_args.nocolor)
             if isinstance(command_result.error, JsonHttpError):
@@ -542,26 +576,37 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
             json_printer(processed_data, cmd_args, colorized=cmd_args.nocolor)
 
     except RedfishException as redfish_err:
+        tracing.record_exception(root_span, redfish_err)
         console_error_printer(f"Error: {redfish_err}")
     except TaskIdUnavailable as tid:
+        tracing.record_exception(root_span, tid)
         console_error_printer(f"Error: {tid}")
     except MissingResource as mr:
+        tracing.record_exception(root_span, mr)
         console_error_printer(f"Error: {mr}")
     except InvalidJsonSpec as ijs:
+        tracing.record_exception(root_span, ijs)
         console_error_printer(f"Error: {ijs}")
     except ResourceNotFound as rnf:
+        tracing.record_exception(root_span, rnf)
         console_error_printer(f"Error: {rnf}")
     except InvalidArgument as ia:
+        tracing.record_exception(root_span, ia)
         console_error_printer(f"Error: {ia}")
     except FailedDiscoverAction as fda:
+        tracing.record_exception(root_span, fda)
         console_error_printer(f"Error: {fda}")
     except UnsupportedAction as ua:
+        tracing.record_exception(root_span, ua)
         console_error_printer(f"Error:{ua}")
     except MissingMandatoryArguments as mmr:
+        tracing.record_exception(root_span, mmr)
         console_error_printer(f"Error:{mmr}")
     except FileNotFoundError as fne:
+        tracing.record_exception(root_span, fne)
         console_error_printer(f"Error:{fne}")
     except UncommittedPendingChanges as upc:
+        tracing.record_exception(root_span, upc)
         console_error_printer(f"Error:{upc}")
 
 
@@ -572,7 +617,7 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
     :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
-    redfish_api = RedfishManagerBase()
+    redfish_api = IDracManager()
     command_name_to_cmd = {}
     commands_registry = redfish_api.get_registry()
     command_name = collections.namedtuple("Command", "type name")

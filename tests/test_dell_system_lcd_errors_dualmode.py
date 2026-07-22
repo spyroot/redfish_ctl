@@ -8,9 +8,9 @@ import pytest
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.system.cmd_dell_system_lcd_errors import DellSystemLcdErrors
 
 DELL_CORPUS = corpus_dir(
@@ -38,7 +38,7 @@ def _dell_system_lcd_manager(remove_action=False):
     """Serve the Dell corpus over requests-mock.
 
     :param remove_action: drop ShowErrorsOnLCD from the service fixture.
-    :return: tuple of RedfishManagerBase and recorded requests.
+    :return: tuple of IDracManager and recorded requests.
     """
     requests_mock = pytest.importorskip("requests_mock")
     requests = []
@@ -66,7 +66,7 @@ def _dell_system_lcd_manager(remove_action=False):
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
-        manager = RedfishManagerBase(
+        manager = IDracManager(
             idrac_ip="mock-dell-system-lcd",
             idrac_username="root",
             idrac_password="mock",
@@ -168,7 +168,7 @@ def test_dell_system_lcd_errors_policy_is_destructive():
 
 def test_dell_system_lcd_errors_exposes_cli_entrypoint():
     """The dell-system-lcd-errors command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellSystemLcdErrors]["dell-system-lcd-errors"] is (
         DellSystemLcdErrors
     )

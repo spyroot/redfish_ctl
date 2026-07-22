@@ -16,14 +16,13 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_shared import RedfishJson
-from ..redfish_shared import RedfishApi
+from ..redfish_shared import RedfishApi, RedfishJson
 
 
-class BiosRegistry(RedfishManagerBase,
+class BiosRegistry(IDracManager,
                    scm_type=ApiRequestType.BiosRegistry,
                    name='bios_registry',
                    metaclass=Singleton):

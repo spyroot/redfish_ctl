@@ -9,10 +9,10 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.oem.cmd_hpe_kerberos_keytab import HpeKerberosKeytabImport
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HPE_CORPUS = corpus_dir(REPO_ROOT / "tests" / "hpe_dl360_corpus.tar.gz", "10.43.3.209")
@@ -39,7 +39,7 @@ def hpe_keytab_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-hpe-keytab",
                 idrac_username="root",
                 idrac_password="mock",
@@ -221,7 +221,7 @@ def test_hpe_keytab_import_missing_target_reports_without_post(
 
 def test_hpe_keytab_import_exposes_cli_entrypoint():
     """The HPE Kerberos keytab command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.HpeKerberosKeytabImport][
         "hpe-kerberos-keytab-import"
     ] is HpeKerberosKeytabImport

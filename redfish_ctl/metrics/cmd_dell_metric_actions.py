@@ -19,9 +19,9 @@ from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _METRIC_SERVICE_FALLBACK = (
@@ -58,7 +58,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellMetricActions(RedfishManagerBase,
+class DellMetricActions(IDracManager,
                         scm_type=ApiRequestType.DellMetricActions,
                         name="dell-metric-actions",
                         metaclass=Singleton):

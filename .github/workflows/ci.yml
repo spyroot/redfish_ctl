@@ -25,7 +25,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        # main's branch protection requires test (3.10/3.11/3.12), so the matrix
+        # must run at least those three or the PR stays blocked. Dropped 3.13/3.14
+        # for speed. To go to a single version, first trim the required-checks
+        # list in main's branch protection.
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v5
         with:

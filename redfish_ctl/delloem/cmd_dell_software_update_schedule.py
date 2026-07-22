@@ -17,9 +17,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _SERVICE_FALLBACK = (
@@ -56,7 +56,7 @@ _ACTION_SPECS = {
 
 
 class DellSoftwareUpdateSchedule(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DellSoftwareUpdateSchedule,
     name="dell-software-update-schedule",
     metaclass=Singleton,

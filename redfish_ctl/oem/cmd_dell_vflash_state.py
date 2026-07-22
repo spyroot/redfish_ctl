@@ -16,9 +16,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _VFLASH_STATE_ACTION = "#DellPersistentStorageService.VFlashStateChange"
@@ -28,7 +28,7 @@ _PERSISTENT_STORAGE_FALLBACK = (
 )
 
 
-class DellVFlashStateChange(RedfishManagerBase,
+class DellVFlashStateChange(IDracManager,
                             scm_type=ApiRequestType.DellVFlashStateChange,
                             name="dell-vflash-state",
                             metaclass=Singleton):

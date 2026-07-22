@@ -5,7 +5,7 @@ from pathlib import Path
 
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 SIMPLE_UPDATE_TARGET = (

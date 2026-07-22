@@ -10,9 +10,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _MAX_DNS_SERVERS = 4
 
@@ -52,7 +52,7 @@ def _normalize_dns_servers(servers, clear: bool = False) -> list[str]:
     return normalized
 
 
-class DnsSet(RedfishManagerBase,
+class DnsSet(IDracManager,
              scm_type=ApiRequestType.DnsSet,
              name='dns-set',
              metaclass=Singleton):

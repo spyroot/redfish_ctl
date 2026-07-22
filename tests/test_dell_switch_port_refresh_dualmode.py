@@ -6,12 +6,12 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.network.cmd_dell_switch_port_refresh import (
     DellSwitchPortRefresh,
 )
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -45,7 +45,7 @@ def dell_switch_manager():
         mocker.post(requests_mock.ANY, text=service.post_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-switch",
                 idrac_username="root",
                 idrac_password="mock",
@@ -162,7 +162,7 @@ def test_dell_switch_port_refresh_missing_target_reports_without_post(
 
 def test_dell_switch_port_refresh_is_registered():
     """The dell-switch-port-refresh command is wired into the registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellSwitchPortRefresh][
         "dell-switch-port-refresh"
     ] is DellSwitchPortRefresh

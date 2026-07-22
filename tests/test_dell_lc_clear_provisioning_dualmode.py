@@ -10,9 +10,9 @@ from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.dell_lc.cmd_dell_lc_clear_provisioning import (
     DellLcClearProvisioningServer,
 )
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DELL_CORPUS = corpus_dir(
@@ -43,7 +43,7 @@ def dell_lc_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-lc",
                 idrac_username="root",
                 idrac_password="mock",
@@ -149,7 +149,7 @@ def test_clear_provisioning_reports_missing_action_without_post(dell_lc_mock):
 
 def test_clear_provisioning_is_registered_and_classified():
     """The command is registered and classified as guarded."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellLcClearProvisioningServer][
         "dell-lc-clear-provisioning"
     ] is DellLcClearProvisioningServer

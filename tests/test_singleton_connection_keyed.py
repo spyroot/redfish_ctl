@@ -17,9 +17,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests_mock as requests_mock_lib
 
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 from redfish_ctl.system.cmd_system import SystemQuery
 
 HOST_A = "10.9.9.1"
@@ -108,7 +108,7 @@ def test_dispatch_connection_pop_cleans_mixed_public_aliases():
         "path": "/redfish/v1/",
     }
 
-    value = RedfishManagerBase._pop_connection_value(
+    value = IDracManager._pop_connection_value(
         kwargs, "host", "idrac_ip", "_redfish_host")
 
     assert value == "10.9.9.40"
@@ -121,7 +121,7 @@ def test_dispatch_connection_pop_falls_back_when_canonical_is_none():
     """A None canonical value keeps the deprecated alias fallback working."""
     kwargs = {"host": None, "idrac_ip": "10.9.9.42"}
 
-    value = RedfishManagerBase._pop_connection_value(
+    value = IDracManager._pop_connection_value(
         kwargs, "host", "idrac_ip", "_redfish_host")
 
     assert value == "10.9.9.42"
@@ -136,7 +136,7 @@ def test_internal_dispatch_connection_key_preserves_command_host_arg():
         "host": "downloads.example.test",
     }
 
-    value = RedfishManagerBase._pop_connection_value(
+    value = IDracManager._pop_connection_value(
         kwargs, "host", "idrac_ip", "_redfish_host")
 
     assert value == "10.9.9.43"
@@ -151,7 +151,7 @@ def test_internal_dispatch_connection_key_removes_duplicate_host_arg():
         "host": "10.9.9.43",
     }
 
-    value = RedfishManagerBase._pop_connection_value(
+    value = IDracManager._pop_connection_value(
         kwargs, "host", "idrac_ip", "_redfish_host")
 
     assert value == "10.9.9.43"
@@ -162,7 +162,7 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
     """Registered commands with legacy-only constructors still dispatch safely."""
 
     class LegacyConstructorCommand(
-            RedfishManagerBase,
+            IDracManager,
             scm_type=ApiRequestType.SystemQuery,
             name="legacy-constructor-compat"):
         constructed = None
@@ -215,7 +215,7 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
             """
             return None
 
-    result = RedfishManagerBase.invoke(
+    result = IDracManager.invoke(
         ApiRequestType.SystemQuery,
         "legacy-constructor-compat",
         host="10.9.9.45",

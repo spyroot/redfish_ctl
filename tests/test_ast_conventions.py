@@ -39,27 +39,27 @@ MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confi
 # New command code should expose one of MUTATION_GUARD_ARGS or route through
 # invoke_action instead of extending this list.
 LEGACY_UNGUARDED_MUTATION_CALLS = {
-    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:94 execute base_post",
-    "redfish_ctl/attribute/cmd_attribute_update.py:95 execute base_patch",
+    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:93 execute base_post",
+    "redfish_ctl/attribute/cmd_attribute_update.py:94 execute base_patch",
     "redfish_ctl/bios/cmd_bios_clear_pending.py:81 execute base_post",
     "redfish_ctl/bios/cmd_change_bios.py:369 execute base_patch",
     "redfish_ctl/bios/cmd_change_boot_order.py:177 execute base_patch",
-    "redfish_ctl/boot_source/cmd_clear_pending.py:74 execute base_post",
-    "redfish_ctl/boot_source/cmd_enable.py:121 execute base_patch",
+    "redfish_ctl/boot_source/cmd_clear_pending.py:71 execute base_post",
+    "redfish_ctl/boot_source/cmd_enable.py:117 execute base_patch",
     "redfish_ctl/boot_source/cmd_update.py:175 execute base_patch",
     "redfish_ctl/chassis/cmd_chasis_reset.py:115 execute base_post",
     "redfish_ctl/chassis/cmd_update_chassis.py:119 execute base_patch",
     "redfish_ctl/dell_lc/cmd_dell_lc_api.py:57 execute base_post",
     "redfish_ctl/dell_lc/cmd_dell_lc_rs.py:56 execute base_post",
-    "redfish_ctl/delloem/delloem_attach.py:91 execute base_post",
+    "redfish_ctl/delloem/delloem_attach.py:90 execute base_post",
     "redfish_ctl/delloem/delloem_attach_status.py:67 execute base_post",
-    "redfish_ctl/delloem/delloem_boot_netios.py:98 execute base_post",
-    "redfish_ctl/delloem/delloem_detach.py:57 execute base_post",
-    "redfish_ctl/delloem/delloem_disconnect.py:56 execute base_post",
-    "redfish_ctl/delloem/delloem_get_networkios.py:66 execute base_post",
-    "redfish_ctl/jobs/cmd_job_apply.py:149 execute base_post",
-    "redfish_ctl/jobs/cmd_job_del.py:66 execute base_delete",
-    "redfish_ctl/jobs/cmd_job_delete_all.py:83 execute base_post",
+    "redfish_ctl/delloem/delloem_boot_netios.py:92 execute base_post",
+    "redfish_ctl/delloem/delloem_detach.py:56 execute base_post",
+    "redfish_ctl/delloem/delloem_disconnect.py:55 execute base_post",
+    "redfish_ctl/delloem/delloem_get_networkios.py:65 execute base_post",
+    "redfish_ctl/jobs/cmd_job_apply.py:154 execute base_post",
+    "redfish_ctl/jobs/cmd_job_del.py:65 execute base_delete",
+    "redfish_ctl/jobs/cmd_job_delete_all.py:73 execute base_post",
     "redfish_ctl/manager/cmd_manager_reset.py:99 execute base_post",
     "redfish_ctl/manager/cmd_manager_time.py:124 execute base_patch",
     "redfish_ctl/storage/cmd_convert_none_raid.py:115 execute base_post",
@@ -88,7 +88,7 @@ def _accessed_on(node: ast.Attribute) -> str | None:
 def _enum_member_truthiness_findings() -> list:
     """Every ``<variable>.Success``-style access in the package.
 
-    Enum classes are CamelCase (``RedfishApiRespond``, ``TaskStatus``), so a
+    Enum classes are CamelCase (``RedfishApiRespond``, ``IdracTaskStatus``), so a
     member fetched from a capitalized name is a legitimate class reference;
     fetched from a lowercase name it is a respond value being misused.
     """
@@ -141,7 +141,7 @@ def _unguarded_direct_mutation_findings() -> list[str]:
     """Direct write helpers in command modules without an explicit guard arg."""
     findings = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        if path.name == "redfish_manager_base.py":
+        if path.name == "idrac_manager.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         parents = _parent_map(tree)

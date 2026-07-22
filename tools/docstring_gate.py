@@ -15,7 +15,7 @@ class) must additionally carry a ``redfish_ctl <cmd>`` usage example in its modu
 docstring, so what the command invokes stays obvious and greppable.
 
 The style is the codebase's reStructuredText convention (see
-``redfish_ctl/redfish_manager_base.py``). Run ``--all`` to report the whole-tree
+``redfish_ctl/idrac_manager.py``). Run ``--all`` to report the whole-tree
 backlog instead of the diff.
 
 Exit code 1 (with a per-violation report) fails the gate; 0 passes.

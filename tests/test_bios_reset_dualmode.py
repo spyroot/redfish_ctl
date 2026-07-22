@@ -5,8 +5,8 @@ import copy
 import pytest
 
 from redfish_ctl.bios.cmd_bios_reset_default import BiosResetDefault
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 
 def _post_requests(service):

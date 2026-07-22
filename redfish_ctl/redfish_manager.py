@@ -14,10 +14,11 @@ import functools
 import logging
 import re
 import threading
+import time
 from abc import abstractmethod
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Any, Callable, Dict, Hashable, Optional
+from typing import Any, Callable, Dict, Hashable, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -42,6 +43,7 @@ from .redfish_shared import (
     RedfishJsonSpec,
     env_first,
 )
+from .redfish_task_state import TERMINAL_TASK_STATES, TaskState, TaskStatus
 from .telemetry import tracing
 
 """Each command encapsulate result in named tuple"""
@@ -348,7 +350,7 @@ class RedfishManager:
         semantics of the GET itself are unchanged. Tunable via env:
         ``REDFISH_HTTP_POOL`` (pool size), ``REDFISH_HTTP_RETRIES``,
         ``REDFISH_HTTP_BACKOFF`` (legacy ``IDRAC_HTTP_*`` still honored).
-        Inherited by RedfishManagerBase.
+        Inherited by IDracManager.
 
         :return: the cached keep-alive ``requests.Session``.
         """
@@ -890,6 +892,153 @@ class RedfishManager:
             logging.debug(f"no job id in the response body: {respond_err}")
 
         return ""
+
+    def get_task_state(
+            self, resp: requests.models.Response
+    ) -> Tuple[Optional[TaskState], Optional[TaskStatus]]:
+        """Parse a DMTF ``#Task`` response into its state and status.
+
+        Reads the generic ``TaskState``/``TaskStatus`` properties a Redfish
+        ``TaskService`` serves on ``/redfish/v1/TaskService/Tasks/{id}``. Unlike
+        the Dell ``IDracManager.get_task_state``, it never consults the
+        ``/Oem/Dell/Jobs`` ``JobState`` and raises nothing on a missing key: an
+        absent, non-JSON, or non-spec value maps to ``None`` so the caller keeps
+        its last observed state.
+
+        :param resp: a requests.models.Response holding a ``#Task`` body.
+        :return: a ``(TaskState, TaskStatus)`` tuple; either element is ``None``
+            when the body is not a JSON object, the key is absent, or the value
+            is not a DMTF-defined enum member.
+        """
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError as json_err:
+            self.logger.debug(f"task response carried no json body: {json_err}")
+            return None, None
+        if not isinstance(data, dict):
+            return None, None
+
+        def _coerce(enum_cls, value):
+            """Return the enum member for a wire value, or None if not a member.
+
+            :param enum_cls: the enum class to coerce into (TaskState / TaskStatus).
+            :param value: the raw wire value read from the #Task body.
+            :return: the matching enum member, or None when value is not a member.
+            """
+            try:
+                return enum_cls(value)
+            except ValueError:
+                return None
+
+        return (
+            _coerce(TaskState, data.get(RedfishJson.TaskState)),
+            _coerce(TaskStatus, data.get(RedfishJson.TaskStatus)),
+        )
+
+    def fetch_task(
+            self,
+            task_id: str,
+            sleep_time: Optional[int] = 10,
+            wait_for_state: Optional[TaskState] = None,
+            timeout: Optional[float] = None,
+    ) -> Optional[TaskState]:
+        """Poll the generic DMTF ``TaskService`` until a task finishes.
+
+        Blocks on ``GET /redfish/v1/TaskService/Tasks/{task_id}``, following the
+        Redfish task-monitor semantics: ``202 Accepted`` while the task runs,
+        ``200 OK`` once it carries a state, ``404``/``410`` when a cancelled task
+        is reaped. Returns as soon as the task reaches a terminal state
+        (Completed/Killed/Cancelled/Exception) or the optional ``wait_for_state``.
+        This is the vendor-neutral counterpart to ``IDracManager.fetch_task``,
+        which additionally consults the Dell OEM ``/Oem/Dell/Jobs`` job model;
+        here only the specification's ``TaskService`` is polled.
+
+        :param task_id: the ``Id`` of the task, as returned when it was created.
+        :param sleep_time: seconds to wait between polls; a server ``Retry-After``
+            header takes precedence when larger.
+        :param wait_for_state: return as soon as this state is observed, instead
+            of waiting for a terminal state (e.g. resume once ``Running``).
+        :param timeout: optional wall-clock budget in seconds; ``None`` waits
+            until a terminal state or the task is reaped.
+        :return: the last observed :class:`TaskState`, or ``None`` if the task
+            never reported a recognised state.
+        :raise AuthenticationFailed: if the service returns HTTP 401.
+        """
+        url = f"{self._default_method}{self.redfish_ip}{RedfishApi.Tasks}{task_id}"
+        started = time.monotonic()
+        task_state: Optional[TaskState] = None
+        poll_count = 0
+
+        # One INTERNAL span for the whole poll; each api_get_call below nests as a
+        # CLIENT child automatically because the OTel context is the call stack.
+        with tracing.poll_task_span() as poll_span:
+            try:
+                while True:
+                    resp = self.api_get_call(url, {})
+                    poll_count += 1
+                    code = resp.status_code
+
+                    if code == 401:
+                        raise AuthenticationFailed("task service returned 401.")
+                    # A reaped/cancelled task monitor returns 410 Gone or 404 Not
+                    # Found; a 5xx ends the wait. Keep the last state seen.
+                    if code in (404, 410) or code >= 500:
+                        self.logger.info(
+                            f"task {task_id} monitor returned {code}; stopping poll."
+                        )
+                        break
+
+                    state, _status = self.get_task_state(resp)
+                    if state is not None:
+                        task_state = state
+                    if wait_for_state is not None and task_state == wait_for_state:
+                        break
+                    if task_state in TERMINAL_TASK_STATES:
+                        break
+
+                    try:
+                        retry_after = int(resp.headers.get("Retry-After", 0) or 0)
+                    except (TypeError, ValueError):
+                        retry_after = 0
+                    delay = max(int(sleep_time or 0), retry_after)
+
+                    if timeout is not None and (time.monotonic() - started) >= timeout:
+                        self.logger.info(
+                            f"task {task_id} poll timed out after {timeout}s."
+                        )
+                        break
+                    time.sleep(delay)
+            finally:
+                self._set_poll_span_attributes(
+                    poll_span, poll_count, sleep_time, started, task_state
+                )
+
+        return task_state
+
+    @staticmethod
+    def _set_poll_span_attributes(span, poll_count, sleep_time, started, task_state):
+        """Set the required ``poll_task_span`` attributes on the yielded poll span.
+
+        Runs in a ``finally`` so the contract keys are present even when the poll
+        exits via exception (e.g. a 401 mid-poll).
+
+        :param span: the poll span, or None when tracing is off.
+        :param poll_count: number of BMC polls performed.
+        :param sleep_time: configured inter-poll sleep in seconds.
+        :param started: monotonic start time of the poll.
+        :param task_state: the last observed TaskState, or None.
+        :return: None.
+        """
+        if span is None:
+            return
+        span.set_attribute("poll.count", poll_count)
+        span.set_attribute("poll.interval_ms", int((sleep_time or 0) * 1000))
+        span.set_attribute("poll.elapsed_ms", int((time.monotonic() - started) * 1000))
+        span.set_attribute("poll.terminal_state", task_state in TERMINAL_TASK_STATES)
+        span.set_attribute(
+            "redfish.task.state",
+            task_state.value if task_state is not None else "unknown",
+        )
 
     @abstractmethod
     def api_success_msg(self,

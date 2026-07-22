@@ -14,15 +14,15 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _RESET_BIOS_ACTION = "#Bios.ResetBios"
 
 
-class BiosResetDefault(RedfishManagerBase,
+class BiosResetDefault(IDracManager,
                        scm_type=ApiRequestType.BiosResetDefault,
                        name="bios_reset",
                        metaclass=Singleton):

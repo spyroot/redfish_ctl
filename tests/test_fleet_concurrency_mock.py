@@ -15,7 +15,7 @@ import pytest
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.fleet.cmd_fleet import FleetNode, read_fleet
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.proxy import NodeConfig, NodeRegistry, ReadOnlyProxy
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -98,8 +98,8 @@ def _node_config(node_id: str, address: str, *, port: int = 443) -> NodeConfig:
     )
 
 
-def _manager_for_node(node: NodeConfig, *, use_http: bool = False) -> RedfishManagerBase:
-    return RedfishManagerBase(
+def _manager_for_node(node: NodeConfig, *, use_http: bool = False) -> IDracManager:
+    return IDracManager(
         idrac_ip=node.address,
         idrac_username=node.username or "root",
         idrac_password=node.password or "mock",

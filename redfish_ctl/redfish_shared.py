@@ -87,6 +87,16 @@ class RedfishJson:
     # redfish response message.
     MessageExtendedInfo = "@Message.ExtendedInfo"
 
+    # DMTF Task schema keys, served on a #Task resource at
+    # /redfish/v1/TaskService/Tasks/{id}. Generic (not Dell): the Dell OEM job
+    # model uses JobState/Message on #DellJob instead (see idrac_shared.py).
+    TaskState = "TaskState"
+    TaskStatus = "TaskStatus"
+    PercentComplete = "PercentComplete"
+    # DMTF uses a Messages array; the Dell OEM job carries a single Message string.
+    Messages = "Messages"
+    TaskMonitor = "TaskMonitor"
+
 
 class RedfishApi:
     """
@@ -114,3 +124,7 @@ class RedfishApi:
     BiosReset = f"{Bios}/{Settings}/{Actions}/{RedfishActions.BiosReset.value}"
     ManagerAccount = f"{Version}/{AccountService}"
     CHASSIS = "/Chassis"
+
+    # DMTF TaskService (generic). Append a task id to Tasks for a #Task resource.
+    TaskService = f"{Version}/TaskService"
+    Tasks = f"{Version}/TaskService/Tasks/"

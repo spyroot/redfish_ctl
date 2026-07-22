@@ -5,10 +5,10 @@ import pytest
 from conftest import MockRedfishService, _build_fixture_index
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.oem.cmd_dell_card_group_actions import DellCardGroupActions
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
 
 SERVICE_URI = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DelliDRACCardService"
 JOIN_TARGET = f"{SERVICE_URI}/Actions/DelliDRACCardService.JoinGroup"
@@ -86,7 +86,7 @@ def dell_card_group_mock(tmp_path):
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            RedfishManagerBase(
+            IDracManager(
                 idrac_ip="mock-dell-card",
                 idrac_username="root",
                 idrac_password="mock",
@@ -211,7 +211,7 @@ def test_dell_card_group_invalid_clone_value_reports_without_post(
 
 def test_dell_card_group_actions_exposes_cli_entrypoint():
     """The dell-card-group-actions command is wired into the package registry."""
-    registry = RedfishManagerBase().get_registry()
+    registry = IDracManager().get_registry()
     assert registry[ApiRequestType.DellCardGroupActions][
         "dell-card-group-actions"
     ] is DellCardGroupActions

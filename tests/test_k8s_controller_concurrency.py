@@ -244,7 +244,7 @@ class FakeSession:
 
 
 class FakeManager:
-    """Stand-in for RedfishManagerBase: records creds and a closable session."""
+    """Stand-in for IDracManager: records creds and a closable session."""
 
     def __init__(self, *, registry, behaviors, hang_event, idrac_ip, idrac_username,
                  idrac_password, **_):

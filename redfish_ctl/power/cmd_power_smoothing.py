@@ -13,8 +13,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -24,7 +24,7 @@ _ACTION_TYPES = {
 }
 
 
-class PowerSmoothing(RedfishManagerBase,
+class PowerSmoothing(IDracManager,
                      scm_type=ApiRequestType.PowerSmoothing,
                      name="power-smoothing",
                      metaclass=Singleton):

@@ -1,4 +1,4 @@
-"""Async-path checks for ``RedfishManagerBase.base_request_respond``.
+"""Async-path checks for ``IDracManager.base_request_respond``.
 
 ``base_request_respond`` had no test at all, and the whole offline suite exercised ``do_async=True``
 in exactly one file. That gap let a reversed tuple unpack ship in three places: the
@@ -23,8 +23,8 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
+from redfish_ctl.idrac_shared import HTTPMethod, RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_shared import HTTPMethod, RedfishApiRespond
 
 
 class _FakeResponse:
@@ -55,7 +55,7 @@ def _stub_async(monkeypatch, manager, helper_name: str, response, api_resp):
     re-testing requests.
 
     :param monkeypatch: pytest monkeypatch fixture.
-    :param manager: the RedfishManagerBase instance under test.
+    :param manager: the IDracManager instance under test.
     :param helper_name: attribute name of the async helper to replace.
     :param response: object to return in the first tuple slot.
     :param api_resp: RedfishApiRespond to return in the second tuple slot.

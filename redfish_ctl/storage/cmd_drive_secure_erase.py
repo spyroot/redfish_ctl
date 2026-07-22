@@ -8,9 +8,9 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
+from ..idrac_manager import IDracManager
+from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _SECURE_ERASE_ACTION = "#Drive.SecureErase"
 
@@ -25,7 +25,7 @@ def _last_segment(uri: str) -> str:
 
 
 class DriveSecureErase(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.DriveSecureErase,
     name="drive-secure-erase",
     metaclass=Singleton,

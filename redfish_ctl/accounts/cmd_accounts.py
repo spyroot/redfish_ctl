@@ -9,15 +9,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API
-from ..redfish_manager_shared import REDFISH_JSON
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
-class QueryAccounts(RedfishManagerBase,
+class QueryAccounts(IDracManager,
                     scm_type=ApiRequestType.QueryAccounts,
                     name='query_accounts',
                     metaclass=Singleton):

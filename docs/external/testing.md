@@ -20,7 +20,7 @@ so unset those variables for the default suite.
 handles `GET`, `POST`, `PATCH`, `DELETE`, and action-style POSTs, so mutating command tests can stay
 offline.
 
-Use the `redfish_mock` fixture when you need an `RedfishManagerBase` wired to the mock, and
+Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock, and
 `redfish_service` when you need to inspect requests or state changes.
 
 **Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
