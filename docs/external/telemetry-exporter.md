@@ -161,6 +161,7 @@ Every series carries the join labels used by the GB300 dashboards:
 | `server.address` | `192.0.2.{40+N}` |
 | `bmc.ip` | BMC address from `REDFISH_IP` or `--label-bmc-ip` |
 | `vendor` | `supermicro`, `dell`, or the value passed with `--vendor` |
+| `service.name` | Logical service name, default `redfish_ctl`; override with `--service-name` or `REDFISH_EXPORTER_SERVICE_NAME` |
 | `deployment.environment` | Optional value from `--deployment-environment` or `REDFISH_EXPORTER_DEPLOYMENT_ENVIRONMENT` |
 | `deployment.environment.name` | The same optional value, emitted by default for newer OTel-compatible consumers |
 
@@ -185,6 +186,12 @@ is normalized to lowercase and emitted as both `deployment.environment` and
 compatibility mode. Use `--require-deployment-environment` in a fleet manifest to fail startup when
 that join key is missing. For a bounded extra label, use `--dimension telemetry.source=redfish`; it
 cannot override identity labels or carry URL/token-shaped values.
+
+`service.name` (default `redfish_ctl`) is the OTel logical service name. Every series carries it as a
+label so a dashboard can separate this exporter's hardware metrics from other producers in the same
+environment, and it also becomes the OTLP resource `service.name`. Override it with `--service-name`
+or `REDFISH_EXPORTER_SERVICE_NAME` only when a deployment runs the exporter under a different service
+identity.
 
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
@@ -253,7 +260,7 @@ redfish_ctl exporter --vendor supermicro --output otlp --once             # push
 
 The contract is unchanged: metric names and dimension keys are identical to the Prometheus/SignalFx
 outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`,
-`deployment.environment`, `deployment.environment.name`) map to OTel **resource** attributes when
+`service.name`, `deployment.environment`, `deployment.environment.name`) map to OTel **resource** attributes when
 present; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`, `resource_type`,
 `resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
 byte/frame/error/packet/count totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything

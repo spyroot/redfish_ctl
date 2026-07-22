@@ -10,10 +10,15 @@ from typing import Iterable, Mapping, Optional
 DimensionSource = Optional[Mapping | Iterable[str] | str]
 
 IDENTITY_DIMENSIONS = ("host.name", "node", "server.address", "bmc.ip", "vendor")
+SERVICE_NAME_DIM = "service.name"
+DEFAULT_SERVICE_NAME = "redfish_ctl"
 DEPLOYMENT_ENVIRONMENT_DIM = "deployment.environment"
 DEPLOYMENT_ENVIRONMENT_NAME_DIM = "deployment.environment.name"
 DEPLOYMENT_DIMENSIONS = (DEPLOYMENT_ENVIRONMENT_DIM, DEPLOYMENT_ENVIRONMENT_NAME_DIM)
-RESOURCE_DIMENSIONS = IDENTITY_DIMENSIONS + DEPLOYMENT_DIMENSIONS
+# service.name (the logical service name) and the deployment keys are process-scoped
+# identity: emitted as dimensions on every plane AND lifted to OTLP resource attributes
+# (stripped from OTLP datapoints to avoid a double-emit).
+RESOURCE_DIMENSIONS = IDENTITY_DIMENSIONS + (SERVICE_NAME_DIM,) + DEPLOYMENT_DIMENSIONS
 
 _DIMENSION_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,127}$")
 _DEPLOYMENT_ENV_RE = re.compile(r"^[a-z0-9._-]{1,63}$")
@@ -22,6 +27,7 @@ _SECRET_PREFIXES = ("ghp_", "gho_", "xox", "akia", "bearer")
 _MISSING_DEPLOYMENT_SENTINELS = {"unknown", "none", "null", "n-a", "na"}
 _COMPAT_MODES = {"both", "deprecated", "stable"}
 _RESERVED_EXTRA_DIMENSIONS = set(IDENTITY_DIMENSIONS) | set(DEPLOYMENT_DIMENSIONS) | {
+    SERVICE_NAME_DIM,
     "deployment",
     "model",
 }
@@ -58,6 +64,10 @@ _IDENTITY_ENV_KEYS = {
         "REDFISH_EXPORTER_EXTRA_DIMENSIONS",
         "IDRAC_EXPORTER_EXTRA_DIMENSIONS",
     ),
+    "service_name": (
+        "REDFISH_EXPORTER_SERVICE_NAME",
+        "IDRAC_EXPORTER_SERVICE_NAME",
+    ),
 }
 
 
@@ -74,6 +84,7 @@ class TelemetryIdentity:
     deployment_environment_compat: str = "both"
     require_deployment_environment: bool = False
     extra_dimensions: Mapping[str, str] = field(default_factory=dict)
+    service_name: str = DEFAULT_SERVICE_NAME
 
     def __post_init__(self) -> None:
         """Normalize and validate caller-controlled identity fields."""
@@ -94,6 +105,8 @@ class TelemetryIdentity:
             "extra_dimensions",
             parse_dimension_pairs(self.extra_dimensions),
         )
+        object.__setattr__(
+            self, "service_name", _normalize_service_name(self.service_name))
 
     def dimensions(self) -> dict[str, str]:
         """Return fixed dimensions projected onto every metric sample.
@@ -106,6 +119,7 @@ class TelemetryIdentity:
             "server.address": str(self.server_address),
             "bmc.ip": str(self.bmc_ip),
             "vendor": str(self.vendor),
+            SERVICE_NAME_DIM: str(self.service_name),
         }
         if self.deployment_environment:
             if self.deployment_environment_compat in {"both", "deprecated"}:
@@ -134,7 +148,8 @@ def build_legacy_gb300_identity(
         deployment_environment: Optional[str] = None,
         deployment_environment_compat: str = "both",
         require_deployment_environment: bool = False,
-        extra_dimensions: DimensionSource = None) -> TelemetryIdentity:
+        extra_dimensions: DimensionSource = None,
+        service_name: str = DEFAULT_SERVICE_NAME) -> TelemetryIdentity:
     """Build the compatibility identity strategy used by existing GB300 deploys.
 
     :param bmc_ip: BMC address or label used as the telemetry source identity.
@@ -147,6 +162,7 @@ def build_legacy_gb300_identity(
     :param deployment_environment_compat: deployment label compatibility mode.
     :param require_deployment_environment: whether missing deployment labels fail.
     :param extra_dimensions: additional fixed ``KEY=VALUE`` dimensions to validate.
+    :param service_name: OTel service.name (logical service name) emitted on every sample.
     :return: validated telemetry identity for a single exporter instance.
     """
     bmc = _validate_bmc_label(bmc_ip)
@@ -178,6 +194,7 @@ def build_legacy_gb300_identity(
         deployment_environment_compat=deployment_environment_compat,
         require_deployment_environment=require_deployment_environment,
         extra_dimensions=parse_dimension_pairs(extra_dimensions),
+        service_name=service_name,
     )
 
 
@@ -191,7 +208,8 @@ def build_identity_dimensions(
         deployment_environment: Optional[str] = None,
         deployment_environment_compat: str = "both",
         require_deployment_environment: bool = False,
-        extra_dimensions: DimensionSource = None) -> dict[str, str]:
+        extra_dimensions: DimensionSource = None,
+        service_name: str = DEFAULT_SERVICE_NAME) -> dict[str, str]:
     """Return the fixed join dimensions required on every exported series.
 
     :param bmc_ip: BMC address or label used as the telemetry source identity.
@@ -204,6 +222,7 @@ def build_identity_dimensions(
     :param deployment_environment_compat: deployment label compatibility mode.
     :param require_deployment_environment: whether missing deployment labels fail.
     :param extra_dimensions: additional fixed ``KEY=VALUE`` dimensions to validate.
+    :param service_name: OTel service.name (logical service name) emitted on every sample.
     :return: dimension mapping applied to every exported metric sample.
     """
     return build_legacy_gb300_identity(
@@ -217,6 +236,7 @@ def build_identity_dimensions(
         deployment_environment_compat=deployment_environment_compat,
         require_deployment_environment=require_deployment_environment,
         extra_dimensions=extra_dimensions,
+        service_name=service_name,
     ).dimensions()
 
 
@@ -228,7 +248,8 @@ def resolve_identity_options(
         deployment_environment: Optional[str] = None,
         deployment_environment_compat: Optional[str] = None,
         require_deployment_environment: Optional[bool] = None,
-        extra_dimensions: DimensionSource = None) -> dict:
+        extra_dimensions: DimensionSource = None,
+        service_name: Optional[str] = None) -> dict:
     """Resolve exporter identity options from args/config, env, and defaults.
 
     :param host_prefix: explicit host-name prefix override.
@@ -239,6 +260,7 @@ def resolve_identity_options(
     :param deployment_environment_compat: explicit deployment label mode.
     :param require_deployment_environment: explicit missing-label failure policy.
     :param extra_dimensions: explicit additional fixed dimensions.
+    :param service_name: explicit OTel service.name override; defaults to 'redfish_ctl'.
     :return: keyword arguments for :func:`build_identity_dimensions`.
     """
     resolved_host_prefix = _first_non_empty(
@@ -284,6 +306,11 @@ def resolve_identity_options(
         extra_dimensions,
         *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["extra_dimensions"]),
     )
+    resolved_service_name = _first_non_empty(
+        service_name,
+        *(os.environ.get(name) for name in _IDENTITY_ENV_KEYS["service_name"]),
+        DEFAULT_SERVICE_NAME,
+    )
     return {
         "host_prefix": str(resolved_host_prefix),
         "bmc_octet_base": _coerce_int(resolved_bmc_octet_base, "bmc_octet_base"),
@@ -301,6 +328,7 @@ def resolve_identity_options(
             "require_deployment_environment",
         ),
         "extra_dimensions": parse_dimension_pairs(resolved_extra_dimensions),
+        "service_name": str(resolved_service_name),
     }
 
 
@@ -375,6 +403,25 @@ def _normalize_deployment_environment(value, required: bool = False) -> Optional
     if not _DEPLOYMENT_ENV_RE.fullmatch(text):
         raise ValueError(
             "deployment environment must use 1-63 chars from [a-z0-9._-]")
+    return text
+
+
+def _normalize_service_name(value) -> str:
+    """Normalize the OTel service.name (logical service name); default redfish_ctl.
+
+    :param value: raw service.name value; blank or None yields the default.
+    :return: the validated service.name value.
+    :raises ValueError: when the value is too long or looks like secret material.
+    """
+    if value in (None, ""):
+        return DEFAULT_SERVICE_NAME
+    text = str(value).strip()
+    if not text:
+        return DEFAULT_SERVICE_NAME
+    if len(text) > 255:
+        raise ValueError("service.name must be at most 255 characters")
+    if _looks_secret(text):
+        raise ValueError("service.name must not contain secret material")
     return text
 
 

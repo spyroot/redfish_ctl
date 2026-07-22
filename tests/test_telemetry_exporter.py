@@ -100,6 +100,7 @@ def test_identity_dimensions_follow_nv72_slot_contract():
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "supermicro",
+        "service.name": "redfish_ctl",
     }
     assert "deployment.environment" not in dims
     assert "deployment.environment.name" not in dims
@@ -178,6 +179,7 @@ def test_identity_options_resolve_from_environment(monkeypatch):
         "server.address": "198.51.100.119",
         "bmc.ip": "203.0.113.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
         "deployment.environment": "nv72-gb300",
         "deployment.environment.name": "nv72-gb300",
         "telemetry.source": "redfish",
@@ -563,6 +565,7 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
         "vendor": "dell",
+        "service.name": "redfish_ctl",
         "source": "exporter",
         "collector": "metric-reports",
         "error": "timeout",

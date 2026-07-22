@@ -86,11 +86,14 @@ def _resource_attrs(samples, service_name: str) -> dict:
     :param service_name: value for the ``service.name`` resource attribute.
     :return: dict of OTel resource attributes.
     """
-    attrs = {"service.name": service_name}
+    attrs: dict = {}
     for sample in samples:
         for key in RESOURCE_DIM_KEYS:
             if key in sample.dimensions and key not in attrs:
                 attrs[key] = sample.dimensions[key]
+    # service.name rides the samples' dimensions now; the param is only a fallback
+    # for samples that predate the identity carrying it.
+    attrs.setdefault("service.name", service_name)
     return attrs
 
 
