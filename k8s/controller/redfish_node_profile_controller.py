@@ -70,37 +70,28 @@ def _server_address(endpoint: Mapping[str, Any]) -> str:
     return raw_address
 
 
-def _set_span_attribute(span: Any, key: str, value: Any) -> None:
-    """Set a span attribute when tracing is enabled and a value is present.
-
-    :param span: current span, or None when tracing is disabled.
-    :param key: span attribute key.
-    :param value: span attribute value.
-    """
-    if span is not None and value not in (None, ""):
-        span.set_attribute(key, value)
-
-
-def _set_controller_span_attributes(
-    span: Any,
+def _controller_span_attributes(
     endpoint: Mapping[str, Any],
     *,
     namespace: str | None,
     name: str | None,
     resource_kind: str,
-) -> None:
-    """Attach bounded Kubernetes/BMC identity to a controller root span.
+) -> dict[str, str]:
+    """Build bounded Kubernetes/BMC identity for a controller root span.
 
-    :param span: current operation span, or None when tracing is disabled.
     :param endpoint: endpoint mapping from the resource spec.
     :param namespace: Kubernetes namespace.
     :param name: Kubernetes object name.
     :param resource_kind: Kubernetes custom resource kind.
+    :return: non-empty attributes supplied before span sampling.
     """
-    _set_span_attribute(span, "server.address", _server_address(endpoint))
-    _set_span_attribute(span, "k8s.namespace.name", namespace)
-    _set_span_attribute(span, "k8s.resource.name", name)
-    _set_span_attribute(span, "k8s.resource.kind", resource_kind)
+    attributes = {
+        "server.address": _server_address(endpoint),
+        "k8s.namespace.name": namespace or "",
+        "k8s.resource.name": name or "",
+        "k8s.resource.kind": resource_kind,
+    }
+    return {key: value for key, value in attributes.items() if value}
 
 
 def _utc_now() -> datetime:
@@ -582,16 +573,22 @@ def reconcile_redfish_node_profile(
     :param patch: kopf patch object the new ``.status`` is written into.
     """
     endpoint = _mapping(spec.get("endpoint"))
-    with tracing.operation_span("k8s.redfish_node_profile.reconcile") as span:
-        _set_controller_span_attributes(
-            span,
-            endpoint,
-            namespace=namespace,
-            name=name,
-            resource_kind="RedfishNodeProfile",
-        )
-        credentials = load_secret_credentials(namespace, endpoint.get("secretRef"))
+    span_attributes = _controller_span_attributes(
+        endpoint,
+        namespace=namespace,
+        name=name,
+        resource_kind="RedfishNodeProfile",
+    )
+    with tracing.operation_span(
+        "k8s.redfish_node_profile.reconcile",
+        parent_policy=tracing.SpanParentPolicy.ROOT,
+        attributes=span_attributes,
+    ) as span:
         try:
+            credentials = load_secret_credentials(
+                namespace,
+                endpoint.get("secretRef"),
+            )
             status = reconcile_profile(
                 spec,
                 credentials=credentials,
@@ -600,6 +597,8 @@ def reconcile_redfish_node_profile(
         except Exception as exc:
             tracing.record_exception(span, exc)
             status = build_error_status(str(exc))
+        else:
+            tracing.record_success(span)
         if patch is not None:
             patch.setdefault("status", {}).update(status)
         if logger is not None:

@@ -7,6 +7,8 @@
 operation_span:
   kind: INTERNAL
   name: the invoked command name
+  parent_policy: ROOT for the CLI lifecycle; ENSURE for direct manager dispatch
+  parent: absent when parent_policy is ROOT
   status: ERROR when CommandResult.error is set, else OK
   required:
     - server.address
@@ -15,12 +17,26 @@ operation_span:
 controller_operation_span:
   kind: INTERNAL
   name: k8s.redfish_endpoint.reconcile or k8s.redfish_node_profile.reconcile
+  parent_policy: ROOT
+  parent: absent
   status: ERROR when the reconcile handler records a failure, else OK
   required:
     - server.address
     - k8s.namespace.name
     - k8s.resource.name
     - k8s.resource.kind
+  forbidden: same as request_span
+
+fleet_node_operation_span:
+  kind: INTERNAL
+  name: fleet.node
+  parent_policy: ROOT
+  parent: absent
+  status: ERROR when the node read fails, else OK
+  required:
+    - server.address
+  links:
+    fleet_coordinator: required
   forbidden: same as request_span
 
 request_span:

@@ -1,10 +1,11 @@
 """Offline tests for the span-root ratchet gate.
 
-The gate (tools/span_root_gate.py) flags a ``requests.<verb>`` that runs outside
-a tracing span and is not handed to a tracing wrapper. It must recognize all
-three real tracing patterns (with client_span; traced_request; and the async
-traced_request_callable) and flag only genuine orphans. Driven by parsing small
-source snippets, so it tests the AST logic directly.
+The gate (tools/span_root_gate.py) flags HTTP module aliases, imported verbs,
+and Session/client methods that run outside a CLIENT span and are not handed to
+a tracing wrapper. It must recognize all three real tracing patterns (with
+client_span; traced_request; and the async traced_request_callable) and flag
+only genuine orphans. Driven by parsing small source snippets, so it tests the
+AST logic directly.
 
 Author Mus spyroot@gmail.com
 """
@@ -114,6 +115,12 @@ def test_requests_module_alias_is_checked():
 def test_requests_function_alias_is_checked():
     """An imported request function remains subject to the gate."""
     src = "from requests import get as fetch\ndef f():\n    fetch('u')\n"
+    assert _orphans(src) == ["<mod>:3"]
+
+
+def test_other_http_library_alias_is_checked():
+    """A supported HTTP client module cannot bypass the gate by substitution."""
+    src = "import httpx as http\ndef f():\n    http.get('u')\n"
     assert _orphans(src) == ["<mod>:3"]
 
 

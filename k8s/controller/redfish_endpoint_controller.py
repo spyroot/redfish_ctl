@@ -316,37 +316,28 @@ def _server_address(spec: Mapping[str, Any]) -> str:
     return raw_address
 
 
-def _set_span_attribute(span: Any, key: str, value: Any) -> None:
-    """Set a span attribute when tracing is enabled and a value is present.
-
-    :param span: current span, or None when tracing is disabled.
-    :param key: span attribute key.
-    :param value: span attribute value.
-    """
-    if span is not None and value not in (None, ""):
-        span.set_attribute(key, value)
-
-
-def _set_controller_span_attributes(
-    span: Any,
+def _controller_span_attributes(
     spec: Mapping[str, Any],
     *,
     namespace: str | None,
     name: str | None,
     resource_kind: str,
-) -> None:
-    """Attach bounded Kubernetes/BMC identity to a controller root span.
+) -> dict[str, str]:
+    """Build bounded Kubernetes/BMC identity for a controller root span.
 
-    :param span: current operation span, or None when tracing is disabled.
     :param spec: resource spec containing the endpoint address.
     :param namespace: Kubernetes namespace.
     :param name: Kubernetes object name.
     :param resource_kind: Kubernetes custom resource kind.
+    :return: non-empty attributes supplied before span sampling.
     """
-    _set_span_attribute(span, "server.address", _server_address(spec))
-    _set_span_attribute(span, "k8s.namespace.name", namespace)
-    _set_span_attribute(span, "k8s.resource.name", name)
-    _set_span_attribute(span, "k8s.resource.kind", resource_kind)
+    attributes = {
+        "server.address": _server_address(spec),
+        "k8s.namespace.name": namespace or "",
+        "k8s.resource.name": name or "",
+        "k8s.resource.kind": resource_kind,
+    }
+    return {key: value for key, value in attributes.items() if value}
 
 
 def _parse_rfc3339(text: Any) -> datetime | None:
@@ -763,23 +754,27 @@ def poll_redfish_endpoint(
         ``body`` when ``None``.
     :param force: when ``True``, poll immediately and bypass the cadence gate.
     """
-    with tracing.operation_span("k8s.redfish_endpoint.reconcile") as span:
-        _set_controller_span_attributes(
-            span,
-            spec,
-            namespace=namespace,
-            name=name,
-            resource_kind="RedfishEndpoint",
-        )
+    span_attributes = _controller_span_attributes(
+        spec,
+        namespace=namespace,
+        name=name,
+        resource_kind="RedfishEndpoint",
+    )
+    with tracing.operation_span(
+        "k8s.redfish_endpoint.reconcile",
+        parent_policy=tracing.SpanParentPolicy.ROOT,
+        attributes=span_attributes,
+    ) as span:
         current_status = status if status is not None else _mapping(body).get("status")
         current_status = _mapping(current_status)
         now = _utc_now()
         if not force and not poll_due(spec, current_status, now):
+            tracing.record_success(span)
             return None
 
-        credentials = load_secret_credentials(namespace, spec.get("secretRef"))
         base = base_interval_seconds()
         try:
+            credentials = load_secret_credentials(namespace, spec.get("secretRef"))
             readings = poll_endpoint(
                 spec,
                 credentials=credentials,
@@ -799,8 +794,12 @@ def poll_redfish_endpoint(
                     new_status["consecutiveFailures"],
                     new_status["lastError"],
                 )
+        except Exception as exc:
+            tracing.record_exception(span, exc)
+            raise
         else:
             new_status = build_success_status(readings, now=now)
+            tracing.record_success(span)
             if logger is not None:
                 logger.info("polled RedfishEndpoint %s/%s", namespace or "", name or "")
 

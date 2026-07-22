@@ -54,6 +54,7 @@ class FakeSpan:
     def __init__(self, name: str) -> None:
         self.name = name
         self.attributes: dict[str, object] = {}
+        self.status = None
 
     def set_attribute(self, key: str, value: object) -> None:
         """Record a span attribute assignment.
@@ -62,6 +63,13 @@ class FakeSpan:
         :param value: span attribute value.
         """
         self.attributes[key] = value
+
+    def set_status(self, status: object) -> None:
+        """Record a span status assignment.
+
+        :param status: OpenTelemetry status value.
+        """
+        self.status = status
 
 
 def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
@@ -322,6 +330,14 @@ def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
         attributes=None,
         links=(),
     ):
+        """Capture controller root creation arguments.
+
+        :param name: requested span name.
+        :param parent_policy: requested parent policy.
+        :param attributes: creation-time span attributes.
+        :param links: creation-time span links.
+        :return: context manager yielding a fake span.
+        """
         span_calls.append((parent_policy, dict(attributes or {}), tuple(links)))
         span = FakeSpan(name)
         span.attributes.update(attributes or {})
