@@ -369,6 +369,9 @@ def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
     ("/redfish/v1/Systems/", "Systems"),                    # trailing slash on collection
     ("/redfish/v2/Managers", "Managers"),                   # future version segment stripped
     ("/redfish/v1/Oem/Contoso/Widget", "Oem"),              # unknown/OEM segment preserved
+    ("/Redfish/v1/Systems", "Systems"),                     # capitalized root, case-insensitive
+    ("/redfish/Systems", "Systems"),                        # versionless path still classifies
+    ("/redfish", "ServiceRoot"),                            # bare root
 ])
 def test_path_family_groups_by_top_level_collection(path, expected):
     """_path_family collapses a request path to its low-cardinality Redfish family.

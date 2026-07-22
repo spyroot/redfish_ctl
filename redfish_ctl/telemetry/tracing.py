@@ -293,8 +293,12 @@ def _path_family(path: str) -> str:
     :return: the stable, low-cardinality family label (never empty).
     """
     segments = [seg for seg in path.split("/") if seg]
-    if len(segments) >= 2 and segments[0] == "redfish":
-        segments = segments[2:]
+    if segments and segments[0].lower() == "redfish":
+        # Drop the "redfish" root (scheme is case-insensitive) and, when present,
+        # a version-like segment (v1, v2, ...) — but not a versionless collection.
+        segments = segments[1:]
+        if segments and segments[0][:1] in ("v", "V") and segments[0][1:2].isdigit():
+            segments = segments[1:]
     if not segments:
         return "ServiceRoot"
     return _CANONICAL_FAMILIES.get(segments[0].lower(), segments[0])
