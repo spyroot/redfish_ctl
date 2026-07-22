@@ -451,9 +451,13 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     # Optional OTLP span pipeline for this run; no-op unless --otlp-traces is set.
+    # Endpoint/headers resolve from OTEL_EXPORTER_OTLP_* (point them at the Splunk O11y
+    # OTLP ingest with an X-SF-Token header); deployment.environment and other resource
+    # keys come from OTEL_RESOURCE_ATTRIBUTES. service.name defaults to the shared
+    # redfish_ctl identity so spans and hw.* metrics land on one APM service node.
     if getattr(cmd_args, "otlp_traces", False):
         from .telemetry import tracing
-        tracing.setup_otlp("redfish-ctl")
+        tracing.setup_otlp()
 
     # the manager is the main interface main uses to interact with the BMC.
     redfish_api = RedfishManagerBase(host=cmd_args.redfish_host,
