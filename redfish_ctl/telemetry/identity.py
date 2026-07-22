@@ -595,7 +595,7 @@ def _valid_inherent_identity(value) -> bool:
     text = str(value or "").strip()
     if not text or _looks_secret(text):
         return False
-    lowered = re.sub(r"[\s._-]+", " ", text.lower()).strip()
+    lowered = re.sub(r"[\s._/-]+", " ", text.lower()).strip()
     if lowered in {
         "default string",
         "to be filled by o e m",

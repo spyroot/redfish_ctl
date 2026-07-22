@@ -156,7 +156,7 @@ def test_service_instance_source_precedence_skips_placeholders_and_local_macs():
     """Discovery skips placeholders before selecting the first stable source class."""
     result = identity.service_instance_id_from_sources(
         manager_uuids=["00000000-0000-0000-0000-000000000000"],
-        chassis_serials=["To be filled by O.E.M.", "HA256S016142"],
+        chassis_serials=["To be filled by O.E.M.", "N/A", "HA256S016142"],
         permanent_macs=["02:00:00:00:00:01"],
         mac_addresses=["7C:A6:2A:40:C3:E5"],
     )
