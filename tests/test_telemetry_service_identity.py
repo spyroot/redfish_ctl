@@ -12,6 +12,7 @@ import pytest
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.redfish_manager import RedfishResponseCache
+from redfish_ctl.redfish_manager_shared import REDFISH_API
 from redfish_ctl.telemetry import identity, tracing
 from redfish_ctl.telemetry.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
@@ -209,9 +210,12 @@ def test_exporter_discovers_instance_id_in_sync_and_async_modes(do_async):
         },
     }
     observed_modes = []
+    observed_uris = []
 
     def resource(_self, uri, _cache, selected_mode):
+        """Return one fixture resource while recording the requested URI."""
         observed_modes.append(selected_mode)
+        observed_uris.append(uri)
         return resources.get(uri, {})
 
     class DiscoveryHarness:
@@ -232,6 +236,7 @@ def test_exporter_discovers_instance_id_in_sync_and_async_modes(do_async):
         "HA256S016142",
     ))
     assert observed_modes and set(observed_modes) == {do_async}
+    assert observed_uris[0] == REDFISH_API.IDRAC_MANAGER == "/redfish/v1/Managers"
 
 
 def test_identity_discovery_propagates_transient_transport_errors(monkeypatch):
