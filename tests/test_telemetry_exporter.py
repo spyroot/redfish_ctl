@@ -3,6 +3,8 @@
 import argparse
 import json
 import threading
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -57,6 +59,14 @@ def _collector_metric(samples, metric, collector):
     ]
     assert len(matches) == 1
     return matches[0]
+
+
+def _start_http_server(handler_cls):
+    """Start a loopback HTTP server for redirect-safety tests."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, f"http://127.0.0.1:{server.server_port}"
 
 
 def _gb300_fixture_for_path(path):
@@ -1242,6 +1252,9 @@ def test_resolve_signalfx_ingest_url_validates_full_datapoint_endpoint(monkeypat
     with pytest.raises(ValueError, match="v2/datapoint"):
         resolve_signalfx_ingest_url("https://ingest.us1.observability.splunkcloud.com")
 
+    with pytest.raises(ValueError, match="https"):
+        resolve_signalfx_ingest_url("http://ingest.us1.signalfx.com/v2/datapoint")
+
     monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
     with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
         resolve_signalfx_ingest_url()
@@ -1269,6 +1282,76 @@ def test_require_datapoint_url_accepts_both_hosts_needs_path():
         assert _require_datapoint_url(full) == full
     with pytest.raises(ValueError, match="v2/datapoint"):
         _require_datapoint_url("https://ingest.us1.observability.splunkcloud.com")
+    with pytest.raises(ValueError, match="https"):
+        _require_datapoint_url("http://ingest.us1.signalfx.com/v2/datapoint")
+
+
+def test_push_signalfx_rejects_non_https_ingest_url_before_open(monkeypatch):
+    """Token-bearing SignalFx ingest refuses HTTP before opening a request."""
+    opened = []
+
+    def fail_if_opened(*args, **kwargs):
+        opened.append((args, kwargs))
+        raise AssertionError("request should not open")
+
+    monkeypatch.setattr(exporter_mod, "_open_signalfx_request", fail_if_opened)
+
+    with pytest.raises(ValueError, match="https"):
+        exporter_mod.push_signalfx(
+            {"gauge": []},
+            "secret-token",
+            "http://ingest.us1.signalfx.com/v2/datapoint",
+        )
+
+    assert opened == []
+
+
+def test_signalfx_redirect_opener_does_not_replay_token():
+    """The no-redirect opener refuses 302 and never forwards X-SF-Token."""
+    origin_requests = []
+    target_requests = []
+
+    class TargetHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            target_requests.append(dict(self.headers.items()))
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, *args):
+            return
+
+    target_server, target_url = _start_http_server(TargetHandler)
+
+    class OriginHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            origin_requests.append(dict(self.headers.items()))
+            self.send_response(302)
+            self.send_header("Location", f"{target_url}/v2/datapoint")
+            self.end_headers()
+
+        def log_message(self, *args):
+            return
+
+    origin_server, origin_url = _start_http_server(OriginHandler)
+    try:
+        request = urllib.request.Request(
+            f"{origin_url}/v2/datapoint",
+            data=b"{}",
+            method="POST",
+            headers={"X-SF-Token": "secret-token"},
+        )
+
+        with pytest.raises(ValueError, match="refused redirect"):
+            exporter_mod._open_signalfx_request(request, timeout=2.0)
+
+        origin_headers = {k.lower(): v for k, v in origin_requests[0].items()}
+        assert origin_headers["x-sf-token"] == "secret-token"
+        assert target_requests == []
+    finally:
+        origin_server.shutdown()
+        target_server.shutdown()
+        origin_server.server_close()
+        target_server.server_close()
 
 
 def _report_row(source_property, value, report="HGX_HealthMetrics_0"):
