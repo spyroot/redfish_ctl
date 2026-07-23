@@ -477,7 +477,7 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
 
     if cmd_args.subcommand not in command_name_to_cmd:
         console_error_printer("Error: Unknown command.")
-        return
+        sys.exit(1)
     cmd = command_name_to_cmd[cmd_args.subcommand]
 
     # One operation ROOT span named by the command (static, resolved via the
@@ -499,7 +499,10 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
     Split out of ``main`` so the version handshake, dispatch, and Dell
     post-processing all run inside the single ``operation_span`` (no orphan
     roots). Exceptions are recorded on ``root_span`` here because they are handled
-    (printed) locally and would otherwise never reach the span.
+    (printed) locally and would otherwise never reach the span; every handled
+    error then exits non-zero (``sys.exit(1)``) so scripts and automation can
+    detect the failure — an unreachable BMC, a timeout, rejected auth, or a bad
+    cert must never report success.
 
     :param cmd: the resolved ``(type, name)`` command from the register chain.
     :param cmd_args: parsed CLI arguments.
@@ -509,15 +512,17 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
     :param root_span: the operation root span, or None when tracing is off.
     :return: None.
     """
-    # Version handshake / vendor probe -- the root's first CLIENT child. A network
-    # scan has no single target host, so it is skipped.
-    if not connectionless_mode:
-        _ = redfish_api.check_api_version()
-
     if cmd_args.verbose:
         logger.info("verbose is set on")
 
     try:
+        # Version handshake / vendor probe -- the root's first CLIENT child. A
+        # network scan has no single target host, so it is skipped. Runs inside
+        # the try so a probe-time network/auth fault is recorded on the operation
+        # span and exits non-zero like every other command error.
+        if not connectionless_mode:
+            _ = redfish_api.check_api_version()
+
         arg_dict = dict(
             (k, v) for k, v in vars(cmd_args).items()
             if k not in _ROOT_CONNECTION_ARGS
@@ -578,36 +583,67 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
     except RedfishException as redfish_err:
         tracing.record_exception(root_span, redfish_err)
         console_error_printer(f"Error: {redfish_err}")
+        sys.exit(1)
     except TaskIdUnavailable as tid:
         tracing.record_exception(root_span, tid)
         console_error_printer(f"Error: {tid}")
+        sys.exit(1)
     except MissingResource as mr:
         tracing.record_exception(root_span, mr)
         console_error_printer(f"Error: {mr}")
+        sys.exit(1)
     except InvalidJsonSpec as ijs:
         tracing.record_exception(root_span, ijs)
         console_error_printer(f"Error: {ijs}")
+        sys.exit(1)
     except ResourceNotFound as rnf:
         tracing.record_exception(root_span, rnf)
         console_error_printer(f"Error: {rnf}")
+        sys.exit(1)
     except InvalidArgument as ia:
         tracing.record_exception(root_span, ia)
         console_error_printer(f"Error: {ia}")
+        sys.exit(1)
     except FailedDiscoverAction as fda:
         tracing.record_exception(root_span, fda)
         console_error_printer(f"Error: {fda}")
+        sys.exit(1)
     except UnsupportedAction as ua:
         tracing.record_exception(root_span, ua)
-        console_error_printer(f"Error:{ua}")
+        console_error_printer(f"Error: {ua}")
+        sys.exit(1)
     except MissingMandatoryArguments as mmr:
         tracing.record_exception(root_span, mmr)
-        console_error_printer(f"Error:{mmr}")
+        console_error_printer(f"Error: {mmr}")
+        sys.exit(1)
     except FileNotFoundError as fne:
         tracing.record_exception(root_span, fne)
-        console_error_printer(f"Error:{fne}")
+        console_error_printer(f"Error: {fne}")
+        sys.exit(1)
     except UncommittedPendingChanges as upc:
         tracing.record_exception(root_span, upc)
-        console_error_printer(f"Error:{upc}")
+        console_error_printer(f"Error: {upc}")
+        sys.exit(1)
+    # Transport/auth faults from the probe or dispatch, recorded on the span so
+    # the operation root marks ERROR. Timeout precedes ConnectionError because
+    # requests' ConnectTimeout inherits from both, and a stalled request should
+    # read as a timeout, not a connection drop.
+    except AuthenticationFailed as af:
+        tracing.record_exception(root_span, af)
+        console_error_printer(f"Error: {af}")
+        sys.exit(1)
+    except requests.exceptions.Timeout as timeout_err:
+        tracing.record_exception(root_span, timeout_err)
+        console_error_printer(f"Error: {timeout_err}")
+        sys.exit(1)
+    except requests.exceptions.ConnectionError as conn_err:
+        tracing.record_exception(root_span, conn_err)
+        console_error_printer(f"Error: {conn_err}")
+        sys.exit(1)
+    except ssl.SSLCertVerificationError as ssl_err:
+        tracing.record_exception(root_span, ssl_err)
+        console_error_printer(f"Error: {ssl_err}")
+        sys.exit(1)
 
 
 def create_cmd_tree(arg_parser, debug=False) -> Dict:
@@ -840,7 +876,7 @@ def redfish_main_ctl():
             console_error_printer(f"Error: {err}")
             sys.exit(1)
         except FileNotFoundError as fne:
-            console_error_printer(f"Error:{fne}")
+            console_error_printer(f"Error: {fne}")
             sys.exit(1)
 
     # A network-segment scan (bmc-scan, or discovery --network) has no single
@@ -872,14 +908,25 @@ def redfish_main_ctl():
                 "(export REDFISH_PASSWORD=<password>)"
             )
             sys.exit(1)
+    # Backstop for transport/auth faults raised outside _run's handled region
+    # (e.g. manager construction). Each prints a clean one-line Error and exits
+    # non-zero — reporting success on a network/auth failure breaks scripting.
+    # Timeout precedes ConnectionError because requests' ConnectTimeout
+    # inherits from both.
     try:
         main(args, cmd_dict)
     except AuthenticationFailed as af:
         console_error_printer(f"Error: {af}")
+        sys.exit(1)
+    except requests.exceptions.Timeout as timeout_err:
+        console_error_printer(f"Error: {timeout_err}")
+        sys.exit(1)
     except requests.exceptions.ConnectionError as http_error:
         console_error_printer(f"Error: {http_error}")
+        sys.exit(1)
     except ssl.SSLCertVerificationError as ssl_err:
         console_error_printer(f"Error: {ssl_err}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
