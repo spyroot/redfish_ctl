@@ -37,8 +37,8 @@ help: ## Show available developer targets.
 test: ## Run the offline pytest suite.
 	$(PYTEST) -q
 
-lint: ## Run Ruff over source and tests.
-	$(RUFF) check redfish_ctl tests
+lint: ## Run all LIGHT local linters (ruff, yamllint, helm, kubeconform, kube-linter, shellcheck). No unit tests.
+	RUFF="$(RUFF)" ./scripts/lint.sh
 
 typecheck: ## Run mypy over source and tests.
 	$(MYPY) redfish_ctl tests
