@@ -36,6 +36,17 @@ if _REPO_ROOT in sys.path:
     sys.path.remove(_REPO_ROOT)
 sys.path.insert(0, _REPO_ROOT)
 
+# Put the tests/ dir itself on sys.path so bare sibling imports used across the
+# suite (``from vendor_corpus import ...``, ``from conftest import ...``) resolve
+# from ANY subdirectory. This is what lets tests live in mirrored domain dirs
+# (tests/<domain>/test_<verb>.py) without rewriting their imports: the root
+# conftest runs before any subdir test module is imported, so tests/ is already
+# on the path when a nested test does a bare sibling import.
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _TESTS_DIR in sys.path:
+    sys.path.remove(_TESTS_DIR)
+sys.path.insert(0, _TESTS_DIR)
+
 # Eagerly bind the bare name ``redfish_ctl`` to the real nested package and cache
 # it in sys.modules now, while the parent dir is off the path. pytest may re-add
 # the parent during collection, but a cached module wins over any later lookup,
@@ -126,6 +137,48 @@ def _vendor_fixture_dir(vendor):
     return Path(os.path.dirname(os.path.abspath(__file__))) / f"{vendor}_fixtures"
 
 
+# Vendor-faithful task realization. Only Dell's OEM job service returns a ``JID_``
+# id (the literal the Dell-specific ``re.search("JID_")`` body scrape in
+# redfish_manager.job_id_from_respond matches); every other vendor exposes the
+# generic DMTF TaskService, whose monitor id is a plain token, never a ``JID_``.
+# Serving a ``JID_`` for a non-Dell box is exactly the fabrication that makes a
+# command — or an agent reading the response — wrongly conclude the vendor
+# realizes jobs the Dell way. The mock is faithful to the task *structure*
+# (Dell OEM job vs DMTF TaskService); whether a POST realizes synchronously (204)
+# or as a 202 task is a live-capture detail the read-only corpus cannot prove,
+# and stays marked unobserved in the per_api_map spec, not invented here.
+_DELL_JOB_ID = "JID_000000000001"      # Dell OEM DellJobService job id
+_DMTF_TASK_ID = "1"                     # DMTF TaskService monitor id (all non-Dell)
+
+
+def _vendor_family(vendor):
+    """Collapse a fixture-set name to its vendor family.
+
+    ``supermicro_x10_119`` -> ``supermicro``; ``generic``/``dmtf`` -> ``generic``.
+
+    :param vendor: the fixture-set name passed to ``redfish_mock_factory``.
+    :return: the vendor family that selects the task-realization shape.
+    """
+    v = (vendor or "dell").lower()
+    for fam in ("supermicro", "dell", "hpe", "lenovo"):
+        if v.startswith(fam):
+            return fam
+    return "generic"
+
+
+def _vendor_task_id(vendor):
+    """The task id a vendor returns for an Action POST that realizes as a task.
+
+    Dell returns its OEM ``JID_`` job; every other vendor returns a DMTF
+    TaskService monitor id. Preserving this difference is what lets a command (or
+    an agent) SEE that ``JID_`` is a Dell literal, not a cross-vendor contract.
+
+    :param vendor: the fixture-set name passed to ``redfish_mock_factory``.
+    :return: the vendor-faithful task id string.
+    """
+    return _DELL_JOB_ID if _vendor_family(vendor) == "dell" else _DMTF_TASK_ID
+
+
 def _url_to_fixture(path: str, index=None):
     """Map a Redfish request path to its captured mockup file, case-insensitively.
 
@@ -145,20 +198,37 @@ class MockRedfishService:
 
     * GET    -> fixture JSON (200) or 404 when no fixture exists
     * PATCH  -> deep-merges the body into state, 200 + a success message
-    * POST   -> 202 with a ``Location`` task header for ``/Actions/`` calls
-                (mirrors how iDRAC returns a JID job), else 204
+    * POST   -> 202 with a ``Location`` task header for ``/Actions/`` calls, else 204.
+                The task id in that header is VENDOR-FAITHFUL: ``vendor="dell"``
+                returns an OEM ``JID_`` job; every other vendor returns a plain
+                DMTF TaskService id (never ``JID_``). See ``_vendor_task_id``.
     * DELETE -> 200
 
     ``requests`` records every call, so tests can inspect ``service.last_request``.
     """
 
-    JOB_ID = "JID_000000000001"
+    # Class default = Dell (the bare ``redfish_service`` fixture and legacy tests
+    # that read ``MockRedfishService.JOB_ID``). The per-instance ``self.JOB_ID``
+    # set below is what tests actually assert against and moves with the vendor.
+    JOB_ID = _DELL_JOB_ID
 
-    def __init__(self, fixture_dir: Path, index=None):
+    def __init__(self, fixture_dir: Path, index=None, vendor: str = "dell"):
+        """Build a mock Redfish service for one vendor's fixture tree.
+
+        :param fixture_dir: directory of flattened ``_redfish_v1_*.json`` GET fixtures.
+        :param index: optional prebuilt case-insensitive fixture index; the
+            module default is used when omitted.
+        :param vendor: fixture-set name (e.g. ``dell``, ``supermicro``,
+            ``supermicro_x10_119``, ``generic``, ``hpe``); selects the
+            vendor-faithful task-realization shape via ``_vendor_task_id``.
+        """
         self._dir = fixture_dir
         self._index = index if index is not None else _FIXTURE_INDEX
         self._overlay = {}  # path -> materialized state dict
         self.requests = []
+        self.vendor = vendor
+        # Vendor-faithful task id: Dell -> JID_ OEM job; all others -> DMTF id.
+        self.JOB_ID = _vendor_task_id(vendor)
 
     def _state(self, path: str):
         if path in self._overlay:
@@ -206,7 +276,10 @@ class MockRedfishService:
     def post_cb(self, request, context):
         self.requests.append(request)
         if "/actions/" in request.path.lower():
-            # iDRAC returns 202 + a Location header pointing at the new job.
+            # A vendor that realizes an Action as a task returns 202 + a Location
+            # header at the new task. The id is vendor-faithful (Dell JID_ OEM job
+            # vs DMTF TaskService id) so a JID_ scrape against a non-Dell response
+            # correctly finds nothing.
             context.status_code = 202
             context.headers["Location"] = (
                 f"/redfish/v1/TaskService/Tasks/{self.JOB_ID}"
@@ -287,14 +360,16 @@ def redfish_mock_factory():
     ``mgr, svc = factory("supermicro")`` serves the DMTF base overlaid by
     ``tests/supermicro_fixtures/`` (NOT the Dell ``idrac_fixtures/``), so the same
     command/transport code runs against a real non-Dell tree (System_0/BMC_0)
-    instead of System.Embedded.1. Returns ``(IDracManager, MockRedfishService)``.
+    instead of System.Embedded.1. The service is also vendor-faithful on writes:
+    a Supermicro/generic/HPE Action returns a DMTF TaskService id, only a Dell
+    tree returns a ``JID_`` job. Returns ``(IDracManager, MockRedfishService)``.
     """
     requests_mock = pytest.importorskip("requests_mock")
     _started = []
 
     def _factory(vendor):
         index = _build_fixture_index(_FIXTURE_DIR, _vendor_fixture_dir(vendor))
-        service = MockRedfishService(_FIXTURE_DIR, index=index)
+        service = MockRedfishService(_FIXTURE_DIR, index=index, vendor=vendor)
         mocker = requests_mock.Mocker()
         mocker.start()
         mocker.get(requests_mock.ANY, text=service.get_cb)

@@ -143,7 +143,7 @@ def test_identify_led_collection_query_error_is_reported(monkeypatch):
 
 def test_identify_led_live_scripts_use_portable_bash_shebang():
     """identify-led live scripts must not depend on a local Homebrew bash path."""
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     scripts = [
         repo_root / "scripts/live_sanity_check/hp/dl360/identify_led_roundtrip.sh",
         repo_root / "scripts/live_sanity_check/supermicro/gb300/identify_led_roundtrip.sh",

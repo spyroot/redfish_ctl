@@ -9,7 +9,7 @@ from pathlib import Path
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_bios_profile_list_returns_committed_profile_rows(

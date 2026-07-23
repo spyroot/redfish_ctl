@@ -11,7 +11,7 @@ from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DELL_CORPUS = corpus_dir(
     REPO_ROOT / "tests" / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )

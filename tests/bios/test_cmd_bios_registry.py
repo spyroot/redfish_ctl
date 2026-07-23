@@ -89,7 +89,7 @@ class TestBiosRegistry(TestCase):
         self.assertTrue(generated_file.exists(),
                         "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec("/tmp/bios_registry.json")
+        json_file = redfish_ctl.from_json_spec("/tmp/bios_registry.json")
         try:
             _ = json.dumps(json_file, sort_keys=True)
         except JSONDecodeError as _:
@@ -119,7 +119,7 @@ class TestBiosRegistry(TestCase):
         self.assertTrue(
             generated_file.exists(), "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec(
+        json_file = redfish_ctl.from_json_spec(
             filename)
         try:
             _ = json.dumps(json_file, sort_keys=True)
