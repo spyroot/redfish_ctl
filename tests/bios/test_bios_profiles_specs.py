@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 PROFILE_DIR = REPO / "specs" / "profiles"
 
 # vendor -> committed BIOS attribute registry captured from real hardware.

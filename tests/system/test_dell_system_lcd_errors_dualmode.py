@@ -14,7 +14,7 @@ from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_dell_system_lcd_errors import DellSystemLcdErrors
 
 DELL_CORPUS = corpus_dir(
-    Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
+    Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
 DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 SYSTEM = "/redfish/v1/Systems/System.Embedded.1"
