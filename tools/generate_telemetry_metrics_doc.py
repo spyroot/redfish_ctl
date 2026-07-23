@@ -27,7 +27,7 @@ if str(REPO_ROOT) not in sys.path:
 from redfish_ctl.telemetry import exporter  # noqa: E402
 
 DEFAULT_CORPUS = REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz"
-DEFAULT_OUTPUT = REPO_ROOT / "docs" / "external" / "telemetry-metrics.md"
+DEFAULT_OUTPUT = REPO_ROOT / "docs" / "telemetry-metrics.md"
 DEFAULT_LEAF = "172.25.230.37"
 IDENTITY = exporter.build_identity_dimensions(DEFAULT_LEAF, vendor="supermicro")
 
