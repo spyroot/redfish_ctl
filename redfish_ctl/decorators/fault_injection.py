@@ -240,6 +240,9 @@ def simulate_http_faults(
         :param function: the callable to wrap.
         :return: the fully wrapped callable.
         """
+        # Inner is applied first, so the runtime order is delay -> timeout -> failure.
+        # If several flags are set the outer fault preempts the inner: the delay runs,
+        # then TIMEOUT raises before FAILURE is reached (one simulated fault per call).
         function = inject_exception(SIMULATE_NETWORK_FAILURE, connection_error_factory)(function)
         function = inject_exception(SIMULATE_NETWORK_TIMEOUT, timeout_error_factory)(function)
         function = inject_delay(SIMULATE_SLOW_IO)(function)
@@ -264,6 +267,7 @@ def simulate_http_faults_async(
         :param function: the coroutine to wrap.
         :return: the fully wrapped coroutine.
         """
+        # Same precedence as the sync composite: delay -> timeout -> failure, outer wins.
         function = inject_async_exception(SIMULATE_NETWORK_FAILURE, connection_error_factory)(function)
         function = inject_async_exception(SIMULATE_NETWORK_TIMEOUT, timeout_error_factory)(function)
         function = inject_async_delay(SIMULATE_SLOW_IO)(function)
