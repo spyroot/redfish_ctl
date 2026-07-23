@@ -84,7 +84,7 @@ class TestBiosPending(TestCase):
         self.assertTrue(generated_file.exists(),
                         "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec(bios_filename)
+        json_file = redfish_ctl.from_json_spec(bios_filename)
         try:
             _ = json.dumps(json_file, sort_keys=True)
         except JSONDecodeError as _:
@@ -114,7 +114,7 @@ class TestBiosPending(TestCase):
         self.assertTrue(
             generated_file.exists(), "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec(filename)
+        json_file = redfish_ctl.from_json_spec(filename)
         try:
             _ = json.dumps(json_file, sort_keys=True)
         except JSONDecodeError as _:

@@ -97,7 +97,7 @@ class TestBios(TestCase):
         self.assertTrue(generated_file.exists(),
                         "cmd must save a file")
 
-        json_file = idrac_ctl.from_json_spec(bios_filename)
+        json_file = redfish_ctl.from_json_spec(bios_filename)
         try:
             _ = json.dumps(json_file, sort_keys=True)
         except JSONDecodeError as _:
@@ -177,7 +177,7 @@ class TestBios(TestCase):
             "SysMemSize" in query_data, "query must contain filtered key"
         )
 
-        json_file = idrac_ctl.from_json_spec(filename)
+        json_file = redfish_ctl.from_json_spec(filename)
         self.assertIsInstance(json_file, dict)
         self.assertTrue(
             "ProcCStates" in json_file, "query must contain filtered key"
