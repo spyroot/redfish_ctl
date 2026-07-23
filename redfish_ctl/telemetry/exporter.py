@@ -483,6 +483,11 @@ def scrape_health_samples(
         timestamp_seconds: Optional[float] = None) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
+    Includes ``hw.bmc.up`` — a per-BMC 0/1 liveness gauge carrying the full
+    exporter identity dimensions, emitted every scrape cycle: 1 when the BMC
+    scrape succeeds and 0 when it fails, so an unreachable BMC is distinguishable
+    from missing telemetry (issue #402).
+
     :param identity: fixed join dimensions applied to the health samples.
     :param ok: whether the scrape succeeded (1.0) or failed (0.0).
     :param duration_seconds: scrape wall-clock duration, in seconds.
@@ -511,6 +516,15 @@ def scrape_health_samples(
             "s",
         ),
         _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
+        # hw.bmc.up is a per-BMC 0/1 liveness gauge (Prometheus-style ``up``),
+        # emitted on EVERY scrape cycle regardless of outcome: 1 when the BMC
+        # scrape succeeds, 0 when it fails (connection error, timeout, auth
+        # failure, or a non-2xx ServiceRoot). Because it is emitted with the
+        # full exporter identity dimensions even on failure, a dashboard can
+        # tell an UNREACHABLE BMC (hw.bmc.up=0) apart from MISSING telemetry
+        # (no series at all). See specs/telemetry/expected_signals.yaml and
+        # gates.md; issue #402.
+        _sample("hw.bmc.up", 1.0 if ok else 0.0, dims, None),
         _sample(
             "hw.scrape.duration_seconds",
             safe_duration,

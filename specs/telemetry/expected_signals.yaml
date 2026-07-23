@@ -44,6 +44,20 @@ signals:
     input: "PF_FLR"
     expected: {metric: hw.component.last_reset_type, labels: {reset_type: pf_flr}, value: 1}
 
+# Per-BMC scrape-health gauges. Unlike the categorical `signals` rows above
+# (which are derived from a source_property and mapped one-hot), these are
+# plain 0/1 up-gauges emitted once per scrape cycle for every configured BMC,
+# always carrying the full exporter identity dimensions. hw.bmc.up is the
+# Prometheus-style `up` signal: 1 when the BMC scrape succeeds, 0 when it fails
+# (connection error, timeout, auth failure, or a non-2xx ServiceRoot). Emitting
+# 0 on failure — instead of skipping the host — lets a dashboard tell an
+# UNREACHABLE BMC apart from MISSING telemetry (no series at all); issue #402.
+scrape_health_signals:
+  - metric: hw.bmc.up
+    metric_type: gauge
+    reachable_value: 1
+    unreachable_value: 0
+
 allowlists:
   health: [ok, warning, critical, unknown]
   state: [enabled, disabled, standby_offline, standby_spare, in_test, starting,
