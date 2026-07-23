@@ -4,7 +4,7 @@
 redfish_ctl/cmd_wait.py:38
 redfish_ctl/discover/cli.py:220
 redfish_ctl/discovery/net_scan.py:61
-redfish_ctl/idrac_manager.py:457
-redfish_ctl/idrac_manager.py:465
+redfish_ctl/idrac_manager.py:484
+redfish_ctl/idrac_manager.py:492
 redfish_ctl/redfish_manager.py:326
 redfish_ctl/redfish_manager.py:334

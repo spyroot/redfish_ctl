@@ -47,6 +47,10 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
+from .decorators.fault_injection import (
+    simulate_http_faults,
+    simulate_http_faults_async,
+)
 from .idrac_shared import (
     REDFISH_API,
     REDFISH_JSON,
@@ -75,6 +79,28 @@ from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
 from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
+
+
+def _simulated_connection_error() -> BaseException:
+    """Build the exception a dropped BMC connection raises (SIMULATE_NETWORK_FAILURE).
+
+    :return: a requests ConnectionError mirroring a real transport-level failure, so the
+        downstream error handling and recorded span match a genuine network drop.
+    """
+    return requests.exceptions.ConnectionError(
+        "simulated network failure (SIMULATE_NETWORK_FAILURE)"
+    )
+
+
+def _simulated_read_timeout() -> BaseException:
+    """Build the exception a stalled BMC read raises (SIMULATE_NETWORK_TIMEOUT).
+
+    :return: a requests ReadTimeout mirroring a real read-timeout failure, so the
+        downstream error handling and recorded span match a genuine stalled read.
+    """
+    return requests.exceptions.ReadTimeout(
+        "simulated network timeout (SIMULATE_NETWORK_TIMEOUT)"
+    )
 
 
 class IDracManager(RedfishManager):
@@ -437,6 +463,7 @@ class IDracManager(RedfishManager):
             tracing.record_result(span, result)
             return result
 
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_get_call(self, loop, req, hdr: Dict):
         """Make api asynced requests either with x-auth authentication
          header or base authentication.
@@ -482,6 +509,7 @@ class IDracManager(RedfishManager):
         await self.async_default_error_handler(await response)
         return await response
 
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_get_call(
             self, req: str, hdr: Dict) -> requests.models.Response:
         """Make api request either with x-auth authentication header or redfish_ctl.
@@ -1050,6 +1078,7 @@ class IDracManager(RedfishManager):
                                  if attr_filter.lower() in attr.lower())
         return json_data
 
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_delete_call(
             self, req, hdr: Dict) -> requests.models.Response:
         """Make api request for delete method.
@@ -1080,6 +1109,7 @@ class IDracManager(RedfishManager):
             )
         return tracing.traced_request(req, "DELETE", request_call)
 
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_post_call(
             self, req: str, payload: str, hdr: dict) -> requests.models.Response:
         """Make HTTP post request.
@@ -1113,6 +1143,7 @@ class IDracManager(RedfishManager):
             )
         return tracing.traced_request(req, "POST", request_call)
 
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_post_call(
             self, loop, req: str, payload: str, hdr: Dict):
         """Make post api request either with x-auth authentication header or redfish_ctl.
@@ -1228,6 +1259,7 @@ class IDracManager(RedfishManager):
         )
         return await response, api_respond_status
 
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_patch_call(
             self, req: str, payload: str, hdr: dict, ) -> requests.models.Response:
         """Make api patch request.
@@ -1261,6 +1293,7 @@ class IDracManager(RedfishManager):
             )
         return tracing.traced_request(req, "PATCH", request_call)
 
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_patch_call(
             self, loop, req, payload: str, hdr: Dict):
         """Make async post api request either with
@@ -1299,6 +1332,7 @@ class IDracManager(RedfishManager):
             tracing.traced_request_callable(req, "PATCH", request_call),
         )
 
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_delete_call(
             self, loop, req, payload: str, hdr: Dict):
         """Make async delete api request either with

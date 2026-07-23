@@ -13,7 +13,7 @@ redfish_ctl/discovery/cmd_discovery.py:258
 redfish_ctl/discovery/cmd_discovery.py:260
 redfish_ctl/discovery/cmd_discovery.py:262
 redfish_ctl/fleet/cmd_fleet.py:53
-redfish_ctl/idrac_manager.py:499
+redfish_ctl/idrac_manager.py:527
 redfish_ctl/licenses/cmd_dell_license_actions.py:468
 redfish_ctl/licenses/cmd_dell_license_actions.py:472
 redfish_ctl/licenses/cmd_license_install.py:202
