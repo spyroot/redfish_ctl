@@ -11,6 +11,13 @@ kind: Job
 metadata:
   name: __JOB_NAME__
   namespace: __NAMESPACE__
+  annotations:
+    # Ephemeral single-run CI gate Job (backoffLimit 0, TTL 1800s): clones into an emptyDir and
+    # runs the offline suite as root -- apt/pip/clone/pytest all need a writable root fs and the
+    # image entrypoint is root. Not a long-lived service, so kube-linter's prod-hardening checks
+    # are intentionally exempted here (kubernetes.policy).
+    ignore-check.kube-linter.io/run-as-non-root: "ephemeral CI gate job installs deps and runs as root"
+    ignore-check.kube-linter.io/no-read-only-root-fs: "ephemeral CI gate job needs a writable root fs (apt/pip/clone/pytest)"
   labels:
     app.kubernetes.io/name: redfish-ctl-ci
     redfish-ctl.io/ref: __REF_LABEL__

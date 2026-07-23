@@ -30,6 +30,11 @@ kind: StatefulSet
 metadata:
   name: gb300-bmc
   namespace: redfish-sandbox
+  annotations:
+    # Sandbox fleet simulator: 36 replicas modelling BMCs on one cluster. Density is intentional --
+    # pod anti-affinity (one-per-node) would prevent scheduling 36 pods on the limited sandbox
+    # nodes, so exempt this check for the sim (kubernetes.policy).
+    ignore-check.kube-linter.io/no-anti-affinity: "sandbox fleet sim; density intentional, anti-affinity blocks scheduling 36 pods"
   labels:
     app.kubernetes.io/name: gb300-bmc
     app.kubernetes.io/component: fleet-sim
