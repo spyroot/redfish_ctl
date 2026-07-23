@@ -23,6 +23,11 @@ dependencies:
   - ruff
   - mypy
   - twine
+  # numpy powers the discovery crawl's rest_api_map.npy output (setup.py "discovery"
+  # and "dev" extras; imported by discovery/cmd_discovery.py). Optional at runtime but
+  # REQUIRED to collect the discovery/corpus tests, so this conda toolbox env matches
+  # GitHub CI's `pip install -e .[dev]` instead of the bare `-e .` below.
+  - numpy
   # Schema validation (tools/redfish_validate.py)
   - jsonschema>=4.18
   - referencing

@@ -4,6 +4,11 @@ kind: Deployment
 metadata:
   name: ilo-sim
   namespace: redfish-sandbox
+  annotations:
+    # Sandbox Redfish simulator (ephemeral test workload) that writes to its working fs, so a
+    # read-only root fs would break it; the pod already runs as non-root (uid 10001). Exempt this
+    # one check for the sandbox (kubernetes.policy).
+    ignore-check.kube-linter.io/no-read-only-root-fs: "sandbox sim writes to fs; ephemeral test workload"
   labels:
     app.kubernetes.io/name: ilo-sim
     app.kubernetes.io/component: redfish-sandbox
