@@ -264,30 +264,6 @@ class IDracManager(RedfishManager):
         """
         return self.redfish_ip
 
-    @property
-    def username(self) -> str:
-        """BMC account username.
-
-        :return: the configured username.
-        """
-        return self._username
-
-    @property
-    def password(self) -> str:
-        """BMC account password.
-
-        :return: the configured password.
-        """
-        return self._password
-
-    @property
-    def x_auth(self) -> str:
-        """X-Auth token used in place of basic authentication.
-
-        :return: the X-Auth token, or None when basic auth is used.
-        """
-        return self._x_auth
-
     @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_get_call(self, loop, req, hdr: Dict):
         """Make api asynced requests either with x-auth authentication
@@ -319,20 +295,6 @@ class IDracManager(RedfishManager):
                     auth=(self._username, self._password)
                 )
             )
-
-    async def api_async_get_until_complete(
-            self, req, hdr: Dict, loop=None) -> requests.models.Response:
-        """Make asyncio request,
-        :param req: request
-        :param hdr: HTTP headers
-        :param loop: a default loop, if loop is None method will create
-        :return:
-        """
-        if loop is None:
-            loop = self._event_loop()
-        response = await self.api_async_get_call(loop, req, hdr)
-        await self.async_default_error_handler(await response)
-        return await response
 
     @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_get_call(
@@ -1302,14 +1264,6 @@ class IDracManager(RedfishManager):
         return self.read_api_respond(
             response, expected=expected, ignore_error_code=ignore_error_code
         )
-
-    @staticmethod
-    def expanded(level=1):
-        """Return prefix to use for expanded respond.
-        :param level:
-        :return:
-        """
-        return f"?$expand=*($levels={level})"
 
     @staticmethod
     def _redact_sensitive_payload(payload):
