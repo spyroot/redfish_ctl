@@ -6,6 +6,7 @@ https://www.dmtf.org/standards/REDFISH
 Author Mus spyroot@gmail.com
 """
 
+import argparse
 import asyncio
 import collections
 import contextvars
@@ -24,7 +25,12 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from .cmd_exceptions import AuthenticationFailed, ResourceNotFound, TaskIdUnavailable
+from .cmd_exceptions import (
+    AuthenticationFailed,
+    ResourceNotFound,
+    TaskIdUnavailable,
+    UnsupportedAction,
+)
 from .cmd_utils import save_if_needed
 from .redfish_exceptions import (
     RedfishForbidden,
@@ -45,6 +51,8 @@ from .redfish_shared import (
 )
 from .redfish_task_state import TERMINAL_TASK_STATES, TaskState, TaskStatus
 from .telemetry import tracing
+
+module_logger = logging.getLogger(__name__)
 
 """Each command encapsulate result in named tuple"""
 CommandResult = collections.namedtuple("cmd_result",
@@ -214,6 +222,224 @@ class RedfishManager:
         # run time
         self.action_targets = None
         self.api_endpoints = None
+
+    _registry = collections.defaultdict(dict)
+
+    def __init_subclass__(cls, scm_type=None, name=None, **kwargs):
+        """Initialize and register all sub-commands.
+        :param scm_type:
+        :param name: sub-command name to differentiate each subcommand
+        :param kwargs:
+        :return:
+        """
+        super().__init_subclass__(**kwargs)
+        if scm_type is not None:
+            cls._registry[scm_type][name] = cls
+
+    @abstractmethod
+    def execute(self, **kwargs) -> CommandResult:
+        """Each sub-command must implement this method.  A dispatch automatically will
+        dispatch to each command, each command discovered during initial phase."""
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def register_subcommand(cls) -> Tuple[argparse.ArgumentParser, str, str]:
+        """Each sub-command registers itself. Each command has its
+        own set of arguments and optional arguments.
+        :return: a Tuple that hold ArgumentParser, command name str, command help str
+        """
+        pass
+
+    @classmethod
+    def get_registry(cls):
+        """Return current command registry.
+        :return:
+        """
+        return dict(cls._registry)
+
+    @staticmethod
+    def _pop_connection_value(
+            kwargs: dict, primary: str, legacy: str, internal: str):
+        """Pop a dispatch connection argument, accepting deprecated aliases.
+
+        :param kwargs: dispatch keyword arguments.
+        :param primary: canonical keyword name.
+        :param legacy: deprecated alias keyword name.
+        :param internal: private keyword used by sync dispatch to avoid
+            colliding with subcommand-local ``host`` or ``port`` arguments.
+        :return: the popped value.
+        :raises KeyError: when no connection key exists.
+        """
+        if internal in kwargs:
+            value = kwargs.pop(internal)
+            kwargs.pop(legacy, None)
+            if kwargs.get(primary) in (value, None):
+                kwargs.pop(primary, None)
+            return value
+
+        if primary in kwargs:
+            value = kwargs.pop(primary)
+            legacy_value = kwargs.pop(legacy, None)
+            if value is not None:
+                return value
+            if legacy_value is not None:
+                return legacy_value
+            return value
+
+        return kwargs.pop(legacy)
+
+    @classmethod
+    def invoke(cls,
+               api_call: Hashable,
+               name: str, **kwargs) -> CommandResult:
+        """Main interface uses to invoke a command.
+
+        :param api_call: api request type is enum for each cmd.
+        :param name: a name is key for a given api request type.
+                      So we can register under same type sub-commands.
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: command result returned by the registered command.
+        """
+        z = cls._registry[api_call]
+        if name not in z:
+            raise UnsupportedAction(f"Unknown {name} command.")
+        disp = z[name]
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
+        _insecure = kwargs.pop("insecure")
+        _is_http = kwargs.pop("is_http")
+        _redfish_query = kwargs.pop("redfish_query", None)
+        _redfish_query_one_param_per_uri = kwargs.pop(
+            "redfish_query_one_param_per_uri", False
+        )
+        _redfish_cache = kwargs.pop("redfish_cache", None)
+
+        inst = disp(
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
+            insecure=_insecure,
+            is_http=_is_http
+        )
+        inst._redfish_query = _redfish_query
+        inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
+
+        if _redfish_cache is None:
+            return inst.execute(**kwargs)
+        with redfish_response_cache_scope(_redfish_cache):
+            return inst.execute(**kwargs)
+
+    async def async_invoke(
+            cls, api_call: Hashable, name: str, **kwargs) -> CommandResult:
+        """Main interface uses to invoke a command.
+
+        :param api_call: api request type is enum for each cmd.
+        :param name: a name.
+        :param kwargs: command arguments plus connection arguments. Connection
+            arguments accept canonical ``host``/``username``/``password``/``port``
+            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
+            used by internal dispatch.
+        :return: CommandResult.
+        """
+        z = cls._registry[api_call]
+        disp = z[name]
+        if name not in z:
+            raise UnsupportedAction(f"Unknown {name} command.")
+        _host = cls._pop_connection_value(
+            kwargs, "host", "idrac_ip", "_redfish_host")
+        _username = cls._pop_connection_value(
+            kwargs, "username", "idrac_username", "_redfish_username")
+        _password = cls._pop_connection_value(
+            kwargs, "password", "idrac_password", "_redfish_password")
+        _port = cls._pop_connection_value(
+            kwargs, "port", "idrac_port", "_redfish_port")
+        _insecure = kwargs.pop("insecure")
+        _is_http = kwargs.pop("is_http")
+        _redfish_query = kwargs.pop("redfish_query", None)
+        _redfish_query_one_param_per_uri = kwargs.pop(
+            "redfish_query_one_param_per_uri", False
+        )
+        _redfish_cache = kwargs.pop("redfish_cache", None)
+        module_logger.debug(f"dispatching {name} to Redfish port {_port}")
+
+        inst = disp(
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
+            insecure=_insecure,
+            is_http=_is_http
+        )
+        inst._redfish_query = _redfish_query
+        inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
+        # Operation root span named by the command (matches sync_invoke) so an
+        # async command's BMC client spans nest into ONE trace instead of
+        # surfacing as orphan "redfish.bmc.request" root traces in APM.
+        with tracing.operation_span(name) as span:
+            if _redfish_cache is None:
+                result = inst.execute(**kwargs)
+            else:
+                with redfish_response_cache_scope(_redfish_cache):
+                    result = inst.execute(**kwargs)
+            tracing.record_result(span, result)
+            return result
+
+    def sync_invoke(self, api_call: Hashable, name: str, **kwargs) -> CommandResult:
+        """Synchronous invocation of target command
+
+        :param name: a name for command to differentiate sub-commands
+        :param api_call: enum i.e. a type command that we need invoke
+        :param kwargs: command-specific arguments. The manager injects private
+            ``_redfish_*`` connection keys before dispatching to the registered
+            command constructor.
+        :return: Return result depends on actual command,
+                 encapsulated in generic CommandResult
+        """
+        if len(self._username) == 0:
+            raise ValueError("Username is empty string.")
+        if len(self._password) == 0:
+            raise ValueError("Password is empty string.")
+        if len(self.redfish_ip) == 0:
+            raise ValueError("Redfish host is empty string.")
+
+        kwargs.update(
+            {
+                "_redfish_host": self.redfish_ip,
+                "_redfish_username": self._username,
+                "_redfish_password": self._password,
+                "_redfish_port": self._port,
+                # forward the original "skip verification" intent; _is_verify_cert
+                # is the inverse (requests' verify flag), so flip it back here.
+                "insecure": not self._is_verify_cert,
+                "is_http": self._is_http,
+            }
+        )
+        if "redfish_cache" not in kwargs:
+            redfish_cache = active_redfish_response_cache()
+            if redfish_cache is not None:
+                kwargs["redfish_cache"] = redfish_cache
+        # Operation root span named by the command (no-op unless tracing is on).
+        # When main already opened the operation root, nest under it instead of
+        # opening a second same-named root (the call stack IS the span tree); main
+        # records the result on that root. Only root here for direct/standalone
+        # callers (tests, nested tooling) where no operation span is active yet.
+        if tracing.current_span() is not None:
+            return self.invoke(api_call, name, **kwargs)
+        with tracing.operation_span(name) as span:
+            result = self.invoke(api_call, name, **kwargs)
+            tracing.record_result(span, result)
+            return result
 
     @property
     def redfish_ip(self) -> str:
