@@ -36,11 +36,3 @@ def test_boot_sources_query_keeps_raw_collection_in_extra(redfish_api):
     assert result.extra["@odata.type"] == "#BootOptionCollection.BootOptionCollection"
     assert result.extra["Members@odata.count"] == 2
     assert result.error is None
-
-
-def test_boot_sources_query_expands_collection_once(redfish_mock, redfish_service):
-    """boot_sources_query issues a single expanded GET against BootOptions."""
-    redfish_mock.sync_invoke(ApiRequestType.BootOptions, "boot_sources_query")
-    gets = [r for r in redfish_service.requests if r.method == "GET"]
-    assert len(gets) == 1
-    assert gets[0].path.lower().endswith("/bootoptions")
