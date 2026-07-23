@@ -198,10 +198,12 @@ class MockRedfishService:
 
     * GET    -> fixture JSON (200) or 404 when no fixture exists
     * PATCH  -> deep-merges the body into state, 200 + a success message
-    * POST   -> 202 with a ``Location`` task header for ``/Actions/`` calls, else 204.
-                The task id in that header is VENDOR-FAITHFUL: ``vendor="dell"``
-                returns an OEM ``JID_`` job; every other vendor returns a plain
-                DMTF TaskService id (never ``JID_``). See ``_vendor_task_id``.
+    * POST   -> protocol-accurate per shape: ``SubmitTestEvent`` -> 204 (sync);
+                subscription create (``/Subscriptions``) -> 201 + ``Location``;
+                other ``/Actions/`` -> 202 with a ``Location`` task header; else 204.
+                The 202 task id is VENDOR-FAITHFUL: ``vendor="dell"`` returns an OEM
+                ``JID_`` job; every other vendor a plain DMTF TaskService id (never
+                ``JID_``). See ``_vendor_task_id``.
     * DELETE -> 200
 
     ``requests`` records every call, so tests can inspect ``service.last_request``.
@@ -266,6 +268,11 @@ class MockRedfishService:
             state = {}
         body = request.json() if request.text else {}
         self._overlay[request.path] = self._deep_merge(state, body)
+        # A settable-resource PATCH (e.g. a Bios @Redfish.Settings object) stages
+        # the change as pending and applies it per @Redfish.SettingsApplyTime — it
+        # is DEFERRED, so it returns 200 with a completion message and NEVER a
+        # TaskService monitor. That keeps the realization unambiguous
+        # (task_id_shape=none) for a deferred-settings write.
         context.status_code = 200
         return json.dumps(
             {"@Message.ExtendedInfo": [{"MessageId": "Base.1.12.Success",
@@ -275,7 +282,20 @@ class MockRedfishService:
 
     def post_cb(self, request, context):
         self.requests.append(request)
-        if "/actions/" in request.path.lower():
+        path = request.path.lower()
+        # EventService.SubmitTestEvent is a SYNCHRONOUS DMTF action: 204, no task.
+        # A blanket 202+task here made a lens read the op as async — it is not.
+        if "submittestevent" in path:
+            context.status_code = 204
+            return ""
+        # Creating an EventDestination (subscription) is a resource CREATE, not an
+        # action: DMTF returns 201 + a Location at the new subscription, never a
+        # task. (The POST lands on the collection, so it has no /actions/ segment.)
+        if path.rstrip("/").endswith("/subscriptions"):
+            context.status_code = 201
+            context.headers["Location"] = request.path.rstrip("/") + "/1"
+            return ""
+        if "/actions/" in path:
             # A vendor that realizes an Action as a task returns 202 + a Location
             # header at the new task. The id is vendor-faithful (Dell JID_ OEM job
             # vs DMTF TaskService id) so a JID_ scrape against a non-Dell response
