@@ -26,7 +26,7 @@ redfish_ctl/oem/cmd_hpe_kerberos_keytab.py:188
 redfish_ctl/oem/cmd_nvidia_debug_token.py:317
 redfish_ctl/oem/cmd_nvidia_debug_token.py:319
 redfish_ctl/redfish_csdl.py:70
-redfish_ctl/redfish_main.py:177
+redfish_ctl/redfish_main.py:216
 redfish_ctl/redfish_manager.py:360
 redfish_ctl/redfish_manager.py:362
 redfish_ctl/redfish_manager.py:364

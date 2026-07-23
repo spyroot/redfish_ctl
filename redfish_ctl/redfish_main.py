@@ -37,6 +37,7 @@ from .cmd_exceptions import (
     AuthenticationFailed,
     FailedDiscoverAction,
     InvalidArgument,
+    InvalidArgumentFormat,
     InvalidJsonSpec,
     JsonHttpError,
     MissingMandatoryArguments,
@@ -44,6 +45,7 @@ from .cmd_exceptions import (
     ResourceNotFound,
     TaskIdUnavailable,
     UncommittedPendingChanges,
+    UnexpectedResponse,
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
@@ -90,6 +92,43 @@ _LEGACY_ENDPOINT_ATTRS = {
     "idrac_password": "redfish_password",
     "idrac_port": "redfish_port",
 }
+
+#: Operational errors the CLI translates into one clean ``Error:`` line and a
+#: non-zero exit, at the single boundary handler in ``redfish_main_ctl``. The
+#: command layer and ``_run`` never catch these: they unwind through the
+#: operation span (recorded + ERROR by the OpenTelemetry defaults) and main's
+#: flush ``finally`` (G6), the same path SIGTERM/SIGINT take. The requests
+#: members are a curated allowlist of the transport failures a BMC round trip
+#: can actually produce -- timeout, connection drop (covers TLS/proxy errors
+#: and exhausted urllib3 retries), body cut short, mislabeled encoding,
+#: redirect loop, and a malformed ``--host`` value -- NOT the RequestException
+#: base class: MissingSchema/HTTPError and friends stay traceback-worthy bugs
+#: (the manager prepends the scheme; nothing calls raise_for_status). The raw
+#: ``ssl`` entry keeps parity for SSL errors raised outside requests.
+#: Anything NOT listed here is a bug and keeps its traceback.
+CLI_HANDLED_ERRORS = (
+    RedfishException,
+    TaskIdUnavailable,
+    MissingResource,
+    InvalidJsonSpec,
+    ResourceNotFound,
+    InvalidArgument,
+    InvalidArgumentFormat,
+    FailedDiscoverAction,
+    UnsupportedAction,
+    MissingMandatoryArguments,
+    FileNotFoundError,
+    UncommittedPendingChanges,
+    AuthenticationFailed,
+    UnexpectedResponse,
+    requests.exceptions.Timeout,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ContentDecodingError,
+    requests.exceptions.TooManyRedirects,
+    requests.exceptions.InvalidURL,
+    ssl.SSLCertVerificationError,
+)
 
 class _EndpointAliasAction(argparse.Action):
     """Argparse action that mirrors one option into canonical and legacy attrs."""
@@ -437,11 +476,12 @@ def is_fleet_command(args) -> bool:
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
-def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
+def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> Optional[int]:
     """Main entry point.
 
     :param cmd_args: parsed CLI arguments for the selected command.
     :param command_name_to_cmd: mapping of command name to its (type, name) tuple.
+    :return: the exit code from ``_run`` (1 for an in-band command error), else None.
     """
     # BMCs ship self-signed certs, so verification is opt-in via --verify-ssl.
     # We skip verification by default; --insecure stays as an explicit "skip".
@@ -476,8 +516,9 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     )
 
     if cmd_args.subcommand not in command_name_to_cmd:
-        console_error_printer("Error: Unknown command.")
-        return
+        # Raised, not printed: the single CLI boundary handler in
+        # redfish_main_ctl prints the Error line and owns the exit code.
+        raise InvalidArgument("Unknown command.")
     cmd = command_name_to_cmd[cmd_args.subcommand]
 
     # One operation ROOT span named by the command (static, resolved via the
@@ -488,7 +529,8 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
     # is off.
     try:
         with tracing.operation_span(cmd.name) as root_span:
-            _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span)
+            return _run(cmd, cmd_args, redfish_api, insecure,
+                        connectionless_mode, root_span)
     finally:
         tracing.shutdown()
 
@@ -498,8 +540,14 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
 
     Split out of ``main`` so the version handshake, dispatch, and Dell
     post-processing all run inside the single ``operation_span`` (no orphan
-    roots). Exceptions are recorded on ``root_span`` here because they are handled
-    (printed) locally and would otherwise never reach the span.
+    roots). Deliberately catches nothing: an operational error unwinds the
+    stack, so the operation span records the exception and marks ERROR as it
+    propagates (the OpenTelemetry ``start_as_current_span`` defaults
+    ``record_exception``/``set_status_on_exception``), main's ``finally``
+    flushes the finished spans (G6), and the single CLI boundary handler in
+    ``redfish_main_ctl`` prints one ``Error:`` line and exits non-zero. A
+    command failure thus takes the same unwind path SIGTERM and SIGINT
+    already use, and no per-command error handling exists to forget.
 
     :param cmd: the resolved ``(type, name)`` command from the register chain.
     :param cmd_args: parsed CLI arguments.
@@ -507,7 +555,8 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
     :param insecure: True when TLS certificate verification is skipped.
     :param connectionless_mode: True for scan/local/fleet commands (no BMC host).
     :param root_span: the operation root span, or None when tracing is off.
-    :return: None.
+    :return: 1 when the command reported an in-band error
+        (``CommandResult.error`` set), else None.
     """
     # Version handshake / vendor probe -- the root's first CLIENT child. A network
     # scan has no single target host, so it is skipped.
@@ -517,97 +566,68 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
     if cmd_args.verbose:
         logger.info("verbose is set on")
 
-    try:
-        arg_dict = dict(
-            (k, v) for k, v in vars(cmd_args).items()
-            if k not in _ROOT_CONNECTION_ARGS
+    arg_dict = dict(
+        (k, v) for k, v in vars(cmd_args).items()
+        if k not in _ROOT_CONNECTION_ARGS
+    )
+
+    redfish_query = _redfish_query_from_args(cmd_args)
+    if not connectionless_mode and not redfish_query.is_empty():
+        query_caps = get_vendor(redfish_api.redfish_vendor)
+        _validate_redfish_query_for_vendor(redfish_query, query_caps)
+        arg_dict["redfish_query"] = redfish_query
+        arg_dict["redfish_query_one_param_per_uri"] = (
+            query_caps.one_query_param_per_uri
         )
 
-        redfish_query = _redfish_query_from_args(cmd_args)
-        if not connectionless_mode and not redfish_query.is_empty():
-            query_caps = get_vendor(redfish_api.redfish_vendor)
-            _validate_redfish_query_for_vendor(redfish_query, query_caps)
-            arg_dict["redfish_query"] = redfish_query
-            arg_dict["redfish_query_one_param_per_uri"] = (
-                query_caps.one_query_param_per_uri
-            )
+    if cmd_args.verbose:
+        json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
 
-        if cmd_args.verbose:
-            json_printer(arg_dict, cmd_args, colorized=cmd_args.nocolor)
+    # invoke cmd
+    if connectionless_mode:
+        # Connectionless dispatch: inject empty connection fields (invoke
+        # pops them) without the non-empty credential check that sync_invoke
+        # enforces. Segment scans and local catalog reads need no host.
+        invoke_kwargs = dict(arg_dict)
+        invoke_kwargs.update({
+            "_redfish_host": cmd_args.redfish_host or "",
+            "_redfish_username": cmd_args.redfish_username or "",
+            "_redfish_password": cmd_args.redfish_password or "",
+            "_redfish_port": cmd_args.redfish_port,
+            "insecure": insecure,
+            "is_http": cmd_args.use_http,
+        })
+        command_result = redfish_api.invoke(cmd.type, cmd.name, **invoke_kwargs)
+    else:
+        command_result = redfish_api.sync_invoke(
+            cmd.type, cmd.name, **arg_dict
+        )
 
-        # invoke cmd
-        if connectionless_mode:
-            # Connectionless dispatch: inject empty connection fields (invoke
-            # pops them) without the non-empty credential check that sync_invoke
-            # enforces. Segment scans and local catalog reads need no host.
-            invoke_kwargs = dict(arg_dict)
-            invoke_kwargs.update({
-                "_redfish_host": cmd_args.redfish_host or "",
-                "_redfish_username": cmd_args.redfish_username or "",
-                "_redfish_password": cmd_args.redfish_password or "",
-                "_redfish_port": cmd_args.redfish_port,
-                "insecure": insecure,
-                "is_http": cmd_args.use_http,
-            })
-            command_result = redfish_api.invoke(cmd.type, cmd.name, **invoke_kwargs)
-        else:
-            command_result = redfish_api.sync_invoke(
-                cmd.type, cmd.name, **arg_dict
-            )
+    if not connectionless_mode and redfish_api.redfish_vendor == "Dell":
+        if isinstance(command_result.data, dict):
+            command_result.data["idrac_version"] = redfish_api.idrac_manager_version
+            command_result.data["redfish_version"] = redfish_api.redfish_version
+        # if isinstance(command_result.data, list) and len(command_result.data) > 0:
+        #     command_result.data[0]["idrac_version"] = redfish_api.idrac_manager_version
+        #     command_result.data[0]["redfish_version"] = redfish_api.redfish_version
 
-        if not connectionless_mode and redfish_api.redfish_vendor == "Dell":
-            if isinstance(command_result.data, dict):
-                command_result.data["idrac_version"] = redfish_api.idrac_manager_version
-                command_result.data["redfish_version"] = redfish_api.redfish_version
-            # if isinstance(command_result.data, list) and len(command_result.data) > 0:
-            #     command_result.data[0]["idrac_version"] = redfish_api.idrac_manager_version
-            #     command_result.data[0]["redfish_version"] = redfish_api.redfish_version
+    tracing.record_result(root_span, command_result)
 
-        tracing.record_result(root_span, command_result)
+    # The in-band error channel: the command reported failure in
+    # CommandResult.error (the condition span_contract.yaml marks the
+    # operation span ERROR for). The payload is already printed here, so the
+    # boundary translates the returned code into the process exit without a
+    # second Error line -- span ERROR and exit code stay consistent.
+    if command_result.error is not None:
+        json_printer(command_result.data, cmd_args, colorized=cmd_args.nocolor)
+        if isinstance(command_result.error, JsonHttpError):
+            console_error_printer(command_result.error.json_error)
+        return 1
 
-        if command_result.error is not None:
-            json_printer(command_result.data, cmd_args, colorized=cmd_args.nocolor)
-            if isinstance(command_result.error, JsonHttpError):
-                console_error_printer(command_result.error.json_error)
-            return
-
-        processed_data = process_respond(cmd_args, command_result)
-        if json_printer:
-            json_printer(processed_data, cmd_args, colorized=cmd_args.nocolor)
-
-    except RedfishException as redfish_err:
-        tracing.record_exception(root_span, redfish_err)
-        console_error_printer(f"Error: {redfish_err}")
-    except TaskIdUnavailable as tid:
-        tracing.record_exception(root_span, tid)
-        console_error_printer(f"Error: {tid}")
-    except MissingResource as mr:
-        tracing.record_exception(root_span, mr)
-        console_error_printer(f"Error: {mr}")
-    except InvalidJsonSpec as ijs:
-        tracing.record_exception(root_span, ijs)
-        console_error_printer(f"Error: {ijs}")
-    except ResourceNotFound as rnf:
-        tracing.record_exception(root_span, rnf)
-        console_error_printer(f"Error: {rnf}")
-    except InvalidArgument as ia:
-        tracing.record_exception(root_span, ia)
-        console_error_printer(f"Error: {ia}")
-    except FailedDiscoverAction as fda:
-        tracing.record_exception(root_span, fda)
-        console_error_printer(f"Error: {fda}")
-    except UnsupportedAction as ua:
-        tracing.record_exception(root_span, ua)
-        console_error_printer(f"Error:{ua}")
-    except MissingMandatoryArguments as mmr:
-        tracing.record_exception(root_span, mmr)
-        console_error_printer(f"Error:{mmr}")
-    except FileNotFoundError as fne:
-        tracing.record_exception(root_span, fne)
-        console_error_printer(f"Error:{fne}")
-    except UncommittedPendingChanges as upc:
-        tracing.record_exception(root_span, upc)
-        console_error_printer(f"Error:{upc}")
+    processed_data = process_respond(cmd_args, command_result)
+    if json_printer:
+        json_printer(processed_data, cmd_args, colorized=cmd_args.nocolor)
+    return None
 
 
 def create_cmd_tree(arg_parser, debug=False) -> Dict:
@@ -840,7 +860,7 @@ def redfish_main_ctl():
             console_error_printer(f"Error: {err}")
             sys.exit(1)
         except FileNotFoundError as fne:
-            console_error_printer(f"Error:{fne}")
+            console_error_printer(f"Error: {fne}")
             sys.exit(1)
 
     # A network-segment scan (bmc-scan, or discovery --network) has no single
@@ -872,14 +892,26 @@ def redfish_main_ctl():
                 "(export REDFISH_PASSWORD=<password>)"
             )
             sys.exit(1)
+    # The single CLI error boundary. Operational errors raised anywhere below
+    # (command dispatch, the version probe, transport, manager construction)
+    # unwind the stack and are translated here, once, into one clean ``Error:``
+    # line and a non-zero exit so scripts and automation can detect the
+    # failure. An error raised inside the operation span is recorded on it and
+    # marks it ERROR as it propagates (the OpenTelemetry defaults), and main's
+    # finally flushes the finished spans (G6); an error raised before the span
+    # opens has no spans to lose. In-band failures (CommandResult.error) come
+    # back as main's return code -- their payload is already printed -- so span
+    # ERROR status and process exit stay consistent. KeyboardInterrupt and
+    # SystemExit stay uncaught (the G6 SIGINT/SIGTERM unwind), and an
+    # unexpected exception type keeps its traceback: that is a bug to fix,
+    # not an operational error to silence.
     try:
-        main(args, cmd_dict)
-    except AuthenticationFailed as af:
-        console_error_printer(f"Error: {af}")
-    except requests.exceptions.ConnectionError as http_error:
-        console_error_printer(f"Error: {http_error}")
-    except ssl.SSLCertVerificationError as ssl_err:
-        console_error_printer(f"Error: {ssl_err}")
+        exit_code = main(args, cmd_dict)
+    except CLI_HANDLED_ERRORS as err:
+        console_error_printer(f"Error: {err}")
+        sys.exit(1)
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == "__main__":

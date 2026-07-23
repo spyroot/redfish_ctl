@@ -7,7 +7,8 @@
 operation_span:
   kind: INTERNAL
   name: the invoked command name
-  status: ERROR when CommandResult.error is set, else OK
+  status: ERROR when CommandResult.error is set or an exception propagates
+    through the span (recorded as an exception event by the SDK), else OK
   required:
     - server.address
   forbidden: same as request_span
