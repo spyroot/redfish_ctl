@@ -27,6 +27,9 @@ from typing import Optional
 # A name whose value must never appear in an error message.
 _SECRET_HINT = re.compile(r"PASSWORD|TOKEN|SECRET|KEY|CREDENTIAL", re.IGNORECASE)
 
+# Boolean env-flag values treated as "on" by :func:`env_flag`.
+_TRUTHY_FLAG_VALUES = frozenset({"1", "true", "yes", "on"})
+
 
 class ConfigurationConflict(RuntimeError):
     """Two names for one setting are set to different values.
@@ -108,6 +111,31 @@ def env_first(
             f"{winner} is a deprecated alias for {names[0]}; set {names[0]} instead",
             DeprecationWarning, stacklevel=2)
     return value
+
+
+def env_flag(name: str) -> bool:
+    """Return whether a boolean env flag is set to a truthy value.
+
+    Centralizes boolean env reads here (the config-loader gate forbids ``os.getenv``
+    outside this loader). A flag counts as on when set to 1/true/yes/on.
+
+    :param name: the environment variable to read.
+    :return: True when the value is 1/true/yes/on (case-insensitive, trimmed), else False.
+    """
+    return os.getenv(name, "").strip().lower() in _TRUTHY_FLAG_VALUES
+
+
+def env_float(name: str, default: float) -> float:
+    """Return an env var parsed as a float, or a default when unset or non-numeric.
+
+    :param name: the environment variable to read.
+    :param default: the value returned when the variable is unset or not a valid float.
+    :return: the parsed float, or ``default``.
+    """
+    try:
+        return float(os.getenv(name, ""))
+    except ValueError:
+        return default
 
 
 def endpoint_conflict_fields() -> set[str]:

@@ -26,7 +26,9 @@ exception), keeping downstream error handling and the recorded span identical to
 genuine fault.
 
 This module stays transport-neutral on purpose: it never imports ``requests`` or any
-client library, so it is reusable anywhere. Callers pass the exception factories.
+client library -- callers pass the exception factories. Environment reads go through
+the project config loader (:mod:`redfish_ctl.config`), so all env access stays
+centralized there (enforced by the config-loader gate).
 
 Author Mus spyroot@gmail.com
 """
@@ -34,7 +36,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import os
 import time
 from typing import Awaitable, Callable, TypeVar
 
@@ -42,6 +43,8 @@ try:  # ParamSpec is stdlib on the project's 3.10 floor; guard kept for older ty
     from typing import ParamSpec
 except ImportError:  # pragma: no cover - only reachable on <3.10
     from typing_extensions import ParamSpec
+
+from ..config import env_flag, env_float
 
 #: Env flag: raise the caller-supplied failure exception at each decorated HTTP call.
 SIMULATE_NETWORK_FAILURE = "SIMULATE_NETWORK_FAILURE"
@@ -53,7 +56,6 @@ SIMULATE_SLOW_IO = "SIMULATE_SLOW_IO"
 DELAY_SECONDS_ENV = "REDFISH_FAULT_DELAY_SECONDS"
 
 _DEFAULT_DELAY_SECONDS = 8.0
-_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -77,21 +79,23 @@ __all__ = [
 def flag_enabled(flag_name: str) -> bool:
     """Report whether an env flag is set to a truthy value.
 
+    Reads through the config loader (:func:`redfish_ctl.config.env_flag`) so all env
+    access stays centralized there.
+
     :param flag_name: environment variable name to inspect.
     :return: True when the variable equals 1/true/yes/on (case-insensitive), else False.
     """
-    return os.getenv(flag_name, "").strip().lower() in _TRUTHY
+    return env_flag(flag_name)
 
 
 def delay_seconds() -> float:
     """Resolve the SIMULATE_SLOW_IO delay length in seconds.
 
+    Reads through the config loader (:func:`redfish_ctl.config.env_float`).
+
     :return: DELAY_SECONDS_ENV parsed as a float, or 8.0 when unset or non-numeric.
     """
-    try:
-        return float(os.getenv(DELAY_SECONDS_ENV, ""))
-    except ValueError:
-        return _DEFAULT_DELAY_SECONDS
+    return env_float(DELAY_SECONDS_ENV, _DEFAULT_DELAY_SECONDS)
 
 
 def inject_exception(
