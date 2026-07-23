@@ -151,11 +151,18 @@ class NtpSet(IDracManager,
         """
         if len(servers) > _MAX_LEGACY_NTP_SERVERS:
             raise InvalidArgument(_LEGACY_NTP_SERVER_LIMIT_REASON)
-        return {
-            "NTPEnable": bool(servers),
-            "PrimaryNTPServer": servers[0] if servers else "",
-            "SecondaryNTPServer": servers[1] if len(servers) > 1 else "",
-        }
+        # Some legacy BMCs (Supermicro X10) reject an empty-string server field
+        # ("value '' ... is of a different type than the property can accept",
+        # HTTP 400), so only include Primary/Secondary when it has a real value.
+        # For a clear (empty ``servers``) this disables NTP (``NTPEnable`` False)
+        # but leaves any stored server addresses untouched, since the empty-string
+        # write that would blank them is exactly what the BMC rejects.
+        payload = {"NTPEnable": bool(servers)}
+        if servers:
+            payload["PrimaryNTPServer"] = servers[0]
+        if len(servers) > 1:
+            payload["SecondaryNTPServer"] = servers[1]
+        return payload
 
     @staticmethod
     def _legacy_ntp_skip_reason(servers):
@@ -365,8 +372,28 @@ class NtpSet(IDracManager,
                 "error": result.error,
             })
 
+        # Surface any per-target PATCH failure on the CommandResult's top-level
+        # error, so the CLI exits non-zero and the operation span is recorded as
+        # ERROR. A rejected (but valid-format) NTP value is the negative path;
+        # previously the top-level error was hard-coded None, so a failed PATCH
+        # looked green in the trace.
+        failures = [item for item in applied if item.get("error") is not None]
+        overall_error = None
+        if failures:
+            overall_error = "NTP PATCH failed on {}/{} target(s): {}".format(
+                len(failures), len(applied),
+                "; ".join(
+                    "{} ({}): {}".format(
+                        item.get("Manager", "?"),
+                        item.get("status", "?"),
+                        item.get("error"),
+                    )
+                    for item in failures
+                ),
+            )
+
         return CommandResult({
             "servers": normalized_servers,
             "applied": applied,
             "skipped": skipped,
-        }, None, None, None)
+        }, None, None, overall_error)
