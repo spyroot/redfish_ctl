@@ -537,6 +537,139 @@ def test_scrape_health_samples_report_success_and_duration():
     assert errors[0].dimensions["error"] == "timeout"
 
 
+def test_scrape_health_samples_emit_bmc_up_gauge():
+    """hw.bmc.up is 1 on a healthy scrape and 0 on failure, with identity dims."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    up = _single_metric(
+        exporter_mod.scrape_health_samples(dims, ok=True, duration_seconds=0.5),
+        "hw.bmc.up",
+    )
+    assert up.value == 1
+    assert up.metric_type == "gauge"
+    assert REQUIRED_DIMS <= set(up.dimensions)
+
+    down = _single_metric(
+        exporter_mod.scrape_health_samples(dims, ok=False, duration_seconds=0.5),
+        "hw.bmc.up",
+    )
+    assert down.value == 0
+    assert down.metric_type == "gauge"
+    assert REQUIRED_DIMS <= set(down.dimensions)
+
+
+def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
+    """A reachable BMC scrape emits hw.bmc.up=1 without dropping hw.* readings."""
+    manager = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def fake_sync_invoke(_api_type, name, **_kwargs):
+        """Return a healthy power sensor and empty optional collectors."""
+        if name == "sensors":
+            return CommandResult([
+                {"Reading": 42.0, "ReadingType": "Power",
+                 "Name": "PSU 1", "Chassis": "Chassis_0"},
+            ], None, None, None)
+        if name == "thermal":
+            return CommandResult(
+                {"temperature_readings": [
+                    {"ReadingCelsius": 30.0, "Name": "Inlet", "Chassis": "Chassis_0"}]},
+                None, None, None)
+        if name == "environment-metrics":
+            return CommandResult({"metrics": []}, None, None, None)
+        if name == "leak-detectors":
+            return CommandResult({"detectors": []}, None, None, None)
+        return CommandResult([], None, None, None)
+
+    monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+
+    up = _single_metric(samples, "hw.bmc.up")
+    assert up.value == 1
+    assert REQUIRED_DIMS <= set(up.dimensions)
+    # No regression: the underlying hw.* readings are still emitted.
+    assert _single_metric(samples, "hw.power").value == 42.0
+    assert _single_metric(samples, "hw.temperature").value == 30.0
+
+
+def test_exporter_collect_samples_unreachable_bmc_reports_down(monkeypatch):
+    """An unreachable BMC (every scrape times out) emits hw.bmc.up=0, not nothing."""
+    manager = Exporter(
+        idrac_ip="172.25.230.29",
+        idrac_username="root",
+        idrac_password="mock",
+        insecure=True,
+    )
+
+    def fake_sync_invoke(_api_type, _name, **_kwargs):
+        """Model a fully unreachable BMC: every collector times out."""
+        raise TimeoutError("timed out reading the BMC")
+
+    monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+
+    up = _single_metric(samples, "hw.bmc.up")
+    assert up.value == 0
+    assert REQUIRED_DIMS <= set(up.dimensions)
+    assert up.dimensions["bmc.ip"] == "172.25.230.29"
+    # The failure still surfaces the scrape as down, never silently dropped.
+    assert _single_metric(samples, "hw.scrape.ok").value == 0
+
+
+def test_scrape_health_signals_contract():
+    """Every scrape_health_signals row in the spec is emitted in both states.
+
+    Guards the per-BMC hw.bmc.up gauge (issue #402): the spec declares a
+    reachable and unreachable value, and the exporter must produce both.
+    """
+    import yaml
+    spec = yaml.safe_load(
+        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        .read_text(encoding="utf-8"))
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    for row in spec.get("scrape_health_signals", []):
+        up_ok = _single_metric(
+            exporter_mod.scrape_health_samples(dims, ok=True, duration_seconds=0.1),
+            row["metric"])
+        up_fail = _single_metric(
+            exporter_mod.scrape_health_samples(dims, ok=False, duration_seconds=0.1),
+            row["metric"])
+        assert up_ok.value == float(row["reachable_value"])
+        assert up_fail.value == float(row["unreachable_value"])
+        assert up_ok.metric_type == row["metric_type"]
+
+
+def test_bmc_up_carries_exporter_identity_dims():
+    """hw.bmc.up carries the issue-named exporter identity dims in BOTH states.
+
+    Issue #402 queries hw.bmc.up by service.name, telemetry.source, and
+    deployment.environment.name, so the gauge must carry all three whether the
+    BMC is reachable (value 1) or unreachable (value 0) — otherwise the scoped
+    dashboard query cannot distinguish a down BMC from missing telemetry.
+    """
+    identity = dict(build_identity_dimensions("172.25.230.29", vendor="supermicro"))
+    identity.update({
+        "service.name": "redfish_ctl",
+        "telemetry.source": "redfish",
+        "deployment.environment.name": "nv72-gb300",
+    })
+    for ok in (True, False):
+        up = _single_metric(
+            exporter_mod.scrape_health_samples(identity, ok=ok, duration_seconds=0.1),
+            "hw.bmc.up",
+        )
+        assert up.value == (1 if ok else 0)
+        assert up.dimensions["service.name"] == "redfish_ctl"
+        assert up.dimensions["telemetry.source"] == "redfish"
+        assert up.dimensions["deployment.environment.name"] == "nv72-gb300"
+
+
 def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch):
     """One supported collector failure produces partial scrape self-telemetry."""
     manager = Exporter(
