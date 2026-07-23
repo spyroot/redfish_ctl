@@ -153,7 +153,7 @@ def test_subscription_create_confirm_posts_event_destination_payload(
     assert result.error is None
     assert result.data["action"] == "create"
     assert result.data["target"] == SUBSCRIPTIONS_PATH
-    assert result.data["status"] == "RedfishApiRespond.Success"
+    assert result.data["status"] == "RedfishApiRespond.Created"
     assert len(posts) == 1
     assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
     assert posts[0].json() == {
