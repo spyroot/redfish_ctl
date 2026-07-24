@@ -55,6 +55,13 @@ application:
     REDFISH_EXPORTER_SERVICE_INSTANCE_ID: {alias: IDRAC_EXPORTER_SERVICE_INSTANCE_ID, interpreted: true}
     REDFISH_EXPORTER_SERVICE_VERSION:    {alias: IDRAC_EXPORTER_SERVICE_VERSION,  interpreted: false}
     REDFISH_EXPORTER_SERVICE_CRITICALITY: {alias: IDRAC_EXPORTER_SERVICE_CRITICALITY, interpreted: false}
+    REDFISH_BUILD_REVISION:
+      alias: null
+      interpreted: false
+      default: unknown
+      note: >-
+        docker/Dockerfile build argument or deployment environment supplies
+        the exact source revision
     # canonical-only (no IDRAC_* alias by design — do not auto-generate one)
     REDFISH_SCHEME:                     {alias: null, interpreted: false, default: https}
     REDFISH_CSDL_DIR:                   {alias: null, interpreted: true}
@@ -103,9 +110,9 @@ application:
   # urllib request (parsed/validated), so it is NOT pass-through.
   secrets_and_config:
     SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "validated for /v2/datapoint (exporter.py:1030,1078)"}
-    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "interpolated into api.<realm>.signalfx.com (splunk_metric_gate.py:114,139)"}
+    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "interpolated into api.<realm>.signalfx.com by tools/splunk_metric_gate.py"}
     SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token header; read via variable name (exporter.py:1061) so it evades literal scans — listed explicitly"}
-    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token for the metric query (splunk_metric_gate.py:115,145)"}
+    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token read by tools/splunk_metric_gate.py"}
 
   # OTEL_* names the app INTERPRETS (branches on) — application config, not
   # pass-through, even though the prefix is standard.

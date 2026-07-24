@@ -20,6 +20,7 @@ _EXPECTED = {
     "hw.gpu.power": "gauge",
     "hw.gpu.temperature": "gauge",
     "hw.scrape.duration_seconds": "gauge",
+    "hw.build_info": "gauge",
     "redfish_exporter_scrape_duration_seconds": "gauge",
     "redfish_exporter_last_success_timestamp_seconds": "gauge",
     # counters (monotonic cumulative)
@@ -94,3 +95,19 @@ def test_is_monotonic_counter_covers_audit_cases():
     assert otlp.is_monotonic_counter("hw.fabric.rx_bytes")
     assert not otlp.is_monotonic_counter("hw.scrape.duration_seconds")
     assert not otlp.is_monotonic_counter("hw.power")
+
+
+def test_build_info_attributes_survive_otlp_projection():
+    """OTLP datapoints preserve the revision, package, and schema identity."""
+    pytest.importorskip("opentelemetry.sdk.metrics.export")
+    sample = exporter.build_info_sample(_DIMS, build_revision="abc123")
+
+    data = otlp.metrics_data_from_samples(
+        [sample],
+        service_name="redfish_ctl",
+    ).resource_metrics[0].scope_metrics[0].metrics[0].data
+    attributes = data.data_points[0].attributes
+
+    assert attributes["commit"] == "abc123"
+    assert attributes["version"] == exporter.PACKAGE_VERSION
+    assert attributes["schema_contract_version"] == "1"

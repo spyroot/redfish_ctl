@@ -1,7 +1,8 @@
 # Production redfish_ctl image.
 #
 # Build:
-#   docker build -f docker/Dockerfile -t redfish-ctl .
+#   docker build --build-arg REDFISH_BUILD_REVISION=<commit> \
+#     -f docker/Dockerfile -t redfish-ctl .
 # One-shot CLI equivalent to `redfish_ctl system`:
 #   docker run --rm --env-file .env.redfish redfish-ctl system
 # OTLP sidecar equivalent to `redfish_ctl exporter --output otlp`:
@@ -23,9 +24,14 @@ RUN python -m pip install --upgrade pip \
 
 FROM python:3.12-slim AS runtime
 
+ARG REDFISH_BUILD_REVISION=unknown
+
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    REDFISH_BUILD_REVISION=${REDFISH_BUILD_REVISION}
+
+LABEL org.opencontainers.image.revision=${REDFISH_BUILD_REVISION}
 
 RUN groupadd --system redfish \
     && useradd \

@@ -31,7 +31,8 @@ def test_gate_passes_when_all_metrics_fresh(monkeypatch, capsys):
     _env(monkeypatch)
     now_ms = int(time.time() * 1000)
     monkeypatch.setattr(gate, "query_metric",
-                        lambda realm, token, metric, timeout: {"count": 3, "newest_ms": now_ms})
+                        lambda realm, token, metric, timeout: {
+                            "count": 3, "newest_ms": now_ms, "results": []})
     rc = gate.run_gate(["hw.health", "hw.power"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -86,6 +87,82 @@ def test_gate_configuration_errors(monkeypatch, capsys):
     _env(monkeypatch, realm="")
     monkeypatch.delenv("SPLUNK_O11Y_REALM", raising=False)
     assert gate.run_gate(["hw.health"]) == 2
+
+
+def test_build_revision_gate_requires_revision_and_inventory_together(
+        monkeypatch, tmp_path, capsys):
+    """Fleet revision checks fail closed when either required input is absent."""
+    _env(monkeypatch)
+    hosts = tmp_path / "hosts.txt"
+    hosts.write_text("node-a\n", encoding="utf-8")
+
+    assert gate.run_gate(["--expected-hosts-file", str(hosts)]) == 2
+    assert gate.run_gate(["--expected-build-revision", "abc123"]) == 2
+    assert gate.run_gate(["--expected-schema-contract-version", "1"]) == 2
+    assert "must be used together" in capsys.readouterr().err
+
+
+def test_build_revision_gate_checks_every_host_and_detects_mixed_fleet(
+        monkeypatch, tmp_path, capsys):
+    """Matching, mismatched, and absent hosts are all checked and reported."""
+    _env(monkeypatch)
+    hosts = tmp_path / "hosts.txt"
+    hosts.write_text(
+        "node-a\nnode-b\nnode-c\nnode-d\nnode-e\nnode-a\n",
+        encoding="utf-8",
+    )
+    now_ms = int(time.time() * 1000)
+    checked_hosts = []
+
+    def fake_query(realm, token, metric, timeout, dimensions=None):
+        """Return a matching, mismatched, or missing build-info series by host."""
+        if dimensions is None:
+            return {"count": 1, "newest_ms": now_ms, "results": []}
+        host = dimensions["host.name"]
+        checked_hosts.append(host)
+        if host == "node-c":
+            return {"count": 0, "newest_ms": 0, "results": []}
+        if host == "node-e":
+            return {
+                "count": 1,
+                "newest_ms": now_ms,
+                "results": [{"sf_updatedOnMs": now_ms, "dimensions": {}}],
+            }
+        identities = {
+            "node-a": [("abc123", "1")],
+            "node-b": [("abc123", "2")],
+            "node-d": [("abc123", "1"), ("old456", "1")],
+        }[host]
+        return {
+            "count": len(identities),
+            "newest_ms": now_ms,
+            "results": [
+                {
+                    "sf_updatedOnMs": now_ms,
+                    "dimensions": {
+                        "commit": commit,
+                        "schema_contract_version": schema_version,
+                    },
+                }
+                for commit, schema_version in identities
+            ],
+        }
+
+    monkeypatch.setattr(gate, "query_metric", fake_query)
+    rc = gate.run_gate([
+        "hw.build_info",
+        "--expected-build-revision", "abc123",
+        "--expected-schema-contract-version", "1",
+        "--expected-hosts-file", str(hosts),
+    ])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert checked_hosts == ["node-a", "node-b", "node-c", "node-d", "node-e"]
+    assert "mixed build identities detected" in out
+    assert "multiple fresh build identities" in out
+    assert "no verifiable commit and schema identity" in out
+    assert "1/5 hosts match; mismatched=3 missing=1" in out
 
 
 def test_gate_query_error_counts_as_failure(monkeypatch, capsys):
@@ -153,8 +230,11 @@ def test_gate_prefers_api_token_for_queries(monkeypatch, capsys):
 
 def test_default_metric_set_includes_p0_signals(monkeypatch):
     """The built-in list carries the P0 health/state and link-down-reason names."""
-    for name in ("hw.component.health", "hw.fabric.link_down_reason",
-                 "hw.power.edp_violation_state"):
+    for name in (
+            "hw.component.health",
+            "hw.fabric.link_down_reason",
+            "hw.power.edp_violation_state",
+            "hw.build_info"):
         assert name in gate.DEFAULT_METRICS
 
 
@@ -195,8 +275,16 @@ def test_query_metric_parses_api_response(monkeypatch):
         return FakeResponse(json.dumps(payload).encode())
 
     monkeypatch.setattr(gate.urllib.request, "urlopen", fake_urlopen)
-    info = gate.query_metric("us1", "tok", "hw.health", 5.0)
-    assert info == {"count": 2, "newest_ms": 5000}
+    info = gate.query_metric(
+        "us1",
+        "tok",
+        "hw.health",
+        5.0,
+        {"host.name": "node-a", "commit": "abc123"},
+    )
+    assert info == {"count": 2, "newest_ms": 5000, "results": payload["results"]}
     assert "api.us1.signalfx.com" in captured["url"]
     assert "hw.health" in captured["url"]
+    assert "host.name" in captured["url"]
+    assert "commit" in captured["url"]
     assert captured["token"] == "tok"

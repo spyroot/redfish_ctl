@@ -210,11 +210,20 @@ hw.scrape.sources_attempted
 hw.scrape.sources_succeeded
 hw.scrape.sources_failed
 hw.scrape.bmc_requests_total{method="GET", source="thermal", status_class="2xx"}
+hw.build_info{commit="<build-revision>", version="<package-version>",
+              schema_contract_version="<catalog-version>"} 1
 ```
 
 Gate: every listed self-signal is emitted each scrape cycle and covered by the same
 fixture-driven expected-signal check as M2; a per-source failure changes
 `hw.scrape.source.ok` for that source only.
+
+Deployment currency is a profile-required extension of this gate. Run
+`tools/splunk_metric_gate.py --expected-build-revision <commit>
+--expected-schema-contract-version <version> --expected-hosts-file <hosts.txt>`
+with the complete deployment inventory. The gate checks every `host.name`,
+fails on missing or stale `hw.build_info`, and reports mixed revisions across
+hosts or within one host's freshness window.
 
 ### R2 — Push-loop survival
 

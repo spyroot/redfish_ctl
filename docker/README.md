@@ -6,7 +6,7 @@ non-root user. Credentials are supplied at container runtime only; do not add th
 
 | File | Purpose | Local command |
 | --- | --- | --- |
-| `docker/Dockerfile` | Production CLI/exporter image with the OTLP extra installed. | `docker build -f docker/Dockerfile -t redfish-ctl .` |
+| `docker/Dockerfile` | Production CLI/exporter image with the OTLP extra installed. | `make docker-image IMAGE=redfish-ctl` |
 | `docker/Dockerfile.test` | Linux image for the offline pytest suite. | `./docker/run-tests.sh` |
 | `docker/Dockerfile.mock-bmc` | Read-only mock BMC image for the kind sandbox. | `docker build -f docker/Dockerfile.mock-bmc -t redfish-ctl-mock-bmc:local .` |
 | `docker/Dockerfile.ilo-sim` | HPE iLO Redfish emulator image for the simulator sandbox backend. | `docker build -f docker/Dockerfile.ilo-sim -t redfish-ctl-ilo-sim:local .` |
