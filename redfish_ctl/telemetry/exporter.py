@@ -18,7 +18,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from ..config import ConfigurationConflict
+from ..config import ConfigurationConflict, exporter_build_revision
+from ..version import __version__ as PACKAGE_VERSION
 from . import identity as identity_mod
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
@@ -28,6 +29,7 @@ common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
 METRIC_KINDS = frozenset({"gauge", "counter", "cumulative_counter"})
+METRIC_AVAILABILITY = frozenset({"self", "baseline", "capability", "event"})
 COUNTER_SUFFIXES = (
     "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
 )
@@ -143,6 +145,9 @@ POWER_BREAK_STATES = {"normal", "active"}
 
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
+# This value mirrors the top-level version in specs/telemetry/catalog.yaml.
+TELEMETRY_SCHEMA_CONTRACT_VERSION = "1"
+UNKNOWN_BUILD_REVISION = "unknown"
 
 
 class _SignalFxNoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -206,11 +211,17 @@ class MetricDefinition:
     family: str = "telemetry"
     dimensions: tuple[str, ...] = ()
     liveness: str = "signal"
+    availability: str = "baseline"
+    profile_required: bool = False
 
     def __post_init__(self) -> None:
         """Validate and normalize the immutable definition."""
         if self.kind not in METRIC_KINDS:
             raise ValueError(f"unknown metric kind {self.kind!r} for {self.name}")
+        if self.availability not in METRIC_AVAILABILITY:
+            raise ValueError(
+                f"unknown availability {self.availability!r} for {self.name}"
+            )
         if not self.prometheus_name:
             object.__setattr__(self, "prometheus_name", self.name)
         object.__setattr__(self, "dimensions", tuple(self.dimensions))
@@ -235,7 +246,9 @@ def _definition(
         description: str = "",
         family: str = "telemetry",
         dimensions: tuple[str, ...] = (),
-        liveness: str = "signal") -> MetricDefinition:
+        liveness: str = "signal",
+        availability: str = "baseline",
+        profile_required: bool = False) -> MetricDefinition:
     """Construct a catalog definition with concise defaults.
 
     :param name: exported metric name.
@@ -245,6 +258,8 @@ def _definition(
     :param family: broad metric family used by specs and docs.
     :param dimensions: expected dimension keys for this metric family.
     :param liveness: liveness role, usually ``signal`` or ``scrape``.
+    :param availability: inherent availability class from the telemetry catalog.
+    :param profile_required: whether deployment profiles must require the metric.
     :return: immutable MetricDefinition.
     """
     return MetricDefinition(
@@ -255,6 +270,8 @@ def _definition(
         family=family,
         dimensions=dimensions,
         liveness=liveness,
+        availability=availability,
+        profile_required=profile_required,
     )
 
 
@@ -410,6 +427,19 @@ _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.bmc.up",
                 description="Per-BMC 0/1 liveness gauge (1 reachable, 0 unreachable).",
                 family="scrape", liveness="scrape"),
+    _definition(
+        "hw.build_info",
+        description="Exporter build and telemetry schema identity.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + (
+            "commit",
+            "version",
+            "schema_contract_version",
+        ),
+        liveness="scrape",
+        availability="self",
+        profile_required=True,
+    ),
     _definition(
         "redfish_exporter_scrape_success",
         description="Whether the latest scrape completed without a supported collector failure.",
@@ -852,7 +882,8 @@ def scrape_health_samples(
         duration_seconds: float,
         collector_results: Iterable[CollectorResult] = (),
         partial: bool = False,
-        timestamp_seconds: Optional[float] = None) -> list[MetricSample]:
+        timestamp_seconds: Optional[float] = None,
+        build_revision: Optional[str] = None) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
     Includes ``hw.bmc.up`` — a per-BMC 0/1 liveness gauge carrying the full
@@ -867,6 +898,7 @@ def scrape_health_samples(
     :param partial: whether at least one supported collector failed while another
         collector still returned a usable result.
     :param timestamp_seconds: wall-clock timestamp used for last-success freshness.
+    :param build_revision: exact source revision injected at image build or deployment.
     :return: scrape-level, collector-level, and deprecated compatibility samples.
     """
     dims = _with_dims(identity, source="exporter")
@@ -897,6 +929,7 @@ def scrape_health_samples(
         # (no series at all). See specs/telemetry/expected_signals.yaml and
         # gates.md; issue #402.
         _sample("hw.bmc.up", 1.0 if ok else 0.0, dims, None),
+        build_info_sample(identity, build_revision=build_revision),
         _sample(
             "hw.scrape.duration_seconds",
             safe_duration,
@@ -951,6 +984,34 @@ def scrape_health_samples(
                 metric_type="counter",
             ))
     return health
+
+
+def build_info_sample(
+        identity: Mapping[str, str],
+        build_revision: Optional[str] = None) -> MetricSample:
+    """Return the build and schema identity emitted on every scrape.
+
+    ``REDFISH_BUILD_REVISION`` is defined by the production image build argument
+    or deployment environment. An absent value remains visible as ``unknown`` so
+    the fleet currency gate can distinguish an uninjected build from a match.
+
+    :param identity: fixed join dimensions for the exporter instance.
+    :param build_revision: explicit source revision, overriding the environment.
+    :return: the ``hw.build_info`` gauge with a constant value of 1.0.
+    """
+    revision = (
+        str(build_revision).strip()
+        if build_revision not in (None, "")
+        else exporter_build_revision(UNKNOWN_BUILD_REVISION)
+    ) or UNKNOWN_BUILD_REVISION
+    dims = _with_dims(
+        identity,
+        source="exporter",
+        commit=revision,
+        version=PACKAGE_VERSION,
+        schema_contract_version=TELEMETRY_SCHEMA_CONTRACT_VERSION,
+    )
+    return _sample("hw.build_info", 1.0, dims, None)
 
 
 def collector_scrape_status(results: Iterable[CollectorResult]) -> tuple[bool, bool]:

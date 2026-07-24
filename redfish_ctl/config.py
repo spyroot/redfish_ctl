@@ -235,6 +235,19 @@ def endpoint_defaults(strict: bool = True) -> EndpointConfig:
     )
 
 
+def exporter_build_revision(default: str = "unknown") -> str:
+    """Return the exact source revision injected for exporter build telemetry.
+
+    ``REDFISH_BUILD_REVISION`` is set by docker/Dockerfile's build argument or
+    by the deployment environment.
+
+    :param default: visible sentinel used when no revision was injected.
+    :return: stripped revision value, or ``default`` when unset or blank.
+    """
+    value = env_first("REDFISH_BUILD_REVISION", default=default)
+    return str(value or default).strip() or default
+
+
 def exporter_identity_env(
         overridden: tuple[str, ...] = ()) -> dict[str, Optional[str]]:
     """Return conflict-aware environment values for exporter identity.

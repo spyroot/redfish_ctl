@@ -21,6 +21,7 @@ MYPY ?= $(CONDA_RUN) mypy
 TWINE ?= $(CONDA_RUN) twine
 DOCKER ?= docker
 IMAGE ?= redfish-ctl
+BUILD_REVISION ?= $(shell git rev-parse --verify HEAD 2>/dev/null)
 
 .PHONY: help test lint typecheck build bench-concurrency docker-test docker-image docs-voice-check docstring-gate docstring-gate-all k8s-sandbox k8s-consumer k8s-explorer clean gb300-check gb300-image gb300-test gb300-lint gb300-gate gb300-shell gb300-clean k8s-check k8s-ci k8s-ci-clean
 
@@ -63,7 +64,15 @@ docker-image: ## Build the production CLI image locally.
 		printf '%s\n' 'Add the production image definition before using this target.'; \
 		exit 2; \
 	}
-	$(DOCKER) build -f docker/Dockerfile -t $(IMAGE) .
+	@test -n "$(strip $(BUILD_REVISION))" || { \
+		printf '%s\n' 'BUILD_REVISION is empty; pass the exact source revision.'; \
+		exit 2; \
+	}
+	$(DOCKER) build \
+		--build-arg REDFISH_BUILD_REVISION="$(BUILD_REVISION)" \
+		-f docker/Dockerfile \
+		-t $(IMAGE) \
+		.
 
 docs-voice-check: ## Reject first-person wording in public docs.
 	! grep -rnE '\b(I|me|my|mine|myself)\b' README.md docs/
@@ -170,4 +179,3 @@ gb300-clean: ## Remove exited rfctl containers + dangling layers on a slot. SLOT
 		ids=$$(docker ps -aq --filter status=exited --filter name=rfctl); \
 		if [ -n "$$ids" ]; then docker rm $$ids >/dev/null; fi; \
 		docker image prune -f'
-

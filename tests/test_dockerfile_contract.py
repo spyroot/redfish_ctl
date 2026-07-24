@@ -4,6 +4,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile"
 DOCKER_README = REPO_ROOT / "docker" / "README.md"
 README = REPO_ROOT / "README.md"
+MAKEFILE = REPO_ROOT / "Makefile"
 
 
 def test_production_dockerfile_installs_local_otlp_wheel_as_non_root() -> None:
@@ -24,6 +25,19 @@ def test_production_dockerfile_installs_local_otlp_wheel_as_non_root() -> None:
     assert '"redfish_ctl[otlp]"' in dockerfile
     assert 'ENTRYPOINT ["redfish_ctl"]' in dockerfile
     assert "USER redfish" in dockerfile
+
+
+def test_production_dockerfile_preserves_injected_build_revision() -> None:
+    """The production image exposes its source revision to runtime telemetry."""
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+
+    assert "ARG REDFISH_BUILD_REVISION=unknown" in dockerfile
+    assert "REDFISH_BUILD_REVISION=${REDFISH_BUILD_REVISION}" in dockerfile
+    assert "org.opencontainers.image.revision=${REDFISH_BUILD_REVISION}" in dockerfile
+
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    assert "BUILD_REVISION ?= $(shell git rev-parse --verify HEAD" in makefile
+    assert '--build-arg REDFISH_BUILD_REVISION="$(BUILD_REVISION)"' in makefile
 
 
 def test_production_dockerfile_header_shows_safe_runtime_examples() -> None:
