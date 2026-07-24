@@ -352,3 +352,111 @@ def test_setup_otlp_defaults_to_shared_redfish_ctl_service_name(monkeypatch):
         tracing.setup_otlp()
     finally:
         tracing.disable_tracing()
+
+
+@pytest.mark.parametrize("path, expected", [
+    ("/redfish/v1/Systems/System.Embedded.1", "Systems"),
+    ("/redfish/v1/Chassis", "Chassis"),
+    ("/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces", "Managers"),
+    ("/redfish/v1/UpdateService/FirmwareInventory", "UpdateService"),
+    ("/redfish/v1/TelemetryService/MetricReports/Sensor", "TelemetryService"),
+    ("/redfish/v1", "ServiceRoot"),
+    ("/redfish/v1/", "ServiceRoot"),
+    ("", "ServiceRoot"),
+    ("/api/custom/thing", "api"),
+    ("/redfish/v1/systems/System.Embedded.1", "Systems"),   # lower-case canonicalized
+    ("/redfish/v1/CHASSIS", "Chassis"),                     # upper-case canonicalized
+    ("/redfish/v1/Systems/", "Systems"),                    # trailing slash on collection
+    ("/redfish/v2/Managers", "Managers"),                   # future version segment stripped
+    ("/redfish/v1/Oem/Contoso/Widget", "Oem"),              # unknown/OEM segment preserved
+    ("/Redfish/v1/Systems", "Systems"),                     # capitalized root, case-insensitive
+    ("/redfish/Systems", "Systems"),                        # versionless path still classifies
+    ("/redfish", "ServiceRoot"),                            # bare root
+])
+def test_path_family_groups_by_top_level_collection(path, expected):
+    """_path_family collapses a request path to its low-cardinality Redfish family.
+
+    Instance ids (``System.Embedded.1``) and deeper segments must not raise the
+    cardinality: every path under one collection shares one family label, the
+    service root maps to ``ServiceRoot``, and a non-Redfish path falls back to
+    its first segment.
+    """
+    assert tracing._path_family(path) == expected
+
+
+def test_client_span_sets_required_path_family(span_exporter):
+    """Every BMC client span carries the contract-required redfish.path_family.
+
+    ``redfish.path_family`` is a required attribute in span_contract.yaml, so a
+    request span that omitted it would fail the contract gate. This asserts the
+    attribute is emitted and derived from the request path.
+    """
+    with tracing.client_span(
+            "https://bmc.example/redfish/v1/Systems/System.Embedded.1", "GET"):
+        pass
+    request_spans = [
+        s for s in span_exporter.get_finished_spans()
+        if s.name == "redfish.bmc.request"
+    ]
+    assert request_spans, "expected one redfish.bmc.request span"
+    for span in request_spans:
+        assert span.attributes.get("redfish.path_family") == "Systems"
+
+
+def test_client_span_fixed_attributes_are_not_overridable(span_exporter):
+    """Caller attributes never clobber the internally-derived contract keys.
+
+    A caller that passes a same-named attribute (path_family, method,
+    server.address, peer.service) must not override the value client_span
+    derives; server.address is present even when the URL has no host; and a
+    non-fixed attribute still passes through.
+    """
+    with tracing.client_span(
+            "https:///redfish/v1/Chassis",  # deliberately hostless
+            "GET",
+            attributes={
+                "redfish.path_family": "SPOOFED",
+                "http.request.method": "DELETE",
+                "server.address": "spoofed",
+                "peer.service": "notbmc",
+                "redfish.vendor": "Dell",
+            }):
+        pass
+    attrs = next(
+        dict(s.attributes) for s in span_exporter.get_finished_spans()
+        if s.name == "redfish.bmc.request"
+    )
+    assert attrs["redfish.path_family"] == "Chassis"
+    assert attrs["http.request.method"] == "GET"
+    assert attrs["peer.service"] == "bmc"
+    assert attrs["server.address"] == "unknown"   # hostless URL still sets it
+    assert attrs["redfish.vendor"] == "Dell"      # non-fixed attr passes through
+
+
+def test_span_contract_declares_every_emitted_request_attribute():
+    """span_contract.yaml lists every attribute the code emits on request spans.
+
+    Guards the contract-vs-code reconciliation: the four ``redfish.action.*``
+    keys (emitted by the action primitive) and ``redfish.path_family`` (emitted
+    by every ``client_span``) must be declared, or the contract gate's
+    ``unknown attribute keys == 0`` / ``missing required keys == 0`` checks break.
+    """
+    import pathlib
+
+    import yaml
+
+    contract_path = pathlib.Path(__file__).resolve().parent.parent / \
+        "specs" / "telemetry" / "span_contract.yaml"
+    request_span = yaml.safe_load(contract_path.read_text())["request_span"]
+    required = set(request_span.get("required", []))
+    allowed = required | set(request_span.get("optional", []))
+
+    action_keys = {
+        "redfish.action.name", "redfish.action.type",
+        "redfish.action.target", "redfish.action.level",
+    }
+    missing = (action_keys | {"redfish.path_family"}) - allowed
+    assert not missing, f"span_contract omits emitted request attributes: {missing}"
+    assert "redfish.path_family" in required
+    assert "redfish.action" not in allowed, \
+        "singular redfish.action is stale; code emits redfish.action.* keys"
