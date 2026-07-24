@@ -13,7 +13,6 @@ import contextvars
 import copy
 import functools
 import logging
-import re
 import threading
 import time
 from abc import abstractmethod
@@ -27,7 +26,6 @@ from urllib3.util.retry import Retry
 
 from .cmd_exceptions import (
     AuthenticationFailed,
-    ResourceNotFound,
     TaskIdUnavailable,
     UnsupportedAction,
 )
@@ -36,7 +34,6 @@ from .redfish_exceptions import (
     RedfishForbidden,
     RedfishMethodNotAllowed,
     RedfishNotAcceptable,
-    RedfishUnauthorized,
 )
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
@@ -163,39 +160,77 @@ class RedfishManager:
             asyncio.set_event_loop(loop)
             return loop
 
+    @staticmethod
+    def _coalesce_ctor_alias(kwargs: dict, value, default, *aliases):
+        """Resolve one connection value from a canonical param and legacy aliases.
+
+        Transitional (one wave): direct constructions still pass
+        ``redfish_ip``/``idrac_ip``-style keywords; they arrive via ``**kwargs``
+        and are popped here so exactly ONE canonical value is stored. The
+        canonical parameter wins whenever it differs from its default.
+
+        :param kwargs: the constructor's ``**kwargs`` (aliases are popped).
+        :param value: the canonical parameter value as passed.
+        :param default: the canonical parameter's default.
+        :param aliases: legacy keyword names, highest precedence first.
+        :return: the resolved value.
+        """
+        alias_value = None
+        for name in aliases:
+            popped = kwargs.pop(name, None)
+            if alias_value is None:
+                alias_value = popped
+        if value == default and alias_value is not None:
+            return alias_value
+        return value
+
     def __init__(self,
-                 redfish_ip: Optional[str] = "",
-                 redfish_username: Optional[str] = "root",
-                 redfish_password: Optional[str] = "",
-                 redfish_port: Optional[int] = 443,
+                 host: Optional[str] = "",
+                 username: Optional[str] = "root",
+                 password: Optional[str] = "",
+                 port: Optional[int] = 443,
                  insecure: Optional[bool] = True,
                  is_http: Optional[bool] = False,
                  x_auth: Optional[str] = None,
-                 is_debug: Optional[bool] = False):
+                 is_debug: Optional[bool] = False,
+                 **kwargs):
         """Default constructor for Redfish Manager.
            it requires a credentials to interact with redfish endpoint.
            By default, Redfish Manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param redfish_ip: redfish IP or hostname
-        :param redfish_username: redfish username default is root
-        :param redfish_password: redfish password.
-        :param redfish_port: redfish TCP port (default 443); accepts an int or str.
+        :param host: BMC IP or hostname.
+        :param username: BMC account username; default is root.
+        :param password: BMC account password.
+        :param port: BMC TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMCs ship self-signed certificates, so verification is
             opt-in: pass ``insecure=False`` to verify the server certificate.
         :param is_http: use plain HTTP instead of HTTPS for requests when True.
         :param x_auth: X-Authentication header.
         :param is_debug: when True, include exception tracebacks in error logs.
+        :param kwargs: extensibility per the constructor contract; legacy
+            ``redfish_*``/``idrac_*`` connection aliases are still accepted
+            here for one wave (the canonical spelling wins on conflict), then
+            they live only at the CLI/env edge (config.py, argparse).
         """
-        self._redfish_ip = redfish_ip
-        self._username = redfish_username
-        self._password = redfish_password
+        host = self._coalesce_ctor_alias(
+            kwargs, host, "", "redfish_ip", "idrac_ip")
+        username = self._coalesce_ctor_alias(
+            kwargs, username, "root", "redfish_username", "idrac_username")
+        password = self._coalesce_ctor_alias(
+            kwargs, password, "", "redfish_password", "idrac_password")
+        port = self._coalesce_ctor_alias(
+            kwargs, port, 443, "redfish_port", "idrac_port")
 
-        if isinstance(redfish_port, str):
-            redfish_port = int(redfish_port)
+        self._host = host
+        self._username = username
+        self._password = password
 
-        self._port = redfish_port
+        if isinstance(port, str):
+            port = int(port)
+
+        self._port = port
         # ``insecure`` means "skip TLS verification"; requests' ``verify`` is the
         # inverse, so verification is enabled only when insecure is explicitly off.
         self._is_verify_cert = not insecure
@@ -325,10 +360,10 @@ class RedfishManager:
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
         inst = disp(
-            idrac_ip=_host,
-            idrac_username=_username,
-            idrac_password=_password,
-            idrac_port=_port,
+            host=_host,
+            username=_username,
+            password=_password,
+            port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -374,10 +409,10 @@ class RedfishManager:
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
-            idrac_ip=_host,
-            idrac_username=_username,
-            idrac_password=_password,
-            idrac_port=_port,
+            host=_host,
+            username=_username,
+            password=_password,
+            port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -447,13 +482,33 @@ class RedfishManager:
 
         :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
         """
-        if ":" in self._redfish_ip:
-            return self._redfish_ip
+        if ":" in self._host:
+            return self._host
         else:
             if self._port != 443:
-                return f"{self._redfish_ip}:{self._port}"
+                return f"{self._host}:{self._port}"
             else:
-                return self._redfish_ip
+                return self._host
+
+    @property
+    def _redfish_ip(self) -> str:
+        """Transitional view of the canonical ``_host`` storage.
+
+        The connection host is stored once, as ``_host`` (the constructor
+        cleanup). This shim keeps pre-rename readers and writers of the old
+        private name working for one wave; delete with the alias retirement.
+
+        :return: the stored host value.
+        """
+        return self._host
+
+    @_redfish_ip.setter
+    def _redfish_ip(self, value: str) -> None:
+        """Write through to the canonical ``_host`` storage.
+
+        :param value: the host value to store.
+        """
+        self._host = value
 
     @property
     def username(self) -> str:
@@ -700,6 +755,48 @@ class RedfishManager:
         """
         api_resp = self.base_query("/redfish/v1/")
         return api_resp.data if api_resp is not None else None
+
+    #: Vendor a connection resolves to when there is no better evidence — no
+    #: cached classification and no already-fetched ServiceRoot. The neutral
+    #: base presumes generic (DMTF); the Dell manager overrides with "dell",
+    #: which is exactly the pre-profile behavior of the Dell-based commands.
+    _default_profile_vendor = "generic"
+
+    @property
+    def vendor_profile(self):
+        """The connection's vendor chokepoint profile, resolved once and cached.
+
+        Vendor binds per CONNECTION, not per class. Resolution never performs
+        I/O of its own (a probe here would spend a BMC round trip — and consume
+        stubbed transports in offline suites); it consults, in order:
+
+        1. the connection cache — a prior classification on this (host, port),
+           shared by every command singleton on the connection;
+        2. the ``_service_root`` document, ONLY when some earlier call already
+           fetched and cached it (zero extra GETs), classified via the
+           discovery classifier and then cached for the connection;
+        3. the class-declared ``_default_profile_vendor`` — today's behavior
+           for a connection nothing has probed (not cached: a presumption is
+           not evidence, so a later real classification can still win).
+
+        :return: the connection's ``DmtfProfile`` (or vendor subclass) instance.
+        """
+        # Imports live here so the module graph stays acyclic (vendor_profile
+        # imports this module); importing dell_profile guarantees the Dell
+        # registration is present.
+        from . import dell_profile  # noqa: F401  (registration side effect)
+        from .vendor_profile import (
+            cached_profile,
+            profile_for_connection,
+            resolve_profile,
+        )
+        cached = cached_profile(self._host, self._port)
+        if cached is not None:
+            return cached
+        if "_service_root" in self.__dict__:
+            return profile_for_connection(
+                self._host, self._port, lambda: self._service_root)
+        return resolve_profile(type(self)._default_profile_vendor)
 
     @cached_property
     def redfish_version(self) -> str:
@@ -959,28 +1056,23 @@ class RedfishManager:
 
     @staticmethod
     def default_error_handler(response) -> RedfishApiRespond:
-        """Default error handler.
-        :param response:
-        :return:
+        """Default error handler, the DMTF (vendor-neutral) decode.
+
+        The body moved to ``DmtfProfile.error_handler`` (the vendor-profile
+        chokepoint set); this stays a @staticmethod because callers invoke it
+        unbound as ``RedfishManager.default_error_handler(resp)``, and always
+        decodes with DMTF semantics. Per-connection vendor dispatch happens in
+        ``IDracManager.default_error_handler``, which routes through
+        ``self.vendor_profile`` — the layer every registered command inherits.
+
+        :param response: the HTTP response to classify.
+        :return: the folded ``RedfishApiRespond`` for a 2xx status.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on any other non-2xx, with the parsed error.
         """
-        if response.status_code == 200:
-            return RedfishApiRespond.Ok
-        if response.status_code == 202:
-            return RedfishApiRespond.AcceptedTaskGenerated
-        if response.status_code == 204:
-            return RedfishApiRespond.Success
-        if 200 <= response.status_code < 300:
-            return RedfishApiRespond.Success
-        if response.status_code == 401:
-            raise RedfishUnauthorized("Unauthorized access")
-        elif response.status_code == 403:
-            raise RedfishForbidden("access forbidden")
-        elif response.status_code == 404:
-            error_msg = RedfishManager.parse_error(response)
-            raise ResourceNotFound(error_msg)
-        else:
-            error_msg = RedfishManager.parse_error(response)
-            raise ResourceNotFound(error_msg)
+        from .vendor_profile import DmtfProfile
+        return DmtfProfile.instance().error_handler(response)
 
     @staticmethod
     def value_from_json_list(json_obj, k: str):
@@ -1058,32 +1150,19 @@ class RedfishManager:
 
         return job_id
 
-    @staticmethod
-    def job_id_from_respond(
-            response: requests.models.Response) -> str:
-        """Try to parse job id from HTTP respond, otherwise empty string
-        :param response: requests.models.Response
-        :return: str: a job id or empty string
-        """
-        try:
-            if response is not None and hasattr(response, "__dict__"):
-                response_dict = str(response.__dict__)
-                if response_dict is not None and len(response_dict) > 0:
-                    job_id = re.search("JID_.+?,", response_dict)
-                    if job_id is not None:
-                        job_id = job_id.group(0)
-                    return job_id
-        except AttributeError as attr_err:
-            logging.debug(f"could not read job id from respond object: {attr_err}")
-
-        return ""
-
     def parse_task_id(self, data) -> str:
         """Parses input data and try to get a
         job id from the http header or http response.
 
+        Unwraps a ``CommandResult``'s ``extra`` or a raw response, then
+        delegates the extraction to the connection's vendor profile: the DMTF
+        form reads the ``Location`` header only; the Dell profile adds the
+        ``JID_`` body-scrape fallback (the regex that used to live here — the
+        neutral layer now holds no Dell literal).
+
         :param data:  http response or CommandResult
         :return: job_id or empty string.
+        :raises ValueError: when ``data`` is neither of the accepted shapes.
         """
         # get response from extra
         if data is None:
@@ -1100,66 +1179,26 @@ class RedfishManager:
         if resp is None:
             return ""
 
-        # this based on spec
-        try:
-            job_id = self.job_id_from_header(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-            return job_id
-        # optional lookup, fall through to the response body below.
-        except TaskIdUnavailable as header_err:
-            logging.debug(f"no job id in the response header: {header_err}")
-
-        # this from response
-        try:
-            # try to get from the response, it an optional check.
-            job_id = self.job_id_from_respond(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-        except TaskIdUnavailable as respond_err:
-            logging.debug(f"no job id in the response body: {respond_err}")
-
-        return ""
+        return self.vendor_profile.parse_task_id(resp)
 
     def get_task_state(
             self, resp: requests.models.Response
     ) -> Tuple[Optional[TaskState], Optional[TaskStatus]]:
-        """Parse a DMTF ``#Task`` response into its state and status.
+        """Parse a task response into its state and status, per vendor profile.
 
-        Reads the generic ``TaskState``/``TaskStatus`` properties a Redfish
-        ``TaskService`` serves on ``/redfish/v1/TaskService/Tasks/{id}``. Unlike
-        the Dell ``IDracManager.get_task_state``, it never consults the
-        ``/Oem/Dell/Jobs`` ``JobState`` and raises nothing on a missing key: an
-        absent, non-JSON, or non-spec value maps to ``None`` so the caller keeps
-        its last observed state.
+        Delegates to the connection's vendor profile: the DMTF form reads the
+        generic ``TaskState``/``TaskStatus`` properties and raises nothing on a
+        missing key (an absent, non-JSON, or non-spec value maps to ``None``);
+        the Dell profile parses the iDRAC vocabulary and raises
+        ``UnexpectedResponse`` when neither state nor status is present.
 
         :param resp: a requests.models.Response holding a ``#Task`` body.
         :return: a ``(TaskState, TaskStatus)`` tuple; either element is ``None``
             when the body is not a JSON object, the key is absent, or the value
-            is not a DMTF-defined enum member.
+            is not a DMTF-defined enum member. The Dell profile returns the
+            ``(IdracTaskState, IdracTaskStatus)`` vocabulary instead.
         """
-        try:
-            data = resp.json()
-        except requests.exceptions.JSONDecodeError as json_err:
-            self.logger.debug(f"task response carried no json body: {json_err}")
-            return None, None
-        if not isinstance(data, dict):
-            return None, None
-
-        def _coerce(enum_cls, value):
-            """Return the enum member for a wire value, or None if not a member.
-
-            :param enum_cls: the enum class to coerce into (TaskState / TaskStatus).
-            :param value: the raw wire value read from the #Task body.
-            :return: the matching enum member, or None when value is not a member.
-            """
-            try:
-                return enum_cls(value)
-            except ValueError:
-                return None
-
-        return (
-            _coerce(TaskState, data.get(RedfishJson.TaskState)),
-            _coerce(TaskStatus, data.get(RedfishJson.TaskStatus)),
-        )
+        return self.vendor_profile.get_task_state(self, resp)
 
     def fetch_task(
             self,
@@ -1168,16 +1207,14 @@ class RedfishManager:
             wait_for_state: Optional[TaskState] = None,
             timeout: Optional[float] = None,
     ) -> Optional[TaskState]:
-        """Poll the generic DMTF ``TaskService`` until a task finishes.
+        """Poll one task until it finishes, per the connection's vendor profile.
 
-        Blocks on ``GET /redfish/v1/TaskService/Tasks/{task_id}``, following the
-        Redfish task-monitor semantics: ``202 Accepted`` while the task runs,
-        ``200 OK`` once it carries a state, ``404``/``410`` when a cancelled task
-        is reaped. Returns as soon as the task reaches a terminal state
-        (Completed/Killed/Cancelled/Exception) or the optional ``wait_for_state``.
-        This is the vendor-neutral counterpart to ``IDracManager.fetch_task``,
-        which additionally consults the Dell OEM ``/Oem/Dell/Jobs`` job model;
-        here only the specification's ``TaskService`` is polled.
+        Delegates to the vendor profile resolved for this connection: the DMTF
+        form blocks on ``GET /redfish/v1/TaskService/Tasks/{task_id}`` following
+        the Redfish task-monitor semantics (``202`` while running, ``200`` once
+        a state is carried, ``404``/``410`` when a cancelled task is reaped);
+        the Dell profile additionally consults the OEM ``/Oem/Dell/Jobs`` job
+        model first. Same-signature delegate — existing callers are unchanged.
 
         :param task_id: the ``Id`` of the task, as returned when it was created.
         :param sleep_time: seconds to wait between polls; a server ``Retry-After``
@@ -1187,59 +1224,12 @@ class RedfishManager:
         :param timeout: optional wall-clock budget in seconds; ``None`` waits
             until a terminal state or the task is reaped.
         :return: the last observed :class:`TaskState`, or ``None`` if the task
-            never reported a recognised state.
+            never reported a recognised state (Dell returns its own vocabulary).
         :raise AuthenticationFailed: if the service returns HTTP 401.
         """
-        url = f"{self._default_method}{self.redfish_ip}{RedfishApi.Tasks}{task_id}"
-        started = time.monotonic()
-        task_state: Optional[TaskState] = None
-        poll_count = 0
-
-        # One INTERNAL span for the whole poll; each api_get_call below nests as a
-        # CLIENT child automatically because the OTel context is the call stack.
-        with tracing.poll_task_span() as poll_span:
-            try:
-                while True:
-                    resp = self.api_get_call(url, {})
-                    poll_count += 1
-                    code = resp.status_code
-
-                    if code == 401:
-                        raise AuthenticationFailed("task service returned 401.")
-                    # A reaped/cancelled task monitor returns 410 Gone or 404 Not
-                    # Found; a 5xx ends the wait. Keep the last state seen.
-                    if code in (404, 410) or code >= 500:
-                        self.logger.info(
-                            f"task {task_id} monitor returned {code}; stopping poll."
-                        )
-                        break
-
-                    state, _status = self.get_task_state(resp)
-                    if state is not None:
-                        task_state = state
-                    if wait_for_state is not None and task_state == wait_for_state:
-                        break
-                    if task_state in TERMINAL_TASK_STATES:
-                        break
-
-                    try:
-                        retry_after = int(resp.headers.get("Retry-After", 0) or 0)
-                    except (TypeError, ValueError):
-                        retry_after = 0
-                    delay = max(int(sleep_time or 0), retry_after)
-
-                    if timeout is not None and (time.monotonic() - started) >= timeout:
-                        self.logger.info(
-                            f"task {task_id} poll timed out after {timeout}s."
-                        )
-                        break
-                    time.sleep(delay)
-            finally:
-                self._set_poll_span_attributes(
-                    poll_span, poll_count, sleep_time, started, task_state
-                )
-
-        return task_state
+        return self.vendor_profile.fetch_task(
+            self, task_id, sleep_time=sleep_time,
+            wait_for_state=wait_for_state, timeout=timeout)
 
     @staticmethod
     def _set_poll_span_attributes(span, poll_count, sleep_time, started, task_state):

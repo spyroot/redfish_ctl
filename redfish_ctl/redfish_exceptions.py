@@ -50,3 +50,12 @@ class RedfishGone(RedfishException):
     """HTTP status code 410
     """
     pass
+
+
+class ProfileRegistrationCollision(RedfishException):
+    """Two vendor profiles registered under the same vendor key.
+
+    Raised at import time so a duplicate registration fails loudly during
+    startup instead of silently last-write-winning at dispatch time.
+    """
+    pass

@@ -214,15 +214,18 @@ class MockRedfishService:
     # set below is what tests actually assert against and moves with the vendor.
     JOB_ID = _DELL_JOB_ID
 
-    def __init__(self, fixture_dir: Path, index=None, vendor: str = "dell"):
+    def __init__(self, fixture_dir: Path, index=None, *, vendor: str):
         """Build a mock Redfish service for one vendor's fixture tree.
 
         :param fixture_dir: directory of flattened ``_redfish_v1_*.json`` GET fixtures.
         :param index: optional prebuilt case-insensitive fixture index; the
             module default is used when omitted.
-        :param vendor: fixture-set name (e.g. ``dell``, ``supermicro``,
-            ``supermicro_x10_119``, ``generic``, ``hpe``); selects the
-            vendor-faithful task-realization shape via ``_vendor_task_id``.
+        :param vendor: REQUIRED keyword — the fixture-set lens this mock
+            serves (e.g. ``dell``, ``supermicro``, ``supermicro_x10_119``,
+            ``generic``, ``hpe``); selects the vendor-faithful
+            task-realization shape via ``_vendor_task_id``. A mock without a
+            named lens is the anti-pattern that produced cross-vendor
+            assertions, so omission is a TypeError by design.
         """
         self._dir = fixture_dir
         self._index = index if index is not None else _FIXTURE_INDEX
@@ -337,12 +340,18 @@ def _reset_command_singletons():
     (``idrac_manage_servers`` and friends) on the instance. Without a reset, the
     first vendor a command sees wins for the whole session — which only bites
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
-    Clearing the instance registry before each test isolates them.
+    Clearing the instance registry before each test isolates them. The
+    connection-level vendor-profile cache (``vendor_profile._PROFILE_CACHE``)
+    is cleared alongside for the same reason: a lens classified in one test
+    must not leak its profile into the next.
     """
+    from redfish_ctl import vendor_profile
     from redfish_ctl.idrac_shared import Singleton
     Singleton._instances.clear()
+    vendor_profile.clear_profile_cache()
     yield
     Singleton._instances.clear()
+    vendor_profile.clear_profile_cache()
 
 
 @pytest.fixture
@@ -353,7 +362,7 @@ def redfish_service():
     or pre-seed state. Most tests can use ``redfish_mock`` / ``redfish_api`` instead.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    service = MockRedfishService(_FIXTURE_DIR)
+    service = MockRedfishService(_FIXTURE_DIR, vendor="dell")
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)

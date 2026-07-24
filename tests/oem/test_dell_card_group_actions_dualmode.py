@@ -78,7 +78,8 @@ def dell_card_group_mock(tmp_path):
             },
         },
     )
-    service = MockRedfishService(tmp_path, index=_build_fixture_index(tmp_path))
+    service = MockRedfishService(
+        tmp_path, index=_build_fixture_index(tmp_path), vendor="dell")
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)
