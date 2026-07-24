@@ -1,9 +1,10 @@
 """Dual-mode-style coverage for Dell software update schedule actions."""
 
-import json
+import copy
 from pathlib import Path
 
 import pytest
+from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
@@ -18,7 +19,6 @@ DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz",
     "10.252.252.209",
 )
-DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 SERVICE = (
     "/redfish/v1/Systems/System.Embedded.1/Oem/Dell/"
     "DellSoftwareInstallationService"
@@ -27,82 +27,60 @@ SET_TARGET = f"{SERVICE}/Actions/DellSoftwareInstallationService.SetUpdateSchedu
 CLEAR_TARGET = f"{SERVICE}/Actions/DellSoftwareInstallationService.ClearUpdateSchedule"
 
 
-def _fixture_for_path(path):
-    """Return the extracted Dell fixture matching a Redfish path.
-
-    :param path: request path from requests-mock.
-    :return: fixture path, or None when the corpus lacks the resource.
-    """
-    name = "_" + path.strip("/").replace("/", "_") + ".json"
-    return DELL_INDEX.get(name.lower())
-
-
-def _service_body():
-    """Return the DellSoftwareInstallationService fixture body.
-
-    :return: parsed DellSoftwareInstallationService JSON.
-    """
-    return json.loads(_fixture_for_path(SERVICE).read_text())
-
-
 @pytest.fixture
-def dell_software_manager():
-    """Serve the committed Dell corpus over requests-mock.
+def dell_software_mock():
+    """Return a manager and mock service backed by the Dell XR8620t corpus.
 
-    :return: tuple of IDracManager, recorded requests, and GET overrides.
+    The vendor-faithful service realizes an Action POST the Dell way: 202 plus
+    a ``JID_`` OEM job id in the Location header, never a DMTF-generic token.
+
+    :return: tuple of IDracManager and the recording MockRedfishService.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    requests = []
-    overrides = {}
-
-    def get_cb(request, context):
-        requests.append(request)
-        override = overrides.get(request.path.lower())
-        if override is not None:
-            context.status_code = 200
-            return json.dumps(override)
-        fixture = _fixture_for_path(request.path)
-        if fixture is None:
-            context.status_code = 404
-            return json.dumps({"error": f"no fixture for {request.path}"})
-        context.status_code = 200
-        return fixture.read_text()
-
-    def post_cb(request, context):
-        requests.append(request)
-        context.status_code = 202
-        context.headers["Location"] = "/redfish/v1/TaskService/Tasks/software-schedule-1"
-        return json.dumps({
-            "Task": {
-                "@odata.id": "/redfish/v1/TaskService/Tasks/software-schedule-1"
-            }
-        })
-
+    service = MockRedfishService(
+        DELL_CORPUS,
+        index=_build_fixture_index(DELL_CORPUS),
+    )
     with requests_mock.Mocker() as mocker:
-        mocker.get(requests_mock.ANY, text=get_cb)
-        mocker.post(requests_mock.ANY, text=post_cb)
-        manager = IDracManager(
-            idrac_ip="mock-dell-software",
-            idrac_username="root",
-            idrac_password="mock",
-            insecure=True,
-            is_debug=False,
+        mocker.get(requests_mock.ANY, text=service.get_cb)
+        mocker.patch(requests_mock.ANY, text=service.patch_cb)
+        mocker.post(requests_mock.ANY, text=service.post_cb)
+        mocker.delete(requests_mock.ANY, text=service.delete_cb)
+        service.mocker = mocker
+        yield (
+            IDracManager(
+                idrac_ip="mock-dell-software",
+                idrac_username="root",
+                idrac_password="mock",
+                insecure=True,
+                is_debug=False,
+            ),
+            service,
         )
-        yield manager, requests, overrides
 
 
-def _post_requests(requests):
-    """Return POST requests recorded by the mock Redfish transport.
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service.
 
-    :param requests: recorded requests-mock request objects.
+    :param service: the recording MockRedfishService.
     :return: list of POST requests.
     """
-    return [request for request in requests if request.method == "POST"]
+    return [request for request in service.requests if request.method == "POST"]
 
 
-def test_dell_software_update_schedule_lists_targets(dell_software_manager):
+def _overlay_installation_service(service, body):
+    """Overlay DellSoftwareInstallationService under both common request casings.
+
+    :param service: the recording MockRedfishService.
+    :param body: replacement installation-service body.
+    """
+    service._overlay[SERVICE] = body
+    service._overlay[SERVICE.lower()] = body
+
+
+def test_dell_software_update_schedule_lists_targets(dell_software_mock):
     """Omitting --action lists set/clear targets without POSTing."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -126,12 +104,12 @@ def test_dell_software_update_schedule_lists_targets(dell_software_manager):
         "HTTPS",
         "NFS",
     ]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_software_update_schedule_set_previews_payload(dell_software_manager):
+def test_dell_software_update_schedule_set_previews_payload(dell_software_mock):
     """SetUpdateSchedule resolves and previews payloads by default."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -155,12 +133,12 @@ def test_dell_software_update_schedule_set_previews_payload(dell_software_manage
         "ShareType": "HTTP",
         "ApplyReboot": "NoReboot",
     }
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_software_update_schedule_set_confirm_posts(dell_software_manager):
-    """--confirm POSTs a SetUpdateSchedule payload to the discovered target."""
-    manager, requests, _ = dell_software_manager
+def test_dell_software_update_schedule_set_confirm_posts(dell_software_mock):
+    """--confirm POSTs SetUpdateSchedule; the Dell lens realizes a ``JID_`` job id."""
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -172,13 +150,14 @@ def test_dell_software_update_schedule_set_confirm_posts(dell_software_manager):
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
     assert result.data["action"] == "#DellSoftwareInstallationService.SetUpdateSchedule"
     assert result.data["target"] == SET_TARGET
-    assert result.data["task_id"] == "software-schedule-1"
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.JOB_ID.startswith("JID_")
     assert len(posts) == 1
     assert posts[0].path.lower() == SET_TARGET.lower()
     assert posts[0].json() == {
@@ -189,10 +168,10 @@ def test_dell_software_update_schedule_set_confirm_posts(dell_software_manager):
 
 
 def test_dell_software_update_schedule_set_dry_run_overrides_confirm(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """--dry_run keeps SetUpdateSchedule from POSTing even with --confirm."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -208,14 +187,14 @@ def test_dell_software_update_schedule_set_dry_run_overrides_confirm(
     assert result.data["dry_run"] is True
     assert result.data["blocked"] is None
     assert result.data["target"] == SET_TARGET
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_software_update_schedule_rejects_invalid_allowable(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """Inline allowable values reject invalid SetUpdateSchedule enum values."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -237,12 +216,12 @@ def test_dell_software_update_schedule_rejects_invalid_allowable(
             "allowed": ["CIFS", "FTP", "HTTP", "HTTPS", "NFS"],
         }
     ]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_software_update_schedule_clear_previews(dell_software_manager):
+def test_dell_software_update_schedule_clear_previews(dell_software_mock):
     """ClearUpdateSchedule previews by default without POSTing."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -257,14 +236,14 @@ def test_dell_software_update_schedule_clear_previews(dell_software_manager):
     assert result.data["target"] == CLEAR_TARGET
     assert result.data["payload"] == {}
     assert result.data["blocked"] == "destructive action requires --confirm"
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_software_update_schedule_clear_confirm_posts_empty_payload(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """--confirm POSTs an empty ClearUpdateSchedule body."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -273,7 +252,7 @@ def test_dell_software_update_schedule_clear_confirm_posts_empty_payload(
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
@@ -285,13 +264,13 @@ def test_dell_software_update_schedule_clear_confirm_posts_empty_payload(
 
 
 def test_dell_software_update_schedule_reports_missing_action(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """A service without SetUpdateSchedule reports the available schedule action."""
-    manager, requests, overrides = dell_software_manager
-    body = _service_body()
+    manager, service = dell_software_mock
+    body = copy.deepcopy(service._state(SERVICE))
     body["Actions"].pop("#DellSoftwareInstallationService.SetUpdateSchedule")
-    overrides[SERVICE.lower()] = body
+    _overlay_installation_service(service, body)
 
     result = manager.sync_invoke(
         ApiRequestType.DellSoftwareUpdateSchedule,
@@ -303,14 +282,14 @@ def test_dell_software_update_schedule_reports_missing_action(
     assert isinstance(result, CommandResult)
     assert result.error == "Dell software update schedule action not found: set"
     assert [row["Action"] for row in result.data["available"]] == ["clear"]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_software_update_schedule_rejects_empty_set_payload(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """SetUpdateSchedule requires at least one payload field."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     with pytest.raises(InvalidArgument, match="--action set requires"):
         manager.sync_invoke(
@@ -319,14 +298,14 @@ def test_dell_software_update_schedule_rejects_empty_set_payload(
             action="set",
         )
 
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_software_update_schedule_rejects_non_object_json(
-    dell_software_manager,
+    dell_software_mock,
 ):
     """The payload JSON must be an object."""
-    manager, requests, _ = dell_software_manager
+    manager, service = dell_software_mock
 
     with pytest.raises(InvalidArgument, match="JSON object"):
         manager.sync_invoke(
@@ -336,7 +315,7 @@ def test_dell_software_update_schedule_rejects_non_object_json(
             payload_json='["not-object"]',
         )
 
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_software_update_schedule_is_registered():
