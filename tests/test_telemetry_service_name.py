@@ -18,8 +18,15 @@ def _clear_service_env(monkeypatch):
 
     :param monkeypatch: pytest environment patcher.
     """
-    for name in ("REDFISH_EXPORTER_SERVICE_NAME", "IDRAC_EXPORTER_SERVICE_NAME"):
-        monkeypatch.delenv(name, raising=False)
+    for prefix in ("REDFISH_EXPORTER_", "IDRAC_EXPORTER_"):
+        for suffix in (
+            "SERVICE_NAME",
+            "SERVICE_NAMESPACE",
+            "SERVICE_INSTANCE_ID",
+            "SERVICE_VERSION",
+            "SERVICE_CRITICALITY",
+        ):
+            monkeypatch.delenv(prefix + suffix, raising=False)
 
 
 def _identity(**kwargs):
@@ -100,3 +107,20 @@ def test_cli_service_name_override_parses():
     parser, _, _ = Exporter.register_subcommand(Exporter)
     namespace = parser.parse_args(["--service-name", "redfish-fleet"])
     assert namespace.service_name == "redfish-fleet"
+
+
+def test_cli_full_service_identity_parses():
+    """All OTel service identity fields have dedicated exporter flags."""
+    parser, _, _ = Exporter.register_subcommand(Exporter)
+    namespace = parser.parse_args([
+        "--service-name", "redfish-fleet",
+        "--service-namespace", "hardware",
+        "--service-instance-id", "rack-a-exporter",
+        "--service-version", "2.0.0",
+        "--service-criticality", "critical",
+    ])
+    assert namespace.service_name == "redfish-fleet"
+    assert namespace.service_namespace == "hardware"
+    assert namespace.service_instance_id == "rack-a-exporter"
+    assert namespace.service_version == "2.0.0"
+    assert namespace.service_criticality == "critical"

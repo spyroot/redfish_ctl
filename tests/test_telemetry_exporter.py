@@ -4,6 +4,7 @@ import argparse
 import json
 import threading
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from redfish_ctl.telemetry.exporter import (
 from redfish_ctl.telemetry.identity import parse_dimension_pairs
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
+TEST_SERVICE_INSTANCE_ID = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
 GB300_CORPUS = corpus_dir(
     Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
 )
@@ -628,6 +630,10 @@ def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
         return CommandResult([], None, None, None)
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+    # Identity discovery reads the Managers/Chassis collections via base_query;
+    # stub it so the offline scrape never reaches the network.
+    monkeypatch.setattr(
+        manager, "base_query", lambda *a, **k: CommandResult({}, None, None, None))
 
     samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
 
@@ -653,6 +659,12 @@ def test_exporter_collect_samples_unreachable_bmc_reports_down(monkeypatch):
         raise TimeoutError("timed out reading the BMC")
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
+
+    def fake_base_query(*_a, **_k):
+        """Identity discovery also times out on a fully unreachable BMC."""
+        raise TimeoutError("timed out reading the BMC")
+
+    monkeypatch.setattr(manager, "base_query", fake_base_query)
 
     samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
 
@@ -744,7 +756,11 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _single_metric(samples, "redfish_exporter_scrape_success").value == 0
     assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 1
@@ -757,7 +773,9 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         samples, "redfish_exporter_collector_success", "metric-reports").value == 0
     errors = _metric_samples(samples, "redfish_exporter_collection_errors_total")
     assert len(errors) == 1
-    assert errors[0].dimensions == {
+    error_dimensions = dict(errors[0].dimensions)
+    assert uuid.UUID(error_dimensions.pop("service.instance.id"))
+    assert error_dimensions == {
         "host.name": "gb300-poc1-slot9",
         "node": "slot9",
         "server.address": "172.25.230.49",
@@ -788,7 +806,11 @@ def test_exporter_collect_samples_treats_unsupported_collectors_as_healthy(
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _single_metric(samples, "redfish_exporter_scrape_success").value == 1
     assert _single_metric(samples, "redfish_exporter_scrape_partial").value == 0
@@ -823,7 +845,11 @@ def test_exporter_collect_samples_classifies_malformed_collector_payload(
 
     monkeypatch.setattr(manager, "sync_invoke", fake_sync_invoke)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29",
+        vendor="dell",
+        service_instance_id=TEST_SERVICE_INSTANCE_ID,
+    )
 
     assert _collector_metric(
         samples, "redfish_exporter_collector_success", "sensors").value == 0
@@ -1077,6 +1103,11 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
             "deployment_environment": "staging",
             "deployment_environment_compat": "stable",
             "require_deployment_environment": True,
+            "service_name": "redfish-fleet",
+            "service_namespace": "hardware",
+            "service_instance_id": "rack-a-exporter",
+            "service_version": "2.0.0",
+            "service_criticality": "critical",
             "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
@@ -1091,6 +1122,11 @@ def test_exporter_config_file_flattens_signalfx_and_identity(tmp_path):
         "deployment_environment": "staging",
         "deployment_environment_compat": "stable",
         "require_deployment_environment": True,
+        "service_name": "redfish-fleet",
+        "service_namespace": "hardware",
+        "service_instance_id": "rack-a-exporter",
+        "service_version": "2.0.0",
+        "service_criticality": "critical",
         "extra_dimensions": {"telemetry.source": "redfish"},
     }
 
@@ -1187,6 +1223,11 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
             "server_octet_base": 100,
             "server_subnet": "198.51.100",
             "deployment_environment": "nv72-gb300",
+            "service_name": "redfish-fleet",
+            "service_namespace": "hardware",
+            "service_instance_id": "rack-a-exporter",
+            "service_version": "2.0.0",
+            "service_criticality": "critical",
             "extra_dimensions": {"telemetry.source": "redfish"},
         },
     }), encoding="utf-8")
@@ -1221,6 +1262,8 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     assert first_dims["deployment.environment"] == "nv72-gb300"
     assert first_dims["deployment.environment.name"] == "nv72-gb300"
     assert first_dims["telemetry.source"] == "redfish"
+    assert first_dims["service.name"] == "redfish-fleet"
+    assert not (set(exporter_mod.identity_mod.RESOURCE_ONLY_DIMENSIONS) & set(first_dims))
 
 
 def test_signalfx_push_loop_jitters_sleep(monkeypatch):

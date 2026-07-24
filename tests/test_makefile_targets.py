@@ -109,4 +109,5 @@ def test_conda_environment_includes_make_build_tools() -> None:
     """The project environment should include every tool used by local Makefile targets."""
     environment_text = (REPO_ROOT / "environment.yml").read_text(encoding="utf-8")
 
+    assert "  - make" in environment_text
     assert "  - twine" in environment_text

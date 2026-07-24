@@ -8,19 +8,22 @@ The exporter is read-only. It walks modern Redfish telemetry resources and
 normalizes them into the ``hw.*`` metric contract used by the GB300/NV72
 observability demo.
 """
+import logging
 import os
 import time
+import uuid
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
+from ..cmd_exceptions import ResourceNotFound
 from ..idrac_manager import IDracManager
 from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult, RedfishResponseCache
 from . import exporter
 from .exporter import (
-    build_identity_dimensions,
     build_metric_samples,
+    build_telemetry_identity,
     render_prometheus_text,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
@@ -28,6 +31,8 @@ from .exporter import (
     serve_prometheus,
     to_signalfx_body,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Exporter(IDracManager,
@@ -158,9 +163,28 @@ class Exporter(IDracManager,
             help="fixed validated KEY=VALUE dimension to add to every telemetry sample")
         cmd_parser.add_argument(
             "--service-name", dest="service_name", default=None, type=str,
-            help="OTel service.name (logical service name) emitted on every series as a "
-                 "dimension/label and the OTLP resource attribute; override only, defaults "
-                 "to 'redfish_ctl'. Also REDFISH_EXPORTER_SERVICE_NAME")
+            help="OTel producer service.name, distinct from deployment.environment; "
+                 "emitted on every series and the OTLP resource, default 'redfish_ctl'. "
+                 "Also REDFISH_EXPORTER_SERVICE_NAME")
+        cmd_parser.add_argument(
+            "--service-namespace", dest="service_namespace", default=None, type=str,
+            help="optional OTel producer service.namespace resource attribute; distinct "
+                 "from deployment.environment. Also REDFISH_EXPORTER_SERVICE_NAMESPACE")
+        cmd_parser.add_argument(
+            "--service-instance-id", dest="service_instance_id", default=None, type=str,
+            help="stable identity for this one exporter process, not a per-BMC metric "
+                 "label; raw tokens become UUIDv5. Set a unique override for each "
+                 "parallel process scraping the same BMC. Also "
+                 "REDFISH_EXPORTER_SERVICE_INSTANCE_ID")
+        cmd_parser.add_argument(
+            "--service-version", dest="service_version", default=None, type=str,
+            help="optional OTel producer service.version resource attribute. Also "
+                 "REDFISH_EXPORTER_SERVICE_VERSION")
+        cmd_parser.add_argument(
+            "--service-criticality", dest="service_criticality", default=None, type=str,
+            help="optional OTel service.criticality resource attribute; registered values "
+                 "include critical, high, medium, and low. Also "
+                 "REDFISH_EXPORTER_SERVICE_CRITICALITY")
         cmd_parser.add_argument(
             "--otlp-endpoint", dest="otlp_endpoint", default=None, type=str,
             help="OTLP collector endpoint for --output otlp; defaults to "
@@ -185,6 +209,161 @@ class Exporter(IDracManager,
             return []
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
+
+    def _identity_resource(self, uri: str, redfish_cache, do_async: bool) -> dict:
+        """Read one identity-discovery resource, tolerating unsupported paths.
+
+        :param uri: Redfish resource URI.
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: resource mapping or an empty mapping.
+        :raises Exception: transport and non-404 failures from the Redfish query.
+        """
+        try:
+            result = self.base_query(
+                uri,
+                do_async=do_async,
+                redfish_cache=redfish_cache,
+            )
+        except ResourceNotFound:
+            return {}
+        return result.data if isinstance(result.data, dict) else {}
+
+    @staticmethod
+    def _identity_link(resource: Mapping, key: str) -> Optional[str]:
+        """Return a Redfish link URI from an identity-discovery resource.
+
+        :param resource: Redfish resource mapping.
+        :param key: linked property name.
+        :return: linked ``@odata.id`` or None.
+        """
+        link = resource.get(key)
+        if not isinstance(link, Mapping):
+            return None
+        uri = link.get("@odata.id")
+        return uri if isinstance(uri, str) and uri else None
+
+    @staticmethod
+    def _chassis_identity_rank(item: tuple[str, Mapping]) -> tuple[int, str]:
+        """Rank BMC/DC-SCM chassis ahead of unrelated enclosure resources.
+
+        :param item: pair of chassis URI and resource mapping.
+        :return: stable sort key with the most relevant chassis first.
+        """
+        uri, resource = item
+        description = " ".join(str(resource.get(key) or "")
+                               for key in ("Id", "Name", "Model"))
+        normalized = description.lower().replace("_", "-")
+        if "bmc" in normalized or "dc-scm" in normalized or "dcscm" in normalized:
+            return (0, uri)
+        if str(resource.get("ChassisType") or "").lower() in {"module", "component"}:
+            return (1, uri)
+        return (2, uri)
+
+    def _discover_service_instance_id(
+            self,
+            redfish_cache: RedfishResponseCache,
+            do_async: bool = False) -> Optional[str]:
+        """Derive a stable global service instance UUID from Redfish identity.
+
+        Source precedence is Manager UUID, BMC/DC-SCM chassis serial, burned-in
+        management MAC, configurable management MAC, then a random UUID fallback.
+
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: canonical service.instance.id UUID text, or None when no stable
+            source is available.
+        """
+        managers_collection = self._identity_resource(
+            REDFISH_API.IDRAC_MANAGER, redfish_cache, do_async)
+        manager_resources = []
+        for uri in sorted(self._members(managers_collection)):
+            manager_resources.append((
+                uri,
+                self._identity_resource(uri, redfish_cache, do_async),
+            ))
+
+        manager_uuids = [resource.get("UUID") for _, resource in manager_resources]
+        instance_id = exporter.identity_mod.service_instance_id_from_sources(
+            manager_uuids=manager_uuids,
+        )
+        if instance_id is not None:
+            return instance_id
+
+        chassis_collection = self._identity_resource(
+            REDFISH_API.Chassis, redfish_cache, do_async)
+        chassis_resources = []
+        for uri in sorted(self._members(chassis_collection)):
+            chassis_resources.append((
+                uri,
+                self._identity_resource(uri, redfish_cache, do_async),
+            ))
+        chassis_resources.sort(key=self._chassis_identity_rank)
+        chassis_serials = [resource.get("SerialNumber")
+                           for _, resource in chassis_resources]
+        instance_id = exporter.identity_mod.service_instance_id_from_sources(
+            chassis_serials=chassis_serials,
+        )
+        if instance_id is not None:
+            return instance_id
+
+        mac_addresses = []
+        for _, manager in manager_resources:
+            collection_uri = self._identity_link(manager, "EthernetInterfaces")
+            if not collection_uri:
+                continue
+            collection = self._identity_resource(
+                collection_uri, redfish_cache, do_async)
+            for interface_uri in sorted(self._members(collection)):
+                interface = self._identity_resource(
+                    interface_uri, redfish_cache, do_async)
+                instance_id = exporter.identity_mod.service_instance_id_from_sources(
+                    permanent_macs=[interface.get("PermanentMACAddress")],
+                )
+                if instance_id is not None:
+                    return instance_id
+                mac_addresses.append(interface.get("MACAddress"))
+
+        return exporter.identity_mod.service_instance_id_from_sources(
+            mac_addresses=mac_addresses,
+        )
+
+    def _default_service_instance_id(
+            self,
+            redfish_cache: RedfishResponseCache,
+            do_async: bool = False) -> str:
+        """Return a stable discovered ID or a retryable process fallback.
+
+        A discovered BMC identity is cached permanently. A random fallback is
+        also process-stable, but discovery is retried on later scrapes so a
+        transient read failure cannot pin the fallback for the process lifetime.
+
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: canonical service.instance.id UUID text.
+        """
+        discovered = getattr(self, "_derived_service_instance_id", None)
+        if discovered is not None:
+            return discovered
+        try:
+            discovered = self._discover_service_instance_id(
+                redfish_cache,
+                do_async=do_async,
+            )
+        except Exception as exc:  # an unreachable/malformed BMC must not crash the scrape
+            logger.debug("service.instance.id discovery failed: %s", exc)
+            discovered = None
+        if discovered is not None:
+            self._derived_service_instance_id = discovered
+            return discovered
+        fallback = getattr(self, "_fallback_service_instance_id", None)
+        if fallback is None:
+            fallback = str(uuid.uuid4())
+            self._fallback_service_instance_id = fallback
+            logger.warning(
+                "No stable Redfish service instance identity was available; "
+                "using a random UUID while discovery is retried")
+        return fallback
 
     def _invoke_rows(self, api_type: ApiRequestType, name: str, **kwargs) -> list:
         """Invoke another read-only command and tolerate absent resources.
@@ -490,7 +669,12 @@ class Exporter(IDracManager,
                         deployment_environment_compat: Optional[str] = None,
                         require_deployment_environment: Optional[bool] = None,
                         extra_dimensions: Optional[Mapping | list[str]] = None,
-                        service_name: Optional[str] = None) -> list:
+                        service_name: Optional[str] = None,
+                        service_namespace: Optional[str] = None,
+                        service_instance_id: Optional[str] = None,
+                        service_version: Optional[str] = None,
+                        service_criticality: Optional[str] = None,
+                        otlp_traces: bool = False) -> list:
         """Scrape all supported read-only telemetry paths and build samples.
 
         :param label_bmc_ip: BMC IP used only for metric dimensions; defaults to the
@@ -507,6 +691,11 @@ class Exporter(IDracManager,
         :param require_deployment_environment: when True, fail if the environment is absent.
         :param extra_dimensions: fixed validated dimensions applied to every sample.
         :param service_name: OTel service.name (logical service name) emitted on every sample.
+        :param service_namespace: optional OTel service namespace resource attribute.
+        :param service_instance_id: optional stable process identity override.
+        :param service_version: optional service component version resource attribute.
+        :param service_criticality: optional service importance resource attribute.
+        :param otlp_traces: whether to configure tracing with this resolved identity.
         :return: list of MetricSample objects, including the scrape-health samples.
         """
         started_at = exporter.time.monotonic()
@@ -521,12 +710,30 @@ class Exporter(IDracManager,
             require_deployment_environment=require_deployment_environment,
             extra_dimensions=extra_dimensions,
             service_name=service_name,
+            service_namespace=service_namespace,
+            service_instance_id=service_instance_id,
+            service_version=service_version,
+            service_criticality=service_criticality,
         )
-        identity = build_identity_dimensions(
+        if identity_options["service_instance_id"] is None:
+            identity_options["service_instance_id"] = (
+                self._default_service_instance_id(
+                    redfish_cache,
+                    do_async=do_async,
+                )
+            )
+        telemetry_identity = build_telemetry_identity(
             label_bmc_ip or self.idrac_ip,
             vendor=self._vendor_label(vendor, redfish_cache=redfish_cache),
             **identity_options,
         )
+        if otlp_traces:
+            from . import tracing
+            tracing.setup_otlp(
+                telemetry_identity.service_name,
+                telemetry_identity.resource_attributes(),
+            )
+        identity = telemetry_identity.dimensions()
         collector_results = [
             self._invoke_collector(
                 ApiRequestType.EnvironmentMetrics,
@@ -649,8 +856,13 @@ class Exporter(IDracManager,
                 require_deployment_environment: Optional[bool] = None,
                 extra_dimensions: Optional[list[str]] = None,
                 service_name: Optional[str] = None,
+                service_namespace: Optional[str] = None,
+                service_instance_id: Optional[str] = None,
+                service_version: Optional[str] = None,
+                service_criticality: Optional[str] = None,
                 otlp_endpoint: Optional[str] = None,
                 otlp_protocol: Optional[str] = None,
+                otlp_traces: bool = False,
                 **kwargs) -> CommandResult:
         """Scrape once, serve Prometheus, or push SignalFx/OTLP datapoints.
 
@@ -691,10 +903,15 @@ class Exporter(IDracManager,
         :param extra_dimensions: fixed validated dimensions applied to every sample.
         :param service_name: OTel service.name (logical service name) emitted on every
             series; defaults to 'redfish_ctl'.
+        :param service_namespace: optional OTel service namespace resource attribute.
+        :param service_instance_id: optional stable exporter-process identity override.
+        :param service_version: optional service component version resource attribute.
+        :param service_criticality: optional service importance resource attribute.
         :param otlp_endpoint: OTLP collector endpoint for ``--output otlp``; resolved from
             OTEL_* env when None.
         :param otlp_protocol: OTLP transport (``grpc`` or ``http/protobuf``); resolved from
             OTEL_* env when None.
+        :param otlp_traces: whether to configure tracing with the resolved producer identity.
         :return: on ``once``, a CommandResult wrapping the rendered/pushed output and a
             sample-count summary; a CommandResult with empty payload when serving or looping
             forever.
@@ -739,6 +956,10 @@ class Exporter(IDracManager,
             "require_deployment_environment", require_deployment_environment)
         extra_dimensions = option("extra_dimensions", extra_dimensions)
         service_name = option("service_name", service_name)
+        service_namespace = option("service_namespace", service_namespace)
+        service_instance_id = option("service_instance_id", service_instance_id)
+        service_version = option("service_version", service_version)
+        service_criticality = option("service_criticality", service_criticality)
 
         def collect_current_samples():
             """Collect samples with the resolved exporter identity options.
@@ -759,6 +980,11 @@ class Exporter(IDracManager,
                 require_deployment_environment=require_deployment_environment,
                 extra_dimensions=extra_dimensions,
                 service_name=service_name,
+                service_namespace=service_namespace,
+                service_instance_id=service_instance_id,
+                service_version=service_version,
+                service_criticality=service_criticality,
+                otlp_traces=otlp_traces,
             )
 
         if exporter_output == "otlp":

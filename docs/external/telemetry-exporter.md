@@ -195,6 +195,25 @@ environment, and it also becomes the OTLP resource `service.name`. Override it w
 or `REDFISH_EXPORTER_SERVICE_NAME` only when a deployment runs the exporter under a different service
 identity.
 
+The remaining producer identity fields are OTLP resource attributes only; they do not create
+Prometheus labels or SignalFx dimensions. `--service-namespace` optionally groups related services,
+`--service-version` identifies the deployed component version, and `--service-criticality` records
+operational importance. `--service-instance-id` identifies this exporter process. When it is unset,
+the exporter derives a stable UUID from the first usable Manager UUID, BMC/DC-SCM chassis serial, or
+globally administered management MAC exposed by Redfish; a random UUID fallback is used only when no
+stable source exists. Config files use `service_namespace`, `service_instance_id`, `service_version`,
+and `service_criticality` inside the `identity` object. Their canonical environment settings are
+`REDFISH_EXPORTER_SERVICE_NAMESPACE`, `REDFISH_EXPORTER_SERVICE_INSTANCE_ID`,
+`REDFISH_EXPORTER_SERVICE_VERSION`, and `REDFISH_EXPORTER_SERVICE_CRITICALITY`, each defined by
+`specs/config/environment.yaml`.
+
+The default derivation assumes the supported deployment contract of one exporter process per BMC,
+which keeps the instance identity stable across process restarts and BMC address changes. An
+active-active deployment that intentionally runs multiple exporter processes against the same BMC
+must assign each process a distinct `--service-instance-id`. If a canonical environment setting and
+its deprecated `IDRAC_EXPORTER_*` alias disagree, startup fails unless an explicit CLI or config-file
+value selects the intended setting.
+
 ThermalSubsystem temperature samples set `source=thermal-subsystem` and include `chassis`, `sensor`,
 and `zone` dimensions. The `zone` dimension comes from Redfish `PhysicalContext` when present, or
 falls back to the reported sensor name.
@@ -264,9 +283,11 @@ redfish_ctl exporter --vendor supermicro --output otlp --once             # push
 
 The contract is unchanged: metric names and dimension keys are identical to the Prometheus/SignalFx
 outputs. The identity dimensions (`host.name`, `server.address`, `bmc.ip`, `node`, `vendor`,
-`service.name`, `deployment.environment`, `deployment.environment.name`) map to OTel **resource** attributes when
-present; the per-metric dimensions (`gpu`, `port`, `chassis`, `system`, `index`, `resource_type`,
-`resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
+`service.name`, `deployment.environment`, `deployment.environment.name`) and optional producer
+identity fields (`service.namespace`, `service.instance.id`, `service.version`,
+`service.criticality`) map to OTel **resource** attributes when present; the optional producer fields
+are not emitted on other metric backends. Per-metric dimensions (`gpu`, `port`, `chassis`, `system`,
+`index`, `resource_type`, `resource`) map to **datapoint** attributes. Monotonic cumulative counters (fabric
 byte/frame/error/packet/count totals and `hw.energy_kwh`) are emitted as OTLP **Sum**; everything
 instantaneous stays a **Gauge**.
 

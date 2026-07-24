@@ -10,6 +10,7 @@ Author Mus spyroot@gmail.com
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,37 @@ def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
         capture_output=True, text=True, env={**os.environ, "EVIDENCE_DIR": str(tmp_path)},
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
+    """The Python fallback selects the same non-template YAML as yamllint.
+
+    Helm templates contain Go template expressions rather than parseable raw
+    YAML. The primary yamllint path excludes those files, so the fallback must
+    preserve that selection while concrete chart output remains covered by the
+    required Kubernetes render and schema gates.
+    """
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    commands = {
+        "dirname": shutil.which("dirname"),
+        "git": shutil.which("git"),
+        "python": sys.executable,
+    }
+    assert all(commands.values()), commands
+    for name, target in commands.items():
+        (command_dir / name).symlink_to(target)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": str(command_dir)},
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    assert "repo.yaml: OK (python fallback)" in combined
 
 
 @pytest.mark.skipif(shutil.which("kubeconform") is None, reason="kubeconform not in this environment")

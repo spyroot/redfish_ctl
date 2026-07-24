@@ -18,12 +18,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from redfish_ctl.config import ConfigurationConflict
-
+from ..config import ConfigurationConflict
 from . import identity as identity_mod
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
 build_identity_dimensions = identity_mod.build_identity_dimensions
+build_telemetry_identity = identity_mod.build_legacy_gb300_identity
 common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
@@ -720,6 +720,16 @@ def exporter_config_options(path: Optional[str] = None) -> dict:
         "require_deployment_environment": _config_value(
             config, "identity", "require_deployment_environment",
             "require_deployment_environment"),
+        "service_name": _config_value(
+            config, "identity", "service_name", "service_name"),
+        "service_namespace": _config_value(
+            config, "identity", "service_namespace", "service_namespace"),
+        "service_instance_id": _config_value(
+            config, "identity", "service_instance_id", "service_instance_id"),
+        "service_version": _config_value(
+            config, "identity", "service_version", "service_version"),
+        "service_criticality": _config_value(
+            config, "identity", "service_criticality", "service_criticality"),
         "extra_dimensions": _first_non_empty(
             _config_value(config, "identity", "extra_dimensions", "extra_dimensions"),
             config.get("dimensions"),
@@ -1448,6 +1458,7 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
         label_text = ",".join(
             f'{key}="{_escape_label_value(value)}"'
             for key, value in sorted(sample.dimensions.items())
+            if key not in identity_mod.RESOURCE_ONLY_DIMENSIONS
         )
         lines.append(f"{prometheus_name}{{{label_text}}} {_format_value(sample.value)}")
     return "\n".join(lines) + "\n"
@@ -1469,7 +1480,11 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
         body[envelope].append({
             "metric": sample.metric,
             "value": sample.value,
-            "dimensions": dict(sample.dimensions),
+            "dimensions": {
+                key: value
+                for key, value in sample.dimensions.items()
+                if key not in identity_mod.RESOURCE_ONLY_DIMENSIONS
+            },
         })
     return {kind: points for kind, points in body.items() if points}
 

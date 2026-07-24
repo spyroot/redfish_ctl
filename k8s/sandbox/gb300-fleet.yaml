@@ -51,6 +51,15 @@ spec:
         app.kubernetes.io/name: gb300-bmc
         app.kubernetes.io/component: fleet-sim
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: gb300-bmc
+                topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001        # matches the image's pinned mockbmc uid
