@@ -1,9 +1,10 @@
 """Dual-mode-style coverage for DellLCService.ExposeiSMInstallerToHostOS."""
 
-import json
+import copy
 from pathlib import Path
 
 import pytest
+from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.idrac_manager import IDracManager
@@ -13,67 +14,66 @@ from redfish_ctl.redfish_manager import CommandResult
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
-DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 LC_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLCService"
 ISM_ACTION = "#DellLCService.ExposeiSMInstallerToHostOS"
 ISM_TARGET = f"{LC_SERVICE}/Actions/DellLCService.ExposeiSMInstallerToHostOS"
 
 
-def _fixture_for_path(path):
-    """Return the extracted Dell fixture matching a Redfish path."""
-    name = "_" + path.strip("/").replace("/", "_") + ".json"
-    return DELL_INDEX.get(name.lower())
-
-
 @pytest.fixture
-def dell_lc_manager():
-    """Serve the committed Dell corpus over requests-mock."""
+def dell_lc_mock():
+    """Return a manager and mock service backed by the Dell XR8620t corpus.
+
+    The vendor-faithful service realizes an Action POST the Dell way: 202 plus
+    a ``JID_`` OEM job id in the Location header, never a DMTF-generic token.
+
+    :return: tuple of IDracManager and the recording MockRedfishService.
+    """
     requests_mock = pytest.importorskip("requests_mock")
-    requests = []
-    remove_action = {"enabled": False}
-
-    def get_cb(request, context):
-        requests.append(request)
-        fixture = _fixture_for_path(request.path)
-        if fixture is None:
-            context.status_code = 404
-            return json.dumps({"error": f"no fixture for {request.path}"})
-        context.status_code = 200
-        data = json.loads(fixture.read_text(encoding="utf-8"))
-        if remove_action["enabled"] and request.path.lower() == LC_SERVICE.lower():
-            data = dict(data)
-            actions = dict(data.get("Actions") or {})
-            actions.pop(ISM_ACTION, None)
-            data["Actions"] = actions
-        return json.dumps(data)
-
-    def post_cb(request, context):
-        requests.append(request)
-        context.status_code = 202
-        context.headers["Location"] = "/redfish/v1/TaskService/Tasks/ism-1"
-        return json.dumps({"Task": {"@odata.id": "/redfish/v1/TaskService/Tasks/ism-1"}})
-
+    service = MockRedfishService(
+        DELL_CORPUS,
+        index=_build_fixture_index(DELL_CORPUS),
+    )
     with requests_mock.Mocker() as mocker:
-        mocker.get(requests_mock.ANY, text=get_cb)
-        mocker.post(requests_mock.ANY, text=post_cb)
-        manager = IDracManager(
-            idrac_ip="mock-dell-ism",
-            idrac_username="root",
-            idrac_password="mock",
-            insecure=True,
-            is_debug=False,
+        mocker.get(requests_mock.ANY, text=service.get_cb)
+        mocker.patch(requests_mock.ANY, text=service.patch_cb)
+        mocker.post(requests_mock.ANY, text=service.post_cb)
+        mocker.delete(requests_mock.ANY, text=service.delete_cb)
+        service.mocker = mocker
+        yield (
+            IDracManager(
+                idrac_ip="mock-dell-ism",
+                idrac_username="root",
+                idrac_password="mock",
+                insecure=True,
+                is_debug=False,
+            ),
+            service,
         )
-        yield manager, requests, remove_action
 
 
-def _post_requests(requests):
-    """Return POST requests recorded by the mock Redfish transport."""
-    return [request for request in requests if request.method == "POST"]
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service.
+
+    :param service: the recording MockRedfishService.
+    :return: list of POST requests.
+    """
+    return [request for request in service.requests if request.method == "POST"]
 
 
-def test_ism_installer_without_confirm_is_preview_only(dell_lc_manager):
+def _overlay_lc_service_without_ism(service):
+    """Overlay DellLCService with the iSM action removed, under both casings.
+
+    :param service: the recording MockRedfishService.
+    """
+    body = copy.deepcopy(service._state(LC_SERVICE))
+    body["Actions"].pop(ISM_ACTION, None)
+    service._overlay[LC_SERVICE] = body
+    service._overlay[LC_SERVICE.lower()] = body
+
+
+def test_ism_installer_without_confirm_is_preview_only(dell_lc_mock):
     """The iSM installer action previews by default and does not POST."""
-    manager, requests, _remove_action = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcIsmInstaller,
@@ -90,12 +90,12 @@ def test_ism_installer_without_confirm_is_preview_only(dell_lc_manager):
         "level": "destructive",
         "blocked": "destructive action requires --confirm",
     }
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_ism_installer_confirm_posts_to_discovered_target(dell_lc_manager):
-    """With --confirm the command POSTs to the target from DellLCService."""
-    manager, requests, _remove_action = dell_lc_manager
+def test_ism_installer_confirm_posts_to_discovered_target(dell_lc_mock):
+    """With --confirm the POST fires; the Dell lens realizes a ``JID_`` job id."""
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcIsmInstaller,
@@ -103,21 +103,23 @@ def test_ism_installer_confirm_posts_to_discovered_target(dell_lc_manager):
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
     assert result.data["action"] == ISM_ACTION
     assert result.data["target"] == ISM_TARGET
     assert result.data["level"] == "destructive"
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.JOB_ID.startswith("JID_")
     assert len(posts) == 1
     assert posts[0].path.lower() == ISM_TARGET.lower()
     assert posts[0].json() == {}
 
 
-def test_ism_installer_confirm_with_dry_run_still_does_not_post(dell_lc_manager):
+def test_ism_installer_confirm_with_dry_run_still_does_not_post(dell_lc_mock):
     """--dry_run keeps the command in preview mode even with --confirm."""
-    manager, requests, _remove_action = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcIsmInstaller,
@@ -131,12 +133,12 @@ def test_ism_installer_confirm_with_dry_run_still_does_not_post(dell_lc_manager)
     assert result.data["dry_run"] is True
     assert result.data["blocked"] is None
     assert result.data["target"] == ISM_TARGET
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_ism_installer_resource_uri_override_skips_manager_discovery(dell_lc_manager):
+def test_ism_installer_resource_uri_override_skips_manager_discovery(dell_lc_mock):
     """A direct DellLCService URI can be used when Manager discovery is ambiguous."""
-    manager, requests, _remove_action = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcIsmInstaller,
@@ -147,14 +149,17 @@ def test_ism_installer_resource_uri_override_skips_manager_discovery(dell_lc_man
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["target"] == ISM_TARGET
-    assert not any(request.path == "/redfish/v1/Managers" for request in requests)
-    assert _post_requests(requests) == []
+    assert not any(
+        request.path.lower() == "/redfish/v1/managers"
+        for request in service.requests
+    )
+    assert _post_requests(service) == []
 
 
-def test_ism_installer_missing_action_reports_no_post(dell_lc_manager):
+def test_ism_installer_missing_action_reports_no_post(dell_lc_mock):
     """A BMC without the action returns a structured error and never POSTs."""
-    manager, requests, remove_action = dell_lc_manager
-    remove_action["enabled"] = True
+    manager, service = dell_lc_mock
+    _overlay_lc_service_without_ism(service)
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcIsmInstaller,
@@ -165,4 +170,4 @@ def test_ism_installer_missing_action_reports_no_post(dell_lc_manager):
     assert isinstance(result, CommandResult)
     assert result.error == f"action '{ISM_ACTION}' not found on DellLCService"
     assert result.data == {"action": ISM_ACTION, "available": []}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
