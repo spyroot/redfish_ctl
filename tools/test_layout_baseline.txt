@@ -65,6 +65,7 @@ tests/test_telemetry_submit_test_dualmode.py
 tests/test_utils.py
 tests/test_vendor_evidence.py
 tests/test_vendor_portability.py
+tests/test_vendor_profile.py
 tests/test_version_consistency.py
 tests/test_wait.py
 tests/test_wait_dualmode.py

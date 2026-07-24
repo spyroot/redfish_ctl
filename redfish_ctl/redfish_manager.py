@@ -701,6 +701,26 @@ class RedfishManager:
         api_resp = self.base_query("/redfish/v1/")
         return api_resp.data if api_resp is not None else None
 
+    @property
+    def vendor_profile(self):
+        """The connection's vendor chokepoint profile, resolved once and cached.
+
+        Vendor binds per CONNECTION, not per class: the profile is resolved
+        from the (already cached) ``_service_root`` via the discovery
+        classifier, so resolution costs ZERO extra BMC round trips when the
+        root was fetched anyway. Plumbing seam — the chokepoint call sites
+        delegate here in the implementation pass; nothing calls this yet.
+
+        :return: the connection's ``DmtfProfile`` (or vendor subclass) instance.
+        """
+        # Imports live here so the module graph is unchanged until first use;
+        # importing dell_profile guarantees the Dell registration is present.
+        from . import dell_profile  # noqa: F401  (registration side effect)
+        from .vendor_profile import profile_for_connection
+        return profile_for_connection(
+            self._host if hasattr(self, "_host") else self._redfish_ip,
+            self._port, lambda: self._service_root)
+
     @cached_property
     def redfish_version(self) -> str:
         """Return version remote endpoint implemented
