@@ -1,21 +1,56 @@
-"""Unit tests for the vendor-profile plumbing (redfish_ctl/vendor_profile.py).
+"""Unit tests for the vendor profiles (redfish_ctl/vendor_profile.py).
 
-Covers what the plumbing genuinely does today: loud registration collisions,
-observable generic fallback, per-connection caching with test-isolation reset,
-ServiceRoot detection over the REAL committed corpora (resolved through the
-manifest chain — no hardcoded fixture paths), and the seam contract that
-unimplemented chokepoints fail loudly instead of running half-moved semantics.
+Covers registration (loud collisions), observable generic fallback,
+per-connection caching with test-isolation reset, ServiceRoot detection over
+the REAL committed corpora (resolved through the manifest chain — no hardcoded
+fixture paths), the per-lens chokepoint matrix (status decode, error decode,
+task-id parsing — only the dell lens ever sees 201=Created or a ``JID_``
+scrape), and the manager resolution ladder (evidence outranks the class
+default; resolution never spends a BMC round trip).
 Root-module test: flat placement mirrors redfish_ctl/vendor_profile.py.
 
 Author Mus spyroot@gmail.com
 """
+import json
+from pathlib import Path
 
 import pytest
 from vendor_corpus import corpus_dir as extract_corpus
 
 from redfish_ctl import dell_profile, vendor_profile
-from redfish_ctl.redfish_exceptions import ProfileRegistrationCollision
+from redfish_ctl.cmd_exceptions import AuthenticationFailed, ResourceNotFound
+from redfish_ctl.redfish_exceptions import (
+    ProfileRegistrationCollision,
+    RedfishUnauthorized,
+)
 from tools import corpus, corpus_diff
+
+_TESTS_DIR = Path(__file__).resolve().parent
+
+# The per-lens ServiceRoot fixtures the offline mock serves; each must
+# classify to its own vendor so profile resolution works offline per lens.
+_LENS_ROOTS = {
+    "dell": _TESTS_DIR / "idrac_fixtures" / "_redfish_v1.json",
+    "supermicro": _TESTS_DIR / "supermicro_fixtures" / "_redfish_v1.json",
+    "hpe": _TESTS_DIR / "hpe_fixtures" / "_redfish_v1.json",
+    "generic": _TESTS_DIR / "generic_fixtures" / "_redfish_v1.json",
+}
+
+
+class _FakeResponse:
+    """Minimal stand-in response: status, headers, and an optional JSON body."""
+
+    def __init__(self, status_code, headers=None, body=None):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._body = body if body is not None else {}
+
+    def json(self):
+        """Return the configured JSON body.
+
+        :return: the body dict this fake was built with.
+        """
+        return self._body
 
 
 @pytest.fixture(autouse=True)
@@ -130,31 +165,151 @@ def test_detection_over_every_committed_corpus(row):
         assert profile.vendor == row["vendor"]
 
 
-def test_unimplemented_chokepoints_fail_loudly():
-    """Every seam raises NotImplementedError until its body is relocated.
+@pytest.mark.parametrize("vendor", ["dell", "supermicro", "hpe", "generic"])
+def test_decode_status_matrix(vendor):
+    """Per lens: the shared 2xx folds hold, and ONLY dell maps 201=Created.
 
-    A half-wired tree must crash with the relocation anchor in the message,
-    never silently run partial semantics.
+    201=Created is a Dell addition (architecture state_decode); a Created
+    surfacing on any other lens means Dell semantics leaked into the shared
+    base — the exact defect this design exists to stop.
     """
-    generic = vendor_profile.DmtfProfile.instance()
-    dell = dell_profile.DellProfile.instance()
-    for profile, method, args in [
-        (generic, "decode_status", (200,)),
-        (generic, "parse_task_id", (None,)),
-        (dell, "decode_status", (201,)),
-        (dell, "parse_task_id", (None,)),
-        (dell, "fetch_task", (None, "JID_1")),
-    ]:
-        with pytest.raises(NotImplementedError, match="CHIP"):
-            getattr(profile, method)(*args)
+    profile = vendor_profile.resolve_profile(vendor)
+    assert profile.decode_status(200).name == "Ok"
+    assert profile.decode_status(202).name == "AcceptedTaskGenerated"
+    assert profile.decode_status(204).name == "Success"
+    assert profile.decode_status(299).name == "Success"
+    assert profile.decode_status(404).name == "Error"
+    if vendor == "dell":
+        assert profile.decode_status(201).name == "Created"
+    else:
+        assert profile.decode_status(201).name == "Success"
+    # The neutral map itself must hold no Created row.
+    assert 201 not in vendor_profile.DmtfProfile._status_map
+
+
+@pytest.mark.parametrize("vendor", ["dell", "supermicro", "hpe", "generic"])
+def test_error_handler_matrix(vendor):
+    """Per lens: 401 raises the lens's own exception family with its envelope.
+
+    Dell raises ``AuthenticationFailed``/``UnexpectedResponse`` carrying the
+    parsed IDRAC envelope; the DMTF lenses raise ``RedfishUnauthorized``.
+    A cross-family raise means the wrong error handler ran for the box.
+    """
+    profile = vendor_profile.resolve_profile(vendor)
+    body = {"error": {"code": "Base.1.18.GeneralError",
+                      "message": "denied", "@Message.ExtendedInfo": []}}
+    expected = AuthenticationFailed if vendor == "dell" else RedfishUnauthorized
+    with pytest.raises(expected):
+        profile.error_handler(_FakeResponse(401, body=body))
+    with pytest.raises(ResourceNotFound):
+        profile.error_handler(_FakeResponse(404, body=body))
+    assert profile.error_handler(_FakeResponse(204)).name == "Success"
+
+
+def test_dell_error_handler_records_envelope_on_manager():
+    """The Dell decode records the parsed envelope as ``manager._redfish_error``.
+
+    Callers read that attribute after a failed write; losing it during the
+    relocation would silently break the error-envelope contract.
+    """
+    class _Carrier:
+        """Bare attribute carrier standing in for a manager."""
+        _redfish_error = None
+
+    carrier = _Carrier()
+    body = {"error": {"code": "IDRAC.2.9.SYS446", "message": "nope"}}
+    with pytest.raises(ResourceNotFound):
+        dell_profile.DellProfile.instance().error_handler(
+            _FakeResponse(404, body=body), manager=carrier)
+    assert carrier._redfish_error is not None
+    assert carrier._redfish_error.status_code == 404
+
+
+@pytest.mark.parametrize("vendor", ["dell", "supermicro", "hpe", "generic"])
+def test_parse_task_id_matrix(vendor):
+    """Per lens: Location header wins everywhere; only dell scrapes ``JID_``.
+
+    A response with no Location but a ``JID_`` in its body yields the job id
+    on the dell lens ONLY — a non-dell lens returning a ``JID_`` would mean
+    the Dell body-scrape leaked back into the shared path.
+    """
+    profile = vendor_profile.resolve_profile(vendor)
+
+    with_header = _FakeResponse(
+        202, headers={"Location": "/redfish/v1/TaskService/Tasks/42"})
+    assert profile.parse_task_id(with_header) == "42"
+
+    body_only = _FakeResponse(202)
+    body_only.text = '{"Id": "JID_000000000001", "queued": true}'
+    got = profile.parse_task_id(body_only)
+    if vendor == "dell":
+        assert got and got.startswith("JID_")
+    else:
+        assert not got
+        assert not str(got).startswith("JID_")
+
+
+@pytest.mark.parametrize("vendor", ["dell", "supermicro", "hpe", "generic"])
+def test_lens_service_roots_classify_to_their_vendor(vendor):
+    """Each offline lens root resolves to its own profile (mock lens contract).
+
+    The mock serves these roots at ``/redfish/v1``; if one stops classifying,
+    offline per-lens resolution silently degrades to the generic profile.
+    """
+    root = json.loads(_LENS_ROOTS[vendor].read_text())
+    profile = vendor_profile.profile_for_service_root(root)
+    if vendor == "generic":
+        assert type(profile) is vendor_profile.DmtfProfile
+    else:
+        assert profile.vendor == vendor
+
+
+@pytest.mark.parametrize("vendor", ["dell", "supermicro", "hpe", "generic"])
+def test_manager_chokepoint_delegation_per_lens(vendor):
+    """Through the MANAGER delegate: the box's lens picks the decode, not class.
+
+    Every command still declares IDracManager; with the lens's ServiceRoot
+    bound to the connection, ``self.default_error_handler`` must resolve the
+    box's semantics — 201 folds to Created ONLY when the box is Dell. This is
+    the delegation audit that catches a Dell override silently re-shadowing
+    the chokepoint.
+    """
+    from redfish_ctl.idrac_manager import IDracManager
+    mgr = IDracManager(host=f"matrix-{vendor}", username="u", password="p")
+    mgr.__dict__["_service_root"] = json.loads(_LENS_ROOTS[vendor].read_text())
+    assert type(mgr.vendor_profile).vendor == vendor
+    decoded = mgr.default_error_handler(_FakeResponse(201))
+    assert decoded.name == ("Created" if vendor == "dell" else "Success")
+
+
+def test_manager_resolution_ladder_defaults():
+    """No evidence -> the class default: Dell manager presumes dell, base generic.
+
+    Evidence always outranks the presumption: once a root is bound, a
+    Supermicro box resolves supermicro even through the Dell manager class,
+    and the classification is shared with other managers on the connection.
+    """
+    from redfish_ctl.idrac_manager import IDracManager
+    from redfish_ctl.redfish_manager import RedfishManager
+    dell_mgr = IDracManager(host="ladder-a", username="u", password="p")
+    assert type(dell_mgr.vendor_profile) is dell_profile.DellProfile
+    base_mgr = RedfishManager(host="ladder-b", username="u", password="p")
+    assert type(base_mgr.vendor_profile) is vendor_profile.DmtfProfile
+
+    probed = IDracManager(host="ladder-c", username="u", password="p")
+    probed.__dict__["_service_root"] = {"Vendor": "Supermicro"}
+    assert type(probed.vendor_profile) is vendor_profile.SupermicroProfile
+    # The classification is connection-level: a second manager on the same
+    # (host, port) shares it without holding a root of its own.
+    sibling = IDracManager(host="ladder-c", username="u", password="p")
+    assert type(sibling.vendor_profile) is vendor_profile.SupermicroProfile
 
 
 def test_manager_property_is_present_and_lazy():
     """RedfishManager exposes vendor_profile as a property; nothing eager.
 
-    The plumbing must not change the import graph or any behavior until the
-    delegation pass wires call sites — presence and property-ness is the
-    whole contract today.
+    Resolution happens per access with no import-graph change and no I/O of
+    its own — presence and property-ness stay the contract.
     """
     from redfish_ctl.redfish_manager import RedfishManager
     assert isinstance(

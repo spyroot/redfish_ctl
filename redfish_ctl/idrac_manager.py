@@ -26,17 +26,14 @@ import argparse
 import functools
 import json
 import logging
-import time
 from abc import abstractmethod
 from datetime import datetime
 from functools import cached_property
 from typing import Dict, Optional, Tuple
 
 import requests
-from tqdm import tqdm
 
 from .cmd_exceptions import (
-    AuthenticationFailed,
     DeleteRequestFailed,
     InvalidArgumentFormat,
     MissingMandatoryArguments,
@@ -59,14 +56,12 @@ from .idrac_shared import (
     HTTPMethod,
     IDRACJobType,
     JobApplyTypes,
-    JobState,
     PowerState,
     RedfishAction,
     RedfishApiRespond,
     ScheduleJobType,
 )
 from .idrac_shared import ResetType as ResetType
-from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import (
     CommandResult,
@@ -105,28 +100,36 @@ class IDracManager(RedfishManager):
     IDracManager Class, interact with a Redfish endpoint via REST API interface
     """
 
+    #: A connection nothing has classified yet presumes Dell — exactly the
+    #: pre-profile behavior of the Dell-based command family. Evidence (a
+    #: cached ServiceRoot classification) always outranks this presumption.
+    _default_profile_vendor = "dell"
+
     def __init__(self,
-                 idrac_ip: Optional[str] = "",
-                 idrac_username: Optional[str] = "root",
-                 idrac_password: Optional[str] = "",
-                 idrac_port: Optional[int] = 443,
+                 host: Optional[str] = "",
+                 username: Optional[str] = "root",
+                 password: Optional[str] = "",
+                 port: Optional[int] = 443,
                  insecure: Optional[bool] = True,
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,
                  is_debug: Optional[bool] = False,
                  log_level=logging.NOTSET,
-                 host: Optional[str] = None,
-                 username: Optional[str] = None,
-                 password: Optional[str] = None,
-                 port: Optional[int] = None):
+                 **kwargs):
         """Default constructor requires credentials.
            By default, the manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param idrac_ip: deprecated alias for ``host``.
-        :param idrac_username: deprecated alias for ``username``.
-        :param idrac_password: deprecated alias for ``password``.
-        :param idrac_port: deprecated alias for ``port``.
+        One credential parameter set exists: ``host``/``username``/``password``/
+        ``port``. The legacy ``idrac_*`` spellings are no longer parameters;
+        they arrive via ``**kwargs`` and coalesce in the base constructor for
+        one wave, after which they live only at the CLI/env edge (config.py,
+        argparse).
+
+        :param host: BMC host or IP address.
+        :param username: BMC account username; defaults to root.
+        :param password: BMC account password.
+        :param port: BMC TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
@@ -134,36 +137,22 @@ class IDracManager(RedfishManager):
         :param is_http: use plain HTTP instead of HTTPS for requests when True.
         :param is_debug: when True, include exception tracebacks in error logs.
         :param log_level: logging level applied to this manager's logger.
-        :param host: BMC host or IP address.
-        :param username: BMC account username; defaults to root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
+        :param kwargs: forwarded to the base constructor (legacy connection
+            aliases coalesce there).
         """
-        host = idrac_ip if host is None else host
-        username = idrac_username if username is None else username
-        password = idrac_password if password is None else password
-        port = idrac_port if port is None else port
-
-        super().__init__(redfish_ip=host,
-                         redfish_username=username,
-                         redfish_password=password,
-                         redfish_port=port,
+        super().__init__(host=host,
+                         username=username,
+                         password=password,
+                         port=port,
                          insecure=insecure,
                          is_http=is_http,
                          x_auth=x_auth,
-                         is_debug=is_debug)
+                         is_debug=is_debug,
+                         **kwargs)
 
         self.logger = logging.getLogger(__name__)
         self._logger_level = log_level
         self.logger.setLevel(self._logger_level)
-
-        self.content_type = {'Content-Type': 'application/json; charset=utf-8'}
-        self.json_content_type = {'Content-Type': 'application/json; charset=utf-8'}
-
-        self._manage_servers_obs = []
-        self._manage_chassis_obs = []
-        # mainly to track query sent , for unit test
-        self.query_counter = 0
 
         # mapping between rest API respond to respected
         # string that we report to apper layer.
@@ -175,58 +164,6 @@ class IDracManager(RedfishManager):
 
         }
 
-        # a mapping from http status code to result of request.
-        # the BMC is not consistent with the return code, so it is not very clear
-        # case when 200 is ok and 201 is something else. So it API per API
-        # Thus default success has extra field, so we can always
-        # pass what we expect for particular cmd.
-
-        #  Redfish spec 202 Request has been accepted for processing
-        #  but the processing has not been completed
-        self._http_code_mapping = {
-            200: RedfishApiRespond.Ok,
-            201: RedfishApiRespond.Created,
-            202: RedfishApiRespond.AcceptedTaskGenerated,
-            204: RedfishApiRespond.Success,
-        }
-
-        # mapping a string state to enum, so each cmd can just check a state
-        # without doing any string if else branches.
-        self._job_state_mapping = {
-            "Scheduled": JobState.Scheduled,
-            "Running": JobState.Running,
-            "Completed": JobState.Completed,
-            "Downloaded": JobState.Downloaded,
-            "Downloading": JobState.Downloading,
-            "Scheduling": JobState.Scheduling,
-            "Waiting": JobState.Waiting,
-            "Failed": JobState.Failed,
-            "CompletedWithErrors": JobState.CompletedWithErrors,
-            "RebootFailed": JobState.RebootFailed,
-            "RebootCompleted": JobState.RebootCompleted,
-            "RebootPending": JobState.RebootPending,
-            "PendingActivation": JobState.PendingActivation,
-            "Unknown": JobState.Unknown,
-        }
-
-        # mapping a task state string to enum
-        # without doing any string if else branches.
-        self._task_state_mapping = {
-            "New": IdracTaskState.New,
-            "Running": IdracTaskState.Starting,
-            "Starting": IdracTaskState.Starting,
-            "Suspended": IdracTaskState.Suspended,
-            "Interrupted": IdracTaskState.Interrupted,
-            "Pending": IdracTaskState.Pending,
-            "Stopping": IdracTaskState.Stopping,
-            "Completed": IdracTaskState.Completed,
-            "Killed": IdracTaskState.Killed,
-            "Exception": IdracTaskState.Exception,
-            "Service": IdracTaskState.Service,
-            "Canceling": IdracTaskState.Canceling,
-            "Cancelled": IdracTaskState.Cancelled
-        }
-
         # mapping from cli to job types
         self._cli_job_type_mapping = {
             CliJobTypes.Bios_Config.value: IDRACJobType.BIOSConfiguration.value,
@@ -235,18 +172,22 @@ class IDracManager(RedfishManager):
             CliJobTypes.RebootNoForce.value: IDRACJobType.RebootNoForce.value
         }
 
-        # mapping from string to task status enum
-        self._task_status_mapping = {
-            "ok": IdracTaskStatus.Ok,
-            "warning": IdracTaskStatus.Warning,
-            "critical": IdracTaskStatus.Critical
-        }
-
         self._redfish_error = None
 
-        # run time
-        self.action_targets = None
-        self.api_endpoints = None
+    @property
+    def _http_code_mapping(self):
+        """Transitional view of the Dell status rows, now owned by DellProfile.
+
+        The map (200/201/202/204 rows, including the Dell-only 201=Created)
+        moved to ``DellProfile._status_map`` — the single source. Non-chokepoint
+        consumers (``read_api_respond``, the subscription lifecycle helper)
+        still read ``self._http_code_mapping``; this property serves them until
+        those paths route through the profile. Read-only by contract.
+
+        :return: the Dell status-code map.
+        """
+        from .dell_profile import DellProfile
+        return DellProfile._status_map
 
     @property
     def idrac_ip(self) -> str:
@@ -338,20 +279,35 @@ class IDracManager(RedfishManager):
                 job_id: str,
                 data_type: Optional[str] = "json",
                 do_async: Optional[bool] = False) -> dict:
-        """Query information for particular job from dell oem.
-        Respond is information about a specific configuration Job scheduled
-        by or being executed by a Redfish service's Job Service.
+        """Query information for particular job, per the connection's profile.
+
+        Same-signature delegate: the Dell profile reads the OEM
+        ``/Oem/Dell/Jobs`` queue (the body that used to live here); a non-Dell
+        connection reads the DMTF ``TaskService`` task instead, so the OEM URL
+        never fires at a foreign BMC.
+
         :param job_id: iDRAC job_id JID_744718373591
         :param do_async: note async will subscribe to an event loop.
         :param data_type: json or xml
-        :return: CommandResult.
+        :return: the job payload dict.
         """
-        headers = {}
-        if data_type == "json":
-            headers.update(self.json_content_type)
+        return self.vendor_profile.get_job(
+            self, job_id, data_type=data_type, do_async=do_async)
 
-        r = f"{self.idrac_members}/Oem/Dell/Jobs/{job_id}"
-        return self.base_query(r, do_expanded=True, do_async=do_async).data
+    @staticmethod
+    def job_id_from_respond(response) -> str:
+        """Try to parse a Dell ``JID_`` job id from an HTTP respond body.
+
+        The scrape body moved out of the neutral ``RedfishManager`` into
+        ``DellProfile._scrape_job_id`` (it is a Dell literal); this Dell-side
+        delegate keeps the existing ``self.job_id_from_respond`` call sites
+        working unchanged.
+
+        :param response: requests.models.Response
+        :return: str: a job id or empty string
+        """
+        from .dell_profile import DellProfile
+        return DellProfile._scrape_job_id(response)
 
     @staticmethod
     def update_progress(resp_data, old_value):
@@ -371,198 +327,16 @@ class IDracManager(RedfishManager):
 
         return old_value
 
-    def get_task_state(
-            self, resp: requests.models.Response
-    ) -> Tuple[IdracTaskState, IdracTaskStatus]:
-        """Parse response and return task state and status,
-        if resp has no json payload and JSONDecodeError raised , return Unknown state.
-
-        if the TaskStatus or TaskState key is absent from the response, UnexpectedResponse is raised.
-
-        :param resp: a requests.models.Response object.
-        :return:  redfish_ctl.IdracTaskState and redfish_ctl.IdracTaskStatus
-        :raise  redfish_ctl.UnexpectedResponse: If the response body does not
-            contain a task state.
-        """
-        try:
-            resp_data = resp.json()
-        except requests.exceptions.JSONDecodeError as json_err:
-            self.logger.error(
-                f"failed parse response to get a task state. {str(json_err)}"
-            )
-            return IdracTaskState.Unknown, IdracTaskStatus.Warning
-
-        # dodge case
-        if REDFISH_JSON.TaskStatus not in resp_data or REDFISH_JSON.TaskState not in resp_data:
-            raise UnexpectedResponse(f"IDRAC returned a {resp_data}, neither task state nor status is present..")
-
-        resp_state = resp_data[REDFISH_JSON.TaskState]
-        resp_status = resp_data[REDFISH_JSON.TaskStatus]
-
-        # update state and status.
-        task_state = self._task_state_mapping[resp_state]
-        task_status = self._task_status_mapping[resp_status.lower()]
-        return task_state, task_status
-
-    def fetch_task(self,
-                   task_id: str,
-                   sleep_time: Optional[int] = 10,
-                   wait_for: Optional[int] = 0,
-                   wait_for_state: Optional[IdracTaskState] = IdracTaskState.Unknown,
-                   ) -> IdracTaskState:
-
-        """Synchronous fetch a job from the BMC and wait for job completion.
-
-        A job on the BMC is the Task and contains information about a task
-        that the Redfish Task Service schedules or executes.
-
-        Tasks represent operations that we want to wait.
-        Example we applied a change that create a task, and we need wait for completion.
-
-        Note: that caller can provide wait_for_state that will unblock waiting loop,
-        for example if we don't want wait for completion or error.  i.e.
-        Running or Scheduled is sufficient criterion.
-        (It useful for async io type of request)
-
-        if server return  404 or  410:
-        - if a state was update caller will get last known state.
-        - if a state never updated caller will get Unknown.
-
-        THus, for a caller it amke sense to re-check task services.
-
-        :param wait_for: by default, we wait status code 200 based on spec.
-                         in case API return something else. 204 for example.
-        :param task_id: task id as it returned from a task by task services.
-        :param sleep_time: a default sleep and wait, if server ask for retry_after, it takes precedence
-                           only if retry_after > sleep_time.
-        :param wait_for_state: wait a specific state. Example caller only care
-                               it Running and will resume later to monitor progress
-
-        :return: Nothing
-        :raise AuthenticationFailed MissingResource
-        """
-        last_update = 0
-        percent_done = 0
-
-        # job might be already done.
-        jb = self.get_job(task_id)
-
-        # if job scheduler or scheduling it make sense to wait otherwise we return state
-        # we expect a JobState
-        if REDFISH_JSON.JobState in jb:
-
-            current_state = jb[REDFISH_JSON.JobState]
-            if current_state not in self._job_state_mapping:
-                raise UnexpectedResponse(f"IDRAC returned a {current_state} job type that we don't know.")
-            _ = self._job_state_mapping[current_state]
-            if current_state == JobState.Scheduled.value or current_state == JobState.Scheduling.value \
-                    or current_state == JobState.Running.value:
-                self.logger.info(f"Job {task_id} is {current_state}.. waiting for completion.")
-            else:
-                self.logger.info(f"Job {task_id} is {current_state}..bouncing off.")
-                return self._job_state_mapping[current_state]
-
-        # in case server will ask to wait.
-        retry_after = 0
-        # initial state we don't know
-        task_state = IdracTaskState.Unknown
-        with tqdm(total=100) as pbar:
-            while True:
-                # /redfish/v1/TaskService/Tasks/{TaskId}
-                resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}"
-                                         f"{REDFISH_API.Tasks}{task_id}", hdr={})
-
-                if 'Retry-After' in resp.headers:
-                    retry_after = int(resp.headers["Retry-After"])
-                    self.logger.info(
-                        f"Remote server responded "
-                        f"with Retry-After {retry_after}"
-                    )
-                if resp.status_code == 401:
-                    self.logger.error("task service returned 401")
-                    raise AuthenticationFailed("Authentication failed.")
-                # if server failed, meanwhile HTTP exception propagate
-                # up on the stack.
-                if resp.status_code > 499:
-                    self.logger.critical(
-                        f"task service return http error code "
-                        f"{resp.status_code}"
-                    )
-                    break
-                # Cancellation: A subsequent GET request on the task monitor URI
-                # returns either the HTTP 410 Gone or 404 Not Found status code.
-                elif resp.status_code == 404 or resp.status_code == 410:
-                    self.logger.info(f"task service returned {resp.status_code}")
-                    # at the end we check a state and return it might fail, exception etc.
-                    break
-                # if client expect something else than 200 or something else, we return result.
-                elif 0 < wait_for == resp.status_code:
-                    task_state, task_status = self.get_task_state(resp)
-                    return task_state
-                # As long as the operation is in process, the service shall return the HTTP 202 Accepted status code
-                # when the client performs a GET request on the task monitor URI.
-                elif resp.status_code == 202:
-                    self.logger.info("task service returned 202")
-                    # state acquisition and update state
-                    resp_data = resp.json()
-                    task_state, task_status = self.get_task_state(resp)
-                    self.logger.info(f"Updating state, new state "
-                                     f"{task_state.value}, status {task_status.value}")
-
-                    # update description so caller see.
-                    pbar.set_description(task_state.value)
-                    if (task_status == IdracTaskStatus.Critical
-                            or task_status == IdracTaskStatus.Warning):
-                        # we bounce, if status not ok
-                        break
-
-                    percent_done = self.update_progress(resp_data, percent_done)
-                    if percent_done > last_update:
-                        last_update = percent_done
-                        inc = percent_done - pbar.n
-                        pbar.update(n=inc)
-
-                    # update retry time, we've been asked
-                    if retry_after > sleep_time:
-                        sleep_time = retry_after
-                    time.sleep(sleep_time)
-
-                # The appropriate HTTP status code, such as but not limited to 200 OK
-                # for most operations or 201 Created for POST to create a resource.
-                # if client passed wait_for for example 204 we need have handle for 200
-                elif resp.status_code == 200:
-                    task_state, task_status = self.get_task_state(resp)
-                    self.logger.info(
-                        f"Server return status code 200, Task state "
-                        f"{task_state.value}, {task_status.value}"
-                    )
-                    return task_state
-                # client wait for specific state
-                elif task_state == wait_for_state:
-                    self.logger.info(f"caller asked for wait for a state {wait_for_state.value}")
-                    task_state, task_status = self.get_task_state(resp)
-                    return task_state
-                else:
-                    # in all other cases update state and go back sleep.
-                    task_state, task_status = self.get_task_state(resp)
-                    self.logger.error("unexpected status code", resp.status_code)
-                    if retry_after > sleep_time:
-                        sleep_time = retry_after
-                    time.sleep(sleep_time)
-
-        return task_state
-
     def default_error_handler(
             self, response: requests.models.Response) -> RedfishApiRespond:
-        """Normalize a non-2xx Redfish response per the Redfish error contract.
+        """Normalize a Redfish response per the connection's vendor profile.
 
-        A success code returns its mapped ``RedfishApiRespond``. Every error code
-        is normalized through :meth:`RedfishManager.parse_error`, so the raised
-        exception carries the parsed :class:`RedfishError` envelope (HTTP status,
-        ``error.code``/``error.message`` and every ``@Message.ExtendedInfo``
-        entry) as its primary value — never a generic string — including for an
-        unsupported-operation ``501``/``404``/``405``/``409``. See
-        docs/external/redfish-error-contract.md.
+        Same-signature delegate — the Dell decode body (the 201=Created row and
+        the typed raises carrying the parsed :class:`RedfishError` envelope,
+        see docs/external/redfish-error-contract.md) moved to
+        ``DellProfile.error_handler``; a non-Dell connection resolves the DMTF
+        decode instead. The profile records the parsed envelope on this
+        manager (``self._redfish_error``) before raising, as before.
 
         :param response: the Redfish HTTP response to classify.
         :return: the mapped ``RedfishApiRespond`` for a 2xx success code.
@@ -571,17 +345,7 @@ class IDracManager(RedfishManager):
         :raises ResourceNotFound: on HTTP 404, carrying the parsed error.
         :raises UnexpectedResponse: on any other error code, carrying the parsed error.
         """
-        code = response.status_code
-        if 200 <= code < 300:
-            return self._http_code_mapping.get(code, RedfishApiRespond.Success)
-        self._redfish_error = RedfishManager.parse_error(response)
-        if code == 401:
-            raise AuthenticationFailed(self._redfish_error)
-        if code == 403:
-            raise RedfishForbidden(self._redfish_error)
-        if code == 404:
-            raise ResourceNotFound(self._redfish_error)
-        raise UnexpectedResponse(self._redfish_error)
+        return self.vendor_profile.error_handler(response, manager=self)
 
     def check_api_version(self):
         """Check Dell LLC Service API set
