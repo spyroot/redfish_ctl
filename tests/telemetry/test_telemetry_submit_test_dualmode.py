@@ -11,7 +11,7 @@ from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_XR8620T_CORPUS = corpus_dir(
-    Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
+    Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
 DELL_XR8620T_INDEX = {
     path.name.lower(): path for path in DELL_XR8620T_CORPUS.glob("*.json")
