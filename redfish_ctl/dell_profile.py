@@ -258,8 +258,10 @@ class DellProfile(DmtfProfile):
         last_update = 0
         percent_done = 0
 
-        # job might be already done.
-        jb = self.get_job(manager, task_id)
+        # job might be already done. Read through the MANAGER seam (not this
+        # profile's own get_job) so class-level overrides and test monkeypatches
+        # on IDracManager.get_job keep intercepting, exactly as before the move.
+        jb = manager.get_job(task_id)
 
         # if job scheduler or scheduling it make sense to wait otherwise we
         # return state; we expect a JobState
@@ -311,7 +313,7 @@ class DellProfile(DmtfProfile):
                     break
                 # if client expect something else than 200 or something else, we return result.
                 elif 0 < wait_for == resp.status_code:
-                    task_state, task_status = self.get_task_state(manager, resp)
+                    task_state, task_status = manager.get_task_state(resp)
                     return task_state
                 # As long as the operation is in process, the service shall return the HTTP 202 Accepted status code
                 # when the client performs a GET request on the task monitor URI.
@@ -319,7 +321,7 @@ class DellProfile(DmtfProfile):
                     manager.logger.info("task service returned 202")
                     # state acquisition and update state
                     resp_data = resp.json()
-                    task_state, task_status = self.get_task_state(manager, resp)
+                    task_state, task_status = manager.get_task_state(resp)
                     manager.logger.info(f"Updating state, new state "
                                         f"{task_state.value}, status {task_status.value}")
 
@@ -345,7 +347,7 @@ class DellProfile(DmtfProfile):
                 # for most operations or 201 Created for POST to create a resource.
                 # if client passed wait_for for example 204 we need have handle for 200
                 elif resp.status_code == 200:
-                    task_state, task_status = self.get_task_state(manager, resp)
+                    task_state, task_status = manager.get_task_state(resp)
                     manager.logger.info(
                         f"Server return status code 200, Task state "
                         f"{task_state.value}, {task_status.value}"
@@ -354,11 +356,11 @@ class DellProfile(DmtfProfile):
                 # client wait for specific state
                 elif task_state == wait_for_state:
                     manager.logger.info(f"caller asked for wait for a state {wait_for_state.value}")
-                    task_state, task_status = self.get_task_state(manager, resp)
+                    task_state, task_status = manager.get_task_state(resp)
                     return task_state
                 else:
                     # in all other cases update state and go back sleep.
-                    task_state, task_status = self.get_task_state(manager, resp)
+                    task_state, task_status = manager.get_task_state(resp)
                     manager.logger.error("unexpected status code", resp.status_code)
                     if retry_after > sleep_time:
                         sleep_time = retry_after

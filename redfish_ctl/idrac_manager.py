@@ -106,10 +106,10 @@ class IDracManager(RedfishManager):
     _default_profile_vendor = "dell"
 
     def __init__(self,
-                 host: Optional[str] = "",
-                 username: Optional[str] = "root",
-                 password: Optional[str] = "",
-                 port: Optional[int] = 443,
+                 host: Optional[str] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 port: Optional[int] = None,
                  insecure: Optional[bool] = True,
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,
@@ -126,10 +126,10 @@ class IDracManager(RedfishManager):
         one wave, after which they live only at the CLI/env edge (config.py,
         argparse).
 
-        :param host: BMC host or IP address.
-        :param username: BMC account username; defaults to root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
+        :param host: BMC host or IP address; effective default is empty.
+        :param username: BMC account username; effective default is ``root``.
+        :param password: BMC account password; effective default is empty.
+        :param port: BMC TCP port; effective default 443; accepts int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.

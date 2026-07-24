@@ -167,11 +167,13 @@ class RedfishManager:
         Transitional (one wave): direct constructions still pass
         ``redfish_ip``/``idrac_ip``-style keywords; they arrive via ``**kwargs``
         and are popped here so exactly ONE canonical value is stored. The
-        canonical parameter wins whenever it differs from its default.
+        canonical parameter wins whenever it was passed (is not None) — the
+        precedence the pre-cleanup Dell constructor pinned; an alias fills in
+        only when the canonical was omitted, and the default applies last.
 
         :param kwargs: the constructor's ``**kwargs`` (aliases are popped).
-        :param value: the canonical parameter value as passed.
-        :param default: the canonical parameter's default.
+        :param value: the canonical parameter value as passed, or None.
+        :param default: the value used when neither spelling was passed.
         :param aliases: legacy keyword names, highest precedence first.
         :return: the resolved value.
         """
@@ -180,15 +182,17 @@ class RedfishManager:
             popped = kwargs.pop(name, None)
             if alias_value is None:
                 alias_value = popped
-        if value == default and alias_value is not None:
+        if value is not None:
+            return value
+        if alias_value is not None:
             return alias_value
-        return value
+        return default
 
     def __init__(self,
-                 host: Optional[str] = "",
-                 username: Optional[str] = "root",
-                 password: Optional[str] = "",
-                 port: Optional[int] = 443,
+                 host: Optional[str] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 port: Optional[int] = None,
                  insecure: Optional[bool] = True,
                  is_http: Optional[bool] = False,
                  x_auth: Optional[str] = None,
@@ -199,10 +203,10 @@ class RedfishManager:
            By default, Redfish Manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param host: BMC IP or hostname.
-        :param username: BMC account username; default is root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
+        :param host: BMC IP or hostname; effective default is an empty string.
+        :param username: BMC account username; effective default is ``root``.
+        :param password: BMC account password; effective default is empty.
+        :param port: BMC TCP port; effective default 443; accepts int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMCs ship self-signed certificates, so verification is
             opt-in: pass ``insecure=False`` to verify the server certificate.
@@ -211,8 +215,8 @@ class RedfishManager:
         :param is_debug: when True, include exception tracebacks in error logs.
         :param kwargs: extensibility per the constructor contract; legacy
             ``redfish_*``/``idrac_*`` connection aliases are still accepted
-            here for one wave (the canonical spelling wins on conflict), then
-            they live only at the CLI/env edge (config.py, argparse).
+            here for one wave (a passed canonical spelling wins on conflict),
+            then they live only at the CLI/env edge (config.py, argparse).
         """
         host = self._coalesce_ctor_alias(
             kwargs, host, "", "redfish_ip", "idrac_ip")
@@ -360,10 +364,10 @@ class RedfishManager:
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
         inst = disp(
-            host=_host,
-            username=_username,
-            password=_password,
-            port=_port,
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -409,10 +413,10 @@ class RedfishManager:
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
-            host=_host,
-            username=_username,
-            password=_password,
-            port=_port,
+            idrac_ip=_host,
+            idrac_username=_username,
+            idrac_password=_password,
+            idrac_port=_port,
             insecure=_insecure,
             is_http=_is_http
         )

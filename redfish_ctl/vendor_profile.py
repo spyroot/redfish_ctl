@@ -314,7 +314,7 @@ class DmtfProfile:
                         )
                         break
 
-                    state, _status = self.get_task_state(manager, resp)
+                    state, _status = manager.get_task_state(resp)
                     if state is not None:
                         task_state = state
                     if wait_for_state is not None and task_state == wait_for_state:
