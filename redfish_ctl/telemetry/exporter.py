@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
 from redfish_ctl.config import ConfigurationConflict
+
 from . import identity as identity_mod
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
@@ -26,6 +27,11 @@ build_identity_dimensions = identity_mod.build_identity_dimensions
 common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
+METRIC_KINDS = frozenset({"gauge", "counter", "cumulative_counter"})
+COUNTER_SUFFIXES = (
+    "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
+)
+COUNTER_EXACT = frozenset({"hw.energy_kwh"})
 SENSOR_METRIC = {
     "Temperature": ("hw.temperature", "sensor"),
     "Rotational": ("hw.fan_speed", "fan"),
@@ -189,6 +195,28 @@ def _require_https_url(url: str, label: str) -> urllib.parse.ParseResult:
 
 
 @dataclass(frozen=True)
+class MetricDefinition:
+    """Catalog entry describing one exported telemetry metric."""
+
+    name: str
+    kind: str = "gauge"
+    unit: Optional[str] = None
+    description: str = ""
+    prometheus_name: Optional[str] = None
+    family: str = "telemetry"
+    dimensions: tuple[str, ...] = ()
+    liveness: str = "signal"
+
+    def __post_init__(self) -> None:
+        """Validate and normalize the immutable definition."""
+        if self.kind not in METRIC_KINDS:
+            raise ValueError(f"unknown metric kind {self.kind!r} for {self.name}")
+        if not self.prometheus_name:
+            object.__setattr__(self, "prometheus_name", self.name)
+        object.__setattr__(self, "dimensions", tuple(self.dimensions))
+
+
+@dataclass(frozen=True)
 class MetricSample:
     """One vendor-neutral telemetry sample ready for export."""
 
@@ -198,6 +226,340 @@ class MetricSample:
     metric_type: str = "gauge"
     unit: Optional[str] = None
     timestamp: Optional[str] = None
+
+
+def _definition(
+        name: str,
+        kind: str = "gauge",
+        unit: Optional[str] = None,
+        description: str = "",
+        family: str = "telemetry",
+        dimensions: tuple[str, ...] = (),
+        liveness: str = "signal") -> MetricDefinition:
+    """Construct a catalog definition with concise defaults.
+
+    :param name: exported metric name.
+    :param kind: SignalFx/OpenTelemetry metric kind.
+    :param unit: optional unit annotation.
+    :param description: human-readable metric description.
+    :param family: broad metric family used by specs and docs.
+    :param dimensions: expected dimension keys for this metric family.
+    :param liveness: liveness role, usually ``signal`` or ``scrape``.
+    :return: immutable MetricDefinition.
+    """
+    return MetricDefinition(
+        name=name,
+        kind=kind,
+        unit=unit,
+        description=description,
+        family=family,
+        dimensions=dimensions,
+        liveness=liveness,
+    )
+
+
+_COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
+_FABRIC_DIMS = _COMMON_DIMS + ("fabric", "system", "gpu", "port", "report")
+
+_STATIC_METRIC_DEFINITIONS = (
+    _definition("hw.power", unit="W", description="Power draw in watts."),
+    _definition("hw.energy_kwh", "counter", "kWh",
+                "Cumulative energy consumed in kilowatt-hours."),
+    _definition("hw.temperature", unit="Cel", description="Temperature in Celsius."),
+    _definition("hw.voltage", unit="V", description="Voltage reading."),
+    _definition("hw.fan_speed", unit="RPM", description="Fan speed in revolutions per minute."),
+    _definition("hw.gpu.power", unit="W", description="GPU power draw in watts.", family="gpu"),
+    _definition("hw.gpu.temperature", unit="Cel", description="GPU temperature.", family="gpu"),
+    _definition("hw.gpu.clock_mhz", unit="MHz", description="GPU operating clock.", family="gpu"),
+    _definition("hw.gpu.compute.utilization", unit="%",
+                description="GPU compute engine utilization.", family="gpu"),
+    _definition("hw.gpu.throttle.duration_seconds", "counter", "s",
+                description="GPU throttle duration in seconds.", family="gpu"),
+    _definition("hw.gpu.memory.bandwidth_utilization", unit="%",
+                description="GPU memory bandwidth utilization.", family="gpu"),
+    _definition("hw.gpu.memory.capacity_utilization", unit="%",
+                description="GPU memory capacity utilization.", family="gpu"),
+    _definition("hw.gpu.memory.clock_mhz", unit="MHz",
+                description="GPU memory operating speed.", family="gpu"),
+    _definition("hw.gpu.memory.ecc_errors", "counter", None,
+                "Cumulative GPU memory ECC error count.", family="gpu"),
+    _definition("hw.gpu.memory.row_remap_count", "counter", None,
+                "Cumulative GPU memory row-remap count.", family="gpu"),
+    _definition("hw.gpu.memory.row_remapping_failed", unit=None,
+                description="GPU memory row-remapping failure state.", family="gpu"),
+    _definition("hw.component.health", description="One-hot component health state.",
+                family="state"),
+    _definition("hw.component.health_rollup",
+                description="One-hot component aggregate health state.", family="state"),
+    _definition("hw.component.state", description="One-hot component enabled state.",
+                family="state"),
+    _definition("hw.component.last_reset_type",
+                description="One-hot component last reset type.", family="state"),
+    _definition("hw.power.edp_violation_state",
+                description="One-hot EDP violation state.", family="state"),
+    _definition("hw.power.break_performance_state",
+                description="One-hot power-break performance state.", family="state"),
+    _definition("hw.fabric.link_up", description="Fabric link-up state.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.link_down_reason",
+                description="One-hot fabric link-down reason.", family="fabric",
+                dimensions=_FABRIC_DIMS + ("reason",)),
+    _definition("hw.fabric.port_speed", unit="Gbps",
+                description="Fabric port negotiated speed.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.bit_error_rate", description="Fabric bit error rate.",
+                family="fabric", dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.effective_ber", description="Fabric effective bit error rate.",
+                family="fabric", dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.raw_ber", description="Fabric raw bit error rate.",
+                family="fabric", dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_gbps", unit="Gbps",
+                description="Fabric receive bandwidth.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_gbps", unit="Gbps",
+                description="Fabric transmit bandwidth.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.raw_rx_gbps", unit="Gbps",
+                description="Fabric raw receive bandwidth.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.raw_tx_gbps", unit="Gbps",
+                description="Fabric raw transmit bandwidth.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_bytes", "counter", "By",
+                "Cumulative fabric receive bytes.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_bytes", "counter", "By",
+                "Cumulative fabric transmit bytes.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.vl15_tx_bytes", "counter", "By",
+                "Cumulative fabric VL15 transmit bytes.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_frames", "counter", None,
+                "Cumulative fabric receive frames.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_frames", "counter", None,
+                "Cumulative fabric transmit frames.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.vl15_tx_packets", "counter", None,
+                "Cumulative fabric VL15 transmit packets.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.crc_errors", "counter", None,
+                "Cumulative fabric CRC errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.effective_errors", "counter", None,
+                "Cumulative fabric effective errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.fec_errors", "counter", None,
+                "Cumulative fabric FEC errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.malformed_packets", "counter", None,
+                "Cumulative malformed fabric packets.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.raw_errors", "counter", None,
+                "Cumulative fabric raw errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_errors", "counter", None,
+                "Cumulative fabric receive errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_no_protocol_bytes", "counter", "By",
+                "Cumulative receive bytes without protocol.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_remote_physical_errors", "counter", None,
+                "Cumulative receive remote physical errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.rx_switch_relay_errors", "counter", None,
+                "Cumulative receive switch relay errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.symbol_errors", "counter", None,
+                "Cumulative fabric symbol errors.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_discards", "counter", None,
+                "Cumulative fabric transmit discards.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_no_protocol_bytes", "counter", "By",
+                "Cumulative transmit bytes without protocol.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.tx_wait", "counter", None,
+                "Cumulative fabric transmit wait events.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.intentional_link_down_count", "counter", None,
+                "Cumulative intentional link-down count.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.link_down_count", "counter", None,
+                "Cumulative link-down count.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.link_error_recovery_count", "counter", None,
+                "Cumulative link error recovery count.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.unintentional_link_down_count", "counter", None,
+                "Cumulative unintentional link-down count.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.fabric.vl15_dropped", "counter", None,
+                "Cumulative fabric VL15 dropped packets.", family="fabric",
+                dimensions=_FABRIC_DIMS),
+    _definition("hw.leak.state", description="Leak detector state.", family="chassis"),
+    _definition("hw.fabric.adapter_present", description="Network adapter presence.",
+                family="fabric"),
+    _definition("hw.component_integrity.enabled",
+                description="ComponentIntegrity enabled state.", family="component"),
+    _definition("hw.scrape.ok", description="Exporter scrape success.", family="scrape",
+                liveness="scrape"),
+    _definition("hw.scrape.duration_seconds", unit="s",
+                description="Exporter scrape duration.", family="scrape",
+                liveness="scrape"),
+    _definition("hw.bmc.up",
+                description="Per-BMC 0/1 liveness gauge (1 reachable, 0 unreachable).",
+                family="scrape", liveness="scrape"),
+    _definition(
+        "redfish_exporter_scrape_success",
+        description="Whether the latest scrape completed without a supported collector failure.",
+        family="exporter",
+        dimensions=_COMMON_DIMS,
+        liveness="scrape",
+    ),
+    _definition(
+        "redfish_exporter_scrape_partial",
+        description="Whether the latest scrape returned partial telemetry.",
+        family="exporter",
+        dimensions=_COMMON_DIMS,
+        liveness="scrape",
+    ),
+    _definition(
+        "redfish_exporter_scrape_duration_seconds",
+        unit="s",
+        description="Duration of the latest exporter scrape.",
+        family="exporter",
+        dimensions=_COMMON_DIMS,
+        liveness="scrape",
+    ),
+    _definition(
+        "redfish_exporter_last_success_timestamp_seconds",
+        unit="s",
+        description="Unix timestamp of the latest successful exporter scrape.",
+        family="exporter",
+        dimensions=_COMMON_DIMS,
+        liveness="scrape",
+    ),
+    _definition(
+        "redfish_exporter_collector_success",
+        description="Whether a telemetry collector completed successfully.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + ("collector",),
+    ),
+    _definition(
+        "redfish_exporter_collector_supported",
+        description="Whether the BMC supports a telemetry collector.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + ("collector",),
+    ),
+    _definition(
+        "redfish_exporter_collector_duration_seconds",
+        unit="s",
+        description="Duration of one telemetry collector.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + ("collector",),
+    ),
+    _definition(
+        "redfish_exporter_collector_samples",
+        description="Number of samples returned by one telemetry collector.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + ("collector",),
+    ),
+    _definition(
+        "redfish_exporter_collection_errors_total",
+        kind="counter",
+        description="Cumulative telemetry collection errors.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + ("collector", "error"),
+    ),
+)
+
+METRIC_DEFINITIONS = {definition.name: definition
+                      for definition in _STATIC_METRIC_DEFINITIONS}
+
+
+def metric_definitions() -> Mapping[str, MetricDefinition]:
+    """Return the static metric-definition catalog by metric name.
+
+    :return: mapping of metric name to static MetricDefinition.
+    """
+    return METRIC_DEFINITIONS
+
+
+def metric_definition(metric_name: str) -> MetricDefinition:
+    """Return the catalog definition for ``metric_name``.
+
+    Curated ``hw.*`` metrics are registered statically. The GB300 MetricReport
+    catch-all family is generated deterministically from the metric name so new
+    firmware properties keep exporting without adding free-form backend logic.
+
+    :param metric_name: exported metric name.
+    :return: static or generated MetricDefinition.
+    :raises KeyError: when the metric is not registered and is not in a dynamic family.
+    """
+    if metric_name in METRIC_DEFINITIONS:
+        return METRIC_DEFINITIONS[metric_name]
+    if metric_name.startswith("hw.gb300."):
+        return MetricDefinition(
+            name=metric_name,
+            kind=_infer_metric_kind(metric_name),
+            unit=_infer_metric_unit(metric_name),
+            description="GB300 MetricReport numeric property.",
+            family="gb300",
+            dimensions=_COMMON_DIMS + ("property", "system", "gpu", "port",
+                                       "chassis", "index", "report"),
+        )
+    raise KeyError(f"metric {metric_name!r} is not registered in the catalog")
+
+
+def _infer_metric_kind(metric_name: str) -> str:
+    """Infer the metric kind for generated metric families.
+
+    :param metric_name: generated metric name.
+    :return: ``counter`` for monotonic totals, else ``gauge``.
+    """
+    if metric_name in COUNTER_EXACT:
+        return "counter"
+    if any(metric_name.endswith(suffix) for suffix in COUNTER_SUFFIXES):
+        return "counter"
+    return "gauge"
+
+
+def _infer_metric_unit(metric_name: str) -> Optional[str]:
+    """Infer a unit annotation for generated metric families.
+
+    :param metric_name: generated metric name.
+    :return: inferred unit string, or None when dimensionless or unknown.
+    """
+    lowered = metric_name.lower()
+    if lowered.endswith("_bytes"):
+        return "By"
+    if lowered.endswith("_gbps") or lowered.endswith("port_speed"):
+        return "Gbps"
+    if lowered.endswith("_mhz") or "_freq_" in lowered or "frequency" in lowered:
+        return "MHz"
+    if lowered.endswith("_seconds"):
+        return "s"
+    if lowered.endswith("_kwh") or "energy" in lowered:
+        return "kWh"
+    if "temp" in lowered or "temperature" in lowered:
+        return "Cel"
+    if "power" in lowered:
+        return "W"
+    if "voltage" in lowered:
+        return "V"
+    if "percent" in lowered or "utilization" in lowered:
+        return "%"
+    return None
+
+
+def _prometheus_type(kind: str) -> str:
+    """Map exporter metric kind to the Prometheus exposition type.
+
+    :param kind: exporter metric kind.
+    :return: Prometheus metric type.
+    """
+    return "counter" if kind in {"counter", "cumulative_counter"} else "gauge"
 
 
 @dataclass(frozen=True)
@@ -1074,37 +1436,42 @@ def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
     lines = []
     seen_types = set()
     for sample in samples:
-        if sample.metric not in seen_types:
-            lines.append(f"# TYPE {sample.metric} {sample.metric_type}")
-            seen_types.add(sample.metric)
+        definition = metric_definition(sample.metric)
+        prometheus_name = definition.prometheus_name or sample.metric
+        if prometheus_name not in seen_types:
+            if definition.description:
+                lines.append(
+                    f"# HELP {prometheus_name} "
+                    f"{_escape_help_text(definition.description)}")
+            lines.append(f"# TYPE {prometheus_name} {_prometheus_type(definition.kind)}")
+            seen_types.add(prometheus_name)
         label_text = ",".join(
             f'{key}="{_escape_label_value(value)}"'
             for key, value in sorted(sample.dimensions.items())
         )
-        lines.append(f"{sample.metric}{{{label_text}}} {_format_value(sample.value)}")
+        lines.append(f"{prometheus_name}{{{label_text}}} {_format_value(sample.value)}")
     return "\n".join(lines) + "\n"
 
 
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint envelope, keyed by metric type.
-
-    A ``counter`` metric_type is a monotonic cumulative counter, so it goes under the
-    SignalFx ``cumulative_counter`` envelope (matching the Prometheus ``counter`` type
-    and the OTLP monotonic Sum); everything else is a ``gauge``. This keeps the stored
-    Splunk metric type consistent with the other backends.
+    """Wrap samples in the SignalFx /v2/datapoint typed envelopes.
 
     :param samples: metric samples to wrap.
-    :return: SignalFx ``/v2/datapoint`` body with ``gauge`` and/or ``cumulative_counter`` lists.
+    :return: SignalFx ``/v2/datapoint`` body with typed datapoint lists.
     """
-    body: dict[str, list[dict]] = {}
+    body = {"gauge": [], "counter": [], "cumulative_counter": []}
     for sample in samples:
-        envelope = "cumulative_counter" if sample.metric_type == "counter" else "gauge"
-        body.setdefault(envelope, []).append({
+        definition = metric_definition(sample.metric)
+        envelope = (
+            "cumulative_counter" if definition.kind == "counter"
+            else definition.kind
+        )
+        body[envelope].append({
             "metric": sample.metric,
             "value": sample.value,
             "dimensions": dict(sample.dimensions),
         })
-    return body
+    return {kind: points for kind, points in body.items() if points}
 
 
 def _require_datapoint_url(ingest_url: str) -> str:
@@ -1595,22 +1962,20 @@ def _sample(metric: str,
     :param metric: metric name.
     :param value: numeric sample value.
     :param dims: dimension mapping.
-    :param unit: optional unit annotation; coerced to str so a non-string BMC unit
-        cannot reach the OTLP mapper.
+    :param unit: source-provided unit annotation; the catalog's canonical unit wins.
     :param timestamp: optional sample timestamp.
-    :param metric_type: explicit sample type; when None it is derived from the metric
-        name (monotonic-counter names -> ``counter``, else ``gauge``) so Prometheus,
-        SignalFx, and OTLP all agree on the type. This is the single classifier point.
+    :param metric_type: optional caller classification, validated against the catalog.
     :return: the assembled MetricSample.
     """
-    if metric_type is None:
-        from . import otlp
-        metric_type = "counter" if otlp.is_monotonic_counter(metric) else "gauge"
+    definition = metric_definition(metric)
+    if metric_type is not None and metric_type != definition.kind:
+        raise ValueError(
+            f"{metric} type {metric_type!r} does not match catalog type "
+            f"{definition.kind!r}")
     return MetricSample(metric=metric, value=float(value),
                         dimensions={k: str(v) for k, v in dims.items()},
-                        metric_type=metric_type,
-                        unit=(str(unit) if unit is not None else None),
-                        timestamp=timestamp)
+                        metric_type=definition.kind,
+                        unit=definition.unit, timestamp=timestamp)
 
 
 def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
@@ -1791,16 +2156,12 @@ def _parse_metric_property(prop: str) -> dict[str, str]:
 
 
 def _unit_for_metric(metric: str) -> Optional[str]:
-    """Infer a unit annotation from a metric name suffix.
+    """Return the catalog unit annotation for a metric.
 
     :param metric: the metric name.
-    :return: ``By`` for byte metrics, ``Gbps`` for speed metrics, else None.
+    :return: configured unit or inferred dynamic-family unit.
     """
-    if metric.endswith("_bytes"):
-        return "By"
-    if metric.endswith("_gbps") or metric.endswith("port_speed"):
-        return "Gbps"
-    return None
+    return metric_definition(metric).unit
 
 
 def _generic_metric_name(prop: str) -> str:
@@ -1843,6 +2204,15 @@ def _escape_label_value(value) -> str:
     :return: the escaped label string.
     """
     return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def _escape_help_text(value) -> str:
+    """Escape a value for a Prometheus HELP line.
+
+    :param value: raw HELP text.
+    :return: escaped HELP text.
+    """
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n")
 
 
 def _format_value(value: float) -> str:

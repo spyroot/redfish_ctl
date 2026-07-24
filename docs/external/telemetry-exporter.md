@@ -238,7 +238,9 @@ redfish_ctl exporter \
 ```
 
 For a dry run, use `--once --output signalfx` without `--push-signalfx`. That prints the SignalFx
-datapoint envelope without posting anything.
+datapoint envelope without posting anything. The envelope is split by the metric catalog's SignalFx
+type keys, so instantaneous metrics appear under `gauge` and monotonic totals appear under
+`cumulative_counter`.
 
 ## OTLP (OpenTelemetry)
 

@@ -26,6 +26,8 @@ from redfish_ctl.telemetry.exporter import (
     build_metric_samples,
     exporter_argv_uses_secret,
     load_exporter_env_file,
+    metric_definition,
+    metric_definitions,
     render_prometheus_text,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
@@ -68,6 +70,15 @@ def _start_http_server(handler_cls):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, f"http://127.0.0.1:{server.server_port}"
+
+
+def _all_signalfx_points(body):
+    """Return every SignalFx datapoint from a typed datapoint body."""
+    return [
+        point
+        for kind in ("gauge", "counter", "cumulative_counter")
+        for point in body.get(kind, [])
+    ]
 
 
 def _gb300_fixture_for_path(path):
@@ -277,6 +288,37 @@ def test_mapper_emits_chassis_gpu_and_fabric_samples():
         "hw.fabric.bit_error_rate",
     } <= by_name
     assert all(REQUIRED_DIMS <= set(sample.dimensions) for sample in samples)
+
+
+@pytest.mark.parametrize(
+    "reading_type, reading_units, metric, catalog_unit",
+    [
+        ("Temperature", "Celsius", "hw.temperature", "Cel"),
+        ("Rotational", "RevolutionsPerMinute", "hw.fan_speed", "RPM"),
+        ("Voltage", "Volts", "hw.voltage", "V"),
+    ],
+)
+def test_sensor_mapper_normalizes_vendor_unit_spellings(
+        reading_type, reading_units, metric, catalog_unit):
+    """Vendor unit spellings cannot abort a scrape or change catalog units."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[],
+        sensor_rows=[{
+            "Chassis": "Chassis_0",
+            "Name": f"{reading_type} Sensor",
+            "Reading": 24.0,
+            "ReadingUnits": reading_units,
+            "ReadingType": reading_type,
+        }],
+        nvlink_rows=[],
+        metric_report_rows=[],
+    )
+
+    sample = next(sample for sample in samples if sample.metric == metric)
+    assert sample.unit == catalog_unit
 
 
 def test_mapper_emits_thermal_subsystem_zone_temperatures():
@@ -803,6 +845,7 @@ def test_prometheus_text_preserves_contract_names_and_dimensions():
 
     text = render_prometheus_text([sample])
 
+    assert "# HELP hw.power Power draw in watts." in text
     assert "# TYPE hw.power gauge" in text
     assert "hw.power{" in text
     assert 'host.name="gb300-poc1-slot9"' in text
@@ -811,21 +854,112 @@ def test_prometheus_text_preserves_contract_names_and_dimensions():
     assert text.endswith("\n")
 
 
-def test_signalfx_body_uses_gauge_envelope_and_dimensions():
-    """SignalFx push output matches the /v2/datapoint gauge envelope."""
+def test_prometheus_text_uses_catalog_counter_type():
+    """Catalog cumulative counters render as Prometheus counters."""
     sample = MetricSample(
-        metric="hw.fabric.link_up",
-        value=1,
+        metric="hw.fabric.rx_bytes",
+        value=123,
         dimensions=build_identity_dimensions("172.25.230.29", vendor="supermicro")
         | {"fabric": "nvlink", "gpu": "GPU_0", "port": "NVLink_0"},
-        metric_type="gauge",
+        metric_type="counter",
+        unit="By",
     )
 
-    body = to_signalfx_body([sample])
+    text = render_prometheus_text([sample])
+
+    assert "# HELP hw.fabric.rx_bytes Cumulative fabric receive bytes." in text
+    assert "# TYPE hw.fabric.rx_bytes counter" in text
+
+
+def test_signalfx_body_uses_catalog_envelopes_and_dimensions():
+    """SignalFx push output groups points by catalog metric kind."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = [
+        MetricSample(
+            metric="hw.fabric.link_up",
+            value=1,
+            dimensions=dims | {"fabric": "nvlink", "gpu": "GPU_0", "port": "NVLink_0"},
+            metric_type="gauge",
+        ),
+        MetricSample(
+            metric="hw.fabric.rx_bytes",
+            value=123,
+            dimensions=dims | {"fabric": "nvlink", "gpu": "GPU_0", "port": "NVLink_0"},
+            metric_type="counter",
+            unit="By",
+        ),
+    ]
+
+    body = to_signalfx_body(samples)
 
     assert body["gauge"][0]["metric"] == "hw.fabric.link_up"
     assert body["gauge"][0]["value"] == 1
     assert body["gauge"][0]["dimensions"]["host.name"] == "gb300-poc1-slot9"
+    assert body["cumulative_counter"][0]["metric"] == "hw.fabric.rx_bytes"
+    assert "counter" not in body
+
+
+def test_metric_definition_catalog_registers_emitted_metrics():
+    """Every mapper-emitted metric resolves to a catalog definition."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+    samples = build_metric_samples(
+        identity=dims,
+        environment_rows=[
+            {"Chassis": "Chassis_0", "PowerWatts": {"Reading": 100},
+             "EnergykWh": {"Reading": 2}},
+        ],
+        sensor_rows=[
+            {"Chassis": "Chassis_0", "Name": "Inlet", "Reading": 24,
+             "ReadingUnits": "Cel", "ReadingType": "Temperature"},
+        ],
+        nvlink_rows=[
+            {"System": "HGX_Baseboard_0", "GPU": "GPU_0", "Port": "NVLink_0",
+             "LinkStatus": "LinkUp", "RXBytes": 12, "TXBytes": 13},
+        ],
+        metric_report_rows=[
+            _report_row("MemoryPageRetirementCount", "7",
+                        report="HGX_CpuProcessorMetrics_0"),
+        ],
+        leak_detection_rows=[
+            {"Chassis": "Chassis_0", "Id": "Leak_0", "DetectorState": "OK"},
+        ],
+        network_rows=[{"Id": "NIC_0"}],
+        component_integrity_rows=[{"Id": "HGX_ERoT_BMC_0", "Enabled": True}],
+    )
+    samples.extend(exporter_mod.scrape_health_samples(dims, ok=True, duration_seconds=0.5))
+
+    assert samples
+    for sample in samples:
+        definition = metric_definition(sample.metric)
+        assert sample.metric_type == definition.kind
+        assert sample.unit == definition.unit
+
+    dynamic = metric_definition("hw.gb300.memory_page_retirement_count")
+    assert dynamic.kind == "counter"
+    assert dynamic.family == "gb300"
+
+
+def test_metric_catalog_yaml_matches_runtime_static_catalog():
+    """The checked-in catalog spec mirrors the runtime static definitions."""
+    import yaml
+    spec = yaml.safe_load(
+        (Path(__file__).parent.parent / "specs/telemetry/catalog.yaml")
+        .read_text(encoding="utf-8"))
+    runtime = metric_definitions()
+    rows = {row["name"]: row for row in spec["metrics"]}
+
+    assert {"hw.power", "hw.fabric.rx_bytes", "hw.scrape.ok"} <= set(rows)
+    assert set(rows) == set(runtime)
+    for name, row in rows.items():
+        definition = runtime[name]
+        assert row["kind"] == definition.kind
+        assert row.get("unit") == definition.unit
+        assert row["prometheus_name"] == definition.prometheus_name
+        assert row["family"] == definition.family
+
+    dynamic = spec["dynamic_families"][0]
+    assert dynamic["prefix"] == "hw.gb300."
+    assert dynamic["kind"] == "inferred"
 
 
 def test_exporter_env_file_loader_and_argv_secret_guard(tmp_path):
@@ -985,9 +1119,12 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         vendor="supermicro",
     )
 
-    points = [point for envelope in result.data.values() for point in envelope]
+    points = _all_signalfx_points(result.data)
     metrics = {point["metric"] for point in points}
     assert {"hw.power", "hw.gpu.power", "hw.fabric.rx_bytes", "hw.leak.state"} <= metrics
+    assert "hw.fabric.rx_bytes" in {
+        point["metric"] for point in result.data["cumulative_counter"]
+    }
     assert {"hw.scrape.ok", "hw.scrape.duration_seconds"} <= metrics
     scrape_ok = next(point for point in points if point["metric"] == "hw.scrape.ok")
     scrape_duration = next(
@@ -1078,7 +1215,7 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     assert result.extra["push_status"] == 202
     assert calls[0]["token"] == "file-token"
     assert calls[0]["ingest_url"] == "https://ingest.example.test/v2/datapoint"
-    first_dims = calls[0]["body"]["gauge"][0]["dimensions"]
+    first_dims = _all_signalfx_points(calls[0]["body"])[0]["dimensions"]
     assert first_dims["host.name"] == "rack-a-slot9"
     assert first_dims["server.address"] == "198.51.100.109"
     assert first_dims["deployment.environment"] == "nv72-gb300"
@@ -1188,7 +1325,7 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
         vendor="supermicro",
     )
 
-    points = [point for envelope in result.data.values() for point in envelope]
+    points = _all_signalfx_points(result.data)
     processor_power = [
         point for point in points
         if point["metric"] == "hw.gpu.power"
@@ -1358,9 +1495,9 @@ def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkey
     assert calls[0]["token"] == "test-token"
     assert calls[0]["ingest_url"] == "https://ingest.us1.signalfx.com/v2/datapoint"
     assert calls[0]["body"] is result.data
-    assert result.data["gauge"]
+    assert _all_signalfx_points(result.data)
     assert result.extra["push_status"] == 200
-    assert result.extra["sample_count"] == sum(len(pts) for pts in result.data.values())
+    assert result.extra["sample_count"] == len(_all_signalfx_points(result.data))
 
 
 def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkeypatch):
