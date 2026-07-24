@@ -10,7 +10,7 @@ from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.vendors import capability_report, get_vendor
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_vendor_capabilities_to_dict_is_json_ready():

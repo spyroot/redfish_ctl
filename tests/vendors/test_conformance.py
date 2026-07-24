@@ -6,7 +6,7 @@ import pytest
 
 from redfish_ctl.vendors import get_vendor
 
-TESTS_ROOT = Path(__file__).resolve().parent
+TESTS_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_ROOTS = {
     "dell": TESTS_ROOT / "idrac_fixtures",
     "hpe": TESTS_ROOT / "hpe_fixtures",
