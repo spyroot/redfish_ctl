@@ -329,22 +329,6 @@ def _make_idrac(idrac_ip, username, password):
     )
 
 
-@pytest.fixture(autouse=True)
-def _reset_command_singletons():
-    """Give every test fresh command singletons so no cached state leaks.
-
-    Commands use ``metaclass=Singleton`` and cache per-host state
-    (``idrac_manage_servers`` and friends) on the instance. Without a reset, the
-    first vendor a command sees wins for the whole session — which only bites
-    cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
-    Clearing the instance registry before each test isolates them.
-    """
-    from redfish_ctl.idrac_shared import Singleton
-    Singleton._instances.clear()
-    yield
-    Singleton._instances.clear()
-
-
 @pytest.fixture
 def redfish_service():
     """The bare MockRedfishService mounted on a ``requests-mock`` transport.
