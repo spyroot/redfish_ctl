@@ -1,0 +1,9 @@
+# Exception classes defined OUTSIDE the interface (redfish_ctl/cmd_exceptions.py and
+# redfish_ctl/redfish_exceptions.py), grandfathered. Move each into the interface, then
+# delete its line. A NEW exception class outside the interface fails the gate.
+# Goal: empty baseline — every exception type in the interface, none anywhere else.
+redfish_ctl/api.py:27
+redfish_ctl/config.py:34
+redfish_ctl/fixtures_catalog.py:14
+redfish_ctl/network/cmd_network_adapter_reset.py:25
+redfish_ctl/proxy/core.py:53
