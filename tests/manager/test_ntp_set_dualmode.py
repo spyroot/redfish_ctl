@@ -1,5 +1,7 @@
 """Dual-mode tests for the ntp-set command."""
 
+import re
+
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
@@ -124,7 +126,6 @@ def test_ntp_set_confirm_patches_x10_legacy_ntp_resource(redfish_mock_factory):
     assert patches[0].json() == {
         "NTPEnable": True,
         "PrimaryNTPServer": "0.pool.ntp.org",
-        "SecondaryNTPServer": "",
     }
     assert result.data["applied"] == [{
         "Manager": "1",
@@ -132,6 +133,49 @@ def test_ntp_set_confirm_patches_x10_legacy_ntp_resource(redfish_mock_factory):
         "status": "RedfishApiRespond.Ok",
         "error": None,
     }]
+    assert result.error is None
+
+
+def test_ntp_set_surfaces_error_when_x10_legacy_patch_fails(redfish_mock_factory):
+    """A soft-failed legacy NTP PATCH is surfaced on the top-level result error.
+
+    A non-raising write failure (e.g. HTTP 409 conflict, which ``base_patch``
+    reports as ``RedfishApiRespond.Error`` with a set ``result.error`` rather than
+    raising) must not look green: the per-target failure is aggregated into the
+    command's top-level ``result.error`` so the CLI exits non-zero and the
+    operation span is recorded as ERROR. Regression for the previously hard-coded
+    ``None`` top-level error. (A hard 400/401/403/404 already raises and fails
+    loudly on its own; the aggregation covers the soft-error band.)
+    """
+    manager, service = redfish_mock_factory("supermicro_x10")
+    service.mocker.patch(
+        re.compile(r"/redfish/v1/managers/1/ntp$", re.IGNORECASE),
+        status_code=409,
+        json={
+            "error": {
+                "@Message.ExtendedInfo": [{
+                    "MessageId": "Base.1.12.ResourceInStandby",
+                    "Message": "The NTP resource is busy and rejected the update.",
+                    "Severity": "Critical",
+                }],
+            },
+        },
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.NtpSet,
+        "ntp-set",
+        servers=["0.pool.ntp.org"],
+        confirm=True,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is not None
+    assert "1/1 target(s)" in result.error
+    applied = result.data["applied"]
+    assert len(applied) == 1
+    assert applied[0]["Manager"] == "1"
+    assert applied[0]["error"] is not None
 
 
 def test_ntp_set_clear_patches_x10_legacy_ntp_resource(redfish_mock_factory):
@@ -150,8 +194,6 @@ def test_ntp_set_clear_patches_x10_legacy_ntp_resource(redfish_mock_factory):
     assert patches[0].path == "/redfish/v1/managers/1/ntp"
     assert patches[0].json() == {
         "NTPEnable": False,
-        "PrimaryNTPServer": "",
-        "SecondaryNTPServer": "",
     }
     assert result.data["servers"] == []
     assert result.data["applied"] == [{
