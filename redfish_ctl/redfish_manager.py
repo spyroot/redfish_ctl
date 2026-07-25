@@ -12,6 +12,7 @@ import collections
 import contextvars
 import copy
 import functools
+import json
 import logging
 import re
 import threading
@@ -50,6 +51,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .redfish_api_common import RedfishAction
 
+from .redfish_api_common import HTTPMethod
 from .redfish_shared import (
     RedfishApi,
     RedfishApiRespond,
@@ -869,6 +871,279 @@ class RedfishManager:
         """
         return f"?$select={select_property}"
 
+    # ------------------------------------------------------------------ #
+    # Generic (DMTF) synchronous write path.
+    #
+    # Vendor-neutral counterpart to the Dell write flow in IDracManager. A
+    # DMTF/Supermicro/HPE write is synchronous: it returns a success status
+    # (200/204) with no Location task and no job id, so this path never fetches
+    # a task. It still honours the specification's 202 + Location async form (id
+    # pulled from the Location header via the shared job_id_from_header), which
+    # Supermicro/HPE simply never send. Errors route through the shared
+    # parse_error so the @Message.ExtendedInfo envelope surfaces identically to
+    # Dell.
+    #
+    # IDracManager OVERRIDES every method below because its writes are built on
+    # the Dell job/task system (status via _http_code_mapping, id in header OR
+    # body, fetch_task over the Dell job model). MRO resolves a Dell instance to
+    # those overrides and a non-Dell instance to these generic versions -- the
+    # two must never cross-wire.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _redact_sensitive_payload(payload):
+        """Return a copy of a request payload with sensitive fields masked.
+
+        Masks password-like top-level keys before a payload is written to a
+        debug log so credentials never reach logs. IDracManager provides its own
+        override; this generic version serves non-Dell instances.
+
+        :param payload: the request payload mapping, or any value.
+        :return: a redacted shallow copy when a mapping, else the value unchanged.
+        """
+        if not isinstance(payload, dict):
+            return payload
+        redacted = {}
+        for key, value in payload.items():
+            if isinstance(key, str) and "password" in key.lower():
+                redacted[key] = "***"
+            else:
+                redacted[key] = value
+        return redacted
+
+    def _api_write_call(
+            self, method: str, req: str, hdr: Dict,
+            data: Optional[str] = None) -> requests.models.Response:
+        """Shared transport for the synchronous write verbs (POST/PATCH/DELETE).
+
+        Mirrors :meth:`api_get_call`: reuses the pooled keep-alive session,
+        applies the bounded timeout, and authenticates with the X-Auth token
+        when present, otherwise HTTP basic auth. Vendor-neutral; Dell provides
+        its own api_*_call transport and never reaches this.
+
+        :param method: the HTTP method name (POST/PATCH/DELETE).
+        :param req: the fully qualified request URL.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :param data: the serialized JSON body, or None for DELETE.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+        session = self._http_session()
+        kwargs = {"verify": self._is_verify_cert, "timeout": http_timeout()}
+        if data is not None:
+            kwargs["data"] = data
+        if self._x_auth is not None:
+            headers.update({"X-Auth-Token": self._x_auth})
+        else:
+            kwargs["auth"] = (self._username, self._password)
+        with tracing.client_span(req, method) as span:
+            try:
+                response = session.request(method, req, headers=headers, **kwargs)
+            except Exception as exc:
+                tracing.record_exception(span, exc)
+                raise
+            tracing.record_response(span, response.status_code)
+            return response
+
+    def api_post_call(self, req: str, payload: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP POST to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param payload: the serialized JSON body.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("POST", req, hdr, data=payload)
+
+    def api_patch_call(self, req: str, payload: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP PATCH to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param payload: the serialized JSON body.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("PATCH", req, hdr, data=payload)
+
+    def api_delete_call(self, req: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP DELETE to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("DELETE", req, hdr)
+
+    def default_post_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Map a write response to a RedfishApiRespond, raising on failure.
+
+        Vendor-neutral status handling: an explicitly ignored status is treated
+        as success, otherwise the shared :meth:`default_error_handler` classifies
+        the code (2xx -> Ok/Success, 202 -> AcceptedTaskGenerated) and raises for
+        4xx/5xx. Unlike the Dell override it consults no instance status table.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on HTTP 404 and other error statuses.
+        """
+        if ignore_error_code and response.status_code == ignore_error_code:
+            return RedfishApiRespond.Success
+        return self.default_error_handler(response)
+
+    def default_patch_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """PATCH counterpart of :meth:`default_post_success`.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        """
+        return self.default_post_success(
+            response, expected=expected, ignore_error_code=ignore_error_code)
+
+    def default_delete_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """DELETE counterpart of :meth:`default_post_success`.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        """
+        return self.default_post_success(
+            response, expected=expected, ignore_error_code=ignore_error_code)
+
+    def base_request_respond(
+            self, resource: str, method: HTTPMethod,
+            payload: Optional[dict] = None,
+            do_async: Optional[bool] = False,
+            data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 200,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral synchronous write orchestrator (POST/PATCH/DELETE).
+
+        DMTF counterpart to ``IDracManager.base_request_respond``. A non-Dell
+        write is synchronous: on success it returns a CommandResult with the
+        success message and no task id. It still honours the specification's
+        202 + Location async form (task id from the Location header via the
+        shared job_id_from_header), which Supermicro/HPE never send. Errors
+        propagate from the default_*_success handlers carrying the parsed
+        RedfishError, so the operator sees the @Message.ExtendedInfo text.
+
+        :param resource: the Redfish resource path (leading slash included).
+        :param method: the :class:`HTTPMethod` to issue (POST/PATCH/DELETE).
+        :param payload: the request body mapping, or None for an empty body.
+        :param do_async: accepted for signature parity; this path is synchronous.
+        :param data_type: the body content type; only ``"json"`` adds JSON headers.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        :raises UnsupportedAction: when ``method`` is not a write verb.
+        """
+        headers = {}
+        if data_type == "json":
+            headers.update(self.json_content_type)
+        pd = payload if payload is not None else {}
+        self.logger.debug(
+            f"Issuing {method} request to resource: {resource}, "
+            f"payload: {json.dumps(self._redact_sensitive_payload(pd))}"
+        )
+        r = f"{self._default_method}{self.redfish_ip}{resource}"
+        if method == HTTPMethod.POST:
+            response = self.api_post_call(r, json.dumps(pd), headers)
+            api_resp = self.default_post_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        elif method == HTTPMethod.PATCH:
+            response = self.api_patch_call(r, json.dumps(pd), headers)
+            api_resp = self.default_patch_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        elif method == HTTPMethod.DELETE:
+            response = self.api_delete_call(r, headers)
+            api_resp = self.default_delete_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        else:
+            raise UnsupportedAction(f"unsupported write method: {method}")
+
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
+            task_id = self.job_id_from_header(response, strict=False)
+            return CommandResult({"task_id": task_id}, None, None, None), api_resp
+        return CommandResult(self.api_success_msg(api_resp), None, None, None), api_resp
+
+    def base_post(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP POST wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.POST, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
+
+    def base_patch(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP PATCH wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.PATCH, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
+
+    def base_delete(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP DELETE wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.DELETE, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
+
     def base_query(self,
                    resource: str,
                    filename: Optional[str] = None,
@@ -1462,6 +1737,7 @@ class RedfishManager:
                 return sid
         return ""
 
+
     @abstractmethod
     def redfish_manage_servers(self) -> str:
         """Shared method return who remote endpoint managed servers
@@ -1507,22 +1783,36 @@ class RedfishManager:
     @staticmethod
     def job_id_from_respond(
             response: requests.models.Response) -> str:
-        """Try to parse job id from HTTP respond, otherwise empty string
-        :param response: requests.models.Response
-        :return: str: a job id or empty string
-        """
-        try:
-            if response is not None and hasattr(response, "__dict__"):
-                response_dict = str(response.__dict__)
-                if response_dict is not None and len(response_dict) > 0:
-                    job_id = re.search("JID_.+?,", response_dict)
-                    if job_id is not None:
-                        job_id = job_id.group(0)
-                    return job_id
-        except AttributeError as attr_err:
-            logging.debug(f"could not read job id from respond object: {attr_err}")
+        """Parse a Dell Lifecycle Controller job id (``JID_...``) from the body.
 
-        return ""
+        Dell returns the job id primarily in the ``Location`` header, but some
+        responses carry it in the JSON body as ``{"id": "JID_414099044945",
+        ...}``. This reads the body's ``id``/``Id`` field first, then falls back
+        to scanning the serialized body for a ``JID_`` token, and returns ``""``
+        when the body carries none. It never raises: a body without a job id is a
+        normal, expected outcome the caller treats as "no job created".
+
+        :param response: the write HTTP response.
+        :return: the ``JID_...`` job id, or ``""`` when the body carries none.
+        """
+        if response is None:
+            return ""
+        body = None
+        try:
+            body = response.json()
+        except (ValueError, TypeError, AttributeError):
+            body = None
+        if isinstance(body, dict):
+            for key in ("id", "Id", "JobID", "JID"):
+                value = body.get(key)
+                if isinstance(value, str) and value.startswith("JID_"):
+                    return value
+        try:
+            text = response.text if hasattr(response, "text") else json.dumps(body)
+        except (TypeError, ValueError):
+            text = ""
+        match = re.search(r"JID_[0-9A-Za-z]+", text or "")
+        return match.group(0) if match else ""
 
     def parse_task_id(self, data) -> str:
         """Parses input data and try to get a
