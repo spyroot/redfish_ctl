@@ -1,4 +1,5 @@
-# Fixture-to-signal mapping for the M2 gap-closure gate (see gates.md).
+# Supermicro/NV72 fixture-to-signal mapping for the M2 gap-closure gate
+# (see ../gates.md).
 # The gate computes (expected signals - emitted signals) over these rows and
 # requires the difference to be empty. State metrics follow the M1 model:
 # one-hot value 1 with a normalized, allowlisted lowercase label; unknown

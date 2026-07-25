@@ -18,10 +18,10 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..config import named_env
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
+from ..supermico_manager import SupermicroManager
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ _ACTION_SPECS = {
 }
 
 
-class NvidiaDebugToken(IDracManager,
+class NvidiaDebugToken(SupermicroManager,
                        scm_type=ApiRequestType.NvidiaDebugToken,
                        name="nvidia-debug-token",
                        metaclass=Singleton):

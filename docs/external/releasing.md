@@ -45,8 +45,7 @@ tag step stays a deliberate human action.
 *Settings → Publishing → Add a trusted publisher* → GitHub, owner `spyroot`, repo `redfish_ctl`,
 workflow `release.yml`. After that, no token is needed to release.
 
-The manual steps below remain valid as a fallback (e.g. before the trusted publisher is configured, or
-to publish the one-off `idrac_ctl` deprecation shim under `packaging/idrac_ctl_deprecation/`).
+The manual steps below remain valid as a fallback before the trusted publisher is configured.
 
 ## Release Checklist
 
@@ -63,7 +62,8 @@ Use this order so a broken package does not reach PyPI:
 Run the offline tests with live BMC variables unset:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
 ruff check <changed files>
 ```
 

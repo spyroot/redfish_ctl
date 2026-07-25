@@ -17,4 +17,9 @@ class SupermicroManager(RedfishManager):
     _registry = collections.defaultdict(dict)
 
     def execute(self, **kwargs) -> CommandResult:
+        """Provide the manager-root placeholder required by command dispatch.
+
+        :param kwargs: unused command arguments.
+        :return: no direct manager command result; concrete commands override it.
+        """
         pass

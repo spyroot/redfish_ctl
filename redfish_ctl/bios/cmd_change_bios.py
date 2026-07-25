@@ -26,13 +26,12 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec, UncommittedPendingChanges
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import REDFISH_API, REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class BiosChangeSettings(IDracManager,
+class BiosChangeSettings(RedfishManager,
                          scm_type=ApiRequestType.BiosChangeSettings,
                          name='bios_change_settings',
                          metaclass=Singleton):
@@ -215,14 +214,14 @@ class BiosChangeSettings(IDracManager,
         :param do_async: note async will subscribe to an event loop.
         :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
         """
-        dell_uri = f"{self.idrac_manage_servers}{REDFISH_API.BiosRegistry}"
+        dell_uri = f"{self.managed_system_uri}{REDFISH_API.BiosRegistry}"
         try:
             if (self.base_query(dell_uri, do_async=do_async).data or {}).get(REDFISH_JSON.RegistryEntries):
                 return dell_uri
         except Exception:
             pass
         try:
-            bios = self.base_query(f"{self.idrac_manage_servers}/Bios",
+            bios = self.base_query(f"{self.managed_system_uri}/Bios",
                                    do_async=do_async).data or {}
             name = bios.get("AttributeRegistry")
             if name:
@@ -246,14 +245,14 @@ class BiosChangeSettings(IDracManager,
         :return: the BIOS SettingsObject URI, defaulting to the Dell Settings path.
         """
         try:
-            bios = self.base_query(f"{self.idrac_manage_servers}/Bios",
+            bios = self.base_query(f"{self.managed_system_uri}/Bios",
                                    do_async=do_async).data or {}
             settings = (bios.get("@Redfish.Settings") or {}).get("SettingsObject") or {}
             if settings.get("@odata.id"):
                 return settings["@odata.id"]
         except Exception:
             pass
-        return f"{self.idrac_manage_servers}{REDFISH_API.BiosSettings}"
+        return f"{self.managed_system_uri}{REDFISH_API.BiosSettings}"
 
     def execute(self,
                 attr_name: Optional[str] = None,
@@ -337,7 +336,7 @@ class BiosChangeSettings(IDracManager,
             )
 
         job_req_payload = self.create_apply_time_req(
-            apply, start_time, start_date, default_duration)
+            apply, start_date, start_time, default_duration)
         payload.update(job_req_payload)
         if verbose:
             self.logger.info(f"payload: {payload}")
@@ -345,24 +344,24 @@ class BiosChangeSettings(IDracManager,
         if do_show:
             return CommandResult(payload, None, None, None)
 
-        cmd_pending = self.sync_invoke(
-            ApiRequestType.BiosQueryPending,
-            "bios_query_pending",
-        )
+        if self.uses_dell_job_semantics:
+            cmd_pending = self.sync_invoke(
+                ApiRequestType.BiosQueryPending,
+                "bios_query_pending",
+            )
 
-        # commit or not pending
-        if len(cmd_pending.data) > 0:
-            if commit_pending:
-                cmd_apply = self.sync_invoke(
-                    ApiRequestType.JobApply,
-                    "job_apply", do_reboot=True, do_watch=True, setting="bios",
-                )
-                print("Applied change", cmd_apply.data)
-            else:
-                raise UncommittedPendingChanges(
-                    "BIOS contains uncommitted pending changes in the queue. "
-                    "Please apply changes first."
-                )
+            if len(cmd_pending.data) > 0:
+                if commit_pending:
+                    cmd_apply = self.sync_invoke(
+                        ApiRequestType.JobApply,
+                        "job_apply", do_reboot=True, do_watch=True, setting="bios",
+                    )
+                    print("Applied change", cmd_apply.data)
+                else:
+                    raise UncommittedPendingChanges(
+                        "BIOS contains uncommitted pending changes in the queue. "
+                        "Please apply changes first."
+                    )
 
         # update bios (resolve the SettingsObject link, not a hardcoded path).
         target_api = self._resolve_bios_settings_uri(do_async)

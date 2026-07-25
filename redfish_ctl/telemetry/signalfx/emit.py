@@ -1,11 +1,11 @@
 """SignalFx (Splunk Observability) emission for the telemetry exporter.
 
-Emits the shared ``hw.*`` metric contract to Splunk Observability: it wraps
-samples into the SignalFx ``/v2/datapoint`` envelopes, pushes them, and (issue
+Wraps reader-produced samples in SignalFx ``/v2/datapoint`` envelopes, pushes
+them, and (issue
 #363) reads the metric time series back from Splunk MTS to confirm ingestion,
 since a POST returning 200 is not proof the datapoints landed. Token/URL
-resolution and readback verdicts live here too. Vendor-neutral: it consumes the
-shared MetricSample model, so one SignalFx writer serves every vendor reader.
+resolution and readback verdicts live here too. Metric types come from the
+shared ``MetricSample`` model rather than a writer-owned vendor catalog.
 
 Author Mus spyroot@gmail.com
 """
@@ -25,7 +25,7 @@ from typing import Callable, Iterable, Mapping, Optional
 from redfish_ctl.config import signalfx_access_token, signalfx_ingest_url
 from redfish_ctl.telemetry import http_util
 from redfish_ctl.telemetry import identity as identity_mod
-from redfish_ctl.telemetry.exporter import _non_empty, jittered_interval, metric_definition
+from redfish_ctl.telemetry.exporter import _non_empty, jittered_interval
 from redfish_ctl.telemetry.metric_model import MetricSample
 
 
@@ -40,10 +40,9 @@ def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     """
     body = {"gauge": [], "counter": [], "cumulative_counter": []}
     for sample in samples:
-        definition = metric_definition(sample.metric)
         envelope = (
-            "cumulative_counter" if definition.kind == "counter"
-            else definition.kind
+            "cumulative_counter" if sample.metric_type == "counter"
+            else sample.metric_type
         )
         body[envelope].append({
             "metric": sample.metric,

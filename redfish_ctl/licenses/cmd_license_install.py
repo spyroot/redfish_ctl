@@ -16,15 +16,14 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..config import named_env
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _LICENSE_INSTALL_ACTION = "#LicenseService.Install"
 
 
-class LicenseInstall(IDracManager,
+class LicenseInstall(RedfishManager,
                      scm_type=ApiRequestType.LicenseInstall,
                      name="license-install",
                      metaclass=Singleton):

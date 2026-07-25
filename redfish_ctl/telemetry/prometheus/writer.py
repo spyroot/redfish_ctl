@@ -1,11 +1,8 @@
 """Prometheus exposition writer for telemetry samples.
 
-    redfish_ctl exporter --once --output prometheus
-    redfish_ctl exporter --output prometheus            # serve /metrics forever
-
 The Prometheus backend renders shared :class:`MetricSample` objects as ``/metrics``
-text and, in serve mode, exposes them over HTTP. It is vendor-neutral: every
-vendor reader produces the same samples, so one Prometheus writer serves them all.
+text and, in serve mode, exposes them over HTTP. The writer has no dependency on
+the concrete reader that produced the samples.
 
 Author Mus spyroot@gmail.com
 """
@@ -19,7 +16,7 @@ from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry import identity as identity_mod
 from redfish_ctl.telemetry.abstract_exporter_writer import AbstractExporterWriter
 from redfish_ctl.telemetry.exporter import metric_definition
-from redfish_ctl.telemetry.metric_model import MetricSample
+from redfish_ctl.telemetry.metric_model import MetricDefinition, MetricSample
 
 
 def _prometheus_type(kind: str) -> str:
@@ -58,16 +55,40 @@ def _format_value(value: float) -> str:
     return str(int(value)) if float(value).is_integer() else repr(float(value))
 
 
-def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
+def _sample_definition(
+        sample: MetricSample,
+        definition_lookup: Callable[[str], MetricDefinition],
+        ) -> MetricDefinition:
+    """Resolve catalog metadata, falling back to the sample's declared contract.
+
+    :param sample: metric sample requiring catalog metadata.
+    :param definition_lookup: concrete reader's catalog resolver.
+    :return: resolved or sample-derived metric definition.
+    """
+    try:
+        return definition_lookup(sample.metric)
+    except KeyError:
+        return MetricDefinition(
+            name=sample.metric,
+            kind=sample.metric_type,
+            unit=sample.unit,
+        )
+
+
+def render_prometheus_text(
+        samples: Iterable[MetricSample],
+        definition_lookup: Callable[[str], MetricDefinition] = metric_definition,
+        ) -> str:
     """Render samples in Prometheus/OpenMetrics text exposition form.
 
     :param samples: metric samples to render.
+    :param definition_lookup: catalog resolver supplied by the concrete reader.
     :return: Prometheus/OpenMetrics text exposition of the samples.
     """
     lines = []
     seen_types = set()
     for sample in samples:
-        definition = metric_definition(sample.metric)
+        definition = _sample_definition(sample, definition_lookup)
         prometheus_name = definition.prometheus_name or sample.metric
         if prometheus_name not in seen_types:
             if definition.description:
@@ -136,14 +157,22 @@ class PrometheusWriter(AbstractExporterWriter):
     per request. It owns its Prometheus listener config (``--listen``/``--port``).
     """
 
-    def __init__(self, listen: str = "0.0.0.0", port: int = 9109):
+    def __init__(
+            self,
+            listen: str = "0.0.0.0",
+            port: int = 9109,
+            definition_lookup: Callable[[str], MetricDefinition] = metric_definition,
+            ):
         """Initialize the writer with its Prometheus listener config.
 
         :param listen: address to bind the ``/metrics`` HTTP server to.
         :param port: TCP port to serve ``/metrics`` on.
+        :param definition_lookup: metric catalog resolver supplied by the
+            concrete reader; shared self-metrics are the default.
         """
         self._listen = listen
         self._port = port
+        self._definition_lookup = definition_lookup
 
     def write_once(self, samples: Iterable[MetricSample]) -> CommandResult:
         """Render one scrape of samples as Prometheus text.
@@ -154,7 +183,7 @@ class PrometheusWriter(AbstractExporterWriter):
         """
         materialized = list(samples)
         return CommandResult(
-            render_prometheus_text(materialized), None,
+            render_prometheus_text(materialized, self._definition_lookup), None,
             {"sample_count": len(materialized)}, None)
 
     def run(self, scrape_samples: Callable[[], list[MetricSample]]) -> None:
@@ -163,5 +192,6 @@ class PrometheusWriter(AbstractExporterWriter):
         :param scrape_samples: callable returning fresh samples for each scrape.
         """
         serve_prometheus(
-            lambda: render_prometheus_text(scrape_samples()),
+            lambda: render_prometheus_text(
+                scrape_samples(), self._definition_lookup),
             self._listen, self._port)

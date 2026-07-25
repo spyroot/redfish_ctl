@@ -14,13 +14,13 @@ import copy
 import functools
 import json
 import logging
-import re
 import threading
 import time
 import uuid
 from abc import abstractmethod
 from collections.abc import Mapping
 from contextlib import contextmanager
+from datetime import datetime
 from functools import cached_property
 from typing import Any, Callable, Dict, Hashable, Optional, Tuple
 
@@ -30,6 +30,8 @@ from urllib3.util.retry import Retry
 
 from .cmd_exceptions import (
     AuthenticationFailed,
+    InvalidArgumentFormat,
+    MissingMandatoryArguments,
     ResourceNotFound,
     TaskIdUnavailable,
     UnsupportedAction,
@@ -46,12 +48,12 @@ from .redfish_exceptions import (
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
 from .redfish_respond_error import RedfishError
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .redfish_api_common import RedfishAction
-
-from .redfish_api_common import HTTPMethod, RedfishAction
+from .redfish_api_common import (
+    ApiRequestType,
+    ApiRespondString,
+    HTTPMethod,
+    RedfishAction,
+)
 from .redfish_shared import (
     RedfishApi,
     RedfishApiRespond,
@@ -155,6 +157,8 @@ def redfish_response_cache_scope(cache):
 
 class RedfishManager:
 
+    uses_dell_job_semantics = False
+
     @staticmethod
     def _event_loop() -> asyncio.AbstractEventLoop:
         """Return a usable event loop for a synchronous caller.
@@ -237,6 +241,7 @@ class RedfishManager:
         # run time
         self.action_targets = None
         self.api_endpoints = None
+        self._redfish_error = None
 
     _registry = collections.defaultdict(dict)
 
@@ -248,6 +253,8 @@ class RedfishManager:
         :return:
         """
         super().__init_subclass__(**kwargs)
+        if scm_type is None and "_registry" in cls.__dict__:
+            cls._dispatch_manager_class = cls
         if scm_type is not None:
             cls._registry[scm_type][name] = cls
 
@@ -314,6 +321,47 @@ class RedfishManager:
             if bucket and name in bucket:
                 return bucket[name]
         raise UnsupportedAction(f"Unknown {name} command.")
+
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def _compose_runtime_command(manager_cls, command_cls):
+        """Return the cached composition for a manager and command class.
+
+        :param manager_cls: selected neutral or vendor manager class.
+        :param command_cls: registered command implementation class.
+        :return: command class whose MRO includes the selected manager.
+        """
+        if issubclass(command_cls, manager_cls):
+            return command_cls
+        return type(command_cls)(
+            f"{manager_cls.__name__}{command_cls.__name__}",
+            (command_cls, manager_cls),
+            {
+                "__module__": command_cls.__module__,
+                "__doc__": command_cls.__doc__,
+                "_dispatch_manager_class": manager_cls,
+            },
+        )
+
+    @classmethod
+    def _runtime_command_class(cls, command_cls):
+        """Compose a shared command with the selected vendor manager.
+
+        A DMTF command class owns its command behavior and registers on
+        ``RedfishManager``.  When Dell invokes it, however, the runtime instance
+        must still inherit ``IDracManager`` so Dell's HTTP/job overrides handle
+        the response.  The same composition preserves future HPE or Supermicro
+        overrides without copying a command into each vendor registry.
+
+        Vendor-owned commands already inherit their selected manager and need
+        no wrapper.  The cached dynamic class keeps Singleton identity stable
+        across repeated invocations.
+
+        :param command_cls: registered concrete command implementation.
+        :return: command class with ``SET(command) + SET(selected vendor)`` MRO.
+        """
+        manager_cls = getattr(cls, "_dispatch_manager_class", cls)
+        return RedfishManager._compose_runtime_command(manager_cls, command_cls)
 
     @staticmethod
     def base_parser(is_async: Optional[bool] = True,
@@ -473,7 +521,8 @@ class RedfishManager:
         )
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
-        inst = disp(
+        runtime_cls = cls._runtime_command_class(disp)
+        inst = runtime_cls(
             host=_host,
             username=_username,
             password=_password,
@@ -519,7 +568,8 @@ class RedfishManager:
         _redfish_cache = kwargs.pop("redfish_cache", None)
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
-        inst = disp(
+        runtime_cls = cls._runtime_command_class(disp)
+        inst = runtime_cls(
             host=_host,
             username=_username,
             password=_password,
@@ -891,13 +941,11 @@ class RedfishManager:
     # Generic (DMTF) synchronous write path.
     #
     # Vendor-neutral counterpart to the Dell write flow in IDracManager. A
-    # DMTF/Supermicro/HPE write is synchronous: it returns a success status
-    # (200/204) with no Location task and no job id, so this path never fetches
-    # a task. It still honours the specification's 202 + Location async form (id
-    # pulled from the Location header via the shared job_id_from_header), which
-    # Supermicro/HPE simply never send. Errors route through the shared
-    # parse_error so the @Message.ExtendedInfo envelope surfaces identically to
-    # Dell.
+    # A DMTF/Supermicro/HPE write can complete synchronously (200/204) or return
+    # the specification's 202 + TaskService Location form. This layer returns
+    # that DMTF task id but never applies Dell Lifecycle Controller JID parsing
+    # or polling. Errors route through the shared parse_error so the
+    # @Message.ExtendedInfo envelope surfaces identically to Dell.
     #
     # IDracManager OVERRIDES every method below because its writes are built on
     # the Dell job/task system (status via _http_code_mapping, id in header OR
@@ -993,6 +1041,42 @@ class RedfishManager:
         """
         return self._api_write_call("DELETE", req, hdr)
 
+    async def api_async_post_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue POST through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: serialized JSON body.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_post_call, req, payload, hdr))
+
+    async def api_async_patch_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue PATCH through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: serialized JSON body.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_patch_call, req, payload, hdr))
+
+    async def api_async_delete_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue DELETE through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: accepted for write-call signature compatibility.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_delete_call, req, hdr))
+
     def default_post_success(
             self, response: requests.models.Response,
             expected: Optional[int] = 202,
@@ -1014,6 +1098,9 @@ class RedfishManager:
         """
         if ignore_error_code and response.status_code == ignore_error_code:
             return RedfishApiRespond.Success
+        if response.status_code in (405, 409):
+            self._redfish_error = self.parse_error(response)
+            return RedfishApiRespond.Error
         return self.default_error_handler(response)
 
     def default_patch_success(
@@ -1057,7 +1144,7 @@ class RedfishManager:
         write is synchronous: on success it returns a CommandResult with the
         success message and no task id. It still honours the specification's
         202 + Location async form (task id from the Location header via the
-        shared job_id_from_header), which Supermicro/HPE never send. Errors
+        shared task_id_from_header), when the implementation returns one. Errors
         propagate from the default_*_success handlers carrying the parsed
         RedfishError, so the operator sees the @Message.ExtendedInfo text.
 
@@ -1095,10 +1182,87 @@ class RedfishManager:
         else:
             raise UnsupportedAction(f"unsupported write method: {method}")
 
+        if api_resp == RedfishApiRespond.Error:
+            return CommandResult(
+                {}, None, None, self._redfish_error), api_resp
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
-            task_id = self.job_id_from_header(response, strict=False)
+            task_id = self.task_id_from_header(response, strict=False)
             return CommandResult({"task_id": task_id}, None, None, None), api_resp
         return CommandResult(self.api_success_msg(api_resp), None, None, None), api_resp
+
+    @staticmethod
+    def make_future_task_timestamp(start_date: str, start_time: str) -> str:
+        """Validate and combine a future maintenance-window timestamp.
+
+        :param start_date: local date in ISO format.
+        :param start_time: local time in ISO format.
+        :return: combined future timestamp in ISO format.
+        """
+        if not start_date:
+            raise MissingMandatoryArguments(
+                "A maintenance task requires a start date.")
+        if not start_time:
+            raise MissingMandatoryArguments(
+                "A maintenance task requires a start time.")
+        try:
+            start_timestamp = datetime.fromisoformat(
+                f"{start_date}T{start_time}.000001")
+        except (TypeError, ValueError) as exc:
+            raise InvalidArgumentFormat(str(exc)) from exc
+        if start_timestamp < datetime.now():
+            raise InvalidArgumentFormat(
+                f"Start time is in the past local time {start_timestamp}")
+        return start_timestamp.isoformat()
+
+    def create_apply_time_req(
+            self, apply: str, start_date: str, start_time: str,
+            default_duration: int) -> dict:
+        """Build the DMTF ``@Redfish.SettingsApplyTime`` annotation.
+
+        :param apply: requested apply-time mode.
+        :param start_date: maintenance-window local date.
+        :param start_time: maintenance-window local time.
+        :param default_duration: maintenance-window duration in seconds.
+        :return: Redfish settings-apply-time annotation.
+        """
+        selector = apply.strip().lower()
+        settings = {}
+        if selector in {"auto-boot", "maintenance"}:
+            settings.update({
+                "ApplyTime": (
+                    "AtMaintenanceWindowStart"
+                    if selector == "auto-boot"
+                    else "InMaintenanceWindowOnReset"
+                ),
+                "MaintenanceWindowStartTime": self.make_future_task_timestamp(
+                    start_date, start_time),
+                "MaintenanceWindowDurationInSeconds": default_duration,
+            })
+        elif selector == "on-reset":
+            settings["ApplyTime"] = "OnReset"
+        elif selector == "immediate":
+            settings["ApplyTime"] = "Immediate"
+        else:
+            raise ValueError("Unknown apply time")
+        return {"@Redfish.SettingsApplyTime": settings}
+
+    def reboot(
+            self,
+            do_watch: bool = False,
+            do_wait: Optional[bool] = None) -> CommandResult:
+        """Reset the managed ComputerSystem through the shared DMTF command.
+
+        :param do_watch: compatibility flag requesting reset-cycle waiting.
+        :param do_wait: explicit wait override; when omitted, use ``do_watch``.
+        :return: result of the shared ``ComputerSystem.Reset`` command.
+        """
+        wait = do_watch if do_wait is None else do_wait
+        return self.sync_invoke(
+            ApiRequestType.ComputerSystemReset,
+            "reboot",
+            reset_type="GracefulRestart",
+            do_wait=wait,
+        )
 
     def base_post(
             self, resource: str, payload: Optional[dict] = None,
@@ -1392,9 +1556,9 @@ class RedfishManager:
         if 200 <= response.status_code < 300:
             return RedfishApiRespond.Success
         if response.status_code == 401:
-            raise RedfishUnauthorized("Unauthorized access")
+            raise RedfishUnauthorized(RedfishManager.parse_error(response))
         elif response.status_code == 403:
-            raise RedfishForbidden("access forbidden")
+            raise RedfishForbidden(RedfishManager.parse_error(response))
         elif response.status_code == 404:
             error_msg = RedfishManager.parse_error(response)
             raise ResourceNotFound(error_msg)
@@ -1770,7 +1934,8 @@ class RedfishManager:
         data.setdefault("level", level.value)
 
         error = result.error
-        if api_resp == RedfishApiRespond.Error or error is not None:
+        if getattr(api_resp, "name", None) == RedfishApiRespond.Error.name \
+                or error is not None:
             data["executed"] = False
             if error is None:
                 status_name = getattr(api_resp, "name", str(api_resp))
@@ -1798,10 +1963,9 @@ class RedfishManager:
     def discover_computer_system_ids(self) -> list:
         """Return ALL ComputerSystem ids from ``/redfish/v1/Systems``.
 
-        ``idrac_manage_servers`` resolves a single system via the manager's
-        ``ManagerForServers`` link and (through ``value_from_json_list``) returns
-        only the last member — wrong on multi-system hosts. This enumerates the
-        Systems collection so callers can pick the right one: e.g. a Supermicro
+        :attr:`managed_system_uri` resolves one system via the manager's
+        ``ManagerForServers`` link. This method enumerates the Systems collection
+        so callers can inspect every member: e.g. a Supermicro
         GB300 exposes ``/redfish/v1/Systems/System_0`` (host) and
         ``/redfish/v1/Systems/HGX_Baseboard_0`` (NVIDIA GPU baseboard).
 
@@ -1814,12 +1978,33 @@ class RedfishManager:
         """Return ALL Manager ids from ``/redfish/v1/Managers`` (e.g. BMC_0, HGX_BMC_0).
 
         Companion to :meth:`discover_computer_system_ids` for boxes with more
-        than one BMC; ``idrac_members`` only yields a single (last) manager.
+        than one BMC; :attr:`manager_uri` yields one primary manager.
 
         :return: the list of Manager ``@odata.id`` paths.
         """
         cmd_result = self.base_query(RedfishApi.Managers, key=RedfishJson.Members)
         return self._member_ids(cmd_result.data)
+
+    @cached_property
+    def manager_uri(self) -> str:
+        """Return one primary Redfish Manager URI.
+
+        This is the shared discovery primitive used by every vendor manager.
+        Multi-manager collectors should use :meth:`discover_manager_ids`
+        instead of assuming this primary member is the only BMC.
+
+        :return: one Manager member ``@odata.id``, or ``""`` when unavailable.
+        """
+        result = self.base_query(RedfishApi.Managers, key=RedfishJson.Members)
+        return self.value_from_json_list(result.data, RedfishJson.Data_id)
+
+    @cached_property
+    def idrac_members(self) -> str:
+        """Compatibility alias for the vendor-neutral :attr:`manager_uri`.
+
+        :return: primary Redfish Manager URI.
+        """
+        return self.manager_uri
 
     def _host_system(self, system_ids) -> str:
         """Return the host ComputerSystem id from a multi-system collection.
@@ -1839,6 +2024,57 @@ class RedfishManager:
             if isinstance(data, dict) and ("Bios" in data or "Boot" in data):
                 return sid
         return ""
+
+    @cached_property
+    def managed_system_uri(self) -> str:
+        """Return the host ComputerSystem managed by the primary BMC.
+
+        The standard ``ManagerForServers`` link is preferred for a single-system
+        service. On a multi-system service, such as a host plus an accelerator
+        baseboard, the resource exposing ``Bios`` or ``Boot`` is selected.
+
+        :return: host ComputerSystem ``@odata.id``, or ``""`` if unresolved.
+        """
+        resolved = ""
+        try:
+            links = self.base_query(self.manager_uri, key=RedfishJson.Links).data
+        except Exception:
+            links = None
+        if isinstance(links, dict):
+            managed = links.get(RedfishJson.ManagerServers)
+            if isinstance(managed, list):
+                self._manage_servers_obs = managed
+                resolved = self.value_from_json_list(
+                    managed,
+                    RedfishJson.Data_id,
+                )
+
+        try:
+            system_ids = self.discover_computer_system_ids()
+        except Exception:
+            system_ids = []
+        if len(system_ids) > 1:
+            host = self._host_system(system_ids)
+            if host:
+                return host
+        if len(system_ids) == 1:
+            return system_ids[0]
+        return resolved
+
+    @cached_property
+    def idrac_manage_servers(self) -> str:
+        """Compatibility alias for :attr:`managed_system_uri`.
+
+        :return: host ComputerSystem URI.
+        """
+        return self.managed_system_uri
+
+    def computer_system_id(self) -> str:
+        """Return the vendor-neutral managed ComputerSystem URI.
+
+        :return: host ComputerSystem URI.
+        """
+        return self.managed_system_uri
 
 
     @abstractmethod
@@ -1860,16 +2096,16 @@ class RedfishManager:
         return ""
 
     @staticmethod
-    def job_id_from_header(
+    def task_id_from_header(
             response: requests.models.Response,
             strict: Optional[bool] = True) -> str:
-        """Returns job id from the response header.
+        """Return a DMTF TaskService task id from the Location header.
         :param strict: if true will raise exception.
         :param response: a response that should have job id information in the header.
-        :return: job id from the Location header
+        :return: task id from the Location header
         :raise TaskIdUnavailable if header not present.
         """
-        job_id = ""
+        task_id = ""
         resp_hdr = response.headers
         if RedfishJsonSpec.Location not in resp_hdr:
             if strict:
@@ -1879,84 +2115,9 @@ class RedfishManager:
                 )
         else:
             location = response.headers[RedfishJsonSpec.Location]
-            job_id = location.split("/")[-1]
+            task_id = location.split("/")[-1]
 
-        return job_id
-
-    @staticmethod
-    def job_id_from_respond(
-            response: requests.models.Response) -> str:
-        """Parse a Dell Lifecycle Controller job id (``JID_...``) from the body.
-
-        Dell returns the job id primarily in the ``Location`` header, but some
-        responses carry it in the JSON body as ``{"id": "JID_414099044945",
-        ...}``. This reads the body's ``id``/``Id`` field first, then falls back
-        to scanning the serialized body for a ``JID_`` token, and returns ``""``
-        when the body carries none. It never raises: a body without a job id is a
-        normal, expected outcome the caller treats as "no job created".
-
-        :param response: the write HTTP response.
-        :return: the ``JID_...`` job id, or ``""`` when the body carries none.
-        """
-        if response is None:
-            return ""
-        body = None
-        try:
-            body = response.json()
-        except (ValueError, TypeError, AttributeError):
-            body = None
-        if isinstance(body, dict):
-            for key in ("id", "Id", "JobID", "JID"):
-                value = body.get(key)
-                if isinstance(value, str) and value.startswith("JID_"):
-                    return value
-        try:
-            text = response.text if hasattr(response, "text") else json.dumps(body)
-        except (TypeError, ValueError):
-            text = ""
-        match = re.search(r"JID_[0-9A-Za-z]+", text or "")
-        return match.group(0) if match else ""
-
-    def parse_task_id(self, data) -> str:
-        """Parses input data and try to get a
-        job id from the http header or http response.
-
-        :param data:  http response or CommandResult
-        :return: job_id or empty string.
-        """
-        # get response from extra
-        if data is None:
-            return ""
-
-        # TODO this case I need remove
-        if hasattr(data, "extra"):
-            resp = data.extra
-        elif isinstance(data, requests.models.Response):
-            resp = data
-        else:
-            raise ValueError("Unknown data type.")
-
-        if resp is None:
-            return ""
-
-        # this based on spec
-        try:
-            job_id = self.job_id_from_header(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-            return job_id
-        # optional lookup, fall through to the response body below.
-        except TaskIdUnavailable as header_err:
-            logging.debug(f"no job id in the response header: {header_err}")
-
-        # this from response
-        try:
-            # try to get from the response, it an optional check.
-            job_id = self.job_id_from_respond(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-        except TaskIdUnavailable as respond_err:
-            logging.debug(f"no job id in the response body: {respond_err}")
-
-        return ""
+        return task_id
 
     def get_task_state(
             self, resp: requests.models.Response
@@ -2125,7 +2286,7 @@ class RedfishManager:
         except Exception:
             pass
         try:
-            host_system = self.idrac_manage_servers
+            host_system = self.managed_system_uri
         except Exception:
             host_system = ""
         system_roots = []
@@ -2155,24 +2316,32 @@ class RedfishManager:
             return f"{fallback_system}/VirtualMedia"
         raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
 
-    @abstractmethod
     def api_success_msg(self,
                         api_respond: RedfishApiRespond,
                         message_key: Optional[str] = "message",
                         message=None) -> Dict:
-        """A default api success respond,
-        Return dict contains Status, and it describes whether rest return
-        ok, accepted or success.
+        """Return the vendor-neutral status envelope for a Redfish write.
 
-        if message and msg key provide msg key added to a dict.
-        for example if we want to add extra information about success.
+        Vendor managers may override this presentation hook, but DMTF commands
+        cannot require a Dell manager merely to describe an HTTP outcome.
 
-        :param api_respond: respond enum. we report to upper ok, accepted, success.
-        :param message_key: key we need add extra
-        :param message: message information data
-        :return: a dict
+        :param api_respond: normalized Redfish response classification.
+        :param message_key: key used when an optional message is supplied.
+        :param message: optional response detail.
+        :return: mapping with ``Status`` and, when supplied, the message.
         """
-        pass
+        status_by_response = {
+            RedfishApiRespond.Ok: ApiRespondString.Ok,
+            RedfishApiRespond.Error: ApiRespondString.Error,
+            RedfishApiRespond.Created: ApiRespondString.Created,
+            RedfishApiRespond.Success: ApiRespondString.Success,
+            RedfishApiRespond.AcceptedTaskGenerated:
+                ApiRespondString.AcceptedTaskGenerated,
+        }
+        result = {"Status": status_by_response[api_respond]}
+        if message is not None:
+            result[message_key] = message
+        return result
 
     @staticmethod
     def _members(data):

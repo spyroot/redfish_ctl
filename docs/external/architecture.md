@@ -30,8 +30,8 @@ CLI (`redfish_main.py`, argparse)
 
 The clearest cross-vendor command is `sensors`, defined in `redfish_ctl/sensors/cmd_sensors.py`. It
 walks ServiceRoot -> Chassis -> Sensors by `@odata.id` links and returns sensor names, readings,
-units, types, and health. `tests/test_sensors.py` runs it through the Supermicro fixture overlay, so
-the test uses the real request path against a non-Dell tree.
+units, types, and health. `tests/sensors/test_sensors.py` runs it through the Supermicro fixture
+overlay, so the test uses the real request path against a non-Dell tree.
 
 The discovery pieces live in two places. `redfish_ctl/discover/classifier.py` classifies a ServiceRoot
 as `dell`, `hpe`, `supermicro`, or `generic` using OEM keys, `@odata.type`, and manufacturer text.
@@ -58,15 +58,29 @@ The generic core never imports vendor packages.
 ## Host-System Selection
 
 Some hosts expose more than one ComputerSystem. A Supermicro GB300 can expose the host as `System_0`
-and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `RedfishManager.discover_computer_system_ids()`,
-`discover_manager_ids()`, and `_host_system()` prefer the member with `Bios` or `Boot` links so host
-commands route to the host system instead of a baseboard.
+and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `RedfishManager.manager_uri` follows the standard
+Manager collection, while `managed_system_uri` follows `Links.ManagerForServers` and prefers the
+member with `Bios` or `Boot` links. Host commands therefore route to the host system instead of a
+baseboard. The old Dell-named properties remain compatibility aliases on `RedfishManager`.
 
-## Sync And Async
+## Telemetry Exporter
 
-Most CLI commands call the synchronous request helpers. The async helpers (`api_async_get`,
-`api_async_post`, `api_async_patch`, and `api_async_delete`) already exist for callers that need an
-event loop. A future fleet proxy would build on those helpers; the proxy itself is not implemented.
+The `exporter` command, defined in `redfish_ctl/telemetry/supermicro/cmd_exporter.py`, is registered
+only on `SupermicroManager`. `SupermicroExporterReader`, defined in
+`redfish_ctl/telemetry/supermicro/super_microexporter.py`, owns collector selection, failure
+classification, NV72 mapping, and the catalog in
+`redfish_ctl/telemetry/supermicro/metric_catalog.py`. Prometheus, SignalFx, and OTLP writers consume
+the shared `MetricSample` model and do not depend on a vendor manager.
+
+## Client Concurrency And Server Work
+
+Most CLI commands use synchronous requests. Shared async GET wrappers are
+`RedfishManager.api_async_get_call()` and `api_async_get_until_complete()`; async write helpers remain
+Dell-specific on `IDracManager`.
+
+Client-side sync or async execution is separate from server-side work. Generic DMTF tasks are polled
+through `RedfishManager.fetch_task()` and TaskService. Dell Lifecycle Controller jobs and their JID
+response semantics remain on `IDracManager` and Dell commands.
 
 ## Known Structural Debt
 

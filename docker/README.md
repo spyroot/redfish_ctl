@@ -24,19 +24,19 @@ REDFISH_PASSWORD=replace-me
 REDFISH_PORT=443
 ```
 
-Run a one-shot read command, equivalent to `redfish_ctl system` on the host:
+Run a one-shot Dell read command:
 
 ```bash
-docker run --rm --env-file .env.redfish redfish-ctl system
+docker run --rm --env-file redfish.env redfish-ctl --vendor dell system
 ```
 
 Run the telemetry exporter with native OTLP output:
 
 ```bash
 docker run --rm \
-  --env-file .env.redfish \
+  --env-file redfish.env \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.example.invalid:4317 \
-  redfish-ctl exporter --output otlp --once
+  redfish-ctl --vendor supermicro exporter --output otlp --once
 ```
 
 The image entrypoint is `redfish_ctl`, so container arguments are the normal CLI subcommand and flags.

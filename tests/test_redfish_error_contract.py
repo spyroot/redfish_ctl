@@ -695,13 +695,13 @@ def _base_manager():
     ],
 )
 def test_base_default_error_handler_preserves_dmtf_envelope(status_code, exc_type):
-    """Every command subclasses IDracManager, so ITS default_error_handler -
-    not the parent RedfishManager's - is the real command error path. For every
-    error code it must raise the parsed RedfishError envelope (status, error.code,
-    every @Message.ExtendedInfo), never a generic string, per the Redfish error
-    contract. Regression: the base override previously raised the generic
+    """Dell-selected commands use IDracManager's error classifier.
+
+    For every error code it must raise the parsed RedfishError envelope (status,
+    error.code, every @Message.ExtendedInfo), never a generic string, per the
+    Redfish error contract. Regression: the Dell override previously raised the generic
     "Failed acquire result. Status code N" for 501/5xx, defeating the contract that
-    the parent-only test could not see.
+    a neutral-manager-only test could not see.
     """
     manager = _base_manager()
     with pytest.raises(exc_type) as raised:

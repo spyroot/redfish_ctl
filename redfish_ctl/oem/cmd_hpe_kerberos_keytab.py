@@ -1,8 +1,8 @@
 """Import an HPE iLO Kerberos keytab through AccountService.
 
-    redfish_ctl hpe-kerberos-keytab-import
-    redfish_ctl hpe-kerberos-keytab-import --keytab-file ./krb5.keytab --dry_run
-    redfish_ctl hpe-kerberos-keytab-import --keytab-base64-env HPE_KEYTAB_B64 --confirm
+    redfish_ctl --vendor hp hpe-kerberos-keytab-import
+    redfish_ctl --vendor hp hpe-kerberos-keytab-import --keytab-file ./krb5.keytab --dry_run
+    redfish_ctl --vendor hp hpe-kerberos-keytab-import --keytab-base64-env HPE_KEYTAB_B64 --confirm
 
 The command discovers ``#HpeiLOAccountService.ImportKerberosKeytab`` from the
 AccountService resource. Keytab material is accepted only from an environment
@@ -20,7 +20,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..config import named_env
-from ..idrac_manager import IDracManager
+from ..ilo_manager import IloManager
 from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
@@ -30,7 +30,7 @@ _KEYTAB_FIELD = "KerberosKeytab"
 
 
 class HpeKerberosKeytabImport(
-    IDracManager,
+    IloManager,
     scm_type=ApiRequestType.HpeKerberosKeytabImport,
     name="hpe-kerberos-keytab-import",
     metaclass=Singleton,

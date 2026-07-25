@@ -16,13 +16,12 @@ from typing import Optional
 from tqdm import tqdm
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class PciDeviceQuery(IDracManager,
+class PciDeviceQuery(RedfishManager,
                      scm_type=ApiRequestType.PciDeviceQuery,
                      name='pci_device_query',
                      metaclass=Singleton):
@@ -74,7 +73,7 @@ class PciDeviceQuery(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
+        r = f"{self._default_method}{self.redfish_ip}{self.managed_system_uri}" \
             f"?$select={pci_type}"
 
         try:

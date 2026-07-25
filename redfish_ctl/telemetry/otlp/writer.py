@@ -1,12 +1,8 @@
 """OTLP (OpenTelemetry) writer for telemetry samples.
 
-    redfish_ctl exporter --once --output otlp
-    redfish_ctl exporter --output otlp                  # push on an interval
-
-The OTLP backend maps the shared ``hw.*`` metric contract onto the OpenTelemetry
-data model and exports it, so ``redfish_ctl`` drops into an existing OTel
-pipeline as one more producer. It is vendor-neutral — every vendor reader emits
-the same samples. The emission itself lives in :mod:`.emit`; this file is the
+The OTLP backend maps shared :class:`MetricSample` objects onto the OpenTelemetry
+data model and exports them, so ``redfish_ctl`` drops into an existing OTel
+pipeline as one more producer. The emission itself lives in :mod:`.emit`; this file is the
 :class:`AbstractExporterWriter` adapter that owns the ``--otlp-*``/``OTEL_*``
 config.
 

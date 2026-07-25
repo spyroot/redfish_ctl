@@ -5,17 +5,39 @@ import inspect
 import pytest
 
 from redfish_ctl.actions.cmd_action_list import ActionList
+from redfish_ctl.component_integrity.cmd_component_integrity import (
+    QueryComponentIntegrity,
+)
+from redfish_ctl.compute.cmd_system_reset import SystemReset
 from redfish_ctl.discovery.cmd_bmc_scan import BmcScan
 from redfish_ctl.discovery.cmd_discovery import Discovery
+from redfish_ctl.environment.cmd_environment_metrics import EnvironmentMetrics
 from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.network.cmd_network_adapters import NetworkAdapters
+from redfish_ctl.ports.cmd_nvlink_ports import NvLinkPorts
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult, RedfishManager
+from redfish_ctl.sensors.cmd_sensors import Sensors
+from redfish_ctl.thermal.cmd_leak_detectors import LeakDetectors
+from redfish_ctl.thermal.cmd_thermal import Thermal
 
 
 GENERIC_COMMANDS = (
     (ApiRequestType.ActionList, "action_list", ActionList),
+    (ApiRequestType.SystemReset, "system_reset", SystemReset),
     (ApiRequestType.BmcScan, "bmc-scan", BmcScan),
     (ApiRequestType.Discovery, "discovery", Discovery),
+    (ApiRequestType.EnvironmentMetrics, "environment-metrics", EnvironmentMetrics),
+    (ApiRequestType.Thermal, "thermal", Thermal),
+    (ApiRequestType.Sensors, "sensors", Sensors),
+    (ApiRequestType.NvLinkPorts, "nvlink-ports", NvLinkPorts),
+    (ApiRequestType.LeakDetectors, "leak-detectors", LeakDetectors),
+    (ApiRequestType.NetworkAdapters, "network-adapters", NetworkAdapters),
+    (
+        ApiRequestType.ComponentIntegrity,
+        "component-integrity",
+        QueryComponentIntegrity,
+    ),
 )
 
 
@@ -27,6 +49,14 @@ def test_idrac_init_does_not_redeclare_shared_connection_fields():
     assert {"host", "username", "password"} <= redfish_params.keys()
     assert {"host", "username", "password"}.isdisjoint(idrac_params)
     assert "log_level" in idrac_params
+
+
+def test_managed_system_discovery_is_owned_by_redfish_manager():
+    """Canonical ManagerForServers discovery must not depend on Dell state."""
+    assert "manager_uri" in RedfishManager.__dict__
+    assert "managed_system_uri" in RedfishManager.__dict__
+    assert "idrac_members" not in IDracManager.__dict__
+    assert "idrac_manage_servers" not in IDracManager.__dict__
 
 
 @pytest.mark.parametrize("_api_type,_name,command_cls", GENERIC_COMMANDS)

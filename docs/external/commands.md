@@ -2,12 +2,14 @@
 
 Author: Mus <spyroot@gmail.com>
 
-When connecting to a new BMC, run `redfish_ctl system` first. It proves the endpoint, credentials, and
-basic Redfish path before deeper inventory or any staged change.
+When connecting to a new BMC, run `redfish_ctl sensors` first. It proves the endpoint, credentials,
+and a shared DMTF read path before deeper inventory or any staged change. Dell-only commands use
+`redfish_ctl --vendor dell <command>`.
 
-The table below follows the command names imported by `redfish_ctl/__init__.py`. Run
-`redfish_ctl <command> --help` for flags on your installed version. (`idrac_ctl` remains a
-backward-compatible alias for the `redfish_ctl` command, and `IDRAC_*` env vars are still read.)
+The table below lists subcommand tokens imported by `redfish_ctl/__init__.py`. Run
+`redfish_ctl <command> --help` for shared commands; prepend `--vendor dell|hp|supermicro` for a
+vendor command. The root selector must precede the subcommand. Rows that begin with `--vendor`
+already show the complete invocation.
 
 ## Connection Basics
 
@@ -43,17 +45,20 @@ These root flags are separate from command-specific filters such as `bios --filt
 ## First Reads
 
 ```bash
-redfish_ctl system
-redfish_ctl manager
-redfish_ctl chassis
 redfish_ctl sensors
-redfish_ctl firmware_inventory
-redfish_ctl bios --filter ProcCStates,SysMemSize
-redfish_ctl logs
-redfish_ctl accounts --usernames
-redfish_ctl storage-list
-redfish_ctl get_vm
-redfish_ctl get /redfish/v1/Managers
+redfish_ctl environment-metrics
+redfish_ctl thermal
+redfish_ctl component-integrity
+redfish_ctl --vendor dell system
+redfish_ctl --vendor dell manager
+redfish_ctl --vendor dell chassis
+redfish_ctl --vendor dell firmware_inventory
+redfish_ctl --vendor dell bios --filter ProcCStates,SysMemSize
+redfish_ctl --vendor dell logs
+redfish_ctl --vendor dell accounts --usernames
+redfish_ctl --vendor dell storage-list
+redfish_ctl --vendor dell get_vm
+redfish_ctl --vendor dell get /redfish/v1/Managers
 ```
 
 `system` returns the host ComputerSystem. `manager` returns the BMC manager. `sensors`, defined in
@@ -156,7 +161,7 @@ Safety labels:
 | `ethernet-interfaces` | Read host and manager EthernetInterfaces. | Read |
 | `event-service` | Read EventService, SSE filter support, and subscription collection summary. | Read |
 | `event-submit-test` | Submit a Redfish test event; `--dry_run` previews the payload. | Write |
-| `exporter` | Expose BMC telemetry as Prometheus text or SignalFx datapoints. | Read |
+| `--vendor supermicro exporter` | Expose Supermicro/NV72 telemetry through Prometheus, SignalFx, or OTLP. | Read |
 | `firmware` | Read firmware view data. | Read |
 | `firmware-update` | Run UpdateService SimpleUpdate or a discovered push upload URI; `--dry_run` previews, `--confirm` writes. | Guarded |
 | `firmware_inventory` | Read firmware inventory. | Read |
@@ -260,18 +265,13 @@ redfish_ctl metric-definitions
 redfish_ctl metric-reports
 redfish_ctl telemetry-triggers
 redfish_ctl thermal
-redfish_ctl power
 redfish_ctl environment-metrics
-redfish_ctl processor-metrics
-redfish_ctl memory-metrics
 redfish_ctl leak-detectors
 redfish_ctl network-adapters
-redfish_ctl network-ports
-redfish_ctl ethernet-interfaces
+redfish_ctl nvlink-ports
 redfish_ctl component-integrity
-redfish_ctl secure-boot
-redfish_ctl logs
-redfish_ctl oem-info
+redfish_ctl actions
+redfish_ctl discovery
 ```
 
 These commands are the best starting point on non-Dell BMCs. They follow Redfish links and are
@@ -293,33 +293,36 @@ Before running either kind of write, use the same four phases:
 ### BIOS Change From A Spec
 
 ```bash
-redfish_ctl bios --filter ProcCStates,SysProfile,WorkloadProfile
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl --vendor dell bios --filter ProcCStates,SysProfile,WorkloadProfile
+redfish_ctl --vendor dell bios-change \
+  --from_spec specs/realtime.opt.spec.json on-reset --show
 ```
 
 After target approval, staging and reset commands stay separate from read/preview commands:
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
-redfish_ctl bios-pending
-redfish_ctl jobs
+redfish_ctl --vendor dell bios-change \
+  --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl --vendor dell bios-pending
+redfish_ctl --vendor dell jobs
 ```
 
 Many BIOS changes remain pending until an apply job and host reset. Use `-r` only during an approved
 maintenance window:
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
-redfish_ctl jobs
+redfish_ctl --vendor dell bios-change \
+  --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl --vendor dell jobs
 ```
 
 Named profiles under `specs/profiles/` use the same staging path but add an automatic rollback
 snapshot before the profile is previewed or staged:
 
 ```bash
-redfish_ctl bios-profile list
-redfish_ctl bios-profile show dell-cstates-off
-redfish_ctl bios-profile apply dell-cstates-off
+redfish_ctl --vendor dell bios-profile list
+redfish_ctl --vendor dell bios-profile show dell-cstates-off
+redfish_ctl --vendor dell bios-profile apply dell-cstates-off
 ```
 
 `bios-profile apply` is a dry-run by default. It reads the current BIOS values for the named
@@ -327,30 +330,32 @@ attributes, returns a rollback spec, and only stages the profile through `bios-c
 `--confirm` is present:
 
 ```bash
-redfish_ctl bios-profile apply dell-cstates-off --confirm
-redfish_ctl bios-pending
+redfish_ctl --vendor dell bios-profile apply dell-cstates-off --confirm
+redfish_ctl --vendor dell bios-pending
 ```
 
 ### Secure Boot
 
 ```bash
-redfish_ctl secure-boot
-redfish_ctl bios-registry --attr_name SecureBoot
-redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset --show
+redfish_ctl --vendor dell secure-boot
+redfish_ctl --vendor dell bios-registry --attr_name SecureBoot
+redfish_ctl --vendor dell bios-change \
+  --attr_name SecureBoot --attr_value Enabled on-reset --show
 ```
 
 After approval for a host reset:
 
 ```bash
-redfish_ctl bios-change --attr_name SecureBoot --attr_value Enabled on-reset -r
-redfish_ctl secure-boot
+redfish_ctl --vendor dell bios-change \
+  --attr_name SecureBoot --attr_value Enabled on-reset -r
+redfish_ctl --vendor dell secure-boot
 ```
 
 ### Virtual Media ISO Boot
 
 ```bash
-redfish_ctl get_vm
-redfish_ctl boot-one-shot --device Cd --dry_run
+redfish_ctl --vendor dell get_vm
+redfish_ctl --vendor dell boot-one-shot --device Cd --dry_run
 ```
 
 On older Supermicro X10 Redfish endpoints, `boot-one-shot` maps `Cd` to the
@@ -361,17 +366,18 @@ errors instead of being hidden.
 After approval for live media and next-boot changes:
 
 ```bash
-redfish_ctl eject_vm --device_id 1
-redfish_ctl insert_vm --uri_path http://192.0.2.10/ubuntu.iso --device_id 1
-redfish_ctl get_vm
-redfish_ctl boot-one-shot --device Cd -r
-redfish_ctl boot-state
+redfish_ctl --vendor dell eject_vm --device_id 1
+redfish_ctl --vendor dell insert_vm \
+  --uri_path http://192.0.2.10/ubuntu.iso --device_id 1
+redfish_ctl --vendor dell get_vm
+redfish_ctl --vendor dell boot-one-shot --device Cd -r
+redfish_ctl --vendor dell boot-state
 ```
 
 ### Power Reset
 
 ```bash
-redfish_ctl system
+redfish_ctl --vendor dell system
 redfish_ctl system-reset --reset_type GracefulRestart --dry_run
 ```
 
@@ -379,7 +385,7 @@ After approval for a live host reset:
 
 ```bash
 redfish_ctl system-reset --reset_type GracefulRestart --confirm
-redfish_ctl system
+redfish_ctl --vendor dell system
 ```
 
 `system-reset` previews by default and performs the reset only when `--confirm` is present.
@@ -389,17 +395,19 @@ unless `--dry_run` is supplied; `--wait` only waits after a real reset.
 ### Firmware Update
 
 ```bash
-redfish_ctl firmware_inventory
-redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
-redfish_ctl firmware-update --image_file ./firmware.bin --dry_run
+redfish_ctl --vendor dell firmware_inventory
+redfish_ctl --vendor dell firmware-update \
+  --image_uri https://example.invalid/firmware.exe --dry_run
+redfish_ctl --vendor dell firmware-update --image_file ./firmware.bin --dry_run
 ```
 
 After approval for a live firmware update:
 
 ```bash
-redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --confirm
-redfish_ctl firmware-update --image_file ./firmware.bin --confirm
-redfish_ctl tasks
+redfish_ctl --vendor dell firmware-update \
+  --image_uri https://example.invalid/firmware.exe --confirm
+redfish_ctl --vendor dell firmware-update --image_file ./firmware.bin --confirm
+redfish_ctl --vendor dell tasks
 ```
 
 `firmware-update`, defined in `redfish_ctl/firmware/cmd_firmware_update.py`, is destructive when
@@ -410,7 +418,7 @@ and approved non-production targets until you have your own firmware rollout pro
 ### HPE iLO Canary
 
 `examples/hpe_ilo_canary.sh`, the live-emulator script under `examples/`, starts the HPE iLO emulator
-and runs read-only vendor-neutral commands plus a dry-run `system-reset` preview:
+and runs shared read-only commands through `--vendor hp`:
 
 ```bash
 bash examples/hpe_ilo_canary.sh

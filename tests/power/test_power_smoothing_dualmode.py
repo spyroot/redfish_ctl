@@ -7,8 +7,8 @@ import pytest
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import ApiRequestType
+from redfish_ctl.supermico_manager import SupermicroManager
 
 GB300_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
@@ -45,7 +45,7 @@ def gb300_corpus_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = SupermicroManager(
             host="mock-gb300",
             username="root",
             password="mock",

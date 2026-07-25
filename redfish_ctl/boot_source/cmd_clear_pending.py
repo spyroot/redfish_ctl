@@ -80,5 +80,3 @@ class BootOptionsClearPending(IDracManager,
             cmd_result.data['task_id'] = task_id
 
         return cmd_result
-
-

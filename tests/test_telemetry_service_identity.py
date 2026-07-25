@@ -8,19 +8,19 @@ import uuid
 from pathlib import Path
 
 import pytest
-from redfish_ctl.redfish_api_common import REDFISH_API
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
+from redfish_ctl.redfish_api_common import REDFISH_API
 from redfish_ctl.redfish_manager import RedfishResponseCache
 from redfish_ctl.telemetry import identity, tracing
-from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,
     MetricSample,
 )
 from redfish_ctl.telemetry.prometheus import render_prometheus_text
 from redfish_ctl.telemetry.signalfx import to_signalfx_body
+from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -305,16 +305,19 @@ def test_otlp_trace_flag_reaches_resolved_exporter_identity(monkeypatch):
         insecure=True,
     )
     observed = {}
-    collect_samples = command.collect_samples
+    reader = command._reader
+    read = reader.read
 
     def collect(*_args, **kwargs):
         """Capture options forwarded by exporter execution."""
         observed["forwarded"] = kwargs["otlp_traces"]
         return []
 
-    monkeypatch.setattr(command, "collect_samples", collect)
+    monkeypatch.setattr(reader, "read", collect)
     command.execute(once=True, exporter_output="prometheus", otlp_traces=True)
     assert observed == {"forwarded": True}
+
+    monkeypatch.setattr(reader, "read", read)
 
     stable = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
 
@@ -323,7 +326,7 @@ def test_otlp_trace_flag_reaches_resolved_exporter_identity(monkeypatch):
         return CollectorResult(name, supported=False, success=True,
                                duration_seconds=0.0)
 
-    monkeypatch.setattr(command, "_invoke_collector", collector)
+    monkeypatch.setattr(reader, "_invoke_collector", collector)
     monkeypatch.setattr(
         tracing,
         "setup_otlp",
@@ -332,8 +335,8 @@ def test_otlp_trace_flag_reaches_resolved_exporter_identity(monkeypatch):
             attributes=attrs,
         ),
     )
-    collect_samples(
-        vendor="dell",
+    reader.read(
+        vendor="supermicro",
         service_instance_id=stable,
         otlp_traces=True,
     )

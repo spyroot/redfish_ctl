@@ -135,12 +135,10 @@ class ImportOneTimeBoot(
         data = {}
         try:
             response = self.api_post_call(r, json.dumps(payload), headers)
-            ok = self.default_post_success(self, response, expected=202)
+            ok = self.default_post_success(response, expected=202)
 
             if ok:
-                job_id = self.job_id_from_header(response, strict=False)
-                if not job_id:
-                    job_id = self.job_id_from_respond(response)
+                job_id = self.job_id_from_response(response, strict=False)
                 if job_id:
                     if not do_async:
                         data = self.fetch_task(job_id)

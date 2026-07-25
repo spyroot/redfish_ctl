@@ -68,6 +68,7 @@ class MetricReports(RedfishManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Walk MetricReports and flatten each MetricValue into a flat row.
 
@@ -83,6 +84,8 @@ class MetricReports(RedfishManager,
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: when True, issue the Redfish queries asynchronously.
         :param do_expanded: when True, issue an expanded ($expand) query for the collection.
+        :param preserve_errors: re-raise collector failures for exporter health
+            accounting; the standalone command remains tolerant by default.
         :return: CommandResult wrapping the flattened metric-value rows.
         """
         rows = []
@@ -91,6 +94,8 @@ class MetricReports(RedfishManager,
             coll = self.base_query(reports_uri, do_async=do_async,
                                    do_expanded=do_expanded).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return CommandResult(rows, None, None, None)
 
         for report_uri in self._members(coll):
@@ -100,6 +105,8 @@ class MetricReports(RedfishManager,
             try:
                 rdata = self.base_query(report_uri, do_async=do_async).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
             for sample in rdata.get("MetricValues", []):
                 if not isinstance(sample, dict):

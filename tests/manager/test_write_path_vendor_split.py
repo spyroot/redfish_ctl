@@ -1,22 +1,22 @@
 """Vendor split of the write path, interrogated on the correct class per vendor.
 
-Dell iDRAC builds every write on the job/task system: status is classified with
-the Dell ``_http_code_mapping``, a job id comes back in the Location header OR the
-response body, and completion is polled with ``fetch_task`` over the Dell job
-model. Supermicro/HPE have no job system at all -- a write returns 200/204
-synchronously with no task. So the write methods are a deliberate DUP, one
-implementation per family, and MRO must resolve each family to its own copy and
-never cross-wire:
+Dell iDRAC classifies writes with its ``_http_code_mapping``; a Lifecycle
+Controller job id can arrive in the Location header or response body and
+completion uses Dell's job model. Other vendors use the shared DMTF path, which
+supports synchronous 2xx responses and the standard 202 + TaskService Location
+form. The write methods are therefore a deliberate duplicate, one implementation
+per semantic family, and MRO must never cross-wire them:
 
 * a Dell instance reaching the base's job-less ``base_request_respond`` would
   silently stop extracting/polling job ids;
 * a non-Dell instance reaching Dell's ``read_api_respond`` would ``AttributeError``
   on ``_http_code_mapping`` (built only in ``IDracManager.__init__``).
 
-These tests pin the resolution on the *actual* command classes -- a Dell command
-(``SystemQuery`` -> ``IDracManager``), a Supermicro command (``Exporter`` ->
-``SupermicroManager``) and a generic DMTF command (``MetricReports`` ->
-``RedfishManager``) -- and smoke the generic synchronous write path.
+These tests pin resolution on the runtime command composition selected by the
+CLI manager. The same DMTF ``MetricReports`` command must resolve through Dell's
+transport when selected by ``IDracManager`` and through the neutral transport
+when selected by ``SupermicroManager``. The concrete Supermicro exporter stays
+on that vendor manager directly.
 
 Author Mus spyroot@gmail.com
 """
@@ -25,10 +25,15 @@ import logging
 import pytest
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_shared import RedfishApiRespond
-from redfish_ctl.system.cmd_system import SystemQuery                          # Dell / IDracManager
-from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter            # Supermicro / SupermicroManager
-from redfish_ctl.telemetry.supermicro.cmd_metric_reports import MetricReports  # generic / RedfishManager
+from redfish_ctl.supermico_manager import SupermicroManager
+from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
+from redfish_ctl.telemetry.supermicro.cmd_metric_reports import MetricReports
+
+DELL_METRIC_REPORTS = IDracManager._runtime_command_class(MetricReports)
+SUPERMICRO_METRIC_REPORTS = SupermicroManager._runtime_command_class(
+    MetricReports)
 
 # The write methods that must be a per-family dup (same name, different owner).
 WRITE_METHODS = [
@@ -56,8 +61,8 @@ def _provider(cls, name):
 
 
 @pytest.mark.parametrize("name", WRITE_METHODS)
-def test_dell_command_resolves_write_to_idrac_manager(name):
-    """A Dell command resolves every write method to ``IDracManager``.
+def test_dell_selected_dmtf_command_resolves_write_to_idrac_manager(name):
+    """A Dell-selected DMTF command resolves writes to ``IDracManager``.
 
     If any resolved to ``RedfishManager`` the Dell write would lose its
     job-id/``fetch_task`` handling -- the cross-wire that breaks Dell.
@@ -65,16 +70,16 @@ def test_dell_command_resolves_write_to_idrac_manager(name):
     :param name: the write method under test.
     :return: None.
     """
-    assert _provider(SystemQuery, name) == "IDracManager"
+    assert _provider(DELL_METRIC_REPORTS, name) == "IDracManager"
 
 
-@pytest.mark.parametrize("command", [Exporter, MetricReports])
+@pytest.mark.parametrize("command", [Exporter, SUPERMICRO_METRIC_REPORTS])
 @pytest.mark.parametrize("name", WRITE_METHODS)
 def test_non_dell_command_resolves_write_to_redfish_manager(command, name):
     """Supermicro and generic commands resolve every write method to the base.
 
-    Neither vendor has a job system, so both must inherit the generic
-    synchronous write chain on ``RedfishManager``, not Dell's.
+    Both must inherit the generic DMTF write chain on ``RedfishManager``, not
+    Dell's Lifecycle Controller job handling.
 
     :param command: the non-Dell command class under test.
     :param name: the write method under test.
@@ -89,9 +94,17 @@ def test_read_api_respond_is_dell_only():
 
     :return: None.
     """
-    assert _provider(SystemQuery, "read_api_respond") == "IDracManager"
+    assert _provider(DELL_METRIC_REPORTS, "read_api_respond") == "IDracManager"
     assert _provider(Exporter, "read_api_respond") is None
-    assert _provider(MetricReports, "read_api_respond") is None
+    assert _provider(SUPERMICRO_METRIC_REPORTS, "read_api_respond") is None
+
+
+@pytest.mark.parametrize("name", ["job_id_from_respond", "job_id_from_response"])
+def test_dell_body_job_id_parsers_are_dell_only(name):
+    """Lifecycle Controller body-JID parsing must not leak into DMTF managers."""
+    assert _provider(DELL_METRIC_REPORTS, name) == "IDracManager"
+    assert _provider(Exporter, name) is None
+    assert _provider(SUPERMICRO_METRIC_REPORTS, name) is None
 
 
 class _FakeResp:
@@ -121,9 +134,9 @@ def _generic_instance():
     """Build a non-Dell command instance carrying only the attributes the write
     path touches, so no BMC or network is required.
 
-    :return: an uninitialised :class:`MetricReports` with the write-path attrs set.
+    :return: an uninitialised Supermicro-selected DMTF command instance.
     """
-    inst = object.__new__(MetricReports)
+    inst = object.__new__(SUPERMICRO_METRIC_REPORTS)
     inst.logger = logging.getLogger("test_write_path_vendor_split")
     inst.json_content_type = {"Content-Type": "application/json"}
     inst._default_method = "https://"

@@ -2,11 +2,11 @@
 
 import pytest
 
-from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.redfish_api_common import ApiRequestType
+from redfish_ctl.cmd_exceptions import InvalidArgument, UnsupportedAction
 from redfish_ctl.oem.cmd_nvidia_debug_token import NvidiaDebugToken
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.supermico_manager import SupermicroManager
 
 _TOKEN_RESOURCE = "/redfish/v1/Systems/HGX_Baseboard_0/Oem/Nvidia/CPUDebugToken"
 _GENERATE_TARGET = (
@@ -167,7 +167,7 @@ def test_nvidia_debug_token_missing_target_reports_without_post(
     """A fixture without NVIDIA debug-token resources reports a selector error."""
     manager, service = redfish_mock_factory("generic")
 
-    with pytest.raises(InvalidArgument, match="debug-token resource not found"):
+    with pytest.raises(UnsupportedAction, match="Unknown nvidia-debug-token command"):
         manager.sync_invoke(
             ApiRequestType.NvidiaDebugToken,
             "nvidia-debug-token",
@@ -180,7 +180,7 @@ def test_nvidia_debug_token_missing_target_reports_without_post(
 
 def test_nvidia_debug_token_exposes_cli_entrypoint():
     """The nvidia-debug-token command is wired into the package registry."""
-    registry = IDracManager().get_registry()
+    registry = SupermicroManager.get_registry()
     assert registry[ApiRequestType.NvidiaDebugToken]["nvidia-debug-token"] is (
         NvidiaDebugToken
     )

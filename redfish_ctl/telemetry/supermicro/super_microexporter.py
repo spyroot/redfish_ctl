@@ -1,17 +1,15 @@
-"""Supermicro/GB300 telemetry data-adaptation for the Redfish exporter.
+"""Concrete Supermicro/GB300 reader for the Redfish exporter.
 
-Every vendor exporter emits the same ``hw.*`` metric contract; the only
-per-vendor delta is that each BMC exposes the source data differently. This
-module is the Supermicro/GB300 **data adapter**: it maps this vendor's Redfish
+This module maps Supermicro/NV72 Redfish
 row shapes (Chassis EnvironmentMetrics, Sensors, nvlink-ports, TelemetryService
 MetricReports, ThermalSubsystem, LeakDetectors, NetworkAdapters,
 ComponentIntegrity) into the shared, vendor-neutral :class:`MetricSample` model
-defined in :mod:`redfish_ctl.telemetry.exporter`.
+defined in :mod:`redfish_ctl.telemetry.metric_model`.
 
-The generic sample/dimension/coercion primitives (``_sample``, ``_with_dims``,
-``_dim_value``, ``_as_float``, ``_duration_seconds``, ``_reading``,
-``_unit_for_metric``) and the metric catalog live in the shared exporter module
-and are imported here; nothing Supermicro-specific belongs in that shared layer.
+Generic dimension/coercion primitives are reused from the shared exporter
+runtime.  The ``hw.*``/``hw.gb300.*`` catalog and sample construction stay in
+this concrete package because those names describe the Supermicro/NV72 corpus,
+not the DMTF telemetry schema.
 
 Author Mus spyroot@gmail.com
 """
@@ -19,8 +17,17 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Iterable, Mapping, Optional
 
+from redfish_ctl.redfish_api_common import ApiRequestType
+from redfish_ctl.redfish_manager import (
+    CommandResult,
+    RedfishManager,
+    RedfishResponseCache,
+)
+from redfish_ctl.telemetry import exporter
+from redfish_ctl.telemetry import identity as identity_mod
 from redfish_ctl.telemetry.abstract_exporter_reader import AbstractExporterReader
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
@@ -28,10 +35,31 @@ from redfish_ctl.telemetry.exporter import (
     _dim_value,
     _duration_seconds,
     _reading,
-    _sample,
-    _unit_for_metric,
+    _sample as _catalog_sample,
     _with_dims,
 )
+from redfish_ctl.telemetry.supermicro.metric_catalog import (
+    metric_definition as supermicro_metric_definition,
+    metric_definitions as supermicro_metric_definitions,
+)
+
+
+def _sample(*args, **kwargs) -> MetricSample:
+    """Build a sample using the concrete Supermicro/NV72 catalog.
+
+    :return: catalog-validated metric sample.
+    """
+    kwargs["definition_lookup"] = supermicro_metric_definition
+    return _catalog_sample(*args, **kwargs)
+
+
+def _unit_for_metric(metric: str) -> Optional[str]:
+    """Return the canonical unit from the Supermicro/NV72 catalog.
+
+    :param metric: canonical metric name.
+    :return: catalog unit, or ``None`` for unitless metrics.
+    """
+    return supermicro_metric_definition(metric).unit
 
 # Supermicro/GB300 source-property → metric maps. These name vendor Redfish
 # properties, so they are vendor data, not part of the shared contract.
@@ -193,7 +221,12 @@ def samples_from_environment_rows(
                 unit="kWh",
             ))
         for fan_name, rpm in _fan_readings(row):
-            samples.append(_sample("hw.fan_speed", rpm, dims | {"fan": _dim_value(fan_name)}, "RPM"))
+            samples.append(_sample(
+                "hw.fan_speed",
+                rpm,
+                dims | {"fan": _dim_value(fan_name)},
+                "RPM",
+            ))
     return samples
 
 
@@ -224,7 +257,12 @@ def samples_from_sensor_rows(
             samples.append(_sample("hw.power", value, dims | {"sensor": _dim_value(name)}, "W"))
         elif reading_type in SENSOR_METRIC:
             metric, label = SENSOR_METRIC[reading_type]
-            samples.append(_sample(metric, value, dims | {label: _dim_value(name)}, row.get("ReadingUnits")))
+            samples.append(_sample(
+                metric,
+                value,
+                dims | {label: _dim_value(name)},
+                row.get("ReadingUnits"),
+            ))
     return samples
 
 
@@ -302,7 +340,13 @@ def samples_from_metric_report_rows(
                 if prop_info.get(key):
                     dims[key] = str(prop_info[key])
         dims["report"] = str(row.get("Report") or "unknown")
-        samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
+        samples.append(_sample(
+            metric,
+            value,
+            dims,
+            _unit_for_metric(metric),
+            row.get("Timestamp"),
+        ))
     return samples
 
 
@@ -807,9 +851,11 @@ def _parse_metric_property(prop: str) -> dict[str, str]:
 
 
 def _generic_metric_name(prop: str) -> str:
-    """Vendor-neutral metric name for any MetricReport property not in the
-    curated fabric map, so the full telemetry surface is exported rather than
-    just fabric counters. e.g. ``FP16ActivityPercent`` -> ``hw.gb300.fp16_activity_percent``.
+    """Supermicro/NV72 metric name for an uncurated MetricReport property.
+
+    This keeps the full concrete telemetry surface instead of dropping values
+    outside the curated fabric map. For example, ``FP16ActivityPercent`` becomes
+    ``hw.gb300.fp16_activity_percent``.
 
     :param prop: the MetricReport property name.
     :return: the vendor-neutral ``hw.gb300.*`` metric name.
@@ -830,13 +876,403 @@ def _is_gpu_temperature(prop: str) -> bool:
 
 
 class SupermicroExporterReader(AbstractExporterReader):
-    """Supermicro/GB300 telemetry reader.
+    """Concrete Supermicro/NV72 telemetry reader."""
 
-    Implements the :class:`AbstractExporterReader` contract: pure data
-    adaptation from this vendor's collected Redfish rows into the shared
-    :class:`MetricSample` model. It performs no Redfish transport — the command
-    collects the raw rows and hands them here.
-    """
+    _UNSUPPORTED_COLLECTOR_ERRORS = {
+        "FailedDiscoverAction",
+        "MissingResource",
+        "RedfishMethodNotAllowed",
+        "RedfishNotFound",
+        "ResourceNotFound",
+        "UnsupportedAction",
+    }
+    _AUTHENTICATION_ERRORS = {
+        "AuthenticationFailed",
+        "RedfishForbidden",
+        "RedfishUnauthorized",
+    }
+
+    def __init__(self, source: RedfishManager):
+        """Bind the reader to the already-selected Supermicro manager.
+
+        :param source: selected manager used for all collector dispatch.
+        """
+        self._source = source
+        self._collector_error_totals: dict[tuple[str, str], float] = {}
+        self._last_success_timestamp_seconds = 0.0
+
+    def metric_definition(self, metric_name: str):
+        """Resolve one concrete metric or a shared exporter self-metric.
+
+        :param metric_name: canonical metric name.
+        :return: concrete or shared metric definition.
+        """
+        try:
+            return supermicro_metric_definition(metric_name)
+        except KeyError:
+            return exporter.metric_definition(metric_name)
+
+    @staticmethod
+    def metric_definitions():
+        """Return the concrete catalog plus shared exporter self-metrics.
+
+        :return: merged metric-definition mapping.
+        """
+        return exporter.metric_definitions() | supermicro_metric_definitions()
+
+    @classmethod
+    def _is_unsupported_collector_error(cls, exc: Exception) -> bool:
+        """Return whether a collector exception means the resource is unsupported.
+
+        :param exc: collector exception.
+        :return: whether the exception represents an unavailable resource.
+        """
+        return exc.__class__.__name__ in cls._UNSUPPORTED_COLLECTOR_ERRORS
+
+    @classmethod
+    def _collector_error_kind(cls, exc: Exception) -> str:
+        """Map a collector exception to a bounded exporter error label.
+
+        :param exc: collector exception.
+        :return: stable low-cardinality error label.
+        """
+        name = exc.__class__.__name__
+        lowered = name.lower()
+        if isinstance(exc, TimeoutError) or "timeout" in lowered:
+            return "timeout"
+        if name in cls._AUTHENTICATION_ERRORS or "unauthoriz" in lowered:
+            return "authentication"
+        if "jsondecode" in lowered or "decode" in lowered:
+            return "decode_error"
+        if name in {"TypeError", "ValueError", "KeyError", "UnexpectedResponse"}:
+            return "invalid_payload"
+        if "http" in lowered or "redfish" in lowered or "requestfailed" in lowered:
+            return "http_error"
+        return "internal"
+
+    @staticmethod
+    def _validate_collector_rows(rows) -> tuple[Mapping, ...]:
+        """Materialize and validate a collector's row sequence.
+
+        :param rows: collector row iterable.
+        :return: validated tuple of mapping rows.
+        """
+        if isinstance(rows, (str, bytes, dict)) or not hasattr(rows, "__iter__"):
+            raise ValueError("collector returned a non-list payload")
+        normalized = tuple(rows)
+        if not all(isinstance(row, Mapping) for row in normalized):
+            raise ValueError("collector returned a non-mapping row")
+        return normalized
+
+    @staticmethod
+    def _extract_list_rows(data) -> list:
+        """Extract a collector result whose data is already a row list.
+
+        :param data: collector command data.
+        :return: validated list-shaped data.
+        """
+        if not isinstance(data, list):
+            raise ValueError("collector returned a non-list payload")
+        return data
+
+    @staticmethod
+    def _extract_environment_rows(data) -> list:
+        """Extract EnvironmentMetrics rows from its command result.
+
+        :param data: environment-metrics command data.
+        :return: environment metric rows.
+        """
+        if isinstance(data, dict) and isinstance(data.get("metrics"), list):
+            return data["metrics"]
+        if isinstance(data, list):
+            return data
+        raise ValueError("environment-metrics returned an unexpected payload")
+
+    @staticmethod
+    def _extract_leak_detector_rows(data) -> list:
+        """Extract LeakDetector rows from its command result.
+
+        :param data: leak-detectors command data.
+        :return: leak detector rows.
+        """
+        if isinstance(data, dict) and isinstance(data.get("detectors"), list):
+            return data["detectors"]
+        raise ValueError("leak-detectors returned an unexpected payload")
+
+    @staticmethod
+    def _extract_thermal_rows(data) -> list:
+        """Extract ThermalSubsystem rows from its command result.
+
+        :param data: thermal command data.
+        :return: temperature-reading rows.
+        """
+        if isinstance(data, dict) and isinstance(data.get("temperature_readings"), list):
+            return data["temperature_readings"]
+        raise ValueError("thermal returned an unexpected payload")
+
+    def _collect_result(
+            self,
+            collector: str,
+            call: Callable[[], CommandResult],
+            extract_rows: Callable[[object], list],
+            ) -> exporter.CollectorResult:
+        """Run one collector without losing unsupported and failed outcomes.
+
+        :param collector: stable collector name.
+        :param call: deferred collector invocation.
+        :param extract_rows: command-specific row extractor.
+        :return: normalized collector outcome with duration and error state.
+        """
+        started_at = exporter.time.monotonic()
+        try:
+            result = call()
+        except Exception as exc:
+            duration = exporter.time.monotonic() - started_at
+            if self._is_unsupported_collector_error(exc):
+                return exporter.CollectorResult(
+                    collector, False, True, duration, (), None)
+            return exporter.CollectorResult(
+                collector, True, False, duration, (),
+                self._collector_error_kind(exc))
+        duration = exporter.time.monotonic() - started_at
+        if not hasattr(result, "data"):
+            return exporter.CollectorResult(
+                collector, True, False, duration, (), "invalid_payload")
+        if getattr(result, "error", None):
+            return exporter.CollectorResult(
+                collector, True, False, duration, (), "internal")
+        try:
+            rows = self._validate_collector_rows(extract_rows(result.data))
+        except Exception as exc:
+            return exporter.CollectorResult(
+                collector, True, False, duration, (),
+                self._collector_error_kind(exc))
+        return exporter.CollectorResult(collector, True, True, duration, rows, None)
+
+    def _invoke_collector(
+            self,
+            api_type: ApiRequestType,
+            name: str,
+            extract_rows: Callable[[object], list],
+            redfish_cache: Optional[RedfishResponseCache] = None,
+            **kwargs,
+            ) -> exporter.CollectorResult:
+        """Invoke one registered read-only collector through the selected manager.
+
+        :param api_type: registered collector request type.
+        :param name: registered collector command name.
+        :param extract_rows: command-specific row extractor.
+        :param redfish_cache: scrape-scoped response cache.
+        :return: normalized collector outcome.
+        """
+        return self._collect_result(
+            name,
+            lambda: self._source.sync_invoke(
+                api_type,
+                name,
+                redfish_cache=redfish_cache,
+                **kwargs,
+            ),
+            extract_rows,
+        )
+
+    @staticmethod
+    def _vendor_label(vendor: Optional[str]) -> str:
+        """Return the fixed label for this concrete reader and reject cross-wiring.
+
+        :param vendor: optional requested vendor label.
+        :return: fixed ``supermicro`` label.
+        """
+        if vendor and str(vendor).lower() != "supermicro":
+            raise ValueError(
+                "the Supermicro exporter reader cannot emit another vendor label")
+        return "supermicro"
+
+    def read(
+            self,
+            label_bmc_ip: Optional[str] = None,
+            vendor: Optional[str] = None,
+            do_async: bool = False,
+            do_expanded: bool = False,
+            identity_host_prefix: Optional[str] = None,
+            identity_bmc_octet_base: Optional[int] = None,
+            identity_server_octet_base: Optional[int] = None,
+            identity_server_subnet: Optional[str] = None,
+            deployment_environment: Optional[str] = None,
+            deployment_environment_compat: Optional[str] = None,
+            require_deployment_environment: Optional[bool] = None,
+            extra_dimensions: Optional[Mapping | list[str]] = None,
+            service_name: Optional[str] = None,
+            service_namespace: Optional[str] = None,
+            service_instance_id: Optional[str] = None,
+            service_version: Optional[str] = None,
+            service_criticality: Optional[str] = None,
+            otlp_traces: bool = False,
+            ) -> list[MetricSample]:
+        """Collect one Supermicro/NV72 scrape and return writer-ready samples.
+
+        :param label_bmc_ip: explicit BMC identity label.
+        :param vendor: requested vendor label; must be Supermicro when supplied.
+        :param do_async: issue collector reads through asynchronous paths.
+        :param do_expanded: request expanded resources where supported.
+        :param identity_host_prefix: optional normalized host prefix.
+        :param identity_bmc_octet_base: first BMC octet used for identity mapping.
+        :param identity_server_octet_base: first server octet used for mapping.
+        :param identity_server_subnet: subnet used to derive server identity.
+        :param deployment_environment: canonical deployment environment label.
+        :param deployment_environment_compat: compatibility environment label.
+        :param require_deployment_environment: require an environment identity.
+        :param extra_dimensions: additional fixed metric dimensions.
+        :param service_name: telemetry service name.
+        :param service_namespace: telemetry service namespace.
+        :param service_instance_id: stable telemetry service instance UUID.
+        :param service_version: telemetry service version.
+        :param service_criticality: service criticality dimension.
+        :param otlp_traces: enable trace emission while scraping.
+        :return: complete scrape samples, including exporter health metrics.
+        """
+        started_at = exporter.time.monotonic()
+        redfish_cache = RedfishResponseCache()
+        identity_options = identity_mod.resolve_identity_options(
+            host_prefix=identity_host_prefix,
+            bmc_octet_base=identity_bmc_octet_base,
+            server_octet_base=identity_server_octet_base,
+            server_subnet=identity_server_subnet,
+            deployment_environment=deployment_environment,
+            deployment_environment_compat=deployment_environment_compat,
+            require_deployment_environment=require_deployment_environment,
+            extra_dimensions=extra_dimensions,
+            service_name=service_name,
+            service_namespace=service_namespace,
+            service_instance_id=service_instance_id,
+            service_version=service_version,
+            service_criticality=service_criticality,
+        )
+        if identity_options["service_instance_id"] is None:
+            identity_options["service_instance_id"] = (
+                self._source._default_service_instance_id(
+                    redfish_cache,
+                    do_async=do_async,
+                )
+            )
+        telemetry_identity = identity_mod.build_legacy_gb300_identity(
+            label_bmc_ip or self._source.redfish_ip,
+            vendor=self._vendor_label(vendor),
+            **identity_options,
+        )
+        if otlp_traces:
+            from redfish_ctl.telemetry import tracing
+            tracing.setup_otlp(
+                telemetry_identity.service_name,
+                telemetry_identity.resource_attributes(),
+            )
+        identity = telemetry_identity.dimensions()
+        collector_results = [
+            self._invoke_collector(
+                ApiRequestType.EnvironmentMetrics,
+                "environment-metrics",
+                self._extract_environment_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.Thermal,
+                "thermal",
+                self._extract_thermal_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.Sensors,
+                "sensors",
+                self._extract_list_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.NvLinkPorts,
+                "nvlink-ports",
+                self._extract_list_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.SupermicroMetricReports,
+                "metric-reports",
+                self._extract_list_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.LeakDetectors,
+                "leak-detectors",
+                self._extract_leak_detector_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.NetworkAdapters,
+                "network-adapters",
+                self._extract_list_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+            self._invoke_collector(
+                ApiRequestType.ComponentIntegrity,
+                "component-integrity",
+                self._extract_list_rows,
+                redfish_cache=redfish_cache,
+                do_async=do_async,
+                do_expanded=do_expanded,
+                preserve_errors=True,
+            ),
+        ]
+        rows_by_collector = {
+            result.name: result.rows for result in collector_results
+        }
+        samples = self.build_metric_samples(
+            identity=identity,
+            environment_rows=rows_by_collector["environment-metrics"],
+            sensor_rows=rows_by_collector["sensors"],
+            nvlink_rows=rows_by_collector["nvlink-ports"],
+            metric_report_rows=rows_by_collector["metric-reports"],
+            thermal_rows=rows_by_collector["thermal"],
+            leak_detection_rows=rows_by_collector["leak-detectors"],
+            network_rows=rows_by_collector["network-adapters"],
+            component_integrity_rows=rows_by_collector["component-integrity"],
+        )
+        scrape_ok, scrape_partial = exporter.collector_scrape_status(collector_results)
+        for result in collector_results:
+            if not result.error_kind:
+                continue
+            key = (result.name, result.error_kind)
+            self._collector_error_totals[key] = (
+                self._collector_error_totals.get(key, 0.0) + 1.0
+            )
+        if scrape_ok:
+            self._last_success_timestamp_seconds = exporter.time.time()
+        samples.extend(exporter.scrape_health_samples(
+            identity,
+            ok=scrape_ok,
+            duration_seconds=exporter.time.monotonic() - started_at,
+            collector_results=collector_results,
+            partial=scrape_partial,
+            timestamp_seconds=self._last_success_timestamp_seconds,
+            collection_error_totals=self._collector_error_totals,
+        ))
+        return samples
 
     def build_metric_samples(
             self,
