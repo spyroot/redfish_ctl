@@ -21,7 +21,7 @@ from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry.abstract_exporter_writer import AbstractExporterWriter
 from redfish_ctl.telemetry.metric_model import MetricSample
 
-from .emit import push_otlp, run_otlp_loop
+from . import emit
 
 
 class OtlpWriter(AbstractExporterWriter):
@@ -58,7 +58,7 @@ class OtlpWriter(AbstractExporterWriter):
         :return: CommandResult with a sample-count and export-result summary.
         """
         materialized = list(samples)
-        result = push_otlp(
+        result = emit.push_otlp(
             materialized, service_name=self._service_name,
             endpoint=self._endpoint, protocol=self._protocol)
         return CommandResult(
@@ -71,6 +71,6 @@ class OtlpWriter(AbstractExporterWriter):
 
         :param scrape_samples: callable returning fresh samples for each scrape.
         """
-        run_otlp_loop(
+        emit.run_otlp_loop(
             scrape_samples, self._interval, service_name=self._service_name,
             endpoint=self._endpoint, protocol=self._protocol)

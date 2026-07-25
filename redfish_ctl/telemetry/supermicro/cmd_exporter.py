@@ -9,8 +9,6 @@ normalizes them into the ``hw.*`` metric contract used by the GB300/NV72
 observability demo.
 """
 import logging
-import os
-import time
 import uuid
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
@@ -22,9 +20,10 @@ from redfish_ctl.idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter_cli import register_exporter_subcommand
-from redfish_ctl.telemetry.signalfx import emit as signalfx
 from redfish_ctl.telemetry.exporter import build_telemetry_identity
-from redfish_ctl.telemetry.prometheus import render_prometheus_text, serve_prometheus
+from redfish_ctl.telemetry.otlp import OtlpWriter
+from redfish_ctl.telemetry.prometheus import PrometheusWriter
+from redfish_ctl.telemetry.signalfx import SignalFxWriter
 from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 
 logger = logging.getLogger(__name__)
@@ -231,31 +230,6 @@ class Exporter(SupermicroManager,
                 "using a random UUID while discovery is retried")
         return fallback
 
-    def _invoke_rows(self, api_type: ApiRequestType, name: str, **kwargs) -> list:
-        """Invoke another read-only command and tolerate absent resources.
-
-        :param api_type: ApiRequestType of the command to invoke.
-        :param name: registered name of the command to invoke.
-        :return: the command's list payload, or an empty list on error or non-list data.
-        """
-        try:
-            result = self.sync_invoke(api_type, name, **kwargs)
-        except Exception:
-            return []
-        return result.data if isinstance(result.data, list) else []
-
-    def _invoke_dict(self, api_type: ApiRequestType, name: str, **kwargs) -> dict:
-        """Invoke another read-only command that returns an object payload.
-
-        :param api_type: ApiRequestType of the command to invoke.
-        :param name: registered name of the command to invoke.
-        :return: the command's dict payload, or an empty dict on error or non-dict data.
-        """
-        try:
-            result = self.sync_invoke(api_type, name, **kwargs)
-        except Exception:
-            return {}
-        return result.data if isinstance(result.data, dict) else {}
 
     @classmethod
     def _is_unsupported_collector_error(cls, exc: Exception) -> bool:
@@ -414,90 +388,6 @@ class Exporter(SupermicroManager,
             extract_rows,
         )
 
-    def _leak_detection_rows(self, do_async: bool = False) -> list[dict]:
-        """Return LeakDetector rows from the read-only leak-detectors command.
-
-        :param do_async: when True, issue the underlying query asynchronously.
-        :return: list of leak-detector rows; empty when none are exposed.
-        """
-        data = self._invoke_dict(
-            ApiRequestType.LeakDetectors,
-            "leak-detectors",
-            do_async=do_async,
-        )
-        detectors = data.get("detectors") if isinstance(data, dict) else None
-        return detectors if isinstance(detectors, list) else []
-
-    def _environment_rows(self, do_async: bool = False) -> list[dict]:
-        """Walk Chassis EnvironmentMetrics links and return their payloads.
-
-        :param do_async: when True, issue the Redfish queries asynchronously.
-        :return: list of EnvironmentMetrics payloads, one per chassis that exposes them.
-        """
-        rows = []
-        try:
-            chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async).data or {}
-        except Exception:
-            return rows
-        for chassis_uri in self._members(chassis):
-            try:
-                cdata = self.base_query(chassis_uri, do_async=do_async).data or {}
-            except Exception:
-                continue
-            link = cdata.get("EnvironmentMetrics")
-            env_uri = link.get("@odata.id") if isinstance(link, dict) else None
-            if not env_uri:
-                continue
-            try:
-                env_data = self.base_query(env_uri, do_async=do_async).data or {}
-            except Exception:
-                continue
-            env_data["Chassis"] = cdata.get("Id") or chassis_uri.rsplit("/", 1)[-1]
-            rows.append(env_data)
-        return rows
-
-    def _thermal_rows(self, do_async: bool = False, do_expanded: bool = False) -> list[dict]:
-        """Return temperature readings from the read-only thermal command.
-
-        :param do_async: when True, issue the underlying query asynchronously.
-        :param do_expanded: when True, issue an expanded ($expand) query.
-        :return: list of temperature-reading rows; empty when none are exposed.
-        """
-        try:
-            result = self.sync_invoke(
-                ApiRequestType.Thermal, "thermal",
-                do_async=do_async, do_expanded=do_expanded)
-        except Exception:
-            return []
-        data = result.data if isinstance(result.data, dict) else {}
-        rows = data.get("temperature_readings")
-        if not isinstance(rows, list):
-            return []
-        return [row for row in rows if isinstance(row, dict)]
-
-    def _environment_command_rows(self, do_async: bool = False) -> list[dict]:
-        """Return normalized rows from the environment-metrics command.
-
-        Falls back to walking Chassis EnvironmentMetrics links directly when the
-        command is unavailable or returns an unexpected payload.
-
-        :param do_async: when True, issue the underlying queries asynchronously.
-        :return: list of environment-metric rows; empty when none are exposed.
-        """
-        try:
-            result = self.sync_invoke(
-                ApiRequestType.EnvironmentMetrics,
-                "environment-metrics",
-                do_async=do_async,
-            )
-        except Exception:
-            return self._environment_rows(do_async=do_async)
-        data = result.data
-        if isinstance(data, dict) and isinstance(data.get("metrics"), list):
-            return data["metrics"]
-        if isinstance(data, list):
-            return data
-        return self._environment_rows(do_async=do_async)
 
     def _vendor_label(self,
                       vendor: Optional[str],
@@ -853,105 +743,31 @@ class Exporter(SupermicroManager,
                 otlp_traces=otlp_traces,
             )
 
+        # Build the concrete writer for --output and delegate: the writer owns
+        # its backend config and emission (render/serve, push, readback, loop).
+        # once selects the writer by output; long-running also honors
+        # --push-signalfx; push controls once's POST-vs-body for SignalFx.
         if exporter_output == "otlp":
-            from . import otlp
-            if once:
-                samples = collect_current_samples()
-                result = otlp.push_otlp(
-                    samples, endpoint=otlp_endpoint, protocol=otlp_protocol)
-                return CommandResult(
-                    None, None,
-                    {"sample_count": len(samples), "export_result": str(result)}, None)
-
-            def scrape_samples():
-                """Scrape one round of telemetry samples for the OTLP loop.
-
-                :return: list of MetricSample objects for the current scrape.
-                """
-                return collect_current_samples()
-
-            otlp.run_otlp_loop(
-                scrape_samples, float(interval or 30.0),
-                endpoint=otlp_endpoint, protocol=otlp_protocol)
-            return CommandResult(None, None, None, None)
+            writer = OtlpWriter(
+                endpoint=otlp_endpoint, protocol=otlp_protocol,
+                interval=float(interval or 30.0))
+        elif exporter_output == "signalfx" or (push_signalfx and not once):
+            writer = SignalFxWriter(
+                ingest_url=signalfx_ingest_url,
+                token=signalfx_token,
+                token_env=signalfx_token_env,
+                token_file=signalfx_token_file,
+                realm=signalfx_realm,
+                api_token_env=signalfx_api_token_env,
+                verify_readback=bool(verify_readback),
+                freshness_ms=readback_freshness_ms,
+                interval=float(interval or 30.0),
+                push=bool(push_signalfx))
+        else:
+            writer = PrometheusWriter(
+                listen=listen or "0.0.0.0", port=int(port or 9109))
 
         if once:
-            # Resolve and validate the push target BEFORE scraping so a missing
-            # token or a bare (non-/v2/datapoint) ingest URL fails fast.
-            if exporter_output == "signalfx" and push_signalfx:
-                token = signalfx.resolve_signalfx_token(
-                    signalfx_token_env,
-                    token=signalfx_token,
-                    token_file=signalfx_token_file,
-                )
-                ingest_url = signalfx.resolve_signalfx_ingest_url(signalfx_ingest_url)
-                scrape_start = time.monotonic()
-                samples = collect_current_samples()
-                scrape_ms = int((time.monotonic() - scrape_start) * 1000)
-                body = signalfx.to_signalfx_body(samples)
-                push_start = time.monotonic()
-                status = signalfx.push_signalfx(body, token, ingest_url)
-                push_ms = int((time.monotonic() - push_start) * 1000)
-                if not verify_readback:
-                    return CommandResult(
-                        body, None,
-                        {"sample_count": len(samples),
-                         "push_status": status,
-                         "ingest_url": ingest_url},
-                        None,
-                    )
-                # POST 200 is not proof: confirm the datapoints are visible in MTS.
-                realm = signalfx_realm or os.environ.get("SPLUNK_O11Y_REALM", "")
-                api_token = os.environ.get(
-                    signalfx_api_token_env or "SPLUNK_API_TOKEN", "")
-                if not realm or not api_token:
-                    raise ValueError(
-                        "--verify-readback needs a realm (--signalfx-realm or "
-                        "SPLUNK_O11Y_REALM) and an API token (--signalfx-api-token-env "
-                        "or SPLUNK_API_TOKEN)")
-                metric_names = sorted({sample.metric for sample in samples})
-                # Scope readback by all fixed dimensions common to this scrape,
-                # including deployment.environment when configured.
-                dimensions = exporter.common_sample_dimensions(samples)
-                readback_start = time.monotonic()
-                readback = signalfx.verify_signalfx_readback(
-                    realm, api_token, metric_names, dimensions)
-                readback_ms = int((time.monotonic() - readback_start) * 1000)
-                summary, error = signalfx.build_readback_result(
-                    status, ingest_url, len(samples), metric_names, readback,
-                    {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms},
-                    freshness_ms=readback_freshness_ms)
-                return CommandResult(summary, None, summary, error)
-            samples = collect_current_samples()
-            data = (signalfx.to_signalfx_body(samples) if exporter_output == "signalfx"
-                    else render_prometheus_text(samples))
-            return CommandResult(data, None, {"sample_count": len(samples)}, None)
-
-        if push_signalfx or exporter_output == "signalfx":
-            token = signalfx.resolve_signalfx_token(
-                signalfx_token_env,
-                token=signalfx_token,
-                token_file=signalfx_token_file,
-            )
-            ingest_url = signalfx.resolve_signalfx_ingest_url(signalfx_ingest_url)
-
-            def scrape_samples():
-                """Scrape one round of telemetry samples for the SignalFx loop.
-
-                :return: list of MetricSample objects for the current scrape.
-                """
-                return collect_current_samples()
-
-            signalfx.run_signalfx_loop(scrape_samples, token, ingest_url, float(interval or 30.0))
-            return CommandResult(None, None, None, None)
-
-        def scrape_text():
-            """Scrape samples and render them as Prometheus exposition text.
-
-            :return: the rendered Prometheus /metrics text for the current scrape.
-            """
-            samples = collect_current_samples()
-            return render_prometheus_text(samples)
-
-        serve_prometheus(scrape_text, listen or "0.0.0.0", int(port or 9109))
+            return writer.write_once(collect_current_samples())
+        writer.run(collect_current_samples)
         return CommandResult(None, None, None, None)

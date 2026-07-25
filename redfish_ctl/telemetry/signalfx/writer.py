@@ -24,15 +24,7 @@ from redfish_ctl.telemetry.abstract_exporter_writer import AbstractExporterWrite
 from redfish_ctl.telemetry.exporter import common_sample_dimensions
 from redfish_ctl.telemetry.metric_model import MetricSample
 
-from .emit import (
-    build_readback_result,
-    push_signalfx,
-    resolve_signalfx_ingest_url,
-    resolve_signalfx_token,
-    run_signalfx_loop,
-    to_signalfx_body,
-    verify_signalfx_readback,
-)
+from . import emit
 
 
 class SignalFxWriter(AbstractExporterWriter):
@@ -88,16 +80,16 @@ class SignalFxWriter(AbstractExporterWriter):
             the compact canary summary and verdict.
         """
         materialized = list(samples)
-        body = to_signalfx_body(materialized)
+        body = emit.to_signalfx_body(materialized)
         if not self._push:
             return CommandResult(
                 body, None, {"sample_count": len(materialized)}, None)
 
-        token = resolve_signalfx_token(
+        token = emit.resolve_signalfx_token(
             self._token_env, token=self._token, token_file=self._token_file)
-        ingest_url = resolve_signalfx_ingest_url(self._ingest_url)
+        ingest_url = emit.resolve_signalfx_ingest_url(self._ingest_url)
         push_start = time.monotonic()
-        status = push_signalfx(body, token, ingest_url)
+        status = emit.push_signalfx(body, token, ingest_url)
         push_ms = int((time.monotonic() - push_start) * 1000)
         if not self._verify_readback:
             return CommandResult(
@@ -117,9 +109,9 @@ class SignalFxWriter(AbstractExporterWriter):
         metric_names = sorted({sample.metric for sample in materialized})
         dimensions = common_sample_dimensions(materialized)
         readback_start = time.monotonic()
-        readback = verify_signalfx_readback(realm, api_token, metric_names, dimensions)
+        readback = emit.verify_signalfx_readback(realm, api_token, metric_names, dimensions)
         readback_ms = int((time.monotonic() - readback_start) * 1000)
-        summary, error = build_readback_result(
+        summary, error = emit.build_readback_result(
             status, ingest_url, len(materialized), metric_names, readback,
             {"scrape": 0, "push": push_ms, "readback": readback_ms},
             freshness_ms=self._freshness_ms)
@@ -130,7 +122,7 @@ class SignalFxWriter(AbstractExporterWriter):
 
         :param scrape_samples: callable returning fresh samples for each scrape.
         """
-        token = resolve_signalfx_token(
+        token = emit.resolve_signalfx_token(
             self._token_env, token=self._token, token_file=self._token_file)
-        ingest_url = resolve_signalfx_ingest_url(self._ingest_url)
-        run_signalfx_loop(scrape_samples, token, ingest_url, self._interval)
+        ingest_url = emit.resolve_signalfx_ingest_url(self._ingest_url)
+        emit.run_signalfx_loop(scrape_samples, token, ingest_url, self._interval)
