@@ -28,6 +28,10 @@ class DellLcSupportAssistExport(IDracManager,
                                 metaclass=Singleton):
     """Preview or invoke DellLCService.SupportAssistExportLastCollection."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-supportassist-export command."""
+        super(DellLcSupportAssistExport, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

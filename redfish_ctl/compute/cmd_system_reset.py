@@ -29,6 +29,10 @@ class SystemReset(IDracManager,
                   metaclass=Singleton):
     """Reset the host ComputerSystem via a discovered ComputerSystem.Reset action."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the system-reset command."""
+        super(SystemReset, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

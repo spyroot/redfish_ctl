@@ -30,6 +30,10 @@ class BootQuery(IDracManager,
     Command return boot source
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot command."""
+        super(BootQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

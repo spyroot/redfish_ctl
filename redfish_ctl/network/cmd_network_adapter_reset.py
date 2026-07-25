@@ -32,6 +32,10 @@ class NetworkAdapterReset(IDracManager,
                           metaclass=Singleton):
     """Resolve and invoke NetworkAdapter.Reset through the action guard."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the network-adapter-reset command."""
+        super(NetworkAdapterReset, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

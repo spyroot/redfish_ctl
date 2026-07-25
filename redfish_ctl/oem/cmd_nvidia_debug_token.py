@@ -62,6 +62,10 @@ class NvidiaDebugToken(IDracManager,
                        metaclass=Singleton):
     """Discover and invoke NVIDIA debug-token Redfish actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the nvidia-debug-token command."""
+        super(NvidiaDebugToken, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

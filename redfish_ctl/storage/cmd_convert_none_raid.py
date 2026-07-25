@@ -25,6 +25,10 @@ class ConvertNoneRaid(IDracManager,
     """Convert RAID physical disks to non-RAID via the Dell RAID service.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the convert_none_raid command."""
+        super(ConvertNoneRaid, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -29,6 +29,10 @@ class MetricDefinitions(IDracManager,
                         metaclass=Singleton):
     """Read every TelemetryService MetricReportDefinition (the report schemas)."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the metric-definitions command."""
+        super(MetricDefinitions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

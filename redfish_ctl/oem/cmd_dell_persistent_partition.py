@@ -193,6 +193,10 @@ class DellPersistentPartitionActions(IDracManager,
                                      metaclass=Singleton):
     """Discover and invoke Dell VFlash partition actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-vflash-partition command."""
+        super(DellPersistentPartitionActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

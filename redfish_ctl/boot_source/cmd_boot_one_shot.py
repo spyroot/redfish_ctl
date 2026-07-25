@@ -63,6 +63,10 @@ class BootOneShot(IDracManager,
     Command enable boot option
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-one-shot command."""
+        super(BootOneShot, self).__init__(*args, **kwargs)
+
     @staticmethod
     def _resolve_boot_device(device: str, boot_devices: list[str]) -> str:
         """Resolve a requested boot target against live-advertised values.

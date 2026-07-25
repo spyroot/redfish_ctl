@@ -58,6 +58,10 @@ class DellRaidCancelActions(IDracManager,
                             metaclass=Singleton):
     """Discover and invoke DellRaidService cancel actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-cancel-actions command."""
+        super(DellRaidCancelActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

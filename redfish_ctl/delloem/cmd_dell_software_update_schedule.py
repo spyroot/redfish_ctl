@@ -63,6 +63,10 @@ class DellSoftwareUpdateSchedule(
 ):
     """Discover and invoke Dell software update schedule actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-software-update-schedule command."""
+        super(DellSoftwareUpdateSchedule, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

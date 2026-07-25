@@ -29,6 +29,10 @@ class QueryComponentIntegrity(IDracManager,
                               metaclass=Singleton):
     """Read every ComponentIntegrity (SPDM/attestation) relationship."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the component-integrity command."""
+        super(QueryComponentIntegrity, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

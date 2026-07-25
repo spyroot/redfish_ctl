@@ -28,6 +28,10 @@ class EventSubmitTest(IDracManager,
                       metaclass=Singleton):
     """Submit a test event via EventService.SubmitTestEvent."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the event-submit-test command."""
+        super(EventSubmitTest, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

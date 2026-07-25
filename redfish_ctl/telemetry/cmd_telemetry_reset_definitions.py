@@ -30,6 +30,10 @@ class TelemetryResetMetricDefinitions(
         metaclass=Singleton):
     """Reset TelemetryService metric report definitions to vendor defaults."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the telemetry-reset-definitions command."""
+        super(TelemetryResetMetricDefinitions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

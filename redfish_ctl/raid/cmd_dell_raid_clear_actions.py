@@ -57,6 +57,10 @@ class DellRaidClearActions(
 ):
     """Preview or run DellRaidService clear actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-clear-actions command."""
+        super(DellRaidClearActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

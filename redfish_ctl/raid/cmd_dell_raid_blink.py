@@ -43,6 +43,10 @@ class DellRaidBlink(
 ):
     """Blink or unblink a Dell RAID physical-disk identify LED."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-blink command."""
+        super(DellRaidBlink, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

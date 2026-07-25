@@ -45,6 +45,10 @@ class MountCdrom(IDracManager,
     ``CommandResult.error``; it is never raised.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the ``mount_cdrom`` command."""
+        super(MountCdrom, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -31,6 +31,10 @@ class GetTask(
     Command get task.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the task-watch command."""
+        super(GetTask, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

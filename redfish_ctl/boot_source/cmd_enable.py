@@ -32,6 +32,10 @@ class EnableBootOptions(IDracManager,
     Command enable boot option
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-source-enable command."""
+        super(EnableBootOptions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

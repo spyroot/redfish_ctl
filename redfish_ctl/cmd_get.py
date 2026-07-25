@@ -71,6 +71,10 @@ class RawGet(
 ):
     """Read an arbitrary Redfish resource path."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the get command."""
+        super().__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

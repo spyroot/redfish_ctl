@@ -41,6 +41,10 @@ class SmcVirtualMediaMount(IDracManager,
                            metaclass=Singleton):
     """Supermicro OEM virtual media: mount / unmount / status an ISO via CfgCD."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the vm-mount command."""
+        super(SmcVirtualMediaMount, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

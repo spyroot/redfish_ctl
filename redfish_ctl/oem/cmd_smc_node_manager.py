@@ -31,6 +31,10 @@ class SmcNodeManagerClearPolicies(
 ):
     """Clear Supermicro Node Manager policies through the advertised action."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the smc-clear-policies command."""
+        super(SmcNodeManagerClearPolicies, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

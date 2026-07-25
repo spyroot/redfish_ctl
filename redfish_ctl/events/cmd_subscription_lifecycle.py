@@ -270,6 +270,10 @@ class SubscriptionCreate(_SubscriptionBase,
                          metaclass=Singleton):
     """Create an EventDestination subscription after dry-run preview."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the subscription-create command."""
+        super(SubscriptionCreate, self).__init__(*args, **kwargs)
+
     @staticmethod
     def register_subcommand(cls):
         """Register the guarded subscription-create subcommand.
@@ -412,6 +416,10 @@ class SubscriptionDelete(_SubscriptionBase,
                          name='subscription-delete',
                          metaclass=Singleton):
     """Delete an EventDestination subscription after dry-run preview."""
+
+    def __init__(self, *args, **kwargs):
+        """Construct the subscription-delete command (delegates to the base)."""
+        super(SubscriptionDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
     def register_subcommand(cls):

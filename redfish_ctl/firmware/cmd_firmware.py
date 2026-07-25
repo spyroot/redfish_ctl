@@ -31,6 +31,10 @@ class FirmwareQuery(IDracManager,
     Command implementation to get current firmware version from a Redfish endpoint.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the firmware command."""
+        super(FirmwareQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -274,6 +274,10 @@ class FleetInventory(IDracManager,
                      metaclass=Singleton):
     """Read a YAML fleet inventory and summarize node health."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the fleet command."""
+        super(FleetInventory, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

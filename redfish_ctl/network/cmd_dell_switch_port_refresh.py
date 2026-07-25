@@ -36,6 +36,10 @@ class DellSwitchPortRefresh(
 ):
     """Refresh Dell switch-connection view data through DellSwitchConnectionService."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-switch-port-refresh command."""
+        super(DellSwitchPortRefresh, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

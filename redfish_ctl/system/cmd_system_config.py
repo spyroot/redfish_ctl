@@ -26,6 +26,10 @@ class ExportSystemConfig(IDracManager,
     Command exports system configuration..
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the system-export command."""
+        super(ExportSystemConfig, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -58,6 +58,10 @@ class DellCardCsr(IDracManager,
                   metaclass=Singleton):
     """Discover and generate Dell card-service CSRs."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-csr command."""
+        super(DellCardCsr, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

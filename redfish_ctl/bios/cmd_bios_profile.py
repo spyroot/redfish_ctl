@@ -27,6 +27,10 @@ class BiosProfile(IDracManager,
                   metaclass=Singleton):
     """Read or stage local BIOS profile specifications."""
 
+    def __init__(self, *args, **kwargs):
+        """Construct the bios-profile command, forwarding credentials to the base manager."""
+        super(BiosProfile, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

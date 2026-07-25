@@ -18,6 +18,10 @@ class GetNetworkIsoAttachStatus(IDracManager,
     """A command query job_service_query.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-net-ios-status command."""
+        super(GetNetworkIsoAttachStatus, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -28,6 +28,10 @@ class UpdateStart(IDracManager,
                   metaclass=Singleton):
     """Start UpdateService updates staged for OnStartUpdateRequest."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the update-start command."""
+        super(UpdateStart, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

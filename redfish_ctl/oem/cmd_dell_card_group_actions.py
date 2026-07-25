@@ -66,6 +66,10 @@ class DellCardGroupActions(IDracManager,
                            metaclass=Singleton):
     """Discover and invoke Dell card-service group membership actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-group-actions command."""
+        super(DellCardGroupActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

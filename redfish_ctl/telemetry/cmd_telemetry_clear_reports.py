@@ -25,6 +25,10 @@ class TelemetryClearReports(IDracManager,
                             metaclass=Singleton):
     """Clear generated TelemetryService MetricReports."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the telemetry-clear-reports command."""
+        super(TelemetryClearReports, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

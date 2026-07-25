@@ -24,6 +24,10 @@ class QueryCompute(IDracManager,
                    metaclass=Singleton):
     """Query compute
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the compute-query command."""
+        super(QueryCompute, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

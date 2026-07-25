@@ -27,6 +27,10 @@ class VirtualMediaEject(IDracManager,
     Virtual medial must be inserted, otherwise command throw exception.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the eject_vm command."""
+        super(VirtualMediaEject, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

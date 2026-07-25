@@ -24,6 +24,10 @@ class TelemetrySubmitTest(IDracManager,
                           metaclass=Singleton):
     """Submit a TelemetryService test metric report."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the telemetry-submit-test command."""
+        super(TelemetrySubmitTest, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

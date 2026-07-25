@@ -33,6 +33,10 @@ class SecureBoot(IDracManager,
                  metaclass=Singleton):
     """Read SecureBoot state and key databases for every system."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the secure-boot command."""
+        super(SecureBoot, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
@@ -144,6 +148,10 @@ class SecureBootResetKeys(IDracManager,
                           name="secure-boot-reset-keys",
                           metaclass=Singleton):
     """Preview or run guarded SecureBoot ResetKeys actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the secure-boot-reset-keys command."""
+        super(SecureBootResetKeys, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

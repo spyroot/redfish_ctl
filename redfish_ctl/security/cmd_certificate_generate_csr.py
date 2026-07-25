@@ -29,6 +29,10 @@ class CertificateGenerateCSR(IDracManager,
                              metaclass=Singleton):
     """Generate a CSR through the Redfish CertificateService."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the cert-gen-csr command."""
+        super(CertificateGenerateCSR, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

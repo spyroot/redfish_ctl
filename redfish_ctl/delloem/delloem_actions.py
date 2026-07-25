@@ -17,6 +17,10 @@ class DellOemActions(IDracManager,
                      metaclass=Singleton):
     """A command query oem actions.
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-actions command."""
+        super(DellOemActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -20,6 +20,10 @@ class LeakDetectors(IDracManager,
                     metaclass=Singleton):
     """Read chassis leak detection state and linked leak policies."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the leak-detectors command."""
+        super(LeakDetectors, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -46,6 +46,10 @@ class StorageQuery(IDracManager, scm_type=ApiRequestType.StorageQuery,
     Command return storage controller
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the storage_query command."""
+        super(StorageQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls) -> Tuple[argparse.ArgumentParser, str, str]:

@@ -29,6 +29,10 @@ class ChassisUpdate(IDracManager,
     """
     This  action update chassis .
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the chassis-update command."""
+        super(ChassisUpdate, self).__init__(*args, **kwargs)
+
     @property
     def accepted(self):
         """Accepted; a Task has been generated.

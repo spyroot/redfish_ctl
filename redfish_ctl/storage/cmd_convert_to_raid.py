@@ -28,6 +28,10 @@ class ConvertToRaid(
     """Convert non-RAID disks to RAID for a target controller via the Dell RAID service.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the convert-to-raid command."""
+        super(ConvertToRaid, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

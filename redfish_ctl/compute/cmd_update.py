@@ -26,6 +26,10 @@ class UpdateCompute(IDracManager,
     Update compute system settings
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the compute-update command."""
+        super(UpdateCompute, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
