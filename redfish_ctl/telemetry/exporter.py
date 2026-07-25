@@ -11,7 +11,6 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timezone
 from email.utils import parsedate_to_datetime
@@ -132,57 +131,6 @@ class MetricSample:
     metric_type: str = "gauge"
     unit: Optional[str] = None
     timestamp: Optional[str] = None
-
-
-class AbstractExporterReader(ABC):
-    """Interface a class must satisfy to claim to be a telemetry export reader.
-
-    A reader performs pure data adaptation: it maps a vendor's already-collected
-    Redfish rows into the shared, vendor-neutral :class:`MetricSample` model. A
-    reader never uses the Redfish transport — collecting the raw rows from the
-    BMC is the command/Manager's job. Every vendor (Supermicro, DMTF, Dell)
-    provides its own reader implementing this contract, so the same metric
-    contract is emitted no matter how a given BMC exposes the source data.
-    """
-
-    @abstractmethod
-    def build_metric_samples(self, identity: Mapping[str, str],
-                             **rows: Iterable[Mapping]) -> list[MetricSample]:
-        """Adapt collected rows into shared samples.
-
-        :param identity: fixed join dimensions applied to every sample.
-        :param rows: named row sources collected from the BMC; the accepted keys
-            are vendor-specific and defined by the concrete reader.
-        :return: vendor-neutral samples; the base contract yields none.
-        """
-        return []
-
-
-class AbstractExporterWriter(ABC):
-    """Interface a class must satisfy to claim to be a telemetry export writer.
-
-    A writer is decoupled from the reader: it consumes the shared
-    :class:`MetricSample` model and owns *where* and *how* samples are emitted
-    (Prometheus text, SignalFx push, OTLP), including its own backend config
-    (endpoint, token, settings). The reader never knows the destination, so one
-    writer serves every vendor's reader.
-    """
-
-    @abstractmethod
-    def write_once(self, samples: Iterable[MetricSample]) -> object:
-        """Emit one scrape of samples and return a backend-specific summary.
-
-        :param samples: shared samples produced by a reader.
-        :return: a backend-specific result (rendered text, push status, canary
-            summary, …).
-        """
-
-    @abstractmethod
-    def run(self, scrape_samples: Callable[[], list[MetricSample]]) -> None:
-        """Serve or push forever, calling ``scrape_samples`` each cycle.
-
-        :param scrape_samples: callable returning fresh samples for each cycle.
-        """
 
 
 def _definition(

@@ -21,8 +21,8 @@ from __future__ import annotations
 import re
 from typing import Iterable, Mapping, Optional
 
+from redfish_ctl.telemetry.abstract_exporter_reader import AbstractExporterReader
 from redfish_ctl.telemetry.exporter import (
-    AbstractExporterReader,
     MetricSample,
     _as_float,
     _dim_value,
