@@ -15,7 +15,7 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from redfish_ctl.supermico_manager import SupermicroManager
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.idrac_shared import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_shared import RedfishApi
@@ -24,7 +24,7 @@ _RESET_DEFINITIONS_ACTION = "#TelemetryService.ResetMetricReportDefinitionsToDef
 
 
 class TelemetryResetMetricDefinitions(
-        SupermicroManager,
+        RedfishManager,
         scm_type=ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         name="telemetry-reset-definitions",
         metaclass=Singleton):

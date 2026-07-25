@@ -11,7 +11,7 @@ supplied.
 from abc import abstractmethod
 from typing import Optional
 
-from redfish_ctl.supermico_manager import SupermicroManager
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.idrac_shared import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_shared import RedfishApi
@@ -19,7 +19,7 @@ from redfish_ctl.redfish_shared import RedfishApi
 _CLEAR_METRIC_REPORTS_ACTION = "#TelemetryService.ClearMetricReports"
 
 
-class TelemetryClearReports(SupermicroManager,
+class TelemetryClearReports(RedfishManager,
                             scm_type=ApiRequestType.SupermicroTelemetryClearReports,
                             name="telemetry-clear-reports",
                             metaclass=Singleton):

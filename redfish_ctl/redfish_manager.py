@@ -266,6 +266,32 @@ class RedfishManager:
         """
         return dict(cls._registry)
 
+    @classmethod
+    def _resolve_command(cls, api_call, name):
+        """Resolve a registered command across the MRO command registries.
+
+        A vendor manager (``SupermicroManager``/``IloManager``) shadows its own
+        command registry, so its own commands take precedence; but it must also
+        reach the shared DMTF commands registered on ``RedfishManager``. Walking
+        the MRO makes a vendor override win while the neutral base stays the
+        fallback — the same way an inherited method routes to its parent class. A
+        DMTF command registered on ``RedfishManager`` is therefore invokable
+        through every vendor manager, not only ``IDracManager``.
+
+        :param api_call: the ApiRequestType key of the command.
+        :param name: the sub-command name.
+        :return: the registered command class.
+        :raises UnsupportedAction: when no registry in the MRO carries the command.
+        """
+        for klass in cls.__mro__:
+            registry = klass.__dict__.get("_registry")
+            if registry is None:
+                continue
+            bucket = registry.get(api_call)
+            if bucket and name in bucket:
+                return bucket[name]
+        raise UnsupportedAction(f"Unknown {name} command.")
+
     @staticmethod
     def base_parser(is_async: Optional[bool] = True,
                     is_file_save: Optional[bool] = True,
@@ -407,10 +433,7 @@ class RedfishManager:
             used by internal dispatch.
         :return: command result returned by the registered command.
         """
-        z = cls._registry[api_call]
-        if name not in z:
-            raise UnsupportedAction(f"Unknown {name} command.")
-        disp = z[name]
+        disp = cls._resolve_command(api_call, name)
         _host = cls._pop_connection_value(
             kwargs, "host", "idrac_ip", "_redfish_host")
         _username = cls._pop_connection_value(
@@ -455,10 +478,7 @@ class RedfishManager:
             used by internal dispatch.
         :return: CommandResult.
         """
-        z = cls._registry[api_call]
-        disp = z[name]
-        if name not in z:
-            raise UnsupportedAction(f"Unknown {name} command.")
+        disp = cls._resolve_command(api_call, name)
         _host = cls._pop_connection_value(
             kwargs, "host", "idrac_ip", "_redfish_host")
         _username = cls._pop_connection_value(

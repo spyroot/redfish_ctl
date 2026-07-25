@@ -12,13 +12,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from redfish_ctl.supermico_manager import SupermicroManager
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.idrac_shared import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.redfish_shared import RedfishApi
 
 
-class TelemetryTriggers(SupermicroManager,
+class TelemetryTriggers(RedfishManager,
                         scm_type=ApiRequestType.SupermicroTriggers,
                         name='telemetry-triggers',
                         metaclass=Singleton):
