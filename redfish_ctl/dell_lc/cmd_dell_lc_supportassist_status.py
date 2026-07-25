@@ -244,5 +244,4 @@ class DellLcSupportAssistStatus(
             full_action_type=spec.full_type,
             do_async=do_async,
             dry_run=bool(dry_run),
-            confirm=True,
         )
