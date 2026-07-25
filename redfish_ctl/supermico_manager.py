@@ -1,5 +1,6 @@
 import collections
 
+from . import CommandResult
 from .redfish_manager import RedfishManager
 
 
@@ -14,3 +15,6 @@ class SupermicroManager(RedfishManager):
     """
 
     _registry = collections.defaultdict(dict)
+
+    def execute(self, **kwargs) -> CommandResult:
+        pass

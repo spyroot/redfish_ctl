@@ -10,7 +10,7 @@ def test_exporter_once_returns_prometheus_metrics_from_mock_reads(
 ):
     """exporter --once renders Prometheus metrics using read-only Redfish GETs."""
     result = redfish_api.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="prometheus",

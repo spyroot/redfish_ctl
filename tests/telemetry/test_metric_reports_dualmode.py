@@ -11,7 +11,7 @@ def test_metric_reports_dualmode_returns_json_list_without_post(request, monkeyp
     redfish_api = request.getfixturevalue("redfish_api")
     redfish_service = request.getfixturevalue("redfish_service")
 
-    result = redfish_api.sync_invoke(ApiRequestType.MetricReports, "metric-reports")
+    result = redfish_api.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports")
 
     assert isinstance(result, CommandResult)
     assert result.data == []

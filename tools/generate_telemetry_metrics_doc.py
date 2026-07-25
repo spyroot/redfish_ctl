@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from redfish_ctl.telemetry import exporter  # noqa: E402
+from redfish_ctl.telemetry.supermicro import super_microexporter  # noqa: E402
 
 DEFAULT_CORPUS = REPO_ROOT / "tests" / "supermicro_gb300_corpus.tar.gz"
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "telemetry-metrics.md"
@@ -239,7 +240,7 @@ def _exporter_metric(
     """Return rendered exporter metric names and units for matched rows."""
     if not values:
         return "not observed in fixture", "-"
-    samples = exporter.samples_from_metric_report_rows(values, IDENTITY)
+    samples = super_microexporter.samples_from_metric_report_rows(values, IDENTITY)
     metrics = sorted({sample.metric for sample in samples})
     units = sorted({sample.unit for sample in samples if sample.unit})
     if not metrics:

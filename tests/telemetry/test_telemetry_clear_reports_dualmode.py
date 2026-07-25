@@ -30,7 +30,7 @@ def test_telemetry_clear_reports_dry_run_blocks_post(redfish_mock_factory):
     _seed_clear_metric_reports(service)
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryClearReports,
+        ApiRequestType.SupermicroTelemetryClearReports,
         "telemetry-clear-reports",
     )
 
@@ -53,7 +53,7 @@ def test_telemetry_clear_reports_confirm_posts_to_discovered_target(redfish_mock
     _seed_clear_metric_reports(service)
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryClearReports,
+        ApiRequestType.SupermicroTelemetryClearReports,
         "telemetry-clear-reports",
         confirm=True,
     )
@@ -74,7 +74,7 @@ def test_telemetry_clear_reports_missing_action_reports_available(redfish_mock_f
     manager, service = redfish_mock_factory("supermicro")
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryClearReports,
+        ApiRequestType.SupermicroTelemetryClearReports,
         "telemetry-clear-reports",
         confirm=True,
     )

@@ -16,13 +16,13 @@ from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
-from ..cmd_exceptions import ResourceNotFound
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult, RedfishResponseCache
-from . import exporter
-from .exporter import (
-    build_metric_samples,
+from redfish_ctl import SupermicroManager
+from redfish_ctl.cmd_exceptions import ResourceNotFound
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
+from redfish_ctl.telemetry import exporter
+from redfish_ctl.telemetry.exporter import (
     build_telemetry_identity,
     render_prometheus_text,
     resolve_signalfx_ingest_url,
@@ -31,12 +31,13 @@ from .exporter import (
     serve_prometheus,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 
 logger = logging.getLogger(__name__)
 
 
-class Exporter(IDracManager,
-               scm_type=ApiRequestType.Exporter,
+class Exporter(SupermicroManager,
+               scm_type=ApiRequestType.SupermicroExporter,
                name='exporter',
                metaclass=Singleton):
     """Read BMC telemetry and expose Prometheus or SignalFx metric output."""
@@ -767,7 +768,7 @@ class Exporter(IDracManager,
                 do_expanded=do_expanded,
             ),
             self._invoke_collector(
-                ApiRequestType.MetricReports,
+                ApiRequestType.SupermicroMetricReports,
                 "metric-reports",
                 self._extract_list_rows,
                 redfish_cache=redfish_cache,

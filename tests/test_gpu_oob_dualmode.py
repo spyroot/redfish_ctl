@@ -6,8 +6,8 @@ from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 GPU_OOB_READ_COMMANDS = (
-    (ApiRequestType.MetricReportDefinitions, "metric-definitions"),
-    (ApiRequestType.MetricReports, "metric-reports"),
+    (ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions"),
+    (ApiRequestType.SupermicroMetricReports, "metric-reports"),
     (ApiRequestType.ComponentIntegrity, "component-integrity"),
     (ApiRequestType.NetworkAdapters, "network-adapters"),
     (ApiRequestType.NvLinkPorts, "nvlink-ports"),

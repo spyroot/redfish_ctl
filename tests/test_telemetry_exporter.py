@@ -17,14 +17,13 @@ from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
-from redfish_ctl.telemetry.cmd_exporter import Exporter
+from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,
     MetricSample,
     _require_datapoint_url,
     apply_exporter_env_file,
     build_identity_dimensions,
-    build_metric_samples,
     exporter_argv_uses_secret,
     load_exporter_env_file,
     metric_definition,
@@ -34,6 +33,7 @@ from redfish_ctl.telemetry.exporter import (
     resolve_signalfx_token,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 from redfish_ctl.telemetry.identity import parse_dimension_pairs
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
@@ -1147,7 +1147,7 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
     mgr, service = redfish_mock_factory("supermicro")
 
     result = mgr.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="signalfx",
@@ -1243,7 +1243,7 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
     monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
 
     result = mgr.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="signalfx",
@@ -1360,7 +1360,7 @@ def test_exporter_uses_environment_metrics_command_rollups(gb300_exporter_manage
     manager, requests = gb300_exporter_manager
 
     result = manager.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="signalfx",
@@ -1493,7 +1493,7 @@ def test_exporter_scrape_shares_exact_gets_across_collectors(gb300_exporter_mana
     manager, requests = gb300_exporter_manager
 
     manager.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="signalfx",
@@ -1523,7 +1523,7 @@ def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkey
     monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
 
     result = mgr.sync_invoke(
-        ApiRequestType.Exporter,
+        ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="signalfx",
@@ -1554,7 +1554,7 @@ def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkey
 
     with pytest.raises(ValueError, match="v2/datapoint"):
         mgr.sync_invoke(
-            ApiRequestType.Exporter,
+            ApiRequestType.SupermicroExporter,
             "exporter",
             once=True,
             exporter_output="signalfx",
@@ -1574,7 +1574,7 @@ def test_once_push_signalfx_requires_ingest_url(redfish_mock_factory, monkeypatc
 
     with pytest.raises(ValueError, match="SPLUNK_INGEST_URL is not set"):
         mgr.sync_invoke(
-            ApiRequestType.Exporter,
+            ApiRequestType.SupermicroExporter,
             "exporter",
             once=True,
             exporter_output="signalfx",

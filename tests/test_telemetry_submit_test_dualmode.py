@@ -73,7 +73,7 @@ def _post_requests(requests):
 def _submit(manager, **kwargs):
     """Invoke the telemetry test metric command with concise defaults."""
     return manager.sync_invoke(
-        ApiRequestType.TelemetrySubmitTest,
+        ApiRequestType.SupermicroTelemetrySubmitTest,
         "telemetry-submit-test",
         metric_report_name="SyntheticReport",
         metric_id="SyntheticMetric",
@@ -177,7 +177,7 @@ def test_telemetry_submit_test_no_action_reports_clear_error(redfish_mock_factor
     manager, service = redfish_mock_factory("hpe")
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetrySubmitTest,
+        ApiRequestType.SupermicroTelemetrySubmitTest,
         "telemetry-submit-test",
         confirm=True,
     )

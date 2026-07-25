@@ -15,17 +15,17 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
-from ..redfish_shared import RedfishApi
+from redfish_ctl.supermico_manager import SupermicroManager
+from redfish_ctl.idrac_shared import ApiRequestType, Singleton
+from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_shared import RedfishApi
 
 _RESET_DEFINITIONS_ACTION = "#TelemetryService.ResetMetricReportDefinitionsToDefaults"
 
 
 class TelemetryResetMetricDefinitions(
-        IDracManager,
-        scm_type=ApiRequestType.TelemetryResetMetricDefinitions,
+        SupermicroManager,
+        scm_type=ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         name="telemetry-reset-definitions",
         metaclass=Singleton):
     """Reset TelemetryService metric report definitions to vendor defaults."""

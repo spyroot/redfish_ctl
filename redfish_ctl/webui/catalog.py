@@ -80,9 +80,9 @@ CATALOG: tuple[tuple[str, tuple[CommandEntry, ...]], ...] = (
                      "MemoryMetrics per module"),
         CommandEntry("Processor metrics", ApiRequestType.ProcessorMetrics, "processor-metrics",
                      "ProcessorMetrics per CPU/GPU"),
-        CommandEntry("Metric reports", ApiRequestType.MetricReports, "metric-reports",
+        CommandEntry("Metric reports", ApiRequestType.SupermicroMetricReports, "metric-reports",
                      "TelemetryService MetricReports", heavy=True),
-        CommandEntry("Metric definitions", ApiRequestType.MetricReportDefinitions, "metric-definitions",
+        CommandEntry("Metric definitions", ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions",
                      "TelemetryService MetricReportDefinitions"),
     )),
     ("Firmware", (

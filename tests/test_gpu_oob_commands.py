@@ -17,7 +17,7 @@ from redfish_ctl.idrac_shared import ApiRequestType
 def test_metric_definitions_lists_report_defs(redfish_mock_factory):
     """metric-definitions returns every MetricReportDefinition with its report + count."""
     mgr, _ = redfish_mock_factory("supermicro")
-    result = mgr.sync_invoke(ApiRequestType.MetricReportDefinitions, "metric-definitions")
+    result = mgr.sync_invoke(ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions")
     assert isinstance(result.data, list) and result.data
     assert len(result.data) == 10
     by_id = {r["Definition"]: r for r in result.data}

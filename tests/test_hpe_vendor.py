@@ -26,8 +26,8 @@ def test_hpe_read_commands_return_data(redfish_mock_factory):
     assert mgr.sync_invoke(ApiRequestType.Sensors, "sensors").data, "no iLO sensors"
     assert mgr.sync_invoke(ApiRequestType.NetworkAdapters, "network-adapters").data
     assert mgr.sync_invoke(ApiRequestType.ComponentIntegrity, "component-integrity").data
-    assert mgr.sync_invoke(ApiRequestType.MetricReports, "metric-reports").data
-    assert mgr.sync_invoke(ApiRequestType.MetricReportDefinitions, "metric-definitions").data
+    assert mgr.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports").data
+    assert mgr.sync_invoke(ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions").data
 
 
 def test_hpe_nvlink_ports_empty_not_error(redfish_mock_factory):

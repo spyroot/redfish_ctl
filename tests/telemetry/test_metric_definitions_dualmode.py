@@ -12,7 +12,7 @@ def test_metric_definitions_dualmode_returns_json_list_without_post(request, mon
     redfish_service = request.getfixturevalue("redfish_service")
 
     result = redfish_api.sync_invoke(
-        ApiRequestType.MetricReportDefinitions,
+        ApiRequestType.SupermicroMetricReportDefinitions,
         "metric-definitions",
     )
 

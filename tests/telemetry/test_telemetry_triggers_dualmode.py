@@ -12,7 +12,7 @@ def test_telemetry_triggers_returns_hpe_threshold_rows_without_mutation(
     """telemetry-triggers reads HPE Trigger rows and never mutates the BMC."""
     manager, service = redfish_mock_factory("hpe")
 
-    result = manager.sync_invoke(ApiRequestType.Triggers, "telemetry-triggers")
+    result = manager.sync_invoke(ApiRequestType.SupermicroTriggers, "telemetry-triggers")
 
     assert isinstance(result, CommandResult)
     assert isinstance(result.data, list)

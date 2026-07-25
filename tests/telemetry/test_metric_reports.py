@@ -15,7 +15,7 @@ def test_metric_reports_reads_telemetry(redfish_mock_factory):
     so the command must surface every report, not just one.
     """
     mgr, _ = redfish_mock_factory("supermicro")
-    result = mgr.sync_invoke(ApiRequestType.MetricReports, "metric-reports")
+    result = mgr.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports")
     assert isinstance(result.data, list) and result.data, "no metric values"
     reports = {row["Report"] for row in result.data}
     # the GPU processor report and the platform-environment report are both present
@@ -33,11 +33,11 @@ def test_metric_reports_report_filter(redfish_mock_factory):
     mgr, _ = redfish_mock_factory("supermicro")
     # an exact id matches only its own report (six reports merely contain
     # "Processor", so the filter must be specific to scope to the GPU one).
-    hit = mgr.sync_invoke(ApiRequestType.MetricReports, "metric-reports",
+    hit = mgr.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports",
                           report="HGX_ProcessorMetrics_0")
     assert hit.data and all(r["Report"] == "HGX_ProcessorMetrics_0" for r in hit.data)
 
-    miss = mgr.sync_invoke(ApiRequestType.MetricReports, "metric-reports",
+    miss = mgr.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports",
                            report="NoSuchReport")
     assert miss.data == []
 
@@ -48,5 +48,5 @@ def test_metric_reports_no_telemetry_service(redfish_mock):
     The default Dell-shaped mock has no TelemetryService fixture, so the initial
     collection GET fails and the command degrades to an empty result.
     """
-    result = redfish_mock.sync_invoke(ApiRequestType.MetricReports, "metric-reports")
+    result = redfish_mock.sync_invoke(ApiRequestType.SupermicroMetricReports, "metric-reports")
     assert result.data == []

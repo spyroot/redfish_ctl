@@ -42,7 +42,7 @@ def test_metric_definitions_from_persistent_sim(dmtf_sim_endpoint):
         is_http=dmtf_sim_endpoint.is_http,
     )
     result = manager.sync_invoke(
-        ApiRequestType.MetricReportDefinitions,
+        ApiRequestType.SupermicroMetricReportDefinitions,
         "metric-definitions",
     )
     assert result.error is None

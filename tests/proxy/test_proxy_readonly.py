@@ -280,7 +280,7 @@ def test_proxy_metric_samples_reuse_exporter_contract_per_node():
             None,
             None,
         ),
-        (ApiRequestType.MetricReports, "metric-reports"): CommandResult(
+        (ApiRequestType.SupermicroMetricReports, "metric-reports"): CommandResult(
             [
                 {
                     "Report": "HGX_ProcessorMetrics_0",
@@ -357,7 +357,7 @@ def test_proxy_metric_samples_reuse_exporter_contract_per_node():
         (ApiRequestType.Thermal, "thermal", {}),
         (ApiRequestType.Sensors, "sensors", {"do_expanded": False}),
         (ApiRequestType.NvLinkPorts, "nvlink-ports", {"do_expanded": False}),
-        (ApiRequestType.MetricReports, "metric-reports", {"do_expanded": False}),
+        (ApiRequestType.SupermicroMetricReports, "metric-reports", {"do_expanded": False}),
         (ApiRequestType.LeakDetectors, "leak-detectors", {}),
         (ApiRequestType.NetworkAdapters, "network-adapters", {"do_expanded": False}),
         (ApiRequestType.ComponentIntegrity, "component-integrity", {"do_expanded": False}),

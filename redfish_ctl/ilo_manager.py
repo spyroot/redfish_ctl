@@ -1,6 +1,6 @@
 import collections
 
-from .redfish_manager import RedfishManager
+from .redfish_manager import RedfishManager, CommandResult
 
 
 class IloManager(RedfishManager):
@@ -12,3 +12,6 @@ class IloManager(RedfishManager):
     """
 
     _registry = collections.defaultdict(dict)
+
+    def execute(self, **kwargs) -> CommandResult:
+        pass

@@ -409,7 +409,7 @@ def test_metric_definitions_command_reads_the_dmtf_mockup(profile: Path) -> None
             is_http=True,
         )
         result = manager.sync_invoke(
-            ApiRequestType.MetricReportDefinitions, "metric-definitions"
+            ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions"
         )
 
     rows = {row["Definition"]: row for row in result.data}
