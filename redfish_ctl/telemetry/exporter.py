@@ -20,6 +20,7 @@ from typing import Callable, Iterable, Mapping, Optional
 
 from ..config import ConfigurationConflict
 from . import identity as identity_mod
+from .metric_model import MetricDefinition, MetricSample, _definition
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
 build_identity_dimensions = identity_mod.build_identity_dimensions
@@ -27,7 +28,6 @@ build_telemetry_identity = identity_mod.build_legacy_gb300_identity
 common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
-METRIC_KINDS = frozenset({"gauge", "counter", "cumulative_counter"})
 COUNTER_SUFFIXES = (
     "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
 )
@@ -97,70 +97,6 @@ def _require_https_url(url: str, label: str) -> urllib.parse.ParseResult:
     if parsed.scheme.lower() != "https" or not parsed.netloc:
         raise ValueError(f"{label} must use https; got {url!r}")
     return parsed
-
-
-@dataclass(frozen=True)
-class MetricDefinition:
-    """Catalog entry describing one exported telemetry metric."""
-
-    name: str
-    kind: str = "gauge"
-    unit: Optional[str] = None
-    description: str = ""
-    prometheus_name: Optional[str] = None
-    family: str = "telemetry"
-    dimensions: tuple[str, ...] = ()
-    liveness: str = "signal"
-
-    def __post_init__(self) -> None:
-        """Validate and normalize the immutable definition."""
-        if self.kind not in METRIC_KINDS:
-            raise ValueError(f"unknown metric kind {self.kind!r} for {self.name}")
-        if not self.prometheus_name:
-            object.__setattr__(self, "prometheus_name", self.name)
-        object.__setattr__(self, "dimensions", tuple(self.dimensions))
-
-
-@dataclass(frozen=True)
-class MetricSample:
-    """One vendor-neutral telemetry sample ready for export."""
-
-    metric: str
-    value: float
-    dimensions: Mapping[str, str]
-    metric_type: str = "gauge"
-    unit: Optional[str] = None
-    timestamp: Optional[str] = None
-
-
-def _definition(
-        name: str,
-        kind: str = "gauge",
-        unit: Optional[str] = None,
-        description: str = "",
-        family: str = "telemetry",
-        dimensions: tuple[str, ...] = (),
-        liveness: str = "signal") -> MetricDefinition:
-    """Construct a catalog definition with concise defaults.
-
-    :param name: exported metric name.
-    :param kind: SignalFx/OpenTelemetry metric kind.
-    :param unit: optional unit annotation.
-    :param description: human-readable metric description.
-    :param family: broad metric family used by specs and docs.
-    :param dimensions: expected dimension keys for this metric family.
-    :param liveness: liveness role, usually ``signal`` or ``scrape``.
-    :return: immutable MetricDefinition.
-    """
-    return MetricDefinition(
-        name=name,
-        kind=kind,
-        unit=unit,
-        description=description,
-        family=family,
-        dimensions=dimensions,
-        liveness=liveness,
-    )
 
 
 _COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
