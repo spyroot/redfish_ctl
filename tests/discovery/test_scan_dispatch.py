@@ -10,7 +10,7 @@ this test does, for both scan commands. All network I/O is mocked.
 import requests
 
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 
 
 class _Resp:

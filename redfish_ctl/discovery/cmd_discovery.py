@@ -19,7 +19,7 @@ from typing import Optional
 import requests
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..config import discovery_backoff, discovery_pace_ms, discovery_retries
 from ..redfish_manager import CommandResult
 

@@ -15,7 +15,7 @@ import pytest
 from redfish_ctl.boot_source.cmd_boot_one_shot import BootOneShot
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.compute.cmd_power_state import RebootHost
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

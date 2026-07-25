@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import CommandResult, IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 
 
 class SystemQuery(IDracManager,

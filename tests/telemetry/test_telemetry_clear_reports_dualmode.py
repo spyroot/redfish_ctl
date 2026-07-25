@@ -1,6 +1,6 @@
 """Dual-mode-style coverage for TelemetryService.ClearMetricReports."""
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _TELEMETRY_SERVICE = "/redfish/v1/TelemetryService"

@@ -15,7 +15,7 @@ from typing import Optional
 
 from redfish_ctl.supermico_manager import SupermicroManager
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.idrac_shared import ApiRequestType, Singleton
+from redfish_ctl.redfish_api_common import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter_cli import register_exporter_subcommand

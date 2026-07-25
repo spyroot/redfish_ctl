@@ -11,7 +11,7 @@ the mock service's own ``JOB_ID`` so the vendor difference stays visible.
 Author Mus spyroot@gmail.com
 """
 from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

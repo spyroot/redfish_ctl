@@ -11,7 +11,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     REDFISH_API,
     ApiRequestType,
     HTTPMethod,

@@ -90,7 +90,7 @@ def _reset_command_singletons():
     (e.g. ``reboot``) would poison each other depending on collection order. The
     command ``_registry`` (used for dispatch) is a separate dict and is untouched.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_api_common import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -373,7 +373,7 @@ def _reset_command_singletons():
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
     Clearing the instance registry before each test isolates them.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_api_common import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()

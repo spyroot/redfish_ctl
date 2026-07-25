@@ -26,7 +26,7 @@ from ..cmd_exceptions import (
     UnsupportedAction,
 )
 from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     ApiRequestType,
     BootSourceOverrideMode,
     RedfishApiRespond,

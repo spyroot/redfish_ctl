@@ -23,7 +23,7 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from redfish_ctl.idrac_shared import HTTPMethod, RedfishApiRespond
+from redfish_ctl.redfish_api_common import HTTPMethod, RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 
 

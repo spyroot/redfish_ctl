@@ -48,7 +48,7 @@ from .redfish_respond_error import RedfishError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .idrac_shared import RedfishAction
+    from .redfish_api_common import RedfishAction
 
 from .redfish_shared import (
     RedfishApi,

@@ -24,7 +24,7 @@ from typing import Optional
 
 from ..cmd_utils import from_json_spec, save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 

@@ -7,7 +7,7 @@ with ``USB1``/``USB2``/``Slot_0``); the Dell path through the default mock tree.
 """
 
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _INSERT = (ApiRequestType.VirtualMediaInsert, "mount_cdrom")

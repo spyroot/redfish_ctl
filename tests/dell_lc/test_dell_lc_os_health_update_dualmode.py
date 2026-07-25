@@ -10,7 +10,7 @@ from redfish_ctl.dell_lc.cmd_dell_lc_os_health_update import (
     DellLcOsHealthUpdate,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

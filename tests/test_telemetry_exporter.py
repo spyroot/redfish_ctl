@@ -17,7 +17,7 @@ import redfish_ctl.telemetry.signalfx.emit as signalfx_emit
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (

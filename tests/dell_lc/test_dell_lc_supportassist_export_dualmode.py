@@ -11,7 +11,7 @@ from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_export import (
     DellLcSupportAssistExport,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

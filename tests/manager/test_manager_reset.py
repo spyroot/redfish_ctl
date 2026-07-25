@@ -8,7 +8,7 @@ actually returned, so a Dell ``JID_`` literal is never assumed cross-vendor.
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType, DellJobState
+from redfish_ctl.redfish_api_common import ApiRequestType, DellJobState
 from redfish_ctl.manager.cmd_manager_reset import ManagerReset
 from redfish_ctl.redfish_manager import CommandResult
 

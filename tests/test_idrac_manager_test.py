@@ -10,7 +10,7 @@ from unittest import TestCase
 import pytest
 
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import PowerState
+from redfish_ctl.redfish_api_common import PowerState
 
 logging.basicConfig()
 log = logging.getLogger("LOG")

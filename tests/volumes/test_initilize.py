@@ -12,7 +12,7 @@ Author Mus spyroot@gmail.com
 import pytest
 
 from redfish_ctl.cmd_exceptions import UnsupportedAction
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _CONTROLLER = "RAID.Integrated.1-1"

@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from redfish_ctl.idrac_shared import REDFISH_API
+from redfish_ctl.redfish_api_common import REDFISH_API
 
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict

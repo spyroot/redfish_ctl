@@ -5,7 +5,7 @@ from copy import deepcopy
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 NODE_MANAGER = "/redfish/v1/Systems/1/SmcNodeManager"

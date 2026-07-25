@@ -8,7 +8,7 @@ against the mock service by default and against real hardware when IDRAC_IP is s
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

@@ -53,7 +53,7 @@ from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpForm
 from .idrac_manager import IDracManager
 from .redfish_manager import RedfishManager
 from .supermico_manager import SupermicroManager
-from .idrac_shared import RedfishAction, RedfishActionEncoder
+from .redfish_api_common import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
 from .telemetry import tracing
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret

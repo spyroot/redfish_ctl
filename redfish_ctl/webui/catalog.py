@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..idrac_shared import ApiRequestType
+from ..redfish_api_common import ApiRequestType
 
 
 @dataclass(frozen=True)

@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument, UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 

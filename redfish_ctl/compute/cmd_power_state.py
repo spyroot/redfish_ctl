@@ -14,7 +14,7 @@ from typing import Optional
 
 from ..cmd_exceptions import MissingResource
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, DellCliJobTypes, Singleton
+from ..redfish_api_common import ApiRequestType, DellCliJobTypes, Singleton
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 

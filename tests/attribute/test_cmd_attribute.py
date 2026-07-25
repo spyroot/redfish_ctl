@@ -18,7 +18,7 @@ from unittest import TestCase
 import pytest
 
 from redfish_ctl.idrac_manager import CommandResult, IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_shared import RedfishJson
 
 logging.basicConfig()

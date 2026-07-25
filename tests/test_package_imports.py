@@ -42,7 +42,7 @@ def test_bios_change_command_is_registered():
 )
 def test_removed_neutral_base_names_no_longer_resolve(removed):
     """The Dell base-layer modules use vendor-honest names again: idrac_manager.py
-    and idrac_shared.py. The transient neutral names redfish_manager_base and
+    and redfish_api_common.py. The transient neutral names redfish_manager_base and
     redfish_manager_shared were removed with no alias, so their import paths must no
     longer resolve -- guarding against reintroducing the inverted naming where the
     Dell child class masqueraded as the generic base. redfish_task_state.py exists

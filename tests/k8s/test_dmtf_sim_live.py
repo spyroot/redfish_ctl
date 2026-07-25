@@ -17,7 +17,7 @@ Author Mus spyroot@gmail.com
 import pytest
 import requests
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import RedfishManager
 
 pytestmark = pytest.mark.dmtf_sim_live

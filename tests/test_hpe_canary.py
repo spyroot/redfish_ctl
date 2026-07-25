@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 
 _IP = os.environ.get("HPE_EMULATOR_IP")
 

@@ -50,7 +50,7 @@ from .decorators.fault_injection import (
     simulate_http_faults,
     simulate_http_faults_async,
 )
-from .idrac_shared import (
+from .redfish_api_common import (
     REDFISH_API,
     REDFISH_JSON,
     ApiRequestType,
@@ -58,14 +58,14 @@ from .idrac_shared import (
     DellCliJobTypes,
     HTTPMethod,
     DellJobType,
-    JobApplyTypes,
+    DellApplyTypes,
     DellJobState,
     PowerState,
     RedfishAction,
     RedfishApiRespond,
     ScheduleJobType,
 )
-from .idrac_shared import ResetType as ResetType
+from .redfish_api_common import ResetType as ResetType
 from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import (
@@ -1753,7 +1753,7 @@ class IDracManager(RedfishManager):
         if reboot_type == ScheduleJobType.NoReboot:
             pd = {
                 REDFISH_JSON.RedfishSettingsApplyTime: {
-                    REDFISH_JSON.ApplyTime: JobApplyTypes.InMaintenance,
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.InMaintenance,
                     REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
                     REDFISH_JSON.MaintenanceWindowDuration: duration_time
                 }
@@ -1761,7 +1761,7 @@ class IDracManager(RedfishManager):
         elif reboot_type == ScheduleJobType.AutoReboot:
             pd = {
                 REDFISH_JSON.RedfishSettingsApplyTime: {
-                    REDFISH_JSON.ApplyTime: JobApplyTypes.AtMaintenance,
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.AtMaintenance,
                     REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
                     REDFISH_JSON.MaintenanceWindowDuration: duration_time
                 }
@@ -1769,13 +1769,13 @@ class IDracManager(RedfishManager):
         elif reboot_type == ScheduleJobType.OnReset:
             pd = {
                 REDFISH_JSON.RedfishSettingsApplyTime: {
-                    REDFISH_JSON.ApplyTime: JobApplyTypes.OnReset
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.OnReset
                 }
             }
         elif reboot_type == ScheduleJobType.Immediate:
             pd = {
                 REDFISH_JSON.RedfishSettingsApplyTime: {
-                    REDFISH_JSON.ApplyTime: JobApplyTypes.Immediate
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.Immediate
                 }
             }
         else:

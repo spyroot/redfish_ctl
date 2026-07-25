@@ -12,7 +12,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec
 from ..cmd_utils import from_json_spec, save_if_needed, str2bool
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, ResetType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, RedfishApiRespond, ResetType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
