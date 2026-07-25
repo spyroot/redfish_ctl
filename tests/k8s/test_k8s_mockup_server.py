@@ -184,21 +184,30 @@ def test_mockup_mode_refuses_write_engines(tmp_path: Path) -> None:
             pass  # pragma: no cover - the context manager raises on entry.
 
 
-def test_mockup_write_verbs_return_405(tmp_path: Path) -> None:
-    """Every write verb is refused with 405 — the mockup mode is GET-only."""
+def test_mockup_non_get_methods_return_405(tmp_path: Path) -> None:
+    """Every non-GET method is refused with 405 and ``Allow: GET``.
+
+    The sim contract (``specs/sim/dmtf-sim-contract.yaml``) provides GET as
+    the entire method surface: writes because an accepted write would be
+    invented behavior, HEAD/OPTIONS because they are outside the declared
+    surface (a HEAD body is suppressed per HTTP).
+    """
     module = _load_server_module()
     direct = _write_min_profile(tmp_path / "direct", prefixed=False)
 
     with module.run_server("127.0.0.1", 0, mockup_dir=direct) as server:
         base = "http://{}:{}".format(*server.server_address)
-        for method in ("POST", "PATCH", "PUT", "DELETE"):
+        for method in ("POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"):
+            body = b"{}" if method in ("POST", "PATCH", "PUT") else None
             request = urllib.request.Request(
-                base + "/redfish/v1", data=b"{}", method=method
+                base + "/redfish/v1", data=body, method=method
             )
             with pytest.raises(urllib.error.HTTPError) as exc_info:
                 urllib.request.urlopen(request, timeout=5)
-            assert exc_info.value.code == 405
-            assert exc_info.value.headers["Allow"] == "GET, HEAD, OPTIONS"
+            assert exc_info.value.code == 405, method
+            assert exc_info.value.headers["Allow"] == "GET", method
+            if method == "HEAD":
+                assert exc_info.value.read() == b""
 
 
 # --- the DMTF public-telemetry profile (bundle-backed) --------------------------
@@ -273,16 +282,10 @@ def test_mockup_leaf_resource_is_byte_faithful(profile: Path) -> None:
     with module.run_server("127.0.0.1", 0, mockup_dir=profile) as server:
         base = "http://{}:{}".format(*server.server_address)
         status, body, content_type = _get_raw(base, leaf)
-        head = urllib.request.Request(base + leaf, method="HEAD")
-        with urllib.request.urlopen(head, timeout=5) as response:
-            head_status = response.status
-            head_length = int(response.headers["Content-Length"])
 
     assert status == 200
     assert body == on_disk
     assert content_type == "application/json"
-    assert head_status == 200
-    assert head_length == len(on_disk)
 
 
 @requires_bundle

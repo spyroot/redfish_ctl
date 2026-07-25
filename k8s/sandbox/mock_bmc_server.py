@@ -438,50 +438,42 @@ class MockupRequestHandler(BaseHTTPRequestHandler):
 
     The request path maps directly onto the extracted profile directory
     (``/redfish/v1/X/Y`` -> ``<service_root>/X/Y/index.json``) and the payload
-    is returned byte-faithful. Write verbs are refused with 405: a mockup tree
-    is a static spec artifact, not a stateful device.
+    is returned byte-faithful. GET is the mode's ENTIRE method surface (the
+    sim contract, ``specs/sim/dmtf-sim-contract.yaml``, provides nothing
+    else): every other verb — writes, but also HEAD and OPTIONS — is refused
+    with 405, so a caller can never mistake the sim for a device with more
+    behavior than the bundle's files.
     """
 
     server_version = "redfish-ctl-mock-bmc/1.0"
     mockup_dir: Path
     service_root: Path
 
-    def _send_bytes(
-        self,
-        status: int,
-        content: bytes,
-        content_type: str,
-        send_body: bool = True,
-    ) -> None:
+    def _send_bytes(self, status: int, content: bytes, content_type: str) -> None:
         """Send a response with the given status, body bytes, and content type.
 
         :param status: HTTP status code to send.
-        :param content: response body bytes (used for Content-Length always).
+        :param content: response body bytes.
         :param content_type: value for the Content-Type header.
-        :param send_body: whether to write the body (False for HEAD).
         """
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
-        if send_body:
-            self.wfile.write(content)
+        self.wfile.write(content)
 
-    def _serve(self, send_body: bool) -> None:
-        """Serve the mockup file for the current request path.
-
-        :param send_body: whether to write the response body (False for HEAD).
-        """
+    def _serve(self) -> None:
+        """Serve the mockup file for the current request path."""
         path = _normalize_request_path(self.path)
         if path == "/redfish":
             # DSP0266 1.24.0 section 6.7 Table 4: /redfish is the spec-defined
             # version object, served from redfish/index.json when the profile
-            # ships it and synthesized otherwise.
+            # ships it and synthesized otherwise — the contract's ONE
+            # sanctioned synthesis.
             self._send_bytes(
                 200,
                 mockup_version_object(type(self).mockup_dir),
                 "application/json",
-                send_body,
             )
             return
         target = mockup_file_for_redfish_path(type(self).service_root, self.path)
@@ -497,52 +489,54 @@ class MockupRequestHandler(BaseHTTPRequestHandler):
                 },
                 sort_keys=True,
             ).encode("utf-8")
-            self._send_bytes(404, body, "application/json", send_body)
+            self._send_bytes(404, body, "application/json")
             return
-        self._send_bytes(
-            200, target.read_bytes(), _mockup_content_type(target), send_body
-        )
+        self._send_bytes(200, target.read_bytes(), _mockup_content_type(target))
 
     def do_GET(self) -> None:
         """Handle a GET request by serving the mapped mockup file."""
-        self._serve(send_body=True)
+        self._serve()
 
-    def do_HEAD(self) -> None:
-        """Handle a HEAD request by serving mockup headers without a body."""
-        self._serve(send_body=False)
+    def _reject_non_get(self) -> None:
+        """Refuse any non-GET method with 405 — GET is the entire surface.
 
-    def do_OPTIONS(self) -> None:
-        """Handle an OPTIONS request by advertising the read-only method set."""
-        self.send_response(204)
-        self.send_header("Allow", "GET, HEAD, OPTIONS")
-        self.send_header("Content-Length", "0")
-        self.end_headers()
-
-    def _reject_write(self) -> None:
-        """Refuse a write verb with 405 — the mockup tree is read-only."""
-        content = b'{"error": "read-only DSP2043 mockup"}'
+        Per the sim contract's ``errors.non_get_method`` row, everything but
+        GET returns 405 with ``Allow: GET`` — writes because an accepted write
+        would be invented behavior, HEAD/OPTIONS because they are outside the
+        declared surface. The body is omitted for HEAD per HTTP.
+        """
+        content = b'{"error": "DSP2043 mockup: GET is the only provided method"}'
         self.send_response(405)
-        self.send_header("Allow", "GET, HEAD, OPTIONS")
+        self.send_header("Allow", "GET")
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
-        self.wfile.write(content)
+        if self.command != "HEAD":
+            self.wfile.write(content)
+
+    def do_HEAD(self) -> None:
+        """Refuse a HEAD request — the contract provides GET only."""
+        self._reject_non_get()
+
+    def do_OPTIONS(self) -> None:
+        """Refuse an OPTIONS request — the contract provides GET only."""
+        self._reject_non_get()
 
     def do_POST(self) -> None:
-        """Refuse a POST request — the mockup mode is GET-only."""
-        self._reject_write()
+        """Refuse a POST request — the contract provides GET only."""
+        self._reject_non_get()
 
     def do_PATCH(self) -> None:
-        """Refuse a PATCH request — the mockup mode is GET-only."""
-        self._reject_write()
+        """Refuse a PATCH request — the contract provides GET only."""
+        self._reject_non_get()
 
     def do_PUT(self) -> None:
-        """Refuse a PUT request — the mockup mode is GET-only."""
-        self._reject_write()
+        """Refuse a PUT request — the contract provides GET only."""
+        self._reject_non_get()
 
     def do_DELETE(self) -> None:
-        """Refuse a DELETE request — the mockup mode is GET-only."""
-        self._reject_write()
+        """Refuse a DELETE request — the contract provides GET only."""
+        self._reject_non_get()
 
     def log_message(self, format: str, *args: object) -> None:
         """Log a request line only when ``MOCK_BMC_VERBOSE`` is ``1``.
