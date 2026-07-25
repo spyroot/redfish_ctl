@@ -1,0 +1,86 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmtf-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: dmtf-sim
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dmtf-sim
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dmtf-sim
+        app.kubernetes.io/component: redfish-sandbox
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: dmtf-sim
+          image: redfish-ctl-dmtf-sim:local
+          imagePullPolicy: IfNotPresent
+          # The --mockup-dir arg selects which DSP2043 profile this simulator
+          # serves; stamp out one Deployment per profile for more DMTF
+          # reference endpoints (the image bakes the whole bundle).
+          args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --mockup-dir
+            - /mockups/DSP2043_2026.1/public-rackmount1
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /redfish/v1/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            # The mockup mode never writes: request -> file -> response.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dmtf-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/name: dmtf-sim
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dmtf-sim
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
