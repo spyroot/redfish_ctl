@@ -1,7 +1,6 @@
 """Offline tests for the Splunk metric visibility gate (tools/splunk_metric_gate.py)."""
 import io
 import json
-import time
 
 from tools import splunk_metric_gate as gate
 
@@ -26,57 +25,61 @@ def _env(monkeypatch, realm="us1", token="tok"):
     monkeypatch.delenv("SPLUNK_API_TOKEN", raising=False)
 
 
-def test_gate_passes_when_all_metrics_fresh(monkeypatch, capsys):
-    """Every metric present and fresh yields exit 0 and PASS lines."""
+def test_gate_passes_when_all_metrics_are_active(monkeypatch, capsys):
+    """Every metric with an active series yields exit 0 and FLOWING lines."""
     _env(monkeypatch)
-    now_ms = int(time.time() * 1000)
     monkeypatch.setattr(gate, "query_metric",
-                        lambda realm, token, metric, timeout: {"count": 3, "newest_ms": now_ms})
+                        lambda realm, token, metric, timeout: {
+                            "count": 3, "active": 1, "active_complete": True,
+                            "newest_ms": 0})
     rc = gate.run_gate(["hw.health", "hw.power"])
     out = capsys.readouterr().out
     assert rc == 0
     assert out.count("PASS") == 2
-    assert "2/2 metrics visible" in out
+    assert "FLOWING=2" in out
 
 
 def test_gate_fails_on_missing_metric(monkeypatch, capsys):
     """A metric with zero time series fails the gate with exit 1."""
     _env(monkeypatch)
     monkeypatch.setattr(gate, "query_metric",
-                        lambda realm, token, metric, timeout: {"count": 0, "newest_ms": 0})
+                        lambda realm, token, metric, timeout: {
+                            "count": 0, "active": 0, "active_complete": False,
+                            "newest_ms": 0})
     rc = gate.run_gate(["hw.health"])
     assert rc == 1
-    assert "FAIL hw.health: no time series" in capsys.readouterr().out
+    assert "FAIL MISSING hw.health" in capsys.readouterr().out
 
 
-def test_gate_fails_on_stale_metric(monkeypatch, capsys):
-    """A metric last updated outside the freshness window fails.
+def test_gate_fails_when_metric_has_no_active_series(monkeypatch, capsys):
+    """An existing metric with no active series fails.
 
-    Staleness matters because the gate runs right after a push — an old
-    series proves history, not that today's pipeline works.
+    Existence proves history; Splunk's active flag proves current flow.
     """
     _env(monkeypatch)
-    old_ms = int((time.time() - 3 * 3600) * 1000)
     monkeypatch.setattr(gate, "query_metric",
-                        lambda realm, token, metric, timeout: {"count": 1, "newest_ms": old_ms})
+                        lambda realm, token, metric, timeout: {
+                            "count": 1, "active": 0, "active_complete": True,
+                            "newest_ms": 0})
     rc = gate.run_gate(["hw.health", "--since-minutes", "30"])
     assert rc == 1
-    assert "stale" in capsys.readouterr().out
+    assert "FAIL INACTIVE" in capsys.readouterr().out
 
 
-def test_gate_fails_when_freshness_unverifiable(monkeypatch, capsys):
-    """Series without any update timestamp fail instead of passing on count.
+def test_gate_fails_when_active_flag_is_unverifiable(monkeypatch, capsys):
+    """Series without complete boolean active flags fail closed.
 
-    This edge occurs when the API returns MTS metadata without timestamp
-    fields; a hard gate must not report PASS when it cannot verify the push
-    actually landed inside the window.
+    The metric-time-series endpoint may omit update timestamps legitimately,
+    but an absent or malformed active flag cannot establish current flow.
     """
     _env(monkeypatch)
     monkeypatch.setattr(gate, "query_metric",
-                        lambda realm, token, metric, timeout: {"count": 4, "newest_ms": 0})
+                        lambda realm, token, metric, timeout: {
+                            "count": 4, "active": 0, "active_complete": False,
+                            "newest_ms": 0})
     rc = gate.run_gate(["hw.health"])
     assert rc == 1
-    assert "freshness unverifiable" in capsys.readouterr().out
+    assert "active flag missing or malformed" in capsys.readouterr().out
 
 
 def test_gate_configuration_errors(monkeypatch, capsys):
@@ -118,7 +121,9 @@ def test_metrics_file_loading(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(
         gate, "query_metric",
         lambda realm, token, metric, timeout: (seen.append(metric)
-                                               or {"count": 1, "newest_ms": int(time.time() * 1000)}))
+                                               or {"count": 1, "active": 1,
+                                                   "active_complete": True,
+                                                   "newest_ms": 0}))
     rc = gate.run_gate(["--metrics-file", str(spec)])
     assert rc == 0
     assert seen == ["hw.health", "hw.power"]
@@ -144,7 +149,8 @@ def test_gate_prefers_api_token_for_queries(monkeypatch, capsys):
         :return: a fresh single-series result.
         """
         seen["token"] = token
-        return {"count": 1, "newest_ms": int(time.time() * 1000)}
+        return {"count": 1, "active": 1, "active_complete": True,
+                "newest_ms": 0}
 
     monkeypatch.setattr(gate, "query_metric", record)
     assert gate.run_gate(["hw.component.health"]) == 0
@@ -158,10 +164,10 @@ def test_default_metric_set_includes_p0_signals(monkeypatch):
         assert name in gate.DEFAULT_METRICS
 
 
-def test_query_metric_parses_api_response(monkeypatch):
-    """query_metric extracts count and the newest update stamp from the API JSON."""
+def test_query_metric_parses_active_without_update_timestamps(monkeypatch):
+    """query_metric treats complete boolean active flags as authoritative."""
     payload = {"count": 2, "results": [
-        {"lastUpdated": 1000}, {"lastUpdated": 5000, "created": 100}]}
+        {"active": True}, {"active": False}]}
 
     class FakeResponse(io.BytesIO):
         """Minimal context-manager response wrapping the canned JSON body."""
@@ -196,7 +202,45 @@ def test_query_metric_parses_api_response(monkeypatch):
 
     monkeypatch.setattr(gate.urllib.request, "urlopen", fake_urlopen)
     info = gate.query_metric("us1", "tok", "hw.health", 5.0)
-    assert info == {"count": 2, "newest_ms": 5000}
+    assert info == {
+        "count": 2,
+        "active": 1,
+        "active_complete": True,
+        "newest_ms": 0,
+    }
     assert "api.us1.signalfx.com" in captured["url"]
     assert "hw.health" in captured["url"]
     assert captured["token"] == "tok"
+
+
+def test_query_metric_marks_non_boolean_active_as_incomplete(monkeypatch):
+    """A truthy non-boolean active value cannot make the gate pass."""
+    payload = {"count": 1, "results": [{"active": 1}]}
+
+    class FakeResponse(io.BytesIO):
+        """Minimal context-manager response wrapping the canned JSON body."""
+
+        def __enter__(self):
+            """Return self as the context object.
+
+            :return: this fake response.
+            """
+            return self
+
+        def __exit__(self, *exc):
+            """Close without suppressing exceptions.
+
+            :param exc: exception triple from the with-block.
+            :return: False so exceptions propagate.
+            """
+            return False
+
+    monkeypatch.setattr(
+        gate.urllib.request,
+        "urlopen",
+        lambda request, timeout=None: FakeResponse(json.dumps(payload).encode()),
+    )
+    info = gate.query_metric("us1", "tok", "hw.health", 5.0)
+    assert info["active"] == 0
+    assert info["active_complete"] is False
+    assert gate.classify_liveness(info) == "ERROR"
