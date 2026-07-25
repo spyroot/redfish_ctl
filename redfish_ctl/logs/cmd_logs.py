@@ -28,10 +28,6 @@ class Logs(IDracManager,
           metaclass=Singleton):
     """Read log-service entries from every system and manager."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the logs command."""
-        super(Logs, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

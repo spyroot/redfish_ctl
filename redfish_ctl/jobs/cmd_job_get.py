@@ -26,10 +26,6 @@ class JobGet(IDracManager,
     """Command gets a job from iDRAC
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the job command."""
-        super(JobGet, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

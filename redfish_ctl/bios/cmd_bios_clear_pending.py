@@ -25,10 +25,6 @@ class BiosClearPending(IDracManager,
     values currently staged on the Redfish endpoint.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Construct the clear-pending command, forwarding credentials to the base manager."""
-        super(BiosClearPending, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

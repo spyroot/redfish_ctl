@@ -26,10 +26,6 @@ class ConsoleInfo(IDracManager,
                   metaclass=Singleton):
     """Report serial / graphical / shell console access for every manager."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the console-info command."""
-        super(ConsoleInfo, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -20,10 +20,6 @@ class MemoryMetrics(IDracManager,
                     metaclass=Singleton):
     """Read Memory Metrics linked from Memory and Processor MemorySummary."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the memory-metrics command."""
-        super(MemoryMetrics, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -21,10 +21,6 @@ class Manager(IDracManager,
     caller can save to a file or output to a file or pass downstream.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the manager command."""
-        super(Manager, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

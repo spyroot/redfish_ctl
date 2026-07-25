@@ -41,10 +41,6 @@ class RebootHost(IDracManager,
     },
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the reboot command."""
-        super(RebootHost, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

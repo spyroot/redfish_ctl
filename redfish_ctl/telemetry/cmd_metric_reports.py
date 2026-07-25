@@ -31,10 +31,6 @@ class MetricReports(IDracManager,
                     metaclass=Singleton):
     """Read every Redfish TelemetryService MetricReport (platform + accelerator OOB metrics)."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the metric-reports command."""
-        super(MetricReports, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

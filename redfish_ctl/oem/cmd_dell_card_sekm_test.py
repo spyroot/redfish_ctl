@@ -33,10 +33,6 @@ class DellCardSekmTest(IDracManager,
                        metaclass=Singleton):
     """Discover and invoke the Dell SEKM server connectivity test."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-card-sekm-test command."""
-        super(DellCardSekmTest, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

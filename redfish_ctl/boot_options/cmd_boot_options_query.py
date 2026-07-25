@@ -20,10 +20,6 @@ class BootOptionsQuery(IDracManager,
     Command enable boot option
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the boot-options command."""
-        super(BootOptionsQuery, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

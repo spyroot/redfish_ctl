@@ -23,10 +23,6 @@ class Sensors(IDracManager,
               metaclass=Singleton):
     """Read every Chassis sensor reading (temperature, power, fan, voltage…)."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the sensors command."""
-        super(Sensors, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -26,10 +26,6 @@ class EthernetInterfaces(IDracManager,
                          metaclass=Singleton):
     """Read EthernetInterface config from every system and manager."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the ethernet-interfaces command."""
-        super(EthernetInterfaces, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

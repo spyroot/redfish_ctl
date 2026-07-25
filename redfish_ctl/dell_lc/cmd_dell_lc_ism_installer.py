@@ -32,10 +32,6 @@ class DellLcIsmInstaller(
 ):
     """Discover and invoke DellLCService.ExposeiSMInstallerToHostOS."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the ``dell-lc-ism-installer`` command."""
-        super(DellLcIsmInstaller, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

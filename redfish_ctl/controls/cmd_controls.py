@@ -18,10 +18,6 @@ class Controls(IDracManager,
                metaclass=Singleton):
     """Read chassis Controls collections and member Control setpoints."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the controls command."""
-        super(Controls, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

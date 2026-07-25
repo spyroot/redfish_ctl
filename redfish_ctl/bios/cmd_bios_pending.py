@@ -23,10 +23,6 @@ class BiosQueryPending(IDracManager,
     """A command query job_service_query.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Construct the bios-pending query command, forwarding credentials to the base manager."""
-        super(BiosQueryPending, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

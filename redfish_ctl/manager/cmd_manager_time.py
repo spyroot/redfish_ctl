@@ -53,10 +53,6 @@ class ManagerTime(IDracManager,
                   metaclass=Singleton):
     """Read or set each Manager's Redfish DateTime clock."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the manager-time command."""
-        super(ManagerTime, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

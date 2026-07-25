@@ -31,10 +31,6 @@ class AttributesUpdate(
     or output to a file or pass downstream.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the attr-update command."""
-        super(AttributesUpdate, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

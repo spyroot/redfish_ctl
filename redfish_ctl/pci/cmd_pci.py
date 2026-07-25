@@ -30,10 +30,6 @@ class PciDeviceQuery(IDracManager,
     Command implementation to get pci device and pci functions.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the pci command."""
-        super(PciDeviceQuery, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

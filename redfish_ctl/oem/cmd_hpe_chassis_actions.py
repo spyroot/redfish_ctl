@@ -47,10 +47,6 @@ class HpeChassisActions(IDracManager,
                         metaclass=Singleton):
     """Discover and invoke guarded HPE iLO chassis OEM actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the hpe-chassis-actions command."""
-        super(HpeChassisActions, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

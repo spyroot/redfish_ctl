@@ -36,6 +36,7 @@ mandatory_ids:
   - repo.exception-interface
   - repo.test-layout
   - repo.rename-tombstone
+  - repo.single-connection
   - repo.span-root
   - repo.no-legacy-resurrection
   - scm.exact-commit
@@ -89,6 +90,7 @@ gates:
   - {id: repo.exception-interface, profile: merge, command: scripts/gates/repository/exception-interface.sh, required: true, mutates: false}
   - {id: repo.test-layout, profile: merge, command: scripts/gates/repository/test-layout.sh, required: true, mutates: false}
   - {id: repo.rename-tombstone, profile: merge, command: scripts/gates/repository/rename-tombstone.sh, required: true, mutates: false}
+  - {id: repo.single-connection, profile: merge, command: scripts/gates/repository/single-connection.sh, required: true, mutates: false}
   - {id: repo.span-root, profile: merge, command: scripts/gates/repository/span-root.sh, required: true, mutates: false}
   - {id: repo.no-legacy-resurrection, profile: merge, command: scripts/gates/repository/no-legacy-resurrection.sh, required: true, mutates: false}
   # --- unit: the offline suite ---

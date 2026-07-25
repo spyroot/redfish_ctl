@@ -77,10 +77,6 @@ class HpeTestActions(IDracManager,
                      metaclass=Singleton):
     """Discover and invoke HPE iLO diagnostic/test actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the hpe-test-actions command."""
-        super(HpeTestActions, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

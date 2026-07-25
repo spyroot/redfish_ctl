@@ -64,10 +64,6 @@ class DellCardCertExport(IDracManager,
                          metaclass=Singleton):
     """Discover and query Dell iDRAC card certificate export actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-card-cert-export command."""
-        super(DellCardCertExport, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

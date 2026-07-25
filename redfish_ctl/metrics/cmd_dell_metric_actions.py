@@ -64,10 +64,6 @@ class DellMetricActions(IDracManager,
                         metaclass=Singleton):
     """Discover and invoke Dell MetricService actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-metric-actions command."""
-        super(DellMetricActions, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

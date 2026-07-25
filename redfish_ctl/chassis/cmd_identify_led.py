@@ -25,10 +25,6 @@ class IdentifyLed(IDracManager,
                   metaclass=Singleton):
     """Read or set the physical identify LED on a chassis or system."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the identify-led command."""
-        super(IdentifyLed, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

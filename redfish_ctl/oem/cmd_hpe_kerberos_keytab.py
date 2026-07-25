@@ -37,10 +37,6 @@ class HpeKerberosKeytabImport(
 ):
     """Import a Kerberos keytab into HPE iLO AccountService."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the hpe-kerberos-keytab-import command."""
-        super(HpeKerberosKeytabImport, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

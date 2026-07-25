@@ -47,10 +47,6 @@ class WorkloadPower(IDracManager,
                     metaclass=Singleton):
     """Preview or apply NVIDIA WorkloadPower profile actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the workload-power command."""
-        super(WorkloadPower, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

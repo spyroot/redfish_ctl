@@ -32,10 +32,6 @@ class DellLcClearProvisioningServer(
         metaclass=Singleton):
     """Discover and invoke DellLCService.ClearProvisioningServer."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-clear-provisioning command."""
-        super(DellLcClearProvisioningServer, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

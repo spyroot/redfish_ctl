@@ -28,10 +28,6 @@ class GpuMetrics(IDracManager,
                  metaclass=Singleton):
     """Read per-GPU ProcessorMetrics, Sensor, and MemoryMetrics links."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the gpu-metrics command."""
-        super(GpuMetrics, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

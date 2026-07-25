@@ -60,10 +60,6 @@ class AccountImportSSHKey(_AccountBase,
                          metaclass=Singleton):
     """PATCH an account's Oem.Hpe.SSHKeys to authorize (or clear) an SSH key."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the account-import-sshkey command."""
-        super(AccountImportSSHKey, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

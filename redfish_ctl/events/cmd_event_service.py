@@ -16,10 +16,6 @@ class EventServiceQuery(IDracManager,
                         metaclass=Singleton):
     """Read Redfish EventService, SSE, and subscription metadata."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the event-service command."""
-        super(EventServiceQuery, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

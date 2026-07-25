@@ -35,10 +35,6 @@ class DellRaidSpareActions(IDracManager,
                            metaclass=Singleton):
     """Assign or unassign DellRaidService hot spare disks."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-raid-spare command."""
-        super(DellRaidSpareActions, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

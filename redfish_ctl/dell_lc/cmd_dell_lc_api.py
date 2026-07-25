@@ -20,10 +20,6 @@ class GetRemoteServicesAPIStatus(IDracManager,
     """iDRACs fetch Dell LC status
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the service-api-status command."""
-        super(GetRemoteServicesAPIStatus, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

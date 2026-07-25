@@ -25,10 +25,6 @@ class DellBiosDeviceRecovery(IDracManager,
                              metaclass=Singleton):
     """Preview or invoke DellBIOSService.DeviceRecovery."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-bios-device-recovery command."""
-        super(DellBiosDeviceRecovery, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

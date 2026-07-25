@@ -29,10 +29,6 @@ class LogCollectDiagnosticData(IDracManager,
                                metaclass=Singleton):
     """Collect diagnostic data from a discovered LogService."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the log-collect-diag command."""
-        super(LogCollectDiagnosticData, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

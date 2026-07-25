@@ -23,10 +23,6 @@ class ChassisQuery(IDracManager,
     """A command query chassis.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the chassis command."""
-        super(ChassisQuery, self).__init__(*args, **kwargs)
-
     @property
     def help(self):
         """Describe the Chassis schema for CLI help output.
