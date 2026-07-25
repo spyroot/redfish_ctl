@@ -21,8 +21,7 @@ def hpe_corpus_mock():
     :return: tuple of Redfish manager and mock service.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    service = MockRedfishService(
-        HPE_CORPUS, index=_build_fixture_index(HPE_CORPUS), vendor="hpe")
+    service = MockRedfishService(HPE_CORPUS, index=_build_fixture_index(HPE_CORPUS))
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)
