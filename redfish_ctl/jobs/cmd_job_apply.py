@@ -17,7 +17,7 @@ from ..idrac_manager import IDracManager
 from ..idrac_shared import (
     REDFISH_API,
     ApiRequestType,
-    CliJobTypes,
+    DellCliJobTypes,
     DellJobState,
     RedfishApiRespond,
     ResetType,
@@ -97,7 +97,7 @@ class JobApply(IDracManager,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         elif setting == "boot-option":
             pd = {
                 "RebootJobType": "ForceReboot",
@@ -105,7 +105,7 @@ class JobApply(IDracManager,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         else:
             pd = {}
 

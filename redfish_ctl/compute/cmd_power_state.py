@@ -14,7 +14,7 @@ from typing import Optional
 
 from ..cmd_exceptions import MissingResource
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, CliJobTypes, Singleton
+from ..idrac_shared import ApiRequestType, DellCliJobTypes, Singleton
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 
@@ -105,7 +105,7 @@ class RebootHost(IDracManager,
             scheduled_jobs = self.sync_invoke(
                 ApiRequestType.Jobs, "jobs_sources_query",
                 reboot_pending=True,
-                job_type=CliJobTypes.RebootNoForce.value,
+                job_type=DellCliJobTypes.RebootNoForce.value,
                 job_ids=True
             )
             if scheduled_jobs.error is not None:

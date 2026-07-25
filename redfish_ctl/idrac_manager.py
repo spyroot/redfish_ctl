@@ -55,7 +55,7 @@ from .idrac_shared import (
     REDFISH_JSON,
     ApiRequestType,
     ApiRespondString,
-    CliJobTypes,
+    DellCliJobTypes,
     HTTPMethod,
     DellJobType,
     JobApplyTypes,
@@ -217,10 +217,10 @@ class IDracManager(RedfishManager):
 
         # mapping from cli to job types
         self._cli_job_type_mapping = {
-            CliJobTypes.Bios_Config.value: DellJobType.BIOSConfiguration.value,
-            CliJobTypes.OsDeploy.value: DellJobType.OSDeploy.value,
-            CliJobTypes.FirmwareUpdate.value: DellJobType.FirmwareUpdate.value,
-            CliJobTypes.RebootNoForce.value: DellJobType.RebootNoForce.value
+            DellCliJobTypes.Bios_Config.value: DellJobType.BIOSConfiguration.value,
+            DellCliJobTypes.OsDeploy.value: DellJobType.OSDeploy.value,
+            DellCliJobTypes.FirmwareUpdate.value: DellJobType.FirmwareUpdate.value,
+            DellCliJobTypes.RebootNoForce.value: DellJobType.RebootNoForce.value
         }
 
         # mapping from string to task status enum

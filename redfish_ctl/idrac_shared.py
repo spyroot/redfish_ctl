@@ -481,7 +481,7 @@ class DellJobState(Enum):
     Unknown = "Unknown"
 
 
-class CliJobTypes(Enum):
+class DellCliJobTypes(Enum):
     """cli option for job types"""
     OsDeploy = "os"
     Bios_Config = "bios_config"
