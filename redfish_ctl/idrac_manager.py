@@ -23,6 +23,7 @@ https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v4.x-seri
 Author Mus spyroot@gmail.com
 """
 import argparse
+import collections
 import functools
 import json
 import logging
@@ -105,6 +106,13 @@ class IDracManager(RedfishManager):
     """
     IDracManager Class, interact with a Redfish endpoint via REST API interface
     """
+
+    # Dell owns its own command registry, exactly like SupermicroManager and
+    # IloManager. Without this shadow, Dell commands would register into the
+    # shared RedfishManager._registry (the DMTF base) and leak into every
+    # vendor's tree; with it, get_registry's MRO-merge gives Dell SET(DMTF) +
+    # SET(Dell) while a non-Dell vendor never sees a Dell verb.
+    _registry = collections.defaultdict(dict)
 
     def __init__(self,
                  host: Optional[str] = None,

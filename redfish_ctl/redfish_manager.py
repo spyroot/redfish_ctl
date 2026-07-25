@@ -268,10 +268,26 @@ class RedfishManager:
 
     @classmethod
     def get_registry(cls):
-        """Return current command registry.
-        :return:
+        """Return the command registry visible to ``cls``: ``SET(DMTF) + SET(vendor)``.
+
+        Walks the MRO base-first and merges each class's own ``_registry``, so a
+        vendor manager's own commands override same-named DMTF commands and any
+        verb the vendor never implemented falls back to the base -- the same
+        inheritance the dispatcher (:meth:`_resolve_command`) applies at call
+        time. A vendor manager that shadows ``_registry`` (declares its own dict)
+        keeps its commands isolated from the base; this merge is the single place
+        that recombines them, so no vendor needs its own override. For the neutral
+        base it returns just ``SET(DMTF)``.
+
+        :return: a dict mapping the ApiRequestType key to ``{name: command class}``.
         """
-        return dict(cls._registry)
+        merged = collections.defaultdict(dict)
+        for klass in reversed(cls.__mro__):
+            registry = klass.__dict__.get("_registry")
+            if registry:
+                for scm_type, bucket in registry.items():
+                    merged[scm_type].update(bucket)
+        return dict(merged)
 
     @classmethod
     def _resolve_command(cls, api_call, name):
