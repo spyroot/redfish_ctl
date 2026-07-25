@@ -92,8 +92,14 @@ def _download(url: str, dest: Path) -> None:
 
     :param url: source URL (DMTF public standards host).
     :param dest: destination path (parent created if needed).
-    :raises SystemExit: exit 2 on any network/IO failure, with the next step.
+    :raises SystemExit: exit 2 on a non-https url or any network/IO failure,
+        each with the next step.
     """
+    if not url.lower().startswith("https://"):
+        print(f"error: refusing a non-https artifact url: {url}\n"
+              "next step: fix the manifest row to an https:// source",
+              file=sys.stderr)
+        raise SystemExit(2)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     try:
