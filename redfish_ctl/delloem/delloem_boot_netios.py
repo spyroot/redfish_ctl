@@ -30,10 +30,6 @@ class DellOemNetIsoBoot(IDracManager,
     """A command uses dell oem to attach ISO
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the oem-boot-netios command."""
-        super(DellOemNetIsoBoot, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

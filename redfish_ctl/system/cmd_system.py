@@ -30,10 +30,6 @@ class SystemQuery(IDracManager,
     and aggregate result.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the system command."""
-        super(SystemQuery, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

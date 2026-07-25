@@ -30,10 +30,6 @@ class LicenseInstall(IDracManager,
                      metaclass=Singleton):
     """Install a license file through the Redfish LicenseService."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the license-install command."""
-        super(LicenseInstall, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

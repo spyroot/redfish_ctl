@@ -25,10 +25,6 @@ class QueryBootSourceRegistry(
     """Query a Redfish endpoint resource by resource path.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the boot-source-registry command."""
-        super(QueryBootSourceRegistry, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

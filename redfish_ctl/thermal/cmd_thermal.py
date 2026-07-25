@@ -20,10 +20,6 @@ class Thermal(IDracManager,
               metaclass=Singleton):
     """Read chassis thermal subsystems, thermal metrics, and fan links."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the thermal command."""
-        super(Thermal, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

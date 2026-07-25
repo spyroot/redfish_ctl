@@ -20,10 +20,6 @@ class ProcessorMetrics(IDracManager,
                        metaclass=Singleton):
     """Read Processor Metrics linked from ComputerSystem processors."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the processor-metrics command."""
-        super(ProcessorMetrics, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

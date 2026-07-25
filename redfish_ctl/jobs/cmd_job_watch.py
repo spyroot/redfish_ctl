@@ -25,10 +25,6 @@ class JobWatch(IDracManager,
     """Command watch job progress.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the job-watch command."""
-        super(JobWatch, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

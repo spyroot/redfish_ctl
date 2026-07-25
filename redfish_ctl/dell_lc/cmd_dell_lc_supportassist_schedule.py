@@ -41,10 +41,6 @@ class DellLcSupportAssistSchedule(
         metaclass=Singleton):
     """Discover and invoke DellLCService SupportAssist schedule actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-supportassist-schedule command."""
-        super(DellLcSupportAssistSchedule, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

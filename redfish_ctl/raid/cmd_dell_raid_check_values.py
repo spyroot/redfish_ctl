@@ -41,10 +41,6 @@ class DellRaidCheckValues(IDracManager,
                           metaclass=Singleton):
     """Run DellRaidService.CheckVDValues as a read-only validation query."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-raid-check-values command."""
-        super(DellRaidCheckValues, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

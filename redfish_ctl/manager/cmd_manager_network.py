@@ -16,10 +16,6 @@ class ManagerNetworkProtocol(IDracManager,
                              metaclass=Singleton):
     """Read BMC network protocol enablement and NTP settings."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the manager-network command."""
-        super(ManagerNetworkProtocol, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

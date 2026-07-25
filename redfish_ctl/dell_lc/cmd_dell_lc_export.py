@@ -42,10 +42,6 @@ class DellLcExport(IDracManager,
                    metaclass=Singleton):
     """Export Dell Lifecycle Controller data through discovered DellLCService actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-export command."""
-        super(DellLcExport, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -32,10 +32,6 @@ class DellLcLogComment(IDracManager,
                        metaclass=Singleton):
     """Preview or insert a Dell Lifecycle Controller log comment."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-log-comment command."""
-        super(DellLcLogComment, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

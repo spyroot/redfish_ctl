@@ -139,10 +139,6 @@ class WaitReady(IDracManager,
                 metaclass=Singleton):
     """Poll the Redfish ServiceRoot until the BMC is reachable (bounded by a timeout)."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the wait command."""
-        super(WaitReady, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

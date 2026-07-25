@@ -34,10 +34,6 @@ class DellVFlashStateChange(IDracManager,
                             metaclass=Singleton):
     """Discover and change Dell vFlash state."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-vflash-state command."""
-        super(DellVFlashStateChange, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -39,10 +39,6 @@ class BiosChangeSettings(IDracManager,
     """A command changes bios settings
     """
 
-    def __init__(self, *args, **kwargs):
-        """Construct the bios-change command, forwarding credentials to the base manager."""
-        super(BiosChangeSettings, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -33,10 +33,6 @@ class DellLcOsHealthUpdate(IDracManager,
                            metaclass=Singleton):
     """Discover and invoke DellLCService.UpdateOSAppHealthData."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-os-health-update command."""
-        super(DellLcOsHealthUpdate, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

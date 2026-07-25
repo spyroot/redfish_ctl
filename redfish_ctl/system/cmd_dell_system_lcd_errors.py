@@ -26,10 +26,6 @@ class DellSystemLcdErrors(IDracManager,
                           metaclass=Singleton):
     """Preview or invoke DellSystemManagementService.ShowErrorsOnLCD."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-system-lcd-errors command."""
-        super(DellSystemLcdErrors, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -29,10 +29,6 @@ class SpdmMeasurements(IDracManager,
                        metaclass=Singleton):
     """Fetch signed measurements from SPDM ComponentIntegrity resources."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the spdm-measurements command."""
-        super(SpdmMeasurements, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

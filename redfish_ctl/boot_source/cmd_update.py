@@ -26,10 +26,6 @@ class BootSourceUpdate(IDracManager,
     """A command query dell OEM for boot source pending changes.
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the boot-source-update command."""
-        super(BootSourceUpdate, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

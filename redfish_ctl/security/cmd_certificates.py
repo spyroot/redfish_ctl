@@ -23,10 +23,6 @@ class Certificates(IDracManager,
                    metaclass=Singleton):
     """Read CertificateService and linked certificate collection metadata."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the certificates command."""
-        super(Certificates, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -54,10 +54,6 @@ class DellLcSupportAssistStatus(
 ):
     """Discover and invoke Dell LC SupportAssist status actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-lc-supportassist-status command."""
-        super(DellLcSupportAssistStatus, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

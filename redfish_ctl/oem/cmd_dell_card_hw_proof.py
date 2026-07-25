@@ -34,10 +34,6 @@ class DellCardHwProof(IDracManager,
                       metaclass=Singleton):
     """Discover and invoke Dell hardware proof-of-possession verification."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-card-hw-proof command."""
-        super(DellCardHwProof, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

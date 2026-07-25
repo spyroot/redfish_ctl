@@ -54,10 +54,6 @@ class DellRaidConfigActions(IDracManager,
                             metaclass=Singleton):
     """Preview or run selected DellRaidService configuration actions."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the dell-raid-config-actions command."""
-        super(DellRaidConfigActions, self).__init__(*args, **kwargs)
-
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
