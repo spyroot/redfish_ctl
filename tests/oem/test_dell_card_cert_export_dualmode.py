@@ -6,6 +6,7 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.cmd_exceptions import AuthenticationFailed
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.idrac_shared import ApiRequestType
 from redfish_ctl.oem.cmd_dell_card_cert_export import DellCardCertExport
@@ -197,6 +198,39 @@ def test_dell_card_cert_export_missing_target_reports_without_post(
         "Dell iDRAC card certificate export action not found: factory-identity"
     )
     assert result.data == {"available": []}
+    assert _post_requests(service) == []
+
+
+@pytest.mark.parametrize("do_async", [False, True], ids=["sync", "async"])
+def test_dell_card_cert_export_discovery_auth_failure_fails_closed(
+    dell_corpus_mock,
+    monkeypatch,
+    do_async,
+):
+    """Authentication failures cannot become an empty successful listing."""
+    manager, service = dell_corpus_mock
+    base_query = DellCardCertExport.base_query
+
+    def fail_card_service(command, resource, **kwargs):
+        if resource.rstrip("/") == CARD_SERVICE:
+            raise AuthenticationFailed(
+                "HTTP 401 reading DelliDRACCardService"
+            )
+        return base_query(command, resource, **kwargs)
+
+    monkeypatch.setattr(DellCardCertExport, "base_query", fail_card_service)
+
+    result = manager.sync_invoke(
+        ApiRequestType.DellCardCertExport,
+        "dell-card-cert-export",
+        do_async=do_async,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.data is None
+    assert result.error is not None
+    assert "failed to read" in result.error
+    assert CARD_SERVICE in result.error
     assert _post_requests(service) == []
 
 
