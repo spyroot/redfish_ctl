@@ -106,21 +106,23 @@ class IDracManager(RedfishManager):
     """
 
     def __init__(self,
-                 idrac_ip: Optional[str] = "",
+                 host: Optional[str] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 port: Optional[int] = None,
                  insecure: Optional[bool] = True,
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,
                  is_debug: Optional[bool] = False,
-                 log_level=logging.NOTSET,
-                 host: Optional[str] = None,
-                 username: Optional[str] = None,
-                 password: Optional[str] = None,
-                 port: Optional[int] = None):
+                 log_level=logging.NOTSET):
         """Default constructor requires credentials.
            By default, the manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param idrac_ip: deprecated alias for ``host``.
+        :param host: BMC host or IP address.
+        :param username: BMC account username; defaults to root.
+        :param password: BMC account password.
+        :param port: BMC TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
@@ -128,16 +130,7 @@ class IDracManager(RedfishManager):
         :param is_http: use plain HTTP instead of HTTPS for requests when True.
         :param is_debug: when True, include exception tracebacks in error logs.
         :param log_level: logging level applied to this manager's logger.
-        :param host: BMC host or IP address.
-        :param username: BMC account username; defaults to root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
         """
-        host = idrac_ip if host is None else host
-        username = idrac_username if username is None else username
-        password = idrac_password if password is None else password
-        port = idrac_port if port is None else port
-
         super().__init__(redfish_ip=host,
                          redfish_username=username,
                          redfish_password=password,

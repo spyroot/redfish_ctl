@@ -23,6 +23,8 @@ import requests
 import urllib3
 from pygments import highlight
 
+from redfish_ctl.ilo_manager import IloManager
+from redfish_ctl.sensors import cmd_sensors
 from .redfish_exceptions import RedfishException
 from .version import __version__
 
@@ -462,13 +464,30 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.install_termination_flush()
 
     # the manager is the main interface main uses to interact with the BMC.
-    redfish_api = IDracManager(host=cmd_args.redfish_host,
-                                     username=cmd_args.redfish_username,
-                                     password=cmd_args.redfish_password,
-                                     port=cmd_args.redfish_port,
-                                     insecure=insecure,
-                                     is_http=cmd_args.use_http,
-                                     is_debug=cmd_args.debug)
+    if cmd_args.vendor == "dell":
+        redfish_api = IDracManager(host=cmd_args.redfish_host,
+                                         username=cmd_args.redfish_username,
+                                         password=cmd_args.redfish_password,
+                                         port=cmd_args.redfish_port,
+                                         insecure=insecure,
+                                         is_http=cmd_args.use_http,
+                                         is_debug=cmd_args.debug)
+    if cmd.args.venfor == "hp":
+        redfish_api = IloManager(host=cmd_args.redfish_host,
+                                         username=cmd_args.redfish_username,
+                                         password=cmd_args.redfish_password,
+                                         port=cmd_args.redfish_port,
+                                         insecure=insecure,
+                                         is_http=cmd_args.use_http,
+                                         is_debug=cmd_args.debug)
+    if cmd.args.venfor == "supermicro":
+        redfish_api = Sup(host=cmd_args.redfish_host,
+                                         username=cmd_args.redfish_username,
+                                         password=cmd_args.redfish_password,
+                                         port=cmd_args.redfish_port,
+                                         insecure=insecure,
+                                         is_http=cmd_args.use_http,
+                                         is_debug=cmd_args.debug)
 
     connectionless_mode = (
         is_network_scan(cmd_args)
