@@ -29,8 +29,7 @@ DISK_FQDD = "Disk.Bay.0:Enclosure.Internal.0-1:RAID.Integrated.1-1"
 def dell_corpus_mock():
     """Return a manager and mock service backed by the Dell XR8620t corpus."""
     requests_mock = pytest.importorskip("requests_mock")
-    service = MockRedfishService(
-        DELL_CORPUS, index=_build_fixture_index(DELL_CORPUS), vendor="dell")
+    service = MockRedfishService(DELL_CORPUS, index=_build_fixture_index(DELL_CORPUS))
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)

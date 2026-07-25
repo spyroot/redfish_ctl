@@ -13,7 +13,7 @@ redfish_ctl/discovery/cmd_discovery.py:258
 redfish_ctl/discovery/cmd_discovery.py:260
 redfish_ctl/discovery/cmd_discovery.py:262
 redfish_ctl/fleet/cmd_fleet.py:53
-redfish_ctl/idrac_manager.py:255
+redfish_ctl/idrac_manager.py:314
 redfish_ctl/licenses/cmd_dell_license_actions.py:468
 redfish_ctl/licenses/cmd_dell_license_actions.py:472
 redfish_ctl/licenses/cmd_license_install.py:202
@@ -27,10 +27,10 @@ redfish_ctl/oem/cmd_nvidia_debug_token.py:317
 redfish_ctl/oem/cmd_nvidia_debug_token.py:319
 redfish_ctl/redfish_csdl.py:70
 redfish_ctl/redfish_main.py:177
-redfish_ctl/redfish_manager.py:647
-redfish_ctl/redfish_manager.py:649
-redfish_ctl/redfish_manager.py:645
-redfish_ctl/redfish_manager.py:676
+redfish_ctl/redfish_manager.py:586
+redfish_ctl/redfish_manager.py:588
+redfish_ctl/redfish_manager.py:590
+redfish_ctl/redfish_manager.py:617
 redfish_ctl/telemetry/cmd_exporter.py:1038
 redfish_ctl/telemetry/cmd_exporter.py:1039
 redfish_ctl/telemetry/exporter.py:1539
