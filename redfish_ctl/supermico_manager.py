@@ -3,6 +3,7 @@ import collections
 import functools
 import json
 import logging
+from abc import ABC
 from typing import Dict, Optional, Tuple
 
 from .redfish_manager import (
@@ -10,7 +11,7 @@ from .redfish_manager import (
     RedfishManager,
 )
 
-class IloManager(RedfishManager):
+class SupermicroManager(RedfishManager, ABC):
     """
     IDracManager Class, interact with a Redfish endpoint via REST API interface
     """
