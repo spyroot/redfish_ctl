@@ -61,9 +61,9 @@ def _mock_dell_corpus(remove_action=False):
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

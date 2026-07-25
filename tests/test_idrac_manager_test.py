@@ -26,9 +26,9 @@ class BasicManagerTest(TestCase):
     @classmethod
     def setUpClass(cls) -> IDracManager:
         redfish_api = IDracManager(
-            idrac_ip=os.environ.get('IDRAC_IP', ''),
-            idrac_username=os.environ.get('IDRAC_USERNAME', 'root'),
-            idrac_password=os.environ.get('IDRAC_PASSWORD', ''),
+            host=os.environ.get('IDRAC_IP', ''),
+            username=os.environ.get('IDRAC_USERNAME', 'root'),
+            password=os.environ.get('IDRAC_PASSWORD', ''),
             insecure=False,
             is_debug=False)
         return redfish_api

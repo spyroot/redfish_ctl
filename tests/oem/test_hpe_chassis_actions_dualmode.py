@@ -30,9 +30,9 @@ def hpe_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-hpe-dl360",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-hpe-dl360",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

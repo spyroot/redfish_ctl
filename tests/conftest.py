@@ -321,9 +321,9 @@ class MockRedfishService:
 def _make_idrac(idrac_ip, username, password):
     from redfish_ctl.idrac_manager import IDracManager
     return IDracManager(
-        idrac_ip=idrac_ip,
-        idrac_username=username,
-        idrac_password=password,
+        host=idrac_ip,
+        username=username,
+        password=password,
         insecure=True,
         is_debug=False,
     )

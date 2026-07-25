@@ -231,9 +231,9 @@ def test_firmware_upload_post_emits_action_metadata(
     )
 
     cmd = FirmwareUpdate(
-        idrac_ip="mock-idrac",
-        idrac_username="root",
-        idrac_password="mock",
+        host="mock-idrac",
+        username="root",
+        password="mock",
     )
     response = cmd._post_image_file(
         "/redfish/v1/UpdateService/upload",

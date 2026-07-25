@@ -144,10 +144,10 @@ def test_bios_reset_fallback_uri_normalizes_bios_fragment() -> None:
 def test_bios_reset_system_query_failure_is_not_hidden(monkeypatch) -> None:
     """Connectivity/auth/parsing failures on the ComputerSystem read propagate."""
     command = BiosResetDefault(
-        idrac_ip="127.0.0.1",
-        idrac_username="user",
-        idrac_password="password",
-        idrac_port=443,
+        host="127.0.0.1",
+        username="user",
+        password="password",
+        port=443,
         insecure=True,
         is_http=True,
     )

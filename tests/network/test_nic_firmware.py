@@ -62,7 +62,7 @@ def _run_nic_firmware(routes):
     requests_mock = pytest.importorskip("requests_mock")
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=_serve(routes))
-        mgr = IDracManager(idrac_ip="mock", idrac_username="root", idrac_password="x",
+        mgr = IDracManager(host="mock", username="root", password="x",
                                  insecure=True, is_debug=False)
         return mgr.sync_invoke(ApiRequestType.NicFirmware, "nic-firmware").data
 

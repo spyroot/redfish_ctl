@@ -67,9 +67,9 @@ def _dell_system_lcd_manager(remove_action=False):
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-system-lcd",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-system-lcd",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

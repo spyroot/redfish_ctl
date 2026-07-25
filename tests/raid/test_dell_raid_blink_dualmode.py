@@ -37,9 +37,9 @@ def dell_raid_manager():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-raid",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-raid",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

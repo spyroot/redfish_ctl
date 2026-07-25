@@ -25,10 +25,10 @@ def _manager():
     """Build an IDracManager pointed at the running emulator."""
     from redfish_ctl.idrac_manager import IDracManager
     return IDracManager(
-        idrac_ip=_IP,
-        idrac_username=os.environ.get("HPE_EMULATOR_USER", "root"),
-        idrac_password=os.environ.get("HPE_EMULATOR_PASSWORD", "root_password"),
-        idrac_port=int(os.environ.get("HPE_EMULATOR_PORT", "45678")),
+        host=_IP,
+        username=os.environ.get("HPE_EMULATOR_USER", "root"),
+        password=os.environ.get("HPE_EMULATOR_PASSWORD", "root_password"),
+        port=int(os.environ.get("HPE_EMULATOR_PORT", "45678")),
         insecure=True,
         is_debug=False,
     )

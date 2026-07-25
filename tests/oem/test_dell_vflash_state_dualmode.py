@@ -50,9 +50,9 @@ def dell_vflash_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-vflash",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-vflash",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

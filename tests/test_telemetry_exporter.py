@@ -121,9 +121,9 @@ def gb300_exporter_manager():
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         manager = IDracManager(
-            idrac_ip="mock-gb300",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-gb300",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )
@@ -609,9 +609,9 @@ def test_scrape_health_samples_emit_bmc_up_gauge():
 def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
     """A reachable BMC scrape emits hw.bmc.up=1 without dropping hw.* readings."""
     manager = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -652,9 +652,9 @@ def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
 def test_exporter_collect_samples_unreachable_bmc_reports_down(monkeypatch):
     """An unreachable BMC (every scrape times out) emits hw.bmc.up=0, not nothing."""
     manager = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -731,9 +731,9 @@ def test_bmc_up_carries_exporter_identity_dims():
 def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch):
     """One supported collector failure produces partial scrape self-telemetry."""
     manager = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -798,9 +798,9 @@ def test_exporter_collect_samples_treats_unsupported_collectors_as_healthy(
         monkeypatch):
     """A healthy BMC with no optional telemetry collectors is zero-sample success."""
     manager = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -829,9 +829,9 @@ def test_exporter_collect_samples_classifies_malformed_collector_payload(
         monkeypatch):
     """Malformed collector payloads fail that collector with invalid_payload."""
     manager = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -1460,9 +1460,9 @@ def test_redfish_response_cache_loader_failure_wakes_waiters():
 def test_base_query_cache_shares_full_payload_across_key_selectors(monkeypatch):
     """Different root-key selectors reuse the same exact GET response."""
     manager = IDracManager(
-        idrac_ip="mock-gb300",
-        idrac_username="root",
-        idrac_password="mock",
+        host="mock-gb300",
+        username="root",
+        password="mock",
         insecure=True,
     )
     cache = RedfishResponseCache()

@@ -676,7 +676,7 @@ def _base_manager():
     :return: an offline IDracManager (no BMC contact).
     """
     return IDracManager(
-        idrac_ip="mock", idrac_username="root", idrac_password="x",
+        host="mock", username="root", password="x",
         insecure=True, is_debug=False)
 
 

@@ -194,10 +194,10 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         manager = IDracManager(
-            idrac_ip="mock-gb300",
-            idrac_username="root",
-            idrac_password="mock",
-            idrac_port=8080,
+            host="mock-gb300",
+            username="root",
+            password="mock",
+            port=8080,
             insecure=True,
             is_http=True,
             is_debug=False,

@@ -87,9 +87,9 @@ def dell_card_group_mock(tmp_path):
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-card",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-card",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

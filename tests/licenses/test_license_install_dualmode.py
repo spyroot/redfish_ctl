@@ -57,9 +57,9 @@ def dell_license_manager():
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-license",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-license",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

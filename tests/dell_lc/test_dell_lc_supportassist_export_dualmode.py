@@ -47,9 +47,9 @@ def dell_lc_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

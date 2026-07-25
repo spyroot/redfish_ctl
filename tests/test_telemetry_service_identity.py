@@ -242,9 +242,9 @@ def test_exporter_discovers_instance_id_in_sync_and_async_modes(do_async):
 def test_identity_discovery_propagates_transient_transport_errors(monkeypatch):
     """An absent optional resource is tolerated while a timeout aborts discovery."""
     command = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
 
@@ -269,9 +269,9 @@ def test_identity_discovery_propagates_transient_transport_errors(monkeypatch):
 def test_process_fallback_is_stable_while_discovery_retries(monkeypatch):
     """A fallback remains stable but is replaced once stable BMC identity appears."""
     command = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
     stable = str(uuid.uuid5(identity.SERVICE_INSTANCE_NAMESPACE, "BMC-SERIAL"))
@@ -299,9 +299,9 @@ def test_process_fallback_is_stable_while_discovery_retries(monkeypatch):
 def test_otlp_trace_flag_reaches_resolved_exporter_identity(monkeypatch):
     """Exporter execution forwards the parsed trace flag to identity setup."""
     command = Exporter(
-        idrac_ip="172.25.230.29",
-        idrac_username="root",
-        idrac_password="mock",
+        host="172.25.230.29",
+        username="root",
+        password="mock",
         insecure=True,
     )
     observed = {}

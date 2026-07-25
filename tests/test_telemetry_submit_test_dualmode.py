@@ -56,9 +56,9 @@ def dell_xr8620t_telemetry_manager():
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-xr8620t",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-xr8620t",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

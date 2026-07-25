@@ -46,9 +46,9 @@ def dell_lc_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc-supportassist",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc-supportassist",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

@@ -29,8 +29,8 @@ MOCK_SERVERS = "/redfish/v1/Systems/System.Embedded.1"
 def _cmd(cls):
     """A command instance with mock credentials (offline; nothing contacted)."""
     return cls(
-        idrac_ip="mock-idrac", idrac_username="root",
-        idrac_password="mock", insecure=True, is_debug=False,
+        host="mock-idrac", username="root",
+        password="mock", insecure=True, is_debug=False,
     )
 
 

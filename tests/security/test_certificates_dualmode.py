@@ -101,9 +101,9 @@ def test_certificates_tolerates_root_without_certificate_links():
         mocker.post(requests_mock.ANY, text=get_cb)
         mocker.delete(requests_mock.ANY, text=get_cb)
         manager = IDracManager(
-            idrac_ip="mock-no-certs",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-no-certs",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

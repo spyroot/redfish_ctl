@@ -46,9 +46,9 @@ def dell_switch_manager():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-switch",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-switch",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

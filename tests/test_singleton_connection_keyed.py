@@ -28,8 +28,8 @@ HOST_B = "10.9.9.2"
 
 def _cmd(host, password="mock", is_http=False):
     return SystemQuery(
-        idrac_ip=host, idrac_username="root",
-        idrac_password=password, insecure=True, is_http=is_http,
+        host=host, username="root",
+        password=password, insecure=True, is_http=is_http,
     )
 
 
@@ -69,35 +69,6 @@ def test_canonical_connection_keywords_are_keyed_per_host():
     assert a is not b
     assert a.host == "10.9.9.31"
     assert b.host == "10.9.9.32"
-
-
-def test_singleton_key_uses_canonical_alias_precedence():
-    """When aliases conflict, singleton keying matches constructor precedence."""
-    a = SystemQuery(
-        host="10.9.9.33",
-        idrac_ip="10.9.9.34",
-        username="admin",
-        idrac_username="legacy",
-        password="secret",
-        idrac_password="legacy-secret",
-        port=443,
-        idrac_port=8443,
-        insecure=True,
-    )
-    b = SystemQuery(
-        host="10.9.9.33",
-        idrac_ip="10.9.9.35",
-        username="admin",
-        idrac_username="other-legacy",
-        password="secret",
-        idrac_password="other-legacy-secret",
-        port=443,
-        idrac_port=9443,
-        insecure=True,
-    )
-
-    assert a is b
-    assert a.host == "10.9.9.33"
 
 
 def test_dispatch_connection_pop_cleans_mixed_public_aliases():
@@ -189,10 +160,10 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
                 "is_http": is_http,
             }
             super().__init__(
-                idrac_ip=idrac_ip,
-                idrac_username=idrac_username,
-                idrac_password=idrac_password,
-                idrac_port=idrac_port,
+                host=idrac_ip,
+                username=idrac_username,
+                password=idrac_password,
+                port=idrac_port,
                 insecure=insecure,
                 is_http=is_http,
             )

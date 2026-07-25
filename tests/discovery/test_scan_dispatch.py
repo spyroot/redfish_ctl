@@ -35,12 +35,12 @@ def _fake_get(url, **_):
 
 def _invoke_scan(api_type, name, **scan_kwargs):
     """Mimic redfish_main scan-mode dispatch: empty creds, invoke() not sync_invoke."""
-    api = IDracManager(idrac_ip="", idrac_username="", idrac_password="")
+    api = IDracManager(host="", username="", password="")
     orig, requests.get = requests.get, _fake_get
     try:
         return api.invoke(
             api_type, name,
-            idrac_ip="", username="", password="", port=443,
+            host="", username="", password="", port=443,
             insecure=True, is_http=False, **scan_kwargs,
         )
     finally:

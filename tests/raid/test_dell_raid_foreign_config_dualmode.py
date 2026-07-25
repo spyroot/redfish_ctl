@@ -35,9 +35,9 @@ def dell_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-raid-foreign-config",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-raid-foreign-config",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),
