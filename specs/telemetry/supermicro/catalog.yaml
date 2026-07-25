@@ -1,5 +1,13 @@
 version: 1
 description: Supermicro/NV72 metric-definition catalog for redfish_ctl telemetry export.
+canary_liveness:
+  metric_prefix: hw.
+  default: always_on
+  condition_gated:
+    - hw.component.last_reset_type
+    - hw.fabric.link_down_reason
+    - hw.power.edp_violation_state
+    - hw.power.break_performance_state
 metrics:
   - {name: hw.power, kind: gauge, unit: W, prometheus_name: hw.power, family: telemetry}
   - {name: hw.energy_kwh, kind: counter, unit: kWh, prometheus_name: hw.energy_kwh, family: telemetry}

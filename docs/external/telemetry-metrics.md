@@ -115,6 +115,18 @@ SignalFx push and provide the realm plus an API read token as documented in
 > realm's `SPLUNK_INGEST_URL`; without them, use `--once --output signalfx`
 > to validate the datapoint envelope offline.
 
+## Scheduled Splunk Liveness
+
+The read-only `telemetry.full-coverage` gate selects every entry whose name
+matches `canary_liveness.metric_prefix` in the shared and Supermicro telemetry
+catalogs under `specs/telemetry/`. Splunk MTS `active` is the liveness authority;
+update timestamps are not required. Missing or inactive `always_on` metrics
+fail the gate. A quiet `condition_gated` metric is reported as explicit
+`NOT_APPLICABLE`, while malformed payloads and query errors always fail.
+Every run preserves raw `FLOWING`, `INACTIVE`, `MISSING`, and `ERROR` counts.
+See [Gates](gates.md#the-gates), [Secrets](secrets.md#splunk-metric-query-gate),
+and [Telemetry liveness checks](gates.md#telemetry-liveness-checks).
+
 ## Report Inventory
 
 | Report | Definition type | Definition metrics | Observed rows | Observed value types |

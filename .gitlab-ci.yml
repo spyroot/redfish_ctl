@@ -5,7 +5,8 @@
 # live-apply job is reachable from a merge-request pipeline.
 #
 # Job rules below isolate diagnostic, merge, integration, protected deployment,
-# and publication paths. Operator guidance lives in docs/external/ci.md.
+# scheduled canary, and publication paths. Operator guidance lives in
+# docs/external/ci.md.
 stages: [validate, integration, deploy, publish]
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
@@ -105,6 +106,14 @@ gate-integration:
       - reports/gate-report.sanitized.json
       - reports/gates/
 
+gate-scheduled:
+  stage: integration
+  tags: [homelab-k8s]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - ./scripts/check.sh --profile scheduled
+
 # Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
 # never from a workstation. The runner pod already carries a ServiceAccount, so
 # no kubeconfig or context is involved.
@@ -152,14 +161,17 @@ deploy-apply:
 
 # Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
 # Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
-# branch only — never a merge request (an MR must never push to the public mirror).
+# branch only — never a merge request or scheduled canary pipeline.
 publish-github:
   stage: publish
   tags: [homelab-k8s]
   rules:
     - <<: *private-api-web
       when: never
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_PIPELINE_SOURCE != "schedule" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
+        $CI_COMMIT_REF_PROTECTED == "true"
   before_script: []          # boundary gates need no project environment
   script:
     # Run the PROFILE, not a hand-listed set of scripts. A hand-listed set silently stops covering

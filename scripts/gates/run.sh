@@ -2,15 +2,15 @@
 # Internal backend for scripts/check.sh. Run a profile, or one gate in a profile,
 # from gates/manifest.yaml. An unknown profile, unknown gate, or profile/gate
 # mismatch is an error, never a silent pass.
-#   run.sh merge
+#   run.sh merge | integration | scheduled | deploy | repository-export
 #   run.sh --profile merge [--gate unit.all]
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 usage() {
   cat <<'USAGE'
-usage: run.sh <merge|integration|deploy|repository-export>
-       run.sh --profile <merge|integration|deploy|repository-export> [--gate <id>]
+usage: run.sh <merge|integration|scheduled|deploy|repository-export>
+       run.sh --profile <merge|integration|scheduled|deploy|repository-export> [--gate <id>]
 USAGE
 }
 

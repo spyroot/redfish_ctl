@@ -157,6 +157,21 @@ def test_gate_prefers_api_token_for_queries(monkeypatch, capsys):
     assert seen["token"] == "api-tok"
 
 
+def test_token_env_is_limited_to_registered_names():
+    """The gate cannot dynamically read an undeclared environment variable."""
+    parser = gate.build_parser()
+    try:
+        parser.parse_args([
+            "hw.component.health",
+            "--token-env",
+            "UNREGISTERED_TOKEN",
+        ])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("unregistered token environment name was accepted")
+
+
 def test_default_metric_set_includes_p0_signals(monkeypatch):
     """The built-in list carries the P0 health/state and link-down-reason names."""
     for name in ("hw.component.health", "hw.fabric.link_down_reason",

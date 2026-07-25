@@ -3,7 +3,7 @@
 # Enforced by tools/gate_meta.py (the meta-gate) + tests/gates/. Run gates through scripts/check.sh.
 #
 # Profiles: merge (MR/pre-merge, no cluster mutation) | integration (needs cluster, no BMC mutation)
-#           | deploy (live apply, protected pipeline only)
+#           | scheduled (read-only production canaries) | deploy (live apply, protected pipeline only)
 #           | repository-export (public boundary: internal -> GitLab.com/GitHub).
 # Runner tag: every CI job carries homelab-k8s.
 version: 1
@@ -14,6 +14,7 @@ runner_tag: homelab-k8s
 required_jobs:
   - gate-merge
   - gate-integration
+  - gate-scheduled
 
 # Diagnostic evidence is exact-commit but never merge or release evidence.
 diagnostic_jobs:
@@ -51,6 +52,7 @@ mandatory_ids:
   - kubernetes.schema
   - kubernetes.policy
   - integration.namespace
+  - telemetry.full-coverage
   - gitlab.project-token.exists
   - gitlab.project-token.project-bound
   - gitlab.project-token.api-access
@@ -103,6 +105,8 @@ gates:
   - {id: kubernetes.policy,    profile: merge, command: scripts/gates/kubernetes/policy.sh,      required: true, mutates: false}
   # --- integration: needs the cluster, no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
+  # --- scheduled: read-only production canaries ---
+  - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}
   # --- gitlab.project-token: the CI token is least-privilege and usable (shared, needs live GitLab) ---
   - {id: gitlab.project-token.exists,                profile: integration, command: scripts/gates/gitlab/project-token-exists.sh,                required: true, mutates: false}
   - {id: gitlab.project-token.project-bound,         profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh,         required: true, mutates: false}
