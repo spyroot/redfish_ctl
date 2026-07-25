@@ -107,9 +107,6 @@ class IDracManager(RedfishManager):
 
     def __init__(self,
                  idrac_ip: Optional[str] = "",
-                 idrac_username: Optional[str] = "root",
-                 idrac_password: Optional[str] = "",
-                 idrac_port: Optional[int] = 443,
                  insecure: Optional[bool] = True,
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,
@@ -124,9 +121,6 @@ class IDracManager(RedfishManager):
            and uses json content type.
 
         :param idrac_ip: deprecated alias for ``host``.
-        :param idrac_username: deprecated alias for ``username``.
-        :param idrac_password: deprecated alias for ``password``.
-        :param idrac_port: deprecated alias for ``port``.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMC controllers present self-signed certificates, so
             verification is opt-in: pass ``insecure=False`` to verify the cert.
