@@ -8,7 +8,7 @@ actually returned, so a Dell ``JID_`` literal is never assumed cross-vendor.
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.idrac_shared import ApiRequestType, DellJobState
 from redfish_ctl.manager.cmd_manager_reset import ManagerReset
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -21,7 +21,7 @@ def test_manager_reset_realizes_dell_oem_job(
     def fetch_task(self, task_id):
         """Assert the polled id is the Dell OEM job and report it terminal."""
         assert task_id == redfish_service.JOB_ID
-        return JobState.Completed
+        return DellJobState.Completed
 
     monkeypatch.setattr(ManagerReset, "fetch_task", fetch_task)
 
@@ -30,7 +30,7 @@ def test_manager_reset_realizes_dell_oem_job(
     assert isinstance(result, CommandResult)
     assert result.data["task_id"] == redfish_service.JOB_ID
     assert result.data["task_id"].startswith("JID_")
-    assert result.data["task_state"] == JobState.Completed
+    assert result.data["task_state"] == DellJobState.Completed
 
 
 def test_manager_reset_realizes_generic_dmtf_task(
@@ -42,7 +42,7 @@ def test_manager_reset_realizes_generic_dmtf_task(
     def fetch_task(self, task_id):
         """Assert the polled id is the DMTF task and report it terminal."""
         assert task_id == service.JOB_ID
-        return JobState.Completed
+        return DellJobState.Completed
 
     monkeypatch.setattr(ManagerReset, "fetch_task", fetch_task)
 
@@ -51,4 +51,4 @@ def test_manager_reset_realizes_generic_dmtf_task(
     assert isinstance(result, CommandResult)
     assert result.data["task_id"] == service.JOB_ID
     assert not result.data["task_id"].startswith("JID_")
-    assert result.data["task_state"] == JobState.Completed
+    assert result.data["task_state"] == DellJobState.Completed

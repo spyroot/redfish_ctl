@@ -18,7 +18,7 @@ from ..idrac_shared import (
     REDFISH_API,
     ApiRequestType,
     CliJobTypes,
-    JobState,
+    DellJobState,
     RedfishApiRespond,
     ResetType,
     Singleton,
@@ -146,7 +146,7 @@ class JobApply(IDracManager,
             if 'JobState' in jb:
                 job_state = jb['JobState']
                 # we wait for job change to change a state
-                if job_state == JobState.Scheduled or job_state == JobState.Scheduling:
+                if job_state == DellJobState.Scheduled or job_state == DellJobState.Scheduling:
                     time.sleep(sleep_time)
                 else:
                     self.fetch_task(job)

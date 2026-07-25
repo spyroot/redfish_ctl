@@ -57,9 +57,9 @@ from .idrac_shared import (
     ApiRespondString,
     CliJobTypes,
     HTTPMethod,
-    IDRACJobType,
+    DellJobType,
     JobApplyTypes,
-    JobState,
+    DellJobState,
     PowerState,
     RedfishAction,
     RedfishApiRespond,
@@ -181,20 +181,20 @@ class IDracManager(RedfishManager):
         # mapping a string state to enum, so each cmd can just check a state
         # without doing any string if else branches.
         self._job_state_mapping = {
-            "Scheduled": JobState.Scheduled,
-            "Running": JobState.Running,
-            "Completed": JobState.Completed,
-            "Downloaded": JobState.Downloaded,
-            "Downloading": JobState.Downloading,
-            "Scheduling": JobState.Scheduling,
-            "Waiting": JobState.Waiting,
-            "Failed": JobState.Failed,
-            "CompletedWithErrors": JobState.CompletedWithErrors,
-            "RebootFailed": JobState.RebootFailed,
-            "RebootCompleted": JobState.RebootCompleted,
-            "RebootPending": JobState.RebootPending,
-            "PendingActivation": JobState.PendingActivation,
-            "Unknown": JobState.Unknown,
+            "Scheduled": DellJobState.Scheduled,
+            "Running": DellJobState.Running,
+            "Completed": DellJobState.Completed,
+            "Downloaded": DellJobState.Downloaded,
+            "Downloading": DellJobState.Downloading,
+            "Scheduling": DellJobState.Scheduling,
+            "Waiting": DellJobState.Waiting,
+            "Failed": DellJobState.Failed,
+            "CompletedWithErrors": DellJobState.CompletedWithErrors,
+            "RebootFailed": DellJobState.RebootFailed,
+            "RebootCompleted": DellJobState.RebootCompleted,
+            "RebootPending": DellJobState.RebootPending,
+            "PendingActivation": DellJobState.PendingActivation,
+            "Unknown": DellJobState.Unknown,
         }
 
         # mapping a task state string to enum
@@ -217,10 +217,10 @@ class IDracManager(RedfishManager):
 
         # mapping from cli to job types
         self._cli_job_type_mapping = {
-            CliJobTypes.Bios_Config.value: IDRACJobType.BIOSConfiguration.value,
-            CliJobTypes.OsDeploy.value: IDRACJobType.OSDeploy.value,
-            CliJobTypes.FirmwareUpdate.value: IDRACJobType.FirmwareUpdate.value,
-            CliJobTypes.RebootNoForce.value: IDRACJobType.RebootNoForce.value
+            CliJobTypes.Bios_Config.value: DellJobType.BIOSConfiguration.value,
+            CliJobTypes.OsDeploy.value: DellJobType.OSDeploy.value,
+            CliJobTypes.FirmwareUpdate.value: DellJobType.FirmwareUpdate.value,
+            CliJobTypes.RebootNoForce.value: DellJobType.RebootNoForce.value
         }
 
         # mapping from string to task status enum
@@ -350,9 +350,9 @@ class IDracManager(RedfishManager):
         :return:
         """
         # update percent_done and progress bar
-        if REDFISH_JSON.PercentComplete in resp_data:
+        if REDFISH_JSON.DellPercentComplete in resp_data:
             try:
-                percent_done = int(resp_data[REDFISH_JSON.PercentComplete])
+                percent_done = int(resp_data[REDFISH_JSON.DellPercentComplete])
                 return percent_done
             except TypeError:
                 pass
@@ -381,11 +381,11 @@ class IDracManager(RedfishManager):
             return IdracTaskState.Unknown, IdracTaskStatus.Warning
 
         # dodge case
-        if REDFISH_JSON.TaskStatus not in resp_data or REDFISH_JSON.TaskState not in resp_data:
+        if REDFISH_JSON.DellTaskStatus not in resp_data or REDFISH_JSON.DellTaskState not in resp_data:
             raise UnexpectedResponse(f"IDRAC returned a {resp_data}, neither task state nor status is present..")
 
-        resp_state = resp_data[REDFISH_JSON.TaskState]
-        resp_status = resp_data[REDFISH_JSON.TaskStatus]
+        resp_state = resp_data[REDFISH_JSON.DellTaskState]
+        resp_status = resp_data[REDFISH_JSON.DellTaskStatus]
 
         # update state and status.
         task_state = self._task_state_mapping[resp_state]
@@ -437,14 +437,14 @@ class IDracManager(RedfishManager):
 
         # if job scheduler or scheduling it make sense to wait otherwise we return state
         # we expect a JobState
-        if REDFISH_JSON.JobState in jb:
+        if REDFISH_JSON.DellJobState in jb:
 
-            current_state = jb[REDFISH_JSON.JobState]
+            current_state = jb[REDFISH_JSON.DellJobState]
             if current_state not in self._job_state_mapping:
                 raise UnexpectedResponse(f"IDRAC returned a {current_state} job type that we don't know.")
             _ = self._job_state_mapping[current_state]
-            if current_state == JobState.Scheduled.value or current_state == JobState.Scheduling.value \
-                    or current_state == JobState.Running.value:
+            if current_state == DellJobState.Scheduled.value or current_state == DellJobState.Scheduling.value \
+                    or current_state == DellJobState.Running.value:
                 self.logger.info(f"Job {task_id} is {current_state}.. waiting for completion.")
             else:
                 self.logger.info(f"Job {task_id} is {current_state}..bouncing off.")

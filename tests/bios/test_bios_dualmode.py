@@ -1,7 +1,7 @@
 """Dual-mode tests for BIOS pending and registry commands."""
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.idrac_shared import ApiRequestType, DellJobState
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -126,7 +126,7 @@ def test_bios_clear_pending_posts_discovered_action_in_mock_mode(
 
     assert isinstance(result, CommandResult)
     assert result.data["task_id"] == redfish_service.JOB_ID
-    assert result.data["task_state"] == JobState.Completed
+    assert result.data["task_state"] == DellJobState.Completed
 
     post_requests = [
         request for request in redfish_service.requests if request.method == "POST"

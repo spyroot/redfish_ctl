@@ -459,7 +459,7 @@ class PowerState(Enum):
     Unknown = "Unknown"
 
 
-class JobState(Enum):
+class DellJobState(Enum):
     """IDRAC job states
     https://developer.dell.com/apis/2978/versions/4.xx/docs/101WhatsNew.md
     """
@@ -489,7 +489,7 @@ class CliJobTypes(Enum):
     RebootNoForce = "reboot_no_force"
 
 
-class IDRACJobType(Enum):
+class DellJobType(Enum):
     """idrac job types
     """
     OSDeploy = "OSDeploy"
@@ -590,7 +590,7 @@ class RedfishSupermicro:
     BMC_Backup = f"{RedfishApi.Version}/UpdateService/FirmwareInventory/Backup_BMC"
 
 
-class IdracJobSvcActions(Enum):
+class DellJobSvcActions(Enum):
     """Dell IDRAC job services actions."""
 
     # The CreateRebootJob action is used for creating a reboot job.
@@ -602,7 +602,7 @@ class IdracJobSvcActions(Enum):
     SetDeleteOnCompletionTimeout = "SetDeleteOnCompletionTimeout"
 
 
-class IdracResetActions(Enum):
+class DellResetActions(Enum):
     """Reset actions."""
     ComputerSystemReset = "ComputerSystem.Reset"
     ChassisReset = "Chassis.Reset"
@@ -697,10 +697,10 @@ class REDFISH_JSON:
     UUID = "UUID"
 
     # Job states
-    JobState = "JobState"
-    TaskState = "TaskState"
-    TaskStatus = "TaskStatus"
-    PercentComplete = "PercentComplete"
+    DellJobState = "JobState"
+    DellTaskState = "TaskState"
+    DellTaskStatus = "TaskStatus"
+    DellPercentComplete = "PercentComplete"
 
     ApplyTime = "ApplyTime"
     RedfishSettingsApplyTime = "@Redfish.SettingsApplyTime"
@@ -726,7 +726,7 @@ class REDFISH_JSON:
     PowerState = "PowerState"
 
 
-class JobApplyTypes:
+class DellApplyTypes:
     """Job apply types"""
     InMaintenance = "InMaintenanceWindowOnReset"
     AtMaintenance = "AtMaintenanceWindowStart"
@@ -829,18 +829,18 @@ class DellBootSource:
         return self._name
 
 
-class IdracRequestHeaders:
+class DellRequestHeaders:
     http_x_auth_token = "X-AUTH-TOKEN"
     xsrf_token = "XSRF-TOKEN"
 
 
-class IdracRespondHeaders:
+class DellRespondHeaders:
     http_allow = "Allow"
     http_www_authentication = "WWW-Authenticate"
     http_www_authentication_realm = "Basic realm=\"RedfishService\""
 
 
-class IdracRebootJobTypes(Enum):
+class DellRebootJobTypes(Enum):
     """IdracRebootJobTypes is reboot job types for CreateRebootJobReq
     """
     GracefulRebootWithForcedShutdown = "GracefulRebootWithForcedShutdown"
@@ -848,8 +848,8 @@ class IdracRebootJobTypes(Enum):
     PowerCycle = "PowerCycle"
 
 
-class CreateRebootJobReq:
-    def __init__(self, reboot_job_type: IdracRebootJobTypes, target: str, title: str):
+class DellCreateRebootJobReq:
+    def __init__(self, reboot_job_type: DellRebootJobTypes, target: str, title: str):
         """The CreateRebootJob action is used for creating a reboot job.
         :param reboot_job_type: IdracRebootJobTypes:  a reboot job type IdracRebootJobTypes
         :param target: Link to invoke action
