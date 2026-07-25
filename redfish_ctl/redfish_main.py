@@ -52,6 +52,8 @@ from .cmd_utils import save_if_needed
 from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .idrac_manager import IDracManager
+from .redfish_manager import RedfishManager
+from .supermico_manager import SupermicroManager
 from .idrac_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
 from .telemetry import tracing
@@ -464,30 +466,40 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.install_termination_flush()
 
     # the manager is the main interface main uses to interact with the BMC.
-    if cmd_args.vendor == "dell":
+    # --vendor selects the manager; absent it, the neutral RedfishManager.
+    vendor = getattr(cmd_args, "vendor", None)
+    if vendor == "dell":
         redfish_api = IDracManager(host=cmd_args.redfish_host,
-                                         username=cmd_args.redfish_username,
-                                         password=cmd_args.redfish_password,
-                                         port=cmd_args.redfish_port,
-                                         insecure=insecure,
-                                         is_http=cmd_args.use_http,
-                                         is_debug=cmd_args.debug)
-    if cmd.args.venfor == "hp":
+                                   username=cmd_args.redfish_username,
+                                   password=cmd_args.redfish_password,
+                                   port=cmd_args.redfish_port,
+                                   insecure=insecure,
+                                   is_http=cmd_args.use_http,
+                                   is_debug=cmd_args.debug)
+    elif vendor == "hp":
         redfish_api = IloManager(host=cmd_args.redfish_host,
-                                         username=cmd_args.redfish_username,
-                                         password=cmd_args.redfish_password,
-                                         port=cmd_args.redfish_port,
-                                         insecure=insecure,
-                                         is_http=cmd_args.use_http,
-                                         is_debug=cmd_args.debug)
-    if cmd.args.venfor == "supermicro":
-        redfish_api = Sup(host=cmd_args.redfish_host,
-                                         username=cmd_args.redfish_username,
-                                         password=cmd_args.redfish_password,
-                                         port=cmd_args.redfish_port,
-                                         insecure=insecure,
-                                         is_http=cmd_args.use_http,
-                                         is_debug=cmd_args.debug)
+                                 username=cmd_args.redfish_username,
+                                 password=cmd_args.redfish_password,
+                                 port=cmd_args.redfish_port,
+                                 insecure=insecure,
+                                 is_http=cmd_args.use_http,
+                                 is_debug=cmd_args.debug)
+    elif vendor == "supermicro":
+        redfish_api = SupermicroManager(host=cmd_args.redfish_host,
+                                        username=cmd_args.redfish_username,
+                                        password=cmd_args.redfish_password,
+                                        port=cmd_args.redfish_port,
+                                        insecure=insecure,
+                                        is_http=cmd_args.use_http,
+                                        is_debug=cmd_args.debug)
+    else:
+        redfish_api = RedfishManager(host=cmd_args.redfish_host,
+                                     username=cmd_args.redfish_username,
+                                     password=cmd_args.redfish_password,
+                                     port=cmd_args.redfish_port,
+                                     insecure=insecure,
+                                     is_http=cmd_args.use_http,
+                                     is_debug=cmd_args.debug)
 
     connectionless_mode = (
         is_network_scan(cmd_args)
