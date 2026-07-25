@@ -574,7 +574,7 @@ class RestMethodMapping:
 # ChassisCollection.ChassisCollection
 
 
-class SupportedScheduledJobs(Enum):
+class DellSupportedScheduledJobs(Enum):
     actions = {
         "ComputerSystem.Reset": ""
                                 "Chassis.Reset"
