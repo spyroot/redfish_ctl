@@ -34,6 +34,7 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
+from .config import http_backoff, http_pool, http_retries, http_timeout
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_exceptions import (
     RedfishForbidden,
@@ -50,7 +51,6 @@ from .redfish_shared import (
     RedfishJson,
     RedfishJsonMessage,
     RedfishJsonSpec,
-    env_first,
 )
 from .redfish_task_state import TERMINAL_TASK_STATES, TaskState, TaskStatus
 from .telemetry import tracing
@@ -428,10 +428,10 @@ class RedfishManager:
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
         inst = disp(
-            idrac_ip=_host,
-            idrac_username=_username,
-            idrac_password=_password,
-            idrac_port=_port,
+            host=_host,
+            username=_username,
+            password=_password,
+            port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -477,10 +477,10 @@ class RedfishManager:
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
         inst = disp(
-            idrac_ip=_host,
-            idrac_username=_username,
-            idrac_password=_password,
-            idrac_port=_port,
+            host=_host,
+            username=_username,
+            password=_password,
+            port=_port,
             insecure=_insecure,
             is_http=_is_http
         )
@@ -686,11 +686,10 @@ class RedfishManager:
         session = getattr(self, "_session_cache", None)
         if session is None:
             session = requests.Session()
-            pool = int(env_first("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4"))
+            pool = http_pool()
             retries = Retry(
-                total=int(env_first("REDFISH_HTTP_RETRIES", "IDRAC_HTTP_RETRIES", default="3")),
-                backoff_factor=float(
-                    env_first("REDFISH_HTTP_BACKOFF", "IDRAC_HTTP_BACKOFF", default="0.5")),
+                total=http_retries(),
+                backoff_factor=http_backoff(),
                 status_forcelist=(500, 502, 503, 504),
                 allowed_methods=frozenset(["GET"]),
                 raise_on_status=False,
@@ -717,7 +716,7 @@ class RedfishManager:
             headers.update(hdr)
 
         # Bound every GET so a hung/unreachable BMC can't block forever.
-        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
+        timeout = http_timeout()
         # Reuse one pooled keep-alive connection across GETs (see _http_session):
         # opening a fresh TLS connection per request wedges fragile BMCs.
         session = self._http_session()
@@ -1084,6 +1083,32 @@ class RedfishManager:
         else:
             error_msg = RedfishManager.parse_error(response)
             raise ResourceNotFound(error_msg)
+
+    def check_api_version(self):
+        """Probe the Redfish service root for the API version and action targets.
+
+        Issues a single GET to the service root (:data:`RedfishApi.Version`,
+        ``/redfish/v1``) and records the advertised document on
+        ``self.api_endpoints`` plus any service-root action targets on
+        ``self.action_targets``. This is the vendor-neutral probe every manager
+        inherits; a vendor that exposes an OEM service catalog (for example Dell's
+        Lifecycle Controller service) overrides it to probe that first and fall
+        back here. It must stay free of any OEM/Dell endpoint so non-Dell managers
+        (Supermicro, HPE, generic DMTF) can rely on it.
+
+        :return: a tuple of (service-root document, list of action target URIs).
+        """
+        headers = {}
+        headers.update(self.json_content_type)
+        r = f"{self._default_method}{self.redfish_ip}{RedfishApi.Version}"
+        response = self.api_get_call(r, headers)
+        self.default_error_handler(response)
+        data = response.json()
+        self.api_endpoints = data
+        if RedfishJson.Actions in self.api_endpoints:
+            actions = self.api_endpoints[RedfishJson.Actions]
+            self.action_targets = [actions[k]['target'] for k in actions.keys()]
+        return self.api_endpoints, self.action_targets
 
     @staticmethod
     def value_from_json_list(json_obj, k: str):

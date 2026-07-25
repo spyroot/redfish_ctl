@@ -15,10 +15,10 @@ Author Mus spyroot@gmail.com
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Callable, Iterable, Optional
 
+from redfish_ctl.config import signalfx_api_token, signalfx_realm
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry.abstract_exporter_writer import AbstractExporterWriter
 from redfish_ctl.telemetry.exporter import common_sample_dimensions
@@ -61,16 +61,28 @@ class SignalFxWriter(AbstractExporterWriter):
         :param push: when True, POST datapoints; when False, ``write_once`` only
             renders the datapoint body (no network).
         """
-        self._ingest_url = ingest_url
-        self._token = token
-        self._token_env = token_env
-        self._token_file = token_file
-        self._realm = realm
-        self._api_token_env = api_token_env
         self._verify_readback = verify_readback
         self._freshness_ms = freshness_ms
         self._interval = interval
         self._push = push
+        # Resolve the SignalFx config ONCE here, at the construction boundary, so
+        # write_once/run receive concrete values and the SPLUNK_* env is read in a
+        # single place per run rather than on every push path. Only resolve what
+        # the mode needs: no token/URL when not pushing, no readback creds unless
+        # verifying (resolving an absent ingest URL raises, which is fail-fast).
+        if push:
+            self._resolved_token = emit.resolve_signalfx_token(
+                token_env, token=token, token_file=token_file)
+            self._resolved_ingest_url = emit.resolve_signalfx_ingest_url(ingest_url)
+        else:
+            self._resolved_token = None
+            self._resolved_ingest_url = None
+        if push and verify_readback:
+            self._resolved_realm = signalfx_realm(realm)
+            self._resolved_api_token = signalfx_api_token(api_token_env)
+        else:
+            self._resolved_realm = ""
+            self._resolved_api_token = ""
 
     def write_once(self, samples: Iterable[MetricSample]) -> CommandResult:
         """Render (and, when pushing, POST) one scrape of samples to SignalFx.
@@ -85,9 +97,8 @@ class SignalFxWriter(AbstractExporterWriter):
             return CommandResult(
                 body, None, {"sample_count": len(materialized)}, None)
 
-        token = emit.resolve_signalfx_token(
-            self._token_env, token=self._token, token_file=self._token_file)
-        ingest_url = emit.resolve_signalfx_ingest_url(self._ingest_url)
+        token = self._resolved_token
+        ingest_url = self._resolved_ingest_url
         push_start = time.monotonic()
         status = emit.push_signalfx(body, token, ingest_url)
         push_ms = int((time.monotonic() - push_start) * 1000)
@@ -99,8 +110,8 @@ class SignalFxWriter(AbstractExporterWriter):
                 None)
 
         # A POST returning 200 is not proof: confirm the series are visible in MTS.
-        realm = self._realm or os.environ.get("SPLUNK_O11Y_REALM", "")
-        api_token = os.environ.get(self._api_token_env or "SPLUNK_API_TOKEN", "")
+        realm = self._resolved_realm
+        api_token = self._resolved_api_token
         if not realm or not api_token:
             raise ValueError(
                 "--verify-readback needs a realm (--signalfx-realm or "
@@ -122,7 +133,6 @@ class SignalFxWriter(AbstractExporterWriter):
 
         :param scrape_samples: callable returning fresh samples for each scrape.
         """
-        token = emit.resolve_signalfx_token(
-            self._token_env, token=self._token, token_file=self._token_file)
-        ingest_url = emit.resolve_signalfx_ingest_url(self._ingest_url)
-        emit.run_signalfx_loop(scrape_samples, token, ingest_url, self._interval)
+        emit.run_signalfx_loop(
+            scrape_samples, self._resolved_token, self._resolved_ingest_url,
+            self._interval)

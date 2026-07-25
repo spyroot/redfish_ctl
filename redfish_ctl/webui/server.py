@@ -9,28 +9,15 @@ BMC and returns the command's JSON result. Only allow-listed read commands from
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlsplit
 
+from ..config import endpoint_defaults, named_env
 from ..idrac_manager import IDracManager
 from .catalog import CATALOG, catalog_json, resolve
-
-
-def _env_first(*names: str, default: str = "") -> str:
-    """Return the first set environment variable value (REDFISH_* before IDRAC_*).
-
-    :param default: value returned when none of ``names`` is set.
-    :return: the first non-empty environment value, or ``default``.
-    """
-    for name in names:
-        value = os.environ.get(name)
-        if value:
-            return value
-    return default
 
 
 def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
@@ -285,11 +272,15 @@ def make_manager_factory():
 
     :return: tuple of (manager factory callable, ``"address:port"`` target label).
     """
-    address = _env_first("REDFISH_IP", "IDRAC_IP")
-    username = _env_first("REDFISH_USERNAME", "IDRAC_USERNAME", default="root")
-    password = _env_first("REDFISH_PASSWORD", "IDRAC_PASSWORD")
-    port = int(_env_first("REDFISH_PORT", "IDRAC_PORT", default="443"))
-    scheme = _env_first("REDFISH_SCHEME", default="https")
+    # Canonical endpoint resolution lives in the config loader (REDFISH_* first,
+    # deprecated IDRAC_* aliases next); strict=False so an alias pair that both
+    # resolve does not fail server startup. Scheme has no alias.
+    endpoint = endpoint_defaults(strict=False)
+    address = endpoint.host
+    username = endpoint.username
+    password = endpoint.password
+    port = endpoint.port
+    scheme = named_env("REDFISH_SCHEME", "https")
 
     def factory() -> IDracManager:
         """Construct a IDracManager from the captured connection settings.
@@ -297,10 +288,10 @@ def make_manager_factory():
         :return: a new IDracManager for the configured BMC.
         """
         return IDracManager(
-            idrac_ip=address,
-            idrac_username=username,
-            idrac_password=password,
-            idrac_port=port,
+            host=address,
+            username=username,
+            password=password,
+            port=port,
             insecure=True,
             is_http=(scheme == "http"),
             is_debug=False,

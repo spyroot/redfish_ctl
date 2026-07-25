@@ -317,7 +317,7 @@ class Exporter(SupermicroManager,
                 )
             )
         telemetry_identity = build_telemetry_identity(
-            label_bmc_ip or self.idrac_ip,
+            label_bmc_ip or self.redfish_ip,
             vendor=self._vendor_label(vendor, redfish_cache=redfish_cache),
             **identity_options,
         )

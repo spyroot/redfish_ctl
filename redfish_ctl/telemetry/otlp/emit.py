@@ -20,10 +20,10 @@ imported lazily and is only required when ``--output otlp`` is used
 """
 from __future__ import annotations
 
-import os
 import time
 from typing import Callable, Iterable, Optional
 
+from ...config import otlp_protocol
 from ..identity import RESOURCE_DIMENSIONS
 
 # Identity dims that describe the emitting host -> OTel resource attributes.
@@ -57,26 +57,21 @@ def is_monotonic_counter(metric_name: str) -> bool:
 def resolve_otlp_config(endpoint: Optional[str] = None,
                         protocol: Optional[str] = None,
                         headers: Optional[str] = None) -> tuple[Optional[str], str, Optional[str]]:
-    """Resolve endpoint/protocol/headers from explicit args, then standard OTEL_* env.
+    """Resolve endpoint/protocol/headers, protocol via config, endpoint/headers passthrough.
 
-    Metric-signal-specific vars win over the generic ones, matching the OTel spec
-    so redfish_ctl behaves like every other OTLP producer in the pipeline.
+    Only the transport ``protocol`` is interpreted here: an explicit arg wins,
+    else :func:`config.otlp_protocol` (metric-signal vars overriding the generic
+    ones per the OTel spec), else ``grpc``. Endpoint and headers are passthrough:
+    when no explicit arg is given they stay None so the OpenTelemetry SDK reads
+    ``OTEL_EXPORTER_OTLP_[METRICS_]ENDPOINT``/``HEADERS`` itself (it already
+    applies the metrics>generic precedence).
 
-    :param endpoint: explicit OTLP endpoint; falls back to OTEL_* env when None.
-    :param protocol: explicit OTLP transport; falls back to OTEL_* env, else ``grpc``.
-    :param headers: explicit OTLP headers; falls back to OTEL_* env when None.
+    :param endpoint: explicit OTLP endpoint; stays None for SDK passthrough when None.
+    :param protocol: explicit OTLP transport; falls back to config, else ``grpc``.
+    :param headers: explicit OTLP headers; stays None for SDK passthrough when None.
     :return: tuple of (endpoint, protocol, headers) after resolution.
     """
-    endpoint = (endpoint
-                or os.environ.get("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
-                or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"))
-    protocol = (protocol
-                or os.environ.get("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL")
-                or os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL")
-                or "grpc")
-    headers = (headers
-               or os.environ.get("OTEL_EXPORTER_OTLP_METRICS_HEADERS")
-               or os.environ.get("OTEL_EXPORTER_OTLP_HEADERS"))
+    protocol = protocol or otlp_protocol() or "grpc"
     return endpoint, protocol, headers
 
 
@@ -201,12 +196,13 @@ def push_otlp(samples: Iterable, service_name: str = "redfish_ctl",
 
     :param samples: iterable of exporter MetricSample objects to export.
     :param service_name: value for the ``service.name`` resource attribute.
-    :param endpoint: OTLP endpoint; resolved from OTEL_* env when None.
-    :param protocol: OTLP transport; resolved from OTEL_* env, else ``grpc``.
-    :param headers: OTLP headers; resolved from OTEL_* env when None.
+    :param endpoint: concrete OTLP endpoint, already resolved by the caller
+        (e.g. :class:`OtlpWriter`); the OTLP SDK applies its own OTEL_* default
+        when None. Use :func:`resolve_otlp_config` to resolve before calling.
+    :param protocol: concrete OTLP transport; ``grpc`` when None.
+    :param headers: concrete OTLP headers, or None.
     :return: the exporter's ``MetricExportResult`` from the single export call.
     """
-    endpoint, protocol, headers = resolve_otlp_config(endpoint, protocol, headers)
     metrics_data = metrics_data_from_samples(samples, service_name)
     exporter = _build_exporter(endpoint, protocol, headers)
     try:
@@ -224,12 +220,13 @@ def run_otlp_loop(scrape_samples: Callable[[], Iterable], interval: float,
     :param scrape_samples: callable returning a fresh iterable of MetricSample per scrape.
     :param interval: seconds between scrapes; clamped to a minimum of 1 second.
     :param service_name: value for the ``service.name`` resource attribute.
-    :param endpoint: OTLP endpoint; resolved from OTEL_* env when None.
-    :param protocol: OTLP transport; resolved from OTEL_* env, else ``grpc``.
-    :param headers: OTLP headers; resolved from OTEL_* env when None.
+    :param endpoint: concrete OTLP endpoint, already resolved by the caller
+        (e.g. :class:`OtlpWriter`); the OTLP SDK applies its own OTEL_* default
+        when None.
+    :param protocol: concrete OTLP transport; ``grpc`` when None.
+    :param headers: concrete OTLP headers, or None.
     :param sleep: sleep function between scrapes (injectable for testing).
     """
-    endpoint, protocol, headers = resolve_otlp_config(endpoint, protocol, headers)
     exporter = _build_exporter(endpoint, protocol, headers)
     try:
         while True:

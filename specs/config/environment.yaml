@@ -102,16 +102,16 @@ application:
   # App-owned config that LOOKS external but is consumed by the tool's OWN
   # urllib request (parsed/validated), so it is NOT pass-through.
   secrets_and_config:
-    SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "validated for /v2/datapoint (exporter.py:1030,1078)"}
-    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "interpolated into api.<realm>.signalfx.com (splunk_metric_gate.py:114,139)"}
-    SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token header; read via variable name (exporter.py:1061) so it evades literal scans — listed explicitly"}
-    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token for the metric query (splunk_metric_gate.py:115,145)"}
+    SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "telemetry/signalfx/emit.py resolve_signalfx_ingest_url via config.signalfx_ingest_url(); validated for /v2/datapoint by _require_datapoint_url"}
+    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "telemetry/signalfx/writer.py __init__ via config.signalfx_realm(); interpolated into api.<realm>.signalfx.com by signalfx_metric_readback"}
+    SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token ingest header; telemetry/signalfx/emit.py resolve_signalfx_token via config.signalfx_access_token(); read via variable name so it evades literal scans — listed explicitly"}
+    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token for the metric query; telemetry/signalfx/writer.py __init__ via config.signalfx_api_token()"}
 
   # OTEL_* names the app INTERPRETS (branches on) — application config, not
   # pass-through, even though the prefix is standard.
   interpreted_external:
-    OTEL_EXPORTER_OTLP_PROTOCOL:         {owner: opentelemetry, interpreted: true, note: "branched on startswith('http') to pick exporter class (otlp.py:172)"}
-    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: {owner: opentelemetry, interpreted: true, note: "same http/grpc branch (otlp.py:70,172)"}
+    OTEL_EXPORTER_OTLP_PROTOCOL:         {owner: opentelemetry, interpreted: true, note: "generic protocol fallback; resolved via config.otlp_protocol(), branched on startswith('http') in telemetry/otlp/emit.py _build_exporter to pick the exporter class"}
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: {owner: opentelemetry, interpreted: true, note: "metrics-signal protocol, higher precedence; config.otlp_protocol() metrics>generic, same http/grpc branch in telemetry/otlp/emit.py _build_exporter"}
 
   # Other app/tooling-owned knobs (exact names). Not connection config; grouped
   # by subsystem so no real name is undeclared.
@@ -136,15 +136,15 @@ application:
 # OpenTelemetry SDK. The app never inspects the value. New OTEL_* names do NOT
 # belong here unless proven pass-through.
 external:
-  OTEL_EXPORTER_OTLP_ENDPOINT:         {owner: opentelemetry, passthrough: true, note: "generic endpoint fallback -> OTLPMetricExporter (otlp.py:68,167)"}
-  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {owner: opentelemetry, passthrough: true, note: "metrics-signal endpoint, higher precedence (otlp.py:67,167)"}
-  OTEL_EXPORTER_OTLP_HEADERS:          {owner: opentelemetry, passthrough: true, note: "generic headers fallback (otlp.py:75,169)"}
-  OTEL_EXPORTER_OTLP_METRICS_HEADERS:  {owner: opentelemetry, passthrough: true, note: "metrics headers, higher precedence (otlp.py:74,169)"}
+  OTEL_EXPORTER_OTLP_ENDPOINT:         {owner: opentelemetry, passthrough: true, note: "generic endpoint fallback; OTLPMetricExporter reads it, the app no longer does (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {owner: opentelemetry, passthrough: true, note: "metrics-signal endpoint, higher precedence; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_HEADERS:          {owner: opentelemetry, passthrough: true, note: "generic headers fallback; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_METRICS_HEADERS:  {owner: opentelemetry, passthrough: true, note: "metrics headers, higher precedence; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
   OTEL_RESOURCE_ATTRIBUTES:            {owner: opentelemetry, passthrough: true, note: "SDK resource detector reads it directly; app never reads it"}
 
 # OS / toolchain / CI-runtime names. Not application configuration.
 system:
-  TERM:                          {reason: "terminal capability probe (redfish_main.py:122; customer_argdefault.py)"}
+  TERM:                          {reason: "terminal capability probe; read via config.term_type() in redfish_main.py color_printer + custom_argparser/customer_argdefault.py"}
   HOME:                          {reason: "shell HOME for ssh/git in gb300 harness"}
   PATH:                          {reason: "Dockerfile toolchain path"}
   BASH_ENV:                      {reason: "Dockerfile.gb300-dev bash startup file"}

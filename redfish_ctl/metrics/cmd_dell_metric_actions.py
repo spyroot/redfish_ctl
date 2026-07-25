@@ -12,13 +12,13 @@ environment variable or file and masked in preview payloads.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
@@ -283,7 +283,7 @@ class DellMetricActions(IDracManager,
         :raises InvalidArgument: when a requested source is missing or empty.
         """
         if env_name:
-            value = os.environ.get(env_name)
+            value = named_env(env_name)
             if value is None:
                 raise InvalidArgument(f"{label} env var is not set: {env_name}")
             if value == "":

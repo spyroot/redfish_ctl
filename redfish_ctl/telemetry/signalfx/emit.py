@@ -13,7 +13,6 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 import urllib.parse
@@ -23,6 +22,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
+from redfish_ctl.config import signalfx_access_token, signalfx_ingest_url
 from redfish_ctl.telemetry import http_util
 from redfish_ctl.telemetry import identity as identity_mod
 from redfish_ctl.telemetry.exporter import _non_empty, jittered_interval, metric_definition
@@ -104,7 +104,7 @@ def resolve_signalfx_token(
             raise ValueError(f"{file_path} is empty")
         return value
     name = token_env or "SPLUNK_ACCESS_TOKEN"
-    token = os.environ.get(name, "")
+    token = signalfx_access_token(name)
     if not token:
         raise ValueError(f"{name} is not set")
     return token
@@ -120,7 +120,7 @@ def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
     :return: a validated full ``…/v2/datapoint`` ingest URL.
     :raises ValueError: if no URL is set or it is not a full datapoint endpoint.
     """
-    url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
+    url = signalfx_ingest_url(ingest_url)
     if not url:
         raise ValueError("SPLUNK_INGEST_URL is not set")
     return _require_datapoint_url(url)

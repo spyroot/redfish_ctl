@@ -13,7 +13,6 @@ import argparse
 import collections
 import json
 import logging
-import os
 import ssl
 import sys
 import warnings
@@ -49,7 +48,7 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
-from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
+from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults, term_type
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .idrac_manager import IDracManager
 from .redfish_manager import RedfishManager
@@ -178,7 +177,7 @@ def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
     :param msg: the message to print.
     :param tcolor: terminal color escape applied when the terminal supports color.
     """
-    current_term = os.getenv("TERM")
+    current_term = term_type()
     if current_term is not None and current_term in TermList:
         err_msg = '{:<30}'.format(f"{tcolor}{msg}{TermColors.ENDC}")
         print(err_msg)
@@ -642,16 +641,25 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
         console_error_printer(f"Error:{upc}")
 
 
-def create_cmd_tree(arg_parser, debug=False) -> Dict:
+def create_cmd_tree(arg_parser, vendor=None, debug=False) -> Dict:
     """Create command tree structure.
 
+    The base registry (``IDracManager``) carries the shared/generic commands.
+    ``--vendor`` is the router: when set, that vendor manager's registry is layered
+    on top and *overrides* the base for a same-named verb, so one verb resolves to
+    the vendor-correct class. Example: ``--vendor supermicro exporter`` binds to
+    ``SupermicroManager``'s ``Exporter`` (scm_type ``SupermicroExporter``), while a
+    bare/DMTF ``exporter`` (once added under ``RedfishManager``) binds to that one.
+    The tool cannot detect the vendor before it connects, so the operator declares
+    it with ``--vendor`` and the tree is built accordingly.
+
     :param arg_parser: the root argument parser to attach subcommand parsers to.
+    :param vendor: optional ``--vendor`` router value (``supermicro``/``hp``/``dell``);
+        None builds only the base/shared command set.
     :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
-    redfish_api = IDracManager()
     command_name_to_cmd = {}
-    commands_registry = redfish_api.get_registry()
     command_name = collections.namedtuple("Command", "type name")
 
     subparsers = arg_parser.add_subparsers(
@@ -665,24 +673,44 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
         required=True
     )
 
-    for k in commands_registry:
-        for sub_key in commands_registry[k]:
-            cls = commands_registry[k][sub_key]
-            if debug:
-                logger.debug(f"Registering command {k} {sub_key}")
-            if hasattr(cls, "register_subcommand"):
-                # register each command
+    # The base is the shared/DMTF registry (RedfishManager); the selected vendor's
+    # registry (if any) layers on top so a same-named verb resolves to the vendor
+    # class. Dell is itself a vendor scope (IDracManager): today its commands still
+    # register onto RedfishManager, so base and --vendor dell overlap and the bare
+    # tree carries the Dell verbs; once Dell moves to IDracManager's own registry,
+    # the bare tree collapses to the shared set and --vendor dell scopes Dell — no
+    # change needed here.
+    registries = [RedfishManager.get_registry()]
+    vendor_managers = {"dell": IDracManager,
+                       "supermicro": SupermicroManager,
+                       "hp": IloManager}
+    vendor_mgr = vendor_managers.get(vendor)
+    if vendor_mgr is not None:
+        registries.append(vendor_mgr.get_registry())
+
+    # Resolve verb name -> command, letting a later (vendor) registry win, so the
+    # verb is registered exactly once with the vendor-correct class behind it.
+    resolved = {}
+    for commands_registry in registries:
+        for k in commands_registry:
+            for sub_key in commands_registry[k]:
+                cls = commands_registry[k][sub_key]
+                if not hasattr(cls, "register_subcommand"):
+                    continue
                 cli_arg_parser, cmd_name, cmd_help = cls.register_subcommand(cls)
                 if debug:
-                    logger.debug(f"Registering command name {cmd_name} {cmd_help}")
+                    action = "Overriding" if cmd_name in resolved else "Registering"
+                    logger.debug(f"{action} command {cmd_name} ({k} {sub_key})")
+                resolved[cmd_name] = (cli_arg_parser, cmd_help, k, sub_key)
 
-                subparsers.add_parser(
-                    cmd_name,
-                    parents=[cli_arg_parser],
-                    help=f"{str(cmd_help)}",
-                    formatter_class=CustomArgumentDefaultsHelpFormatter,
-                )
-                command_name_to_cmd[cmd_name] = command_name(k, sub_key)
+    for cmd_name, (cli_arg_parser, cmd_help, k, sub_key) in resolved.items():
+        subparsers.add_parser(
+            cmd_name,
+            parents=[cli_arg_parser],
+            help=f"{str(cmd_help)}",
+            formatter_class=CustomArgumentDefaultsHelpFormatter,
+        )
+        command_name_to_cmd[cmd_name] = command_name(k, sub_key)
 
     return command_name_to_cmd
 
@@ -838,10 +866,24 @@ def redfish_main_ctl():
     output_controllers.add_argument(
         '-f', '--filename', required=False, type=str,
         default="", help="Filename if we need save to a file.")
+    parser.add_argument(
+        '--vendor', required=False, default=None,
+        choices=('dell', 'hp', 'supermicro'),
+        help="route commands to a vendor's command set and manager. The tool "
+             "cannot detect the vendor before it connects, so pass e.g. "
+             "--vendor supermicro to reach Supermicro/GB300 commands such as "
+             "'exporter'. Omit for the shared/generic (and Dell) command set.")
     parser.add_argument('-v', '--version', action='version',
                         version="%(prog)s " + __version__)
 
-    cmd_dict = create_cmd_tree(parser)
+    # --vendor routes which registry builds the command tree, so it must be known
+    # before create_cmd_tree runs. A throwaway add_help=False scanner extracts it
+    # without stealing -h (the real parser, with the subcommands attached below,
+    # owns --help) and without choices-validating twice (the real parser does).
+    vendor_scan = argparse.ArgumentParser(add_help=False)
+    vendor_scan.add_argument('--vendor', default=None)
+    vendor_pre, _ = vendor_scan.parse_known_args()
+    cmd_dict = create_cmd_tree(parser, vendor=vendor_pre.vendor)
     args = parser.parse_args()
     _sync_legacy_endpoint_attrs(args)
     unresolved_endpoint_conflicts = (

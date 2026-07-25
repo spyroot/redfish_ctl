@@ -18,7 +18,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from ..config import ConfigurationConflict
+from ..config import (
+    ConfigurationConflict,
+    exporter_config_file,
+    exporter_credential_file,
+)
 from . import http_util
 from . import identity as identity_mod
 from .metric_model import MetricDefinition, MetricSample, _definition
@@ -361,10 +365,6 @@ _EXPORTER_CRED_KEYS = frozenset({
     "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
     "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
 })
-_EXPORTER_CONFIG_FILE_ENVS = (
-    "REDFISH_EXPORTER_CONFIG_FILE",
-    "IDRAC_EXPORTER_CONFIG_FILE",
-)
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
@@ -418,10 +418,7 @@ def _config_path(path: Optional[str] = None) -> Optional[str]:
     :param path: explicit config path.
     :return: config path from argument or environment, or None.
     """
-    return _first_non_empty(
-        path,
-        *(os.environ.get(name) for name in _EXPORTER_CONFIG_FILE_ENVS),
-    )
+    return _first_non_empty(path, exporter_config_file())
 
 
 def load_exporter_config_file(path: os.PathLike[str] | str) -> dict:
@@ -547,9 +544,7 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         the REDFISH_/IDRAC_ exporter credential-file environment variables.
     """
     file_path = path or getattr(args, "exporter_credential_file", None)
-    file_path = (file_path
-                 or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE")
-                 or os.environ.get("IDRAC_EXPORTER_CREDENTIAL_FILE"))
+    file_path = file_path or exporter_credential_file()
     if not file_path:
         return
     values = load_exporter_env_file(file_path)

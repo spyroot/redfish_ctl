@@ -195,6 +195,247 @@ def env_float(name: str, default: float) -> float:
         return default
 
 
+def http_timeout() -> float:
+    """Return the HTTP request timeout for Redfish calls, in seconds.
+
+    Resolves the canonical ``REDFISH_HTTP_TIMEOUT`` first, then the deprecated
+    ``IDRAC_HTTP_TIMEOUT`` alias, via :func:`env_first`.
+
+    :return: the request timeout in seconds (default 30).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid float.
+    """
+    return float(env_first(
+        "REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
+
+
+def http_pool() -> int:
+    """Return the HTTP connection pool size for the Redfish session.
+
+    Resolves the canonical ``REDFISH_HTTP_POOL`` first, then the deprecated
+    ``IDRAC_HTTP_POOL`` alias, via :func:`env_first`.
+
+    :return: the connection pool size (default 4).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid integer.
+    """
+    return int(env_first(
+        "REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL", default="4"))
+
+
+def http_retries() -> int:
+    """Return the HTTP retry total for the Redfish session.
+
+    Resolves the canonical ``REDFISH_HTTP_RETRIES`` first, then the deprecated
+    ``IDRAC_HTTP_RETRIES`` alias, via :func:`env_first`.
+
+    :return: the total number of retries (default 3).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid integer.
+    """
+    return int(env_first(
+        "REDFISH_HTTP_RETRIES", "IDRAC_HTTP_RETRIES", default="3"))
+
+
+def http_backoff() -> float:
+    """Return the HTTP retry backoff factor for the Redfish session.
+
+    Resolves the canonical ``REDFISH_HTTP_BACKOFF`` first, then the deprecated
+    ``IDRAC_HTTP_BACKOFF`` alias, via :func:`env_first`.
+
+    :return: the backoff factor in seconds (default 0.5).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid float.
+    """
+    return float(env_first(
+        "REDFISH_HTTP_BACKOFF", "IDRAC_HTTP_BACKOFF", default="0.5"))
+
+
+def term_type() -> Optional[str]:
+    """Return the terminal type from ``TERM``, or None when unset.
+
+    A single OS-owned name with no canonical/legacy alias pair, so it reads
+    ``os.environ`` directly rather than through :func:`env_first`. The caller
+    branches on membership in a known-terminal list to decide colour output.
+
+    :return: the raw ``TERM`` value, or None when the variable is not set.
+    """
+    return os.environ.get("TERM")
+
+
+def otlp_protocol() -> Optional[str]:
+    """Return the OTLP metrics protocol, metrics-signal overriding generic.
+
+    Deliberately NOT :func:`env_first`: the OpenTelemetry spec allows
+    ``OTEL_EXPORTER_OTLP_METRICS_PROTOCOL`` to differ from and override the
+    generic ``OTEL_EXPORTER_OTLP_PROTOCOL`` (metrics wins), so a difference is
+    valid, not a :class:`ConfigurationConflict`, and neither name is a
+    deprecated alias. Plain metrics>generic precedence with a None default so
+    the caller (or the OTLP SDK) supplies the ``grpc`` fallback.
+
+    :return: the resolved protocol string, or None when neither name is set.
+    """
+    return (os.environ.get("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL")
+            or os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL")
+            or None)
+
+
+def exporter_config_file() -> Optional[str]:
+    """Return the exporter config-file path from the environment, or None.
+
+    Resolves the canonical ``REDFISH_EXPORTER_CONFIG_FILE`` first, then the
+    deprecated ``IDRAC_EXPORTER_CONFIG_FILE`` alias, via :func:`env_first`; a
+    mismatch is a hard :class:`ConfigurationConflict` (no silent override).
+
+    :return: the configured file path, or None when neither name is set.
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    """
+    return env_first(
+        "REDFISH_EXPORTER_CONFIG_FILE", "IDRAC_EXPORTER_CONFIG_FILE",
+        default=None)
+
+
+def exporter_credential_file() -> Optional[str]:
+    """Return the exporter credential-file path from the environment, or None.
+
+    Resolves the canonical ``REDFISH_EXPORTER_CREDENTIAL_FILE`` first, then the
+    deprecated ``IDRAC_EXPORTER_CREDENTIAL_FILE`` alias, via :func:`env_first`.
+    This is a path value, not a secret; a mismatch is a hard
+    :class:`ConfigurationConflict`.
+
+    :return: the configured credential file path, or None when neither is set.
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    """
+    return env_first(
+        "REDFISH_EXPORTER_CREDENTIAL_FILE", "IDRAC_EXPORTER_CREDENTIAL_FILE",
+        default=None)
+
+
+def signalfx_ingest_url(explicit: Optional[str] = None) -> str:
+    """Return the SignalFx ingest URL, an explicit value winning over env.
+
+    A single owner-supplied name with no canonical/legacy alias, so it reads
+    ``os.environ`` directly. Returns the raw value only; the not-set and
+    ``/v2/datapoint`` validation stay in the caller's resolver.
+
+    :param explicit: an explicitly supplied ingest URL that wins over the env.
+    :return: the explicit URL, the ``SPLUNK_INGEST_URL`` value, or ``""``.
+    """
+    return explicit or os.environ.get("SPLUNK_INGEST_URL", "")
+
+
+def signalfx_realm(explicit: Optional[str] = None) -> str:
+    """Return the Splunk Observability realm, an explicit value winning over env.
+
+    A single owner-supplied name with no canonical/legacy alias, so it reads
+    ``os.environ`` directly. The caller interpolates the realm into the
+    readback API host.
+
+    :param explicit: an explicitly supplied realm that wins over the env.
+    :return: the explicit realm, the ``SPLUNK_O11Y_REALM`` value, or ``""``.
+    """
+    return explicit or os.environ.get("SPLUNK_O11Y_REALM", "")
+
+
+def signalfx_api_token(env_name: Optional[str] = None) -> str:
+    """Return the Splunk API (read) token from a named env var.
+
+    Secret: the returned value must never be logged. Only the env read lives
+    here; the default env-name (``SPLUNK_API_TOKEN``) is owned by this loader.
+
+    :param env_name: env var name holding the token; defaults to ``SPLUNK_API_TOKEN``.
+    :return: the token value, or ``""`` when the named variable is unset.
+    """
+    return os.environ.get(env_name or "SPLUNK_API_TOKEN", "")
+
+
+def signalfx_access_token(env_name: Optional[str] = None) -> str:
+    """Return the Splunk ingest access token from a named env var.
+
+    Secret: the returned value must never be logged. Only the env read lives
+    here; the caller keeps its direct/file precedence and its ``name`` for the
+    ``"{name} is not set"`` error message (which names the variable, never the
+    value).
+
+    :param env_name: env var name holding the token; defaults to ``SPLUNK_ACCESS_TOKEN``.
+    :return: the token value, or ``""`` when the named variable is unset.
+    """
+    return os.environ.get(env_name or "SPLUNK_ACCESS_TOKEN", "")
+
+
+def named_env(name: str, default: Optional[str] = None) -> Optional[str]:
+    """Return the value of a runtime-named environment variable, or ``default``.
+
+    The escape hatch for settings whose variable *name* is chosen at runtime by
+    the caller (for example ``--keytab-base64-env NAME``, a Dell OEM secret env
+    option, or a fleet node's credential-env field), so a fixed accessor cannot
+    be pre-declared. The read still lives here so no call site touches
+    ``os.environ`` directly. ``None`` is returned for an absent variable exactly
+    as ``os.environ.get`` would, so a caller can distinguish absent (``None``)
+    from empty (``""``). Values may be secret; never log them.
+
+    :param name: the environment variable name, chosen by the caller.
+    :param default: value returned when the variable is unset.
+    :return: the variable's value, or ``default`` when it is not set.
+    """
+    return os.environ.get(name, default)
+
+
+def discovery_retries() -> int:
+    """Return the bounded retry count for discovery crawls.
+
+    Resolves canonical ``REDFISH_DISCOVERY_RETRIES`` first, then the deprecated
+    ``IDRAC_DISCOVERY_RETRIES`` alias, via :func:`env_first`.
+
+    :return: the retry attempt count (default 4).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid integer.
+    """
+    return int(env_first(
+        "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4"))
+
+
+def discovery_backoff() -> float:
+    """Return the retry backoff factor for discovery crawls, in seconds.
+
+    Resolves canonical ``REDFISH_DISCOVERY_BACKOFF`` first, then the deprecated
+    ``IDRAC_DISCOVERY_BACKOFF`` alias, via :func:`env_first`.
+
+    :return: the backoff factor in seconds (default 2.0).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid float.
+    """
+    return float(env_first(
+        "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
+
+
+def discovery_pace_ms() -> float:
+    """Return the inter-request pacing for discovery crawls, in milliseconds.
+
+    Resolves canonical ``REDFISH_DISCOVERY_PACE_MS`` first, then the deprecated
+    ``IDRAC_DISCOVERY_PACE_MS`` alias, via :func:`env_first`. The caller converts
+    the value to seconds.
+
+    :return: the pacing delay in milliseconds (default 0).
+    :raises ConfigurationConflict: when canonical and legacy values disagree.
+    :raises ValueError: when the resolved value is not a valid float.
+    """
+    return float(env_first(
+        "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0"))
+
+
+def csdl_dir() -> Optional[str]:
+    """Return the CSDL schema directory override from the environment, or None.
+
+    A single owner-supplied name (``REDFISH_CSDL_DIR``) with no canonical/legacy
+    alias, so it reads ``os.environ`` directly. The caller falls back to the
+    bundled schema directory when this is unset or empty.
+
+    :return: the configured CSDL directory, or None when the variable is unset.
+    """
+    return os.environ.get("REDFISH_CSDL_DIR")
+
+
 def endpoint_conflict_fields() -> set[str]:
     """Return endpoint fields whose canonical and legacy env values disagree.
 

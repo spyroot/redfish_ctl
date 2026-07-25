@@ -72,7 +72,8 @@ from .redfish_manager import (
     CommandResult,
     RedfishManager,
 )
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec, env_first
+from .config import http_timeout
+from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
 from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
@@ -298,7 +299,7 @@ class IDracManager(RedfishManager):
 
         # Bound every GET so a hung/unreachable BMC can't block a crawl or an
         # unattended telemetry poll forever. Override via REDFISH_HTTP_TIMEOUT.
-        timeout = float(env_first("REDFISH_HTTP_TIMEOUT", "IDRAC_HTTP_TIMEOUT", default="30"))
+        timeout = http_timeout()
 
         # Reuse one pooled keep-alive connection across GETs (see _http_session):
         # opening a fresh TLS connection per request wedges fragile BMCs.
@@ -571,8 +572,15 @@ class IDracManager(RedfishManager):
         raise UnexpectedResponse(self._redfish_error)
 
     def check_api_version(self):
-        """Check Dell LLC Service API set
-        :return:
+        """Check the Dell LC Service API set, falling back to the generic root.
+
+        Probes the Dell Lifecycle Controller service (OEM ``DellLCService`` under
+        ``IDRAC_DELL_MANAGERS``) first; on 404 — a non-Dell controller, or a Dell
+        without the LC service — it defers to the vendor-neutral service-root probe
+        on :class:`RedfishManager`. On success it records the LC service document on
+        ``self.api_endpoints`` and its action targets on ``self.action_targets``.
+
+        :return: a tuple of (service document, list of action target URIs).
         """
         headers = {}
         headers.update(self.json_content_type)
@@ -581,20 +589,10 @@ class IDracManager(RedfishManager):
             f"{REDFISH_API.IDRAC_DELL_MANAGERS}" \
             f"{REDFISH_API.IDRAC_LLC}"
 
-        # r = f"{self._default_method}" \
-        #     f"{self.redfish_ip}" \
-        #     f"{RedfishApi.Version}"
-
-        # print("Sending request {}", r)
-        # response = self.api_get_call(r, headers)
-        # # print("Response:", response.text)
-
         response = self.api_get_call(r, headers)
         if response.status_code == 404:
-            r = f"{self._default_method}" \
-                f"{self.redfish_ip}" \
-                f"{RedfishApi.Version}"
-            response = self.api_get_call(r, headers)
+            # Non-Dell / no LC service: use the vendor-neutral service-root probe.
+            return super().check_api_version()
         self.default_error_handler(response)
 
         data = response.json()

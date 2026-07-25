@@ -11,13 +11,13 @@ read from an environment variable or file and masked in returned previews.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
@@ -314,9 +314,10 @@ class NvidiaDebugToken(IDracManager,
             env_name = token_env.strip()
             if not env_name:
                 raise InvalidArgument("token environment variable name cannot be empty")
-            if env_name not in os.environ:
+            v = named_env(env_name)
+            if v is None:
                 raise InvalidArgument(f"token environment variable '{env_name}' is not set")
-            return os.environ[env_name]
+            return v
         if token_file is not None:
             path = Path(token_file).expanduser()
             try:

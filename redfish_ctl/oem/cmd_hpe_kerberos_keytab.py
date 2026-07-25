@@ -13,13 +13,13 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 import base64
-import os
 from abc import abstractmethod
 from binascii import Error as BinasciiError
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
@@ -182,10 +182,11 @@ class HpeKerberosKeytabImport(
             env_name = keytab_base64_env.strip()
             if not env_name:
                 raise InvalidArgument("keytab environment variable name cannot be empty")
-            if env_name not in os.environ:
+            v = named_env(env_name)
+            if v is None:
                 raise InvalidArgument(f"keytab environment variable '{env_name}' is not set")
             return cls._normalize_base64(
-                os.environ[env_name],
+                v,
                 f"environment variable '{env_name}'",
             )
         if keytab_file is not None:

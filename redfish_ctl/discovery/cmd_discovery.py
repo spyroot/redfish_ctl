@@ -20,8 +20,8 @@ import requests
 
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, Singleton
+from ..config import discovery_backoff, discovery_pace_ms, discovery_retries
 from ..redfish_manager import CommandResult
-from ..redfish_shared import env_first
 
 # Upper bound on how deep recursive_discovery will walk below a top-level
 # resource. Real Redfish trees are far shallower than this; the bound exists
@@ -218,12 +218,9 @@ class Discovery(IDracManager,
         :return: the ``base_query`` CommandResult.
         :raises: the last transport exception if all attempts fail.
         """
-        attempts = max(1, int(env_first(
-            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
-        backoff = float(env_first(
-            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
-        pace = float(env_first(
-            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+        attempts = max(1, int(discovery_retries()))
+        backoff = float(discovery_backoff())
+        pace = float(discovery_pace_ms()) / 1000.0
         last_exc = None
         for attempt in range(attempts):
             try:
@@ -255,12 +252,9 @@ class Discovery(IDracManager,
         :return: ``(int status_code, body, Optional[str] allow_header)``.
         :raises: the last transport exception if every attempt fails.
         """
-        attempts = max(1, int(env_first(
-            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
-        backoff = float(env_first(
-            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
-        pace = float(env_first(
-            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+        attempts = max(1, int(discovery_retries()))
+        backoff = float(discovery_backoff())
+        pace = float(discovery_pace_ms()) / 1000.0
         req = f"{self._default_method}{self.redfish_ip}{resource_path}"
         last_exc = None
         for attempt in range(attempts):

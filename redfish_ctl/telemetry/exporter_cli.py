@@ -36,9 +36,8 @@ def register_exporter_subcommand(cls):
     cmd_parser.add_argument(
         "--label-bmc-ip", dest="label_bmc_ip", default=None, type=str,
         help="BMC IP used only for metric dimensions when different from REDFISH_IP")
-    cmd_parser.add_argument(
-        "--vendor", default=None, type=str,
-        help="vendor dimension override, e.g. supermicro or dell")
+    # The vendor dimension is the global ``--vendor`` router (see redfish_main):
+    # it both routes the verb to the vendor manager and labels the metric vendor.
     cmd_parser.add_argument(
         "--credential-file", dest="exporter_credential_file", default=None, type=str,
         help="gitignored KEY=VALUE runtime file for "
