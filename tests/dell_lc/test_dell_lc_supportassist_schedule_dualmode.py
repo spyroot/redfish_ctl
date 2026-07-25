@@ -1,9 +1,9 @@
 """Dual-mode-style coverage for DellLCService SupportAssist schedules."""
 
-import json
 from pathlib import Path
 
 import pytest
+from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
@@ -17,7 +17,6 @@ from redfish_ctl.redfish_manager import CommandResult
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
-DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 DELL_LC_SERVICE = (
     "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLCService"
 )
@@ -31,62 +30,45 @@ SET_TARGET = (
 )
 
 
-def _fixture_for_path(path):
-    """Return the extracted Dell fixture matching a Redfish path.
-
-    :param path: request path from requests-mock.
-    :return: fixture path, or None when the corpus lacks the resource.
-    """
-    name = "_" + path.strip("/").replace("/", "_") + ".json"
-    return DELL_INDEX.get(name.lower())
-
-
 @pytest.fixture
-def dell_lc_manager():
-    """Serve the committed Dell corpus over requests-mock.
+def dell_lc_supportassist_mock():
+    """Return a manager and mock service backed by the Dell XR8620t corpus.
 
-    :return: tuple of IDracManager and recorded requests list.
+    The vendor-faithful service realizes an Action POST the Dell way: 202 plus
+    a ``JID_`` OEM job id in the Location header, never a DMTF-generic token.
+
+    :return: tuple of IDracManager and the recording MockRedfishService.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    requests = []
-
-    def get_cb(request, context):
-        requests.append(request)
-        fixture = _fixture_for_path(request.path)
-        if fixture is None:
-            context.status_code = 404
-            return json.dumps({"error": f"no fixture for {request.path}"})
-        context.status_code = 200
-        return fixture.read_text()
-
-    def post_cb(request, context):
-        requests.append(request)
-        context.status_code = 202
-        context.headers["Location"] = "/redfish/v1/TaskService/Tasks/supportassist-1"
-        return json.dumps(
-            {"Task": {"@odata.id": "/redfish/v1/TaskService/Tasks/supportassist-1"}}
-        )
-
+    service = MockRedfishService(
+        DELL_CORPUS,
+        index=_build_fixture_index(DELL_CORPUS),
+    )
     with requests_mock.Mocker() as mocker:
-        mocker.get(requests_mock.ANY, text=get_cb)
-        mocker.post(requests_mock.ANY, text=post_cb)
-        manager = IDracManager(
-            idrac_ip="mock-dell-lc-supportassist",
-            idrac_username="root",
-            idrac_password="mock",
-            insecure=True,
-            is_debug=False,
+        mocker.get(requests_mock.ANY, text=service.get_cb)
+        mocker.patch(requests_mock.ANY, text=service.patch_cb)
+        mocker.post(requests_mock.ANY, text=service.post_cb)
+        mocker.delete(requests_mock.ANY, text=service.delete_cb)
+        service.mocker = mocker
+        yield (
+            IDracManager(
+                idrac_ip="mock-dell-lc-supportassist",
+                idrac_username="root",
+                idrac_password="mock",
+                insecure=True,
+                is_debug=False,
+            ),
+            service,
         )
-        yield manager, requests
 
 
-def _post_requests(requests):
-    """Return POST requests recorded by the mock Redfish transport.
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service.
 
-    :param requests: recorded requests-mock request objects.
+    :param service: the recording MockRedfishService.
     :return: list of POST requests.
     """
-    return [request for request in requests if request.method == "POST"]
+    return [request for request in service.requests if request.method == "POST"]
 
 
 def test_dell_lc_supportassist_schedule_policy_is_reversible():
@@ -102,10 +84,10 @@ def test_dell_lc_supportassist_schedule_policy_is_reversible():
 
 
 def test_dell_lc_supportassist_schedule_lists_targets_without_post(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """Listing discovers schedule actions and does not POST."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -129,14 +111,14 @@ def test_dell_lc_supportassist_schedule_lists_targets_without_post(
             "AllowedRecurrences": ["Monthly", "Quarterly", "Weekly"],
         },
     ]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_set_previews_by_default(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """Setting a recurrence does not POST unless --confirm is present."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -153,14 +135,14 @@ def test_dell_lc_supportassist_schedule_set_previews_by_default(
     assert result.data["level"] == "reversible"
     assert result.data["blocked"] is None
     assert result.data["payload"] == {"Recurrence": "Weekly"}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_set_confirm_posts_payload(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
-    """--confirm POSTs the recurrence payload to the set action target."""
-    manager, requests = dell_lc_manager
+    """--confirm POSTs the recurrence; the Dell lens realizes a ``JID_`` job id."""
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -170,24 +152,25 @@ def test_dell_lc_supportassist_schedule_set_confirm_posts_payload(
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
     assert result.data["action"] == "#DellLCService.SupportAssistSetAutoCollectSchedule"
     assert result.data["target"] == SET_TARGET
     assert result.data["level"] == "reversible"
-    assert result.data["task_id"] == "supportassist-1"
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.JOB_ID.startswith("JID_")
     assert len(posts) == 1
     assert posts[0].path.lower() == SET_TARGET.lower()
     assert posts[0].json() == {"Recurrence": "Weekly"}
 
 
 def test_dell_lc_supportassist_schedule_clear_previews_by_default(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """Clearing the schedule resolves the target but does not POST by default."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -201,14 +184,14 @@ def test_dell_lc_supportassist_schedule_clear_previews_by_default(
     assert result.data["action"] == "#DellLCService.SupportAssistClearAutoCollectSchedule"
     assert result.data["target"] == CLEAR_TARGET
     assert result.data["payload"] == {}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_clear_confirm_posts_empty_payload(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """--confirm POSTs an empty payload to the clear action target."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -217,7 +200,7 @@ def test_dell_lc_supportassist_schedule_clear_confirm_posts_empty_payload(
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
@@ -228,10 +211,10 @@ def test_dell_lc_supportassist_schedule_clear_confirm_posts_empty_payload(
 
 
 def test_dell_lc_supportassist_schedule_dry_run_overrides_confirm(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """--dry_run keeps the command preview-only even with --confirm."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -247,14 +230,14 @@ def test_dell_lc_supportassist_schedule_dry_run_overrides_confirm(
     assert result.data["dry_run"] is True
     assert result.data["blocked"] is None
     assert result.data["payload"] == {"Recurrence": "Monthly"}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_rejects_invalid_recurrence(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """Inline allowable values reject unsupported recurrences before POST."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -276,14 +259,14 @@ def test_dell_lc_supportassist_schedule_rejects_invalid_recurrence(
             "allowed": ["Monthly", "Quarterly", "Weekly"],
         }
     ]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_set_requires_recurrence(
-    dell_lc_manager,
+    dell_lc_supportassist_mock,
 ):
     """The set action fails closed when Recurrence is omitted."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_supportassist_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcSupportAssistSchedule,
@@ -298,7 +281,7 @@ def test_dell_lc_supportassist_schedule_set_requires_recurrence(
         "required": ["Recurrence"],
         "action": "#DellLCService.SupportAssistSetAutoCollectSchedule",
     }
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_missing_action_does_not_post(
@@ -319,7 +302,7 @@ def test_dell_lc_supportassist_schedule_missing_action_does_not_post(
         "action": "#DellLCService.SupportAssistClearAutoCollectSchedule",
         "available": [],
     }
-    assert _post_requests(service.requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_supportassist_schedule_exposes_cli_entrypoint():

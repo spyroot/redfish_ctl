@@ -1,9 +1,10 @@
 """Dual-mode-style coverage for DellRaidService spare actions."""
 
-import json
+import copy
 from pathlib import Path
 
 import pytest
+from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
@@ -16,7 +17,6 @@ from redfish_ctl.redfish_manager import CommandResult
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
-DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 RAID_SERVICE = "/redfish/v1/Systems/System.Embedded.1/Oem/Dell/DellRaidService"
 ASSIGN_TARGET = f"{RAID_SERVICE}/Actions/DellRaidService.AssignSpare"
 UNASSIGN_TARGET = f"{RAID_SERVICE}/Actions/DellRaidService.UnassignSpare"
@@ -24,82 +24,62 @@ DISK_FQDD = "Disk.Bay.4:Enclosure.Internal.0-1:RAID.Integrated.1-1"
 VD_FQDD = "Disk.Virtual.0:RAID.Integrated.1-1"
 
 
-def _fixture_for_path(path):
-    """Return the extracted Dell fixture matching a Redfish path.
-
-    :param path: request path from requests-mock.
-    :return: fixture path, or None when the corpus lacks the resource.
-    """
-    name = "_" + path.strip("/").replace("/", "_") + ".json"
-    return DELL_INDEX.get(name.lower())
-
-
 @pytest.fixture
-def dell_raid_spare_manager():
-    """Serve the committed Dell corpus over requests-mock.
+def dell_raid_spare_mock():
+    """Return a manager and mock service backed by the Dell XR8620t corpus.
 
-    :return: tuple of IDracManager, recorded requests, and response overlay.
+    The vendor-faithful service realizes an Action POST the Dell way: 202 plus
+    a ``JID_`` OEM job id in the Location header, never a DMTF-generic token.
+
+    :return: tuple of IDracManager and the recording MockRedfishService.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    requests = []
-    overlay = {}
-
-    def get_cb(request, context):
-        requests.append(request)
-        if request.path.lower() in overlay:
-            context.status_code = 200
-            return json.dumps(overlay[request.path.lower()])
-        fixture = _fixture_for_path(request.path)
-        if fixture is None:
-            context.status_code = 404
-            return json.dumps({"error": f"no fixture for {request.path}"})
-        context.status_code = 200
-        return fixture.read_text()
-
-    def post_cb(request, context):
-        requests.append(request)
-        context.status_code = 202
-        context.headers["Location"] = "/redfish/v1/TaskService/Tasks/raid-spare-1"
-        return json.dumps({"Task": {"@odata.id": "/redfish/v1/TaskService/Tasks/raid-spare-1"}})
-
+    service = MockRedfishService(
+        DELL_CORPUS,
+        index=_build_fixture_index(DELL_CORPUS),
+    )
     with requests_mock.Mocker() as mocker:
-        mocker.get(requests_mock.ANY, text=get_cb)
-        mocker.post(requests_mock.ANY, text=post_cb)
-        manager = IDracManager(
-            idrac_ip="mock-dell-raid-spare",
-            idrac_username="root",
-            idrac_password="mock",
-            insecure=True,
-            is_debug=False,
+        mocker.get(requests_mock.ANY, text=service.get_cb)
+        mocker.patch(requests_mock.ANY, text=service.patch_cb)
+        mocker.post(requests_mock.ANY, text=service.post_cb)
+        mocker.delete(requests_mock.ANY, text=service.delete_cb)
+        service.mocker = mocker
+        yield (
+            IDracManager(
+                idrac_ip="mock-dell-raid-spare",
+                idrac_username="root",
+                idrac_password="mock",
+                insecure=True,
+                is_debug=False,
+            ),
+            service,
         )
-        yield manager, requests, overlay
 
 
-def _post_requests(requests):
-    """Return POST requests recorded by the mock Redfish transport.
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service.
 
-    :param requests: recorded requests-mock request objects.
+    :param service: the recording MockRedfishService.
     :return: list of POST requests.
     """
-    return [request for request in requests if request.method == "POST"]
+    return [request for request in service.requests if request.method == "POST"]
 
 
-def _without_action(action_name):
-    """Return the DellRaidService fixture body with one action removed.
+def _overlay_without_action(service, action_name):
+    """Overlay DellRaidService with one action removed, under both casings.
 
+    :param service: the recording MockRedfishService.
     :param action_name: full ``#DellRaidService.*`` action name to remove.
-    :return: copied fixture body with the selected action removed.
     """
-    fixture = _fixture_for_path(RAID_SERVICE)
-    body = json.loads(fixture.read_text())
-    body["Actions"] = dict(body["Actions"])
+    body = copy.deepcopy(service._state(RAID_SERVICE))
     body["Actions"].pop(action_name, None)
-    return body
+    service._overlay[RAID_SERVICE] = body
+    service._overlay[RAID_SERVICE.lower()] = body
 
 
-def test_dell_raid_spare_lists_targets_and_candidates(dell_raid_spare_manager):
+def test_dell_raid_spare_lists_targets_and_candidates(dell_raid_spare_mock):
     """Calling dell-raid-spare without an action lists targets without POSTing."""
-    manager, requests, _overlay = dell_raid_spare_manager
+    manager, service = dell_raid_spare_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellRaidSpareActions,
@@ -125,12 +105,12 @@ def test_dell_raid_spare_lists_targets_and_candidates(dell_raid_spare_manager):
         volume["id"] == "PCIeSSD.Integrated.1-0"
         for volume in result.data["candidates"]["virtual_disks"]
     )
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_raid_spare_assign_defaults_to_preview(dell_raid_spare_manager):
+def test_dell_raid_spare_assign_defaults_to_preview(dell_raid_spare_mock):
     """AssignSpare is a guarded storage change and does not POST by default."""
-    manager, requests, _overlay = dell_raid_spare_manager
+    manager, service = dell_raid_spare_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellRaidSpareActions,
@@ -147,12 +127,12 @@ def test_dell_raid_spare_assign_defaults_to_preview(dell_raid_spare_manager):
     assert result.data["level"] == "destructive"
     assert result.data["blocked"] == "destructive action requires --confirm"
     assert result.data["payload"] == {"TargetFQDD": DISK_FQDD}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_raid_spare_assign_dedicated_posts_with_confirm(dell_raid_spare_manager):
-    """--confirm POSTs a dedicated hot-spare payload to AssignSpare."""
-    manager, requests, _overlay = dell_raid_spare_manager
+def test_dell_raid_spare_assign_dedicated_posts_with_confirm(dell_raid_spare_mock):
+    """--confirm POSTs AssignSpare; the Dell lens realizes a ``JID_`` job id."""
+    manager, service = dell_raid_spare_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellRaidSpareActions,
@@ -163,13 +143,14 @@ def test_dell_raid_spare_assign_dedicated_posts_with_confirm(dell_raid_spare_man
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
     assert result.data["action"] == "#DellRaidService.AssignSpare"
     assert result.data["target"] == ASSIGN_TARGET
-    assert result.data["task_id"] == "raid-spare-1"
+    assert result.data["task_id"] == service.JOB_ID
+    assert service.JOB_ID.startswith("JID_")
     assert len(posts) == 1
     assert posts[0].path.lower() == ASSIGN_TARGET.lower()
     assert posts[0].json() == {
@@ -178,9 +159,9 @@ def test_dell_raid_spare_assign_dedicated_posts_with_confirm(dell_raid_spare_man
     }
 
 
-def test_dell_raid_spare_unassign_dry_run_overrides_confirm(dell_raid_spare_manager):
+def test_dell_raid_spare_unassign_dry_run_overrides_confirm(dell_raid_spare_mock):
     """--dry_run keeps UnassignSpare as a no-POST preview even with --confirm."""
-    manager, requests, _overlay = dell_raid_spare_manager
+    manager, service = dell_raid_spare_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellRaidSpareActions,
@@ -198,12 +179,12 @@ def test_dell_raid_spare_unassign_dry_run_overrides_confirm(dell_raid_spare_mana
     assert result.data["action"] == "#DellRaidService.UnassignSpare"
     assert result.data["target"] == UNASSIGN_TARGET
     assert result.data["payload"] == {"TargetFQDD": DISK_FQDD}
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_raid_spare_unassign_rejects_virtual_disk(dell_raid_spare_manager):
+def test_dell_raid_spare_unassign_rejects_virtual_disk(dell_raid_spare_mock):
     """UnassignSpare accepts only the physical disk target."""
-    manager, requests, _overlay = dell_raid_spare_manager
+    manager, service = dell_raid_spare_mock
 
     with pytest.raises(InvalidArgument, match="only valid with --action assign"):
         manager.sync_invoke(
@@ -214,13 +195,13 @@ def test_dell_raid_spare_unassign_rejects_virtual_disk(dell_raid_spare_manager):
             virtual_disk=[VD_FQDD],
             confirm=True,
         )
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_raid_spare_reports_missing_action(dell_raid_spare_manager):
+def test_dell_raid_spare_reports_missing_action(dell_raid_spare_mock):
     """A service without UnassignSpare returns an actionable no-POST error."""
-    manager, requests, overlay = dell_raid_spare_manager
-    overlay[RAID_SERVICE.lower()] = _without_action("#DellRaidService.UnassignSpare")
+    manager, service = dell_raid_spare_mock
+    _overlay_without_action(service, "#DellRaidService.UnassignSpare")
 
     result = manager.sync_invoke(
         ApiRequestType.DellRaidSpareActions,
@@ -237,7 +218,7 @@ def test_dell_raid_spare_reports_missing_action(dell_raid_spare_manager):
         "action '#DellRaidService.UnassignSpare' not found on "
         f"{RAID_SERVICE}"
     )
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_raid_spare_policy_and_registry_are_wired():
