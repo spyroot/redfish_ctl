@@ -12,6 +12,7 @@ import pytest
 from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
+import redfish_ctl.telemetry.http_util as http_util_mod
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.idrac_manager import IDracManager
@@ -1638,7 +1639,7 @@ def test_push_signalfx_rejects_non_https_ingest_url_before_open(monkeypatch):
         opened.append((args, kwargs))
         raise AssertionError("request should not open")
 
-    monkeypatch.setattr(exporter_mod, "_open_signalfx_request", fail_if_opened)
+    monkeypatch.setattr(http_util_mod, "open_no_redirect_request", fail_if_opened)
 
     with pytest.raises(ValueError, match="https"):
         exporter_mod.push_signalfx(
@@ -1686,7 +1687,7 @@ def test_signalfx_redirect_opener_does_not_replay_token():
         )
 
         with pytest.raises(ValueError, match="refused redirect"):
-            exporter_mod._open_signalfx_request(request, timeout=2.0)
+            http_util_mod.open_no_redirect_request(request, timeout=2.0)
 
         origin_headers = {k.lower(): v for k, v in origin_requests[0].items()}
         assert origin_headers["x-sf-token"] == "secret-token"

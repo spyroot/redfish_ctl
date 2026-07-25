@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
 from ..config import ConfigurationConflict
+from . import http_util
 from . import identity as identity_mod
 from .metric_model import MetricDefinition, MetricSample, _definition
 
@@ -48,55 +49,6 @@ DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 # datapoint endpoint (…/v2/datapoint), never a bare host.
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
-
-
-class _SignalFxNoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Fail closed instead of forwarding token-bearing SignalFx requests."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        """Reject an HTTP redirect before urllib can replay the request.
-
-        :param req: original urllib request object.
-        :param fp: response file object supplied by urllib.
-        :param code: redirect HTTP status code.
-        :param msg: redirect HTTP status message.
-        :param headers: redirect response headers.
-        :param newurl: URL urllib would otherwise follow.
-        :return: never returns; raises :class:`ValueError`.
-        :raises ValueError: always, so credential headers stay on the original host.
-        """
-        raise ValueError("SignalFx request refused redirect")
-
-
-def _open_signalfx_request(request: urllib.request.Request, timeout: float):
-    """Open a SignalFx request without following redirects.
-
-    SignalFx ingest and readback tokens are sent as ``X-SF-Token``. urllib's
-    default opener follows redirects and can replay that custom header to the
-    redirected host, so token-bearing requests must use a redirect-disabled
-    opener.
-
-    :param request: prepared urllib request for SignalFx ingest or readback.
-    :param timeout: HTTP timeout in seconds.
-    :return: urllib response object suitable for use as a context manager.
-    :raises ValueError: if the server returns a redirect response.
-    """
-    opener = urllib.request.build_opener(_SignalFxNoRedirectHandler)
-    return opener.open(request, timeout=timeout)
-
-
-def _require_https_url(url: str, label: str) -> urllib.parse.ParseResult:
-    """Return a parsed URL when it is HTTPS, else raise a clear error.
-
-    :param url: URL string to validate.
-    :param label: human-readable name for error messages.
-    :return: parsed URL for a non-empty HTTPS URL with a network location.
-    :raises ValueError: when the URL is missing a host or does not use HTTPS.
-    """
-    parsed = urllib.parse.urlparse(url or "")
-    if parsed.scheme.lower() != "https" or not parsed.netloc:
-        raise ValueError(f"{label} must use https; got {url!r}")
-    return parsed
 
 
 _COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
@@ -867,7 +819,7 @@ def _require_datapoint_url(ingest_url: str) -> str:
     :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
     :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
     """
-    parsed = _require_https_url(ingest_url, "SignalFx ingest URL")
+    parsed = http_util.require_https_url(ingest_url, "SignalFx ingest URL")
     if parsed.path.rstrip("/") != SIGNALFX_DATAPOINT_PATH:
         raise ValueError(
             "SignalFx ingest URL must be the full datapoint endpoint ending in "
@@ -943,7 +895,7 @@ def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 2
         method="POST",
         headers={"Content-Type": "application/json", "X-SF-Token": token},
     )
-    with _open_signalfx_request(req, timeout=timeout) as response:
+    with http_util.open_no_redirect_request(req, timeout=timeout) as response:
         return response.status
 
 
@@ -997,9 +949,9 @@ def signalfx_metric_readback(
         {"query": _mts_query(metric, dimensions), "limit": 50,
          "orderBy": "-sf_updatedOnMs"})
     url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
-    _require_https_url(url, "SignalFx readback URL")
+    http_util.require_https_url(url, "SignalFx readback URL")
     request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
-    with _open_signalfx_request(request, timeout=timeout) as response:
+    with http_util.open_no_redirect_request(request, timeout=timeout) as response:
         server_ms = _response_date_ms(response)
         raw = response.read()
     try:
