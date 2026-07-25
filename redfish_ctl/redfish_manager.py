@@ -51,7 +51,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .redfish_api_common import RedfishAction
 
-from .redfish_api_common import HTTPMethod
+from .redfish_api_common import HTTPMethod, RedfishAction
 from .redfish_shared import (
     RedfishApi,
     RedfishApiRespond,
@@ -1548,6 +1548,93 @@ class RedfishManager:
                         "allowed": sorted(allowed),
                     })
         return errors
+
+    @staticmethod
+    def _get_actions(cls, json_data):
+        """Parse json from the manager for all supported action
+        and action method arg.
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        unfiltered_actions = {}
+        full_redfish_names = {}
+
+        if RedfishJson.Actions not in json_data:
+            return unfiltered_actions, full_redfish_names
+
+        redfish_actions = json_data[RedfishJson.Actions]
+        for a in redfish_actions:
+            _ca = redfish_actions[a]
+            if a == "Oem" and isinstance(_ca, dict):
+                for k in _ca.keys():
+                    rest_api_action = k.split(".")
+                    if len(rest_api_action) < 2:
+                        continue
+                    rest_api_action = rest_api_action[-1]
+                    unfiltered_actions[rest_api_action] = _ca[k]
+                    full_redfish_names[rest_api_action] = k
+            else:
+                rest_api_action = a.split(".")
+                if len(rest_api_action) < 2:
+                    continue
+                rest_api_action = rest_api_action[-1]
+                unfiltered_actions[rest_api_action] = _ca
+                full_redfish_names[rest_api_action] = a
+
+        return unfiltered_actions, full_redfish_names
+
+    @staticmethod
+    def discover_member_redfish_actions(cls, json_data):
+        """
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        action_dict = {}
+        if RedfishJson.Members not in json_data:
+            if RedfishJson.Actions in json_data:
+                return cls.discover_redfish_actions(cls, json_data)
+            else:
+                return action_dict
+
+        member_data = json_data[RedfishJson.Members]
+        for m in member_data:
+            if isinstance(m, dict):
+                if RedfishJson.Actions in m.keys():
+                    action = cls.discover_redfish_actions(cls, m)
+                    action_dict.update(action)
+
+        return action_dict
+
+    @staticmethod
+    def discover_redfish_actions(cls, json_data):
+        """Discovers all redfish action, args and args choices.
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        if isinstance(json_data, requests.models.Response):
+            json_data = json_data.json()
+
+        action_dict = {}
+        unfiltered_actions, full_redfish_names = cls._get_actions(cls, json_data)
+        for ra in unfiltered_actions.keys():
+            if 'target' not in unfiltered_actions[ra]:
+                continue
+            action_tuple = unfiltered_actions[ra]
+            if isinstance(action_tuple, Dict):
+                arg_keys = action_tuple.keys()
+                redfish_action = RedfishAction(action_name=ra,
+                                               target=action_tuple['target'],
+                                               full_redfish_name=full_redfish_names[ra])
+                action_dict[ra] = redfish_action
+                for k in arg_keys:
+                    if '@Redfish.AllowableValues' in k:
+                        arg_name = k.split('@')[0]
+                        action_dict[ra].add_action_arg(arg_name, action_tuple[k])
+
+        return action_dict
 
     def invoke_action(self,
                       resource_uri: str,
