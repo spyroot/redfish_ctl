@@ -9,7 +9,7 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from redfish_ctl.telemetry import exporter, otlp
+from redfish_ctl.telemetry import exporter, otlp, prometheus
 
 # Curated metric -> expected type, including the tricky cases the data-type audit surfaced.
 _EXPECTED = {
@@ -46,7 +46,7 @@ def _prometheus_type(name, sample):
     :param sample: the sample to render.
     :return: the type token from the ``# TYPE`` line.
     """
-    for line in exporter.render_prometheus_text([sample]).splitlines():
+    for line in prometheus.render_prometheus_text([sample]).splitlines():
         if line.startswith(f"# TYPE {name} "):
             return line.split()[-1]
     return None

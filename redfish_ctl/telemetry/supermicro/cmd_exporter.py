@@ -24,13 +24,12 @@ from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter_cli import register_exporter_subcommand
 from redfish_ctl.telemetry.exporter import (
     build_telemetry_identity,
-    render_prometheus_text,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
     run_signalfx_loop,
-    serve_prometheus,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.prometheus import render_prometheus_text, serve_prometheus
 from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 
 logger = logging.getLogger(__name__)

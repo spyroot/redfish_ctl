@@ -29,11 +29,11 @@ from redfish_ctl.telemetry.exporter import (
     load_exporter_env_file,
     metric_definition,
     metric_definitions,
-    render_prometheus_text,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
     to_signalfx_body,
 )
+from redfish_ctl.telemetry.prometheus import render_prometheus_text
 from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 from redfish_ctl.telemetry.identity import parse_dimension_pairs
 

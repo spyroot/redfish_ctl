@@ -346,15 +346,6 @@ def _infer_metric_unit(metric_name: str) -> Optional[str]:
     return None
 
 
-def _prometheus_type(kind: str) -> str:
-    """Map exporter metric kind to the Prometheus exposition type.
-
-    :param kind: exporter metric kind.
-    :return: Prometheus metric type.
-    """
-    return "counter" if kind in {"counter", "cumulative_counter"} else "gauge"
-
-
 @dataclass(frozen=True)
 class CollectorResult:
     """Outcome from one read-only telemetry collector."""
@@ -752,33 +743,6 @@ def jittered_interval(
     return base * (1.0 - fraction + (2.0 * fraction * bounded))
 
 
-def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
-    """Render samples in Prometheus/OpenMetrics text exposition form.
-
-    :param samples: metric samples to render.
-    :return: Prometheus/OpenMetrics text exposition of the samples.
-    """
-    lines = []
-    seen_types = set()
-    for sample in samples:
-        definition = metric_definition(sample.metric)
-        prometheus_name = definition.prometheus_name or sample.metric
-        if prometheus_name not in seen_types:
-            if definition.description:
-                lines.append(
-                    f"# HELP {prometheus_name} "
-                    f"{_escape_help_text(definition.description)}")
-            lines.append(f"# TYPE {prometheus_name} {_prometheus_type(definition.kind)}")
-            seen_types.add(prometheus_name)
-        label_text = ",".join(
-            f'{key}="{_escape_label_value(value)}"'
-            for key, value in sorted(sample.dimensions.items())
-            if key not in identity_mod.RESOURCE_ONLY_DIMENSIONS
-        )
-        lines.append(f"{prometheus_name}{{{label_text}}} {_format_value(sample.value)}")
-    return "\n".join(lines) + "\n"
-
-
 def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
     """Wrap samples in the SignalFx /v2/datapoint typed envelopes.
 
@@ -1107,49 +1071,6 @@ def _report_signalfx_loop_error(exc: Exception) -> None:
     print(f"SignalFx push failed: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
-def serve_prometheus(
-        scrape: Callable[[], str],
-        bind: str = "0.0.0.0",
-        port: int = 9109) -> None:
-    """Serve ``/metrics`` by calling ``scrape`` for each request.
-
-    :param scrape: callable returning the Prometheus text body for each request.
-    :param bind: address to bind the HTTP server to.
-    :param port: TCP port to serve ``/metrics`` on.
-    """
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - http.server API
-            """Serve ``/metrics`` with the scrape body, or 404/500 on error."""
-            if self.path != "/metrics":
-                self.send_response(404)
-                self.end_headers()
-                return
-            try:
-                payload = scrape().encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-            except Exception as exc:  # noqa: BLE001 - exporter should return HTTP 500
-                payload = f"exporter scrape failed: {type(exc).__name__}\n".encode()
-                self.send_response(500)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-
-        def log_message(self, format, *args):  # noqa: A002 - http.server API
-            """Silence the default per-request stderr logging.
-
-            :param format: log format string (ignored).
-            """
-            return
-
-    HTTPServer((bind, port), Handler).serve_forever()
-
-
 def run_signalfx_loop(
         scrape_samples: Callable[[], list[MetricSample]],
         token: str,
@@ -1307,28 +1228,3 @@ def _dim_value(value) -> str:
     return (cleaned or "unknown")[:256]
 
 
-def _escape_label_value(value) -> str:
-    """Escape a value for a Prometheus label (backslash, newline, quote).
-
-    :param value: the raw label value.
-    :return: the escaped label string.
-    """
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
-
-
-def _escape_help_text(value) -> str:
-    """Escape a value for a Prometheus HELP line.
-
-    :param value: raw HELP text.
-    :return: escaped HELP text.
-    """
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n")
-
-
-def _format_value(value: float) -> str:
-    """Format a float as a Prometheus sample value.
-
-    :param value: the numeric sample value.
-    :return: an integer string when whole, else the float repr.
-    """
-    return str(int(value)) if float(value).is_integer() else repr(float(value))
