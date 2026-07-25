@@ -34,6 +34,10 @@ class BiosSnapshot(IDracManager,
                    metaclass=Singleton):
     """Capture current BIOS attribute values as a re-applicable restore point."""
 
+    def __init__(self, *args, **kwargs):
+        """Construct the bios-snapshot command, forwarding credentials to the base manager."""
+        super(BiosSnapshot, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

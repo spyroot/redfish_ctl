@@ -24,6 +24,10 @@ class ChangeBootOrder(
     """Command change boot order.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Construct the change-boot-order command, forwarding credentials to the base manager."""
+        super(ChangeBootOrder, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

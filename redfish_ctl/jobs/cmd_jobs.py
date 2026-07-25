@@ -31,6 +31,10 @@ class JobList(IDracManager,
     """Command handler for list of jobs
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the jobs command."""
+        super(JobList, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

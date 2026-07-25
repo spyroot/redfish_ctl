@@ -65,6 +65,10 @@ class DellRaidPhysicalDiskActions(
 ):
     """Preview or run DellRaidService physical-disk actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-pd-actions command."""
+        super(DellRaidPhysicalDiskActions, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

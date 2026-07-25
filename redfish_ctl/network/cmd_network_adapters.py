@@ -28,6 +28,10 @@ class NetworkAdapters(IDracManager,
                       metaclass=Singleton):
     """Read every NetworkAdapter (NIC/DPU) across all chassis."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the network-adapters command."""
+        super(NetworkAdapters, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

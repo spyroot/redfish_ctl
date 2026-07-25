@@ -27,6 +27,10 @@ class DellRaidPatrolRead(IDracManager,
                          metaclass=Singleton):
     """Preview or run Dell RAID patrol-read start/stop actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-patrol-read command."""
+        super(DellRaidPatrolRead, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

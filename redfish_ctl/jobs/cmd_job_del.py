@@ -23,6 +23,10 @@ class JobDel(IDracManager,
     """Command gets a job from iDRAC
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the job-rm command."""
+        super(JobDel, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -22,6 +22,10 @@ class EnvironmentMetrics(IDracManager,
                          metaclass=Singleton):
     """Read power, energy, and temperature rollups from EnvironmentMetrics."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the environment-metrics command."""
+        super(EnvironmentMetrics, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

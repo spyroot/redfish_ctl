@@ -23,6 +23,10 @@ class ManagerReset(IDracManager,
     caller can save to a file or output to a file or pass downstream.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the manager-reboot command."""
+        super(ManagerReset, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

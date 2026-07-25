@@ -29,6 +29,10 @@ class BootOptionsClearPending(IDracManager,
     values currently staged on the Redfish endpoint.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-options-clear command."""
+        super(BootOptionsClearPending, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

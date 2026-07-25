@@ -21,6 +21,10 @@ class DellOemDisconnect(IDracManager,
     """A command uses dell oem to disconnect ISO
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-disconnect command."""
+        super(DellOemDisconnect, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

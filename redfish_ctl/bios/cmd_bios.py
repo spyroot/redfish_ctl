@@ -49,6 +49,10 @@ class BiosQuery(IDracManager,
     or output to a file or pass downstream.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Construct the bios inventory query command, forwarding credentials to the base manager."""
+        super(BiosQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls, parent=None):

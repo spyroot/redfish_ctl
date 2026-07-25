@@ -22,6 +22,10 @@ class Power(IDracManager,
             metaclass=Singleton):
     """Read chassis power subsystems, supplies, metrics, and batteries."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the power command."""
+        super(Power, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

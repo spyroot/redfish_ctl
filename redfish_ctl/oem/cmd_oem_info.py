@@ -26,6 +26,10 @@ class OemInfo(IDracManager,
              metaclass=Singleton):
     """Inventory the vendor OEM extensions exposed on systems/managers/chassis."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-info command."""
+        super(OemInfo, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -32,6 +32,10 @@ class GetCurrentBoot(IDracManager,
     """
     cmd_name = "current_boot_query"
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the current_boot command."""
+        super(GetCurrentBoot, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

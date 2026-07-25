@@ -33,6 +33,10 @@ class FirmwareUpdate(IDracManager,
                      metaclass=Singleton):
     """Flash firmware via a discovered UpdateService update endpoint."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the firmware-update command."""
+        super(FirmwareUpdate, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

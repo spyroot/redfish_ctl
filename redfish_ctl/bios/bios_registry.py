@@ -29,6 +29,10 @@ class BiosRegistry(IDracManager,
     """A command query job_service_query.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Construct the bios-registry command, forwarding credentials to the base manager."""
+        super(BiosRegistry, self).__init__(*args, **kwargs)
+
     def _resolve_registry_uri(self, do_async):
         """Locate the BIOS attribute registry URI vendor-neutrally.
 

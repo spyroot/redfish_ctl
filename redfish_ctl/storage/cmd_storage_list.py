@@ -24,6 +24,10 @@ class StorageListView(IDracManager,
     """Fetch the storage controller list over the Redfish API.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the storage_list command."""
+        super(StorageListView, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -23,6 +23,10 @@ class QueryAccount(IDracManager,
     """Query a Redfish endpoint resource by resource path.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the query_account command."""
+        super(QueryAccount, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -42,6 +42,10 @@ class DellLcAutoDiscovery(IDracManager,
                           metaclass=Singleton):
     """List or invoke Dell LC auto-discovery actions."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-autodiscovery command."""
+        super(DellLcAutoDiscovery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -27,6 +27,10 @@ class NetworkPorts(IDracManager,
                    metaclass=Singleton):
     """Read every NetworkAdapter Port's link state across all chassis."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the network-ports command."""
+        super(NetworkPorts, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

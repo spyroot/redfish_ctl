@@ -28,6 +28,10 @@ class BiosResetDefault(IDracManager,
                        metaclass=Singleton):
     """Reset the host BIOS resource through the discovered ResetBios action."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the bios-reset command."""
+        super(BiosResetDefault, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -23,6 +23,10 @@ class ChassisReset(IDracManager,
     that affect those resources.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the chassis-reset command."""
+        super(ChassisReset, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

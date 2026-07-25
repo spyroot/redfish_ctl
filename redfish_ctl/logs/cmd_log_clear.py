@@ -31,6 +31,10 @@ class LogClear(IDracManager,
                metaclass=Singleton):
     """Clear a discovered LogService via LogService.ClearLog."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the log-clear command."""
+        super(LogClear, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

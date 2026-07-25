@@ -24,6 +24,10 @@ class DellNetworkAttributes(IDracManager,
                             metaclass=Singleton):
     """Read or stage Dell NetworkDeviceFunction network attributes."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-network-attributes command."""
+        super(DellNetworkAttributes, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -31,6 +31,10 @@ class NvLinkPorts(IDracManager,
                   metaclass=Singleton):
     """Read every GPU NVLink port and its traffic/error metrics."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the nvlink-ports command."""
+        super(NvLinkPorts, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

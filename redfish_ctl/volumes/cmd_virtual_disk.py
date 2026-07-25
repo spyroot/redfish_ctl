@@ -37,6 +37,10 @@ class VirtualDiskQuery(
     result to a file or output stdout or pass downstream to jq etc. tools.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the volumes command."""
+        super(VirtualDiskQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -22,6 +22,10 @@ class CapabilityReport(IDracManager,
                        metaclass=Singleton):
     """Emit local vendor capability profiles as machine-readable data."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the capability-report command."""
+        super(CapabilityReport, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

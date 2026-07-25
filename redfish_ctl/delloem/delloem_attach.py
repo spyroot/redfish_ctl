@@ -27,6 +27,10 @@ class DellOemAttach(IDracManager, scm_type=ApiRequestType.OemAttach,
     """A command uses dell oem to attach ISO
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-attach command."""
+        super(DellOemAttach, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

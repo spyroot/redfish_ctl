@@ -27,6 +27,10 @@ class AttributeClearPending(
     values currently staged on the Redfish endpoint.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the attr-clear-pending command."""
+        super(AttributeClearPending, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -30,6 +30,10 @@ class ActionList(IDracManager,
                  metaclass=Singleton):
     """Inventory every Redfish action target on the box and its risk level."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the actions command."""
+        super(ActionList, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

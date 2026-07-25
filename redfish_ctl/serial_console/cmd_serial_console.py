@@ -44,6 +44,10 @@ class SerialConsoleConfig(IDracManager,
                           metaclass=Singleton):
     """Report or enable host BIOS serial redirection together with BMC SOL."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the serial-console command."""
+        super(SerialConsoleConfig, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

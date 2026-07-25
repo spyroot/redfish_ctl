@@ -91,6 +91,10 @@ class VirtualMediaInsert(IDracManager,
     Called must first eject existing virtual media.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the insert_vm command."""
+        super(VirtualMediaInsert, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

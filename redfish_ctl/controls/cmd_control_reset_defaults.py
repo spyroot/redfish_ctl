@@ -28,6 +28,10 @@ class ControlResetDefaults(IDracManager,
                            metaclass=Singleton):
     """Discover and reset Redfish Control resources to default values."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the control-reset-defaults command."""
+        super(ControlResetDefaults, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

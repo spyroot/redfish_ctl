@@ -32,6 +32,10 @@ class DriveSecureErase(
 ):
     """Preview or run a guarded Redfish Drive.SecureErase action."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the drive-secure-erase command."""
+        super(DriveSecureErase, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

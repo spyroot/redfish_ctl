@@ -23,6 +23,10 @@ class DellJobQueueSetup(
 ):
     """Run DellJobService.SetupJobQueue behind the action safety gate."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-job-queue-setup command."""
+        super(DellJobQueueSetup, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

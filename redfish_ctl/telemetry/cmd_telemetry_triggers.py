@@ -24,6 +24,10 @@ class TelemetryTriggers(IDracManager,
                         metaclass=Singleton):
     """Read every TelemetryService Trigger (metric alert threshold)."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the telemetry-triggers command."""
+        super(TelemetryTriggers, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

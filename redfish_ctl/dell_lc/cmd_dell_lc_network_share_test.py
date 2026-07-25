@@ -38,6 +38,10 @@ class DellLcNetworkShareTest(IDracManager,
                              metaclass=Singleton):
     """Preview or invoke DellLCService.TestNetworkShare."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-network-share-test command."""
+        super(DellLcNetworkShareTest, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

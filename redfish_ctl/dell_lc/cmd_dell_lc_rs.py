@@ -20,6 +20,10 @@ class GetRemoteRssAPIStatus(IDracManager,
     """iDRACs cmd get status remote services api
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the service-api-rs-status command."""
+        super(GetRemoteRssAPIStatus, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

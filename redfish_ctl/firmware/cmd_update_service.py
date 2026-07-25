@@ -21,6 +21,10 @@ class UpdateServiceQuery(IDracManager,
                          metaclass=Singleton):
     """Read the service, inventory links, push URIs, and action targets."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the update_service command."""
+        super(UpdateServiceQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

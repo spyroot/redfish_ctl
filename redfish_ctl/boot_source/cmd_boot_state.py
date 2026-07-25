@@ -28,6 +28,10 @@ class BootState(IDracManager,
                 metaclass=Singleton):
     """Infer the host's next boot target and OS-deployment posture."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-state command."""
+        super(BootState, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

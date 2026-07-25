@@ -87,6 +87,10 @@ class NtpSet(IDracManager,
              metaclass=Singleton):
     """Set ManagerNetworkProtocol NTP servers after dry-run preview."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the ntp-set command."""
+        super(NtpSet, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

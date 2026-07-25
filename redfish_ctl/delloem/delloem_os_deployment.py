@@ -18,6 +18,10 @@ class DellOemTask(IDracManager,
     """A command query job_service_query.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-net-iso-task command."""
+        super(DellOemTask, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

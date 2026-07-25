@@ -25,6 +25,10 @@ class ImportSystemConfig(IDracManager,
     Command implementation import system configuration.
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the system-import command."""
+        super(ImportSystemConfig, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

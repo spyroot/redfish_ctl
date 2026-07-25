@@ -71,6 +71,10 @@ class NicFirmware(IDracManager,
                   metaclass=Singleton):
     """Read every NIC/DPU adapter and its firmware version across all chassis."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the nic-firmware command."""
+        super(NicFirmware, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

@@ -30,6 +30,10 @@ class PowerSmoothing(IDracManager,
                      metaclass=Singleton):
     """Read GPU PowerSmoothing state and profile setpoints."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the power-smoothing command."""
+        super(PowerSmoothing, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
@@ -430,6 +434,10 @@ class PowerSmoothingAction(PowerSmoothing,
                            name="power-smoothing-action",
                            metaclass=Singleton):
     """Preview or apply NVIDIA PowerSmoothing profile actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the power-smoothing-action command."""
+        super(PowerSmoothingAction, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

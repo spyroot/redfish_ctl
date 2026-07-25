@@ -28,6 +28,10 @@ class DellRaidRenameVD(IDracManager,
                        metaclass=Singleton):
     """Preview or run the DellRaidService RenameVD action."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-rename-vd command."""
+        super(DellRaidRenameVD, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

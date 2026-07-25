@@ -58,6 +58,10 @@ class DnsSet(IDracManager,
              metaclass=Singleton):
     """Set Manager EthernetInterface StaticNameServers after a dry-run preview."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the dns-set command."""
+        super(DnsSet, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

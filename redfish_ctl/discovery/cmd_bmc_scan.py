@@ -30,6 +30,10 @@ class BmcScan(IDracManager,
              metaclass=Singleton):
     """Scan a CIDR for hosts exposing a Redfish ServiceRoot."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the bmc-scan command."""
+        super(BmcScan, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
