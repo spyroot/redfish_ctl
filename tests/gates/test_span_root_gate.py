@@ -1,10 +1,10 @@
 """Offline tests for the span-root ratchet gate.
 
-The gate (tools/span_root_gate.py) flags a ``requests.<verb>`` that runs outside
-a tracing span and is not handed to a tracing wrapper. It must recognize all
-three real tracing patterns (with client_span; traced_request; and the async
-traced_request_callable) and flag only genuine orphans. Driven by parsing small
-source snippets, so it tests the AST logic directly.
+The gate (tools/span_root_gate.py) flags direct HTTP transport calls that run
+outside a tracing span and are not handed to a tracing wrapper. It must resolve
+aliases and client instances while recognizing all three real tracing patterns
+(with client_span; traced_request; and the async traced_request_callable).
+Driven by parsing small source snippets, so it tests the AST logic directly.
 
 Author Mus spyroot@gmail.com
 """
@@ -75,6 +75,14 @@ def test_imported_requests_verb_is_orphan():
     assert len(_orphans(src)) == 1
 
 
+def test_assigned_requests_module_alias_is_orphan():
+    """A second-level module alias remains bound to requests."""
+    src = ("import requests\ndef f():\n"
+           "    transport = requests\n"
+           "    transport.put('u')\n")
+    assert len(_orphans(src)) == 1
+
+
 def test_requests_head_and_options_are_orphans():
     """Less common requests verbs receive the same tracing enforcement."""
     src = ("import requests\ndef f():\n"
@@ -104,6 +112,58 @@ def test_urllib_urlopen_alias_is_orphan():
     src = ("from urllib.request import urlopen as open_url\ndef f():\n"
            "    open_url('u')\n")
     assert len(_orphans(src)) == 1
+
+
+def test_annotated_session_parameter_is_orphan():
+    """A passed Session remains visible when its parameter is annotated."""
+    src = ("import requests\ndef f(session: requests.Session):\n"
+           "    session.post('u')\n")
+    assert len(_orphans(src)) == 1
+
+
+def test_http_client_connection_request_is_orphan():
+    """The stdlib HTTPConnection request method is transport I/O."""
+    src = ("import http.client as hc\ndef f():\n"
+           "    connection = hc.HTTPSConnection('host')\n"
+           "    connection.request('GET', '/')\n")
+    assert len(_orphans(src)) == 1
+
+
+def test_urllib3_pool_request_is_orphan():
+    """A urllib3 PoolManager alias cannot bypass tracing."""
+    src = ("from urllib3 import PoolManager as Pool\ndef f():\n"
+           "    pool = Pool()\n"
+           "    pool.request('GET', 'u')\n")
+    assert len(_orphans(src)) == 1
+
+
+def test_aiohttp_session_request_is_orphan():
+    """An aiohttp async context-manager binding is resolved."""
+    src = ("import aiohttp as net\nasync def f():\n"
+           "    async with net.ClientSession() as session:\n"
+           "        await session.get('u')\n")
+    assert len(_orphans(src)) == 1
+
+
+def test_aliased_transport_inside_client_span_is_traced():
+    """Alias resolution does not flag a call already under client_span."""
+    src = ("import requests as client\ndef f():\n"
+           "    with tracing.client_span('u', 'POST'):\n"
+           "        client.post('u')\n")
+    assert _orphans(src) == []
+
+
+def test_non_transport_get_method_is_ignored():
+    """Generic objects using a get method are outside the HTTP signature set."""
+    assert _orphans("def f(mapping):\n    return mapping.get('key')\n") == []
+
+
+def test_comments_and_docstrings_are_ignored():
+    """Text that resembles a transport call is not executable AST."""
+    src = ('"""requests.post(\\"u\\")"""\n'
+           "# httpx.get('u')\n"
+           "def f():\n    return None\n")
+    assert _orphans(src) == []
 
 
 def test_real_repo_gate_is_clean():
