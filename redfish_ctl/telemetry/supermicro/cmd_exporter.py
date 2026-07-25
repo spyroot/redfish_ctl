@@ -22,13 +22,8 @@ from redfish_ctl.idrac_shared import REDFISH_API, ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter_cli import register_exporter_subcommand
-from redfish_ctl.telemetry.exporter import (
-    build_telemetry_identity,
-    resolve_signalfx_ingest_url,
-    resolve_signalfx_token,
-    run_signalfx_loop,
-    to_signalfx_body,
-)
+from redfish_ctl.telemetry.signalfx import emit as signalfx
+from redfish_ctl.telemetry.exporter import build_telemetry_identity
 from redfish_ctl.telemetry.prometheus import render_prometheus_text, serve_prometheus
 from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 
@@ -884,18 +879,18 @@ class Exporter(SupermicroManager,
             # Resolve and validate the push target BEFORE scraping so a missing
             # token or a bare (non-/v2/datapoint) ingest URL fails fast.
             if exporter_output == "signalfx" and push_signalfx:
-                token = resolve_signalfx_token(
+                token = signalfx.resolve_signalfx_token(
                     signalfx_token_env,
                     token=signalfx_token,
                     token_file=signalfx_token_file,
                 )
-                ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
+                ingest_url = signalfx.resolve_signalfx_ingest_url(signalfx_ingest_url)
                 scrape_start = time.monotonic()
                 samples = collect_current_samples()
                 scrape_ms = int((time.monotonic() - scrape_start) * 1000)
-                body = to_signalfx_body(samples)
+                body = signalfx.to_signalfx_body(samples)
                 push_start = time.monotonic()
-                status = exporter.push_signalfx(body, token, ingest_url)
+                status = signalfx.push_signalfx(body, token, ingest_url)
                 push_ms = int((time.monotonic() - push_start) * 1000)
                 if not verify_readback:
                     return CommandResult(
@@ -919,26 +914,26 @@ class Exporter(SupermicroManager,
                 # including deployment.environment when configured.
                 dimensions = exporter.common_sample_dimensions(samples)
                 readback_start = time.monotonic()
-                readback = exporter.verify_signalfx_readback(
+                readback = signalfx.verify_signalfx_readback(
                     realm, api_token, metric_names, dimensions)
                 readback_ms = int((time.monotonic() - readback_start) * 1000)
-                summary, error = exporter.build_readback_result(
+                summary, error = signalfx.build_readback_result(
                     status, ingest_url, len(samples), metric_names, readback,
                     {"scrape": scrape_ms, "push": push_ms, "readback": readback_ms},
                     freshness_ms=readback_freshness_ms)
                 return CommandResult(summary, None, summary, error)
             samples = collect_current_samples()
-            data = (to_signalfx_body(samples) if exporter_output == "signalfx"
+            data = (signalfx.to_signalfx_body(samples) if exporter_output == "signalfx"
                     else render_prometheus_text(samples))
             return CommandResult(data, None, {"sample_count": len(samples)}, None)
 
         if push_signalfx or exporter_output == "signalfx":
-            token = resolve_signalfx_token(
+            token = signalfx.resolve_signalfx_token(
                 signalfx_token_env,
                 token=signalfx_token,
                 token_file=signalfx_token_file,
             )
-            ingest_url = resolve_signalfx_ingest_url(signalfx_ingest_url)
+            ingest_url = signalfx.resolve_signalfx_ingest_url(signalfx_ingest_url)
 
             def scrape_samples():
                 """Scrape one round of telemetry samples for the SignalFx loop.
@@ -947,7 +942,7 @@ class Exporter(SupermicroManager,
                 """
                 return collect_current_samples()
 
-            run_signalfx_loop(scrape_samples, token, ingest_url, float(interval or 30.0))
+            signalfx.run_signalfx_loop(scrape_samples, token, ingest_url, float(interval or 30.0))
             return CommandResult(None, None, None, None)
 
         def scrape_text():

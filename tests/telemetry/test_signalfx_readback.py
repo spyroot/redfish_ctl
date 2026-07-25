@@ -14,10 +14,13 @@ import pytest
 
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry import http_util
+from redfish_ctl.telemetry import signalfx
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
-    build_readback_result,
     common_sample_dimensions,
+)
+from redfish_ctl.telemetry.signalfx import (
+    build_readback_result,
     signalfx_metric_readback,
     verify_signalfx_readback,
 )
@@ -108,14 +111,14 @@ def test_readback_uses_no_redirect_token_request():
 def test_readback_scopes_query_by_dimension():
     """The MTS query is scoped by the entity dimension so only this host's series
     is read back, not every host reporting the metric (Splunk MTS identity)."""
-    assert exporter._mts_query("hw.power", {"host.name": "slot1"}) == (
+    assert signalfx._mts_query("hw.power", {"host.name": "slot1"}) == (
         'sf_metric:"hw.power" AND host.name:"slot1"')
-    assert exporter._mts_query("hw.power") == 'sf_metric:"hw.power"'
+    assert signalfx._mts_query("hw.power") == 'sf_metric:"hw.power"'
 
 
 def test_readback_query_escapes_quotes_and_backslashes():
     """Dimension values are escaped before they enter the MTS query language."""
-    query = exporter._mts_query(
+    query = signalfx._mts_query(
         'hw."power"',
         {"host.name": r'slot\"1'},
     )

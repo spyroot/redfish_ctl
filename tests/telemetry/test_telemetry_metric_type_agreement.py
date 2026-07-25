@@ -9,7 +9,7 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from redfish_ctl.telemetry import exporter, otlp, prometheus
+from redfish_ctl.telemetry import exporter, otlp, prometheus, signalfx
 
 # Curated metric -> expected type, including the tricky cases the data-type audit surfaced.
 _EXPECTED = {
@@ -58,7 +58,7 @@ def _signalfx_envelope(sample):
     :param sample: the sample to wrap.
     :return: ``gauge`` or ``cumulative_counter``.
     """
-    for envelope, points in exporter.to_signalfx_body([sample]).items():
+    for envelope, points in signalfx.to_signalfx_body([sample]).items():
         if points:
             return envelope
     return None

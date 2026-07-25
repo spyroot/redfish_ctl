@@ -13,6 +13,7 @@ from vendor_corpus import corpus_dir
 
 import redfish_ctl.telemetry.exporter as exporter_mod
 import redfish_ctl.telemetry.http_util as http_util_mod
+import redfish_ctl.telemetry.signalfx.emit as signalfx_emit
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
 from redfish_ctl.idrac_manager import IDracManager
@@ -22,13 +23,15 @@ from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,
     MetricSample,
-    _require_datapoint_url,
     apply_exporter_env_file,
     build_identity_dimensions,
     exporter_argv_uses_secret,
     load_exporter_env_file,
     metric_definition,
     metric_definitions,
+)
+from redfish_ctl.telemetry.signalfx import (
+    _require_datapoint_url,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
     to_signalfx_body,
@@ -1241,7 +1244,7 @@ def test_exporter_command_uses_config_file_for_signalfx_and_identity(
 
     monkeypatch.delenv("SPLUNK_ACCESS_TOKEN", raising=False)
     monkeypatch.delenv("SPLUNK_INGEST_URL", raising=False)
-    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
 
     result = mgr.sync_invoke(
         ApiRequestType.SupermicroExporter,
@@ -1290,13 +1293,13 @@ def test_signalfx_push_loop_jitters_sleep(monkeypatch):
         raise RuntimeError("stop loop")
 
     monotonic_values = iter([100.0, 105.0])
-    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 1.0)
     monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
-        exporter_mod.run_signalfx_loop(
+        signalfx_emit.run_signalfx_loop(
             lambda: samples,
             "token",
             "https://ingest.us1.signalfx.com/v2/datapoint",
@@ -1335,13 +1338,13 @@ def test_signalfx_push_loop_continues_after_transient_push_error(monkeypatch):
 
     errors = []
     monotonic_values = iter([100.0, 101.0, 130.0, 132.0])
-    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 0.5)
     monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
-        exporter_mod.run_signalfx_loop(
+        signalfx_emit.run_signalfx_loop(
             lambda: samples,
             "token",
             "https://ingest.us1.signalfx.com/v2/datapoint",
@@ -1521,7 +1524,7 @@ def test_once_push_signalfx_posts_body_exactly_once(redfish_mock_factory, monkey
         calls.append({"body": body, "token": token, "ingest_url": ingest_url})
         return 200
 
-    monkeypatch.setattr(exporter_mod, "push_signalfx", fake_push)
+    monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
 
     result = mgr.sync_invoke(
         ApiRequestType.SupermicroExporter,
@@ -1550,7 +1553,7 @@ def test_once_push_signalfx_rejects_bare_ingest_url(redfish_mock_factory, monkey
     monkeypatch.setenv("SPLUNK_ACCESS_TOKEN", "test-token")
 
     called = []
-    monkeypatch.setattr(exporter_mod, "push_signalfx",
+    monkeypatch.setattr(signalfx_emit, "push_signalfx",
                         lambda *a, **k: called.append(1))
 
     with pytest.raises(ValueError, match="v2/datapoint"):
@@ -1642,7 +1645,7 @@ def test_push_signalfx_rejects_non_https_ingest_url_before_open(monkeypatch):
     monkeypatch.setattr(http_util_mod, "open_no_redirect_request", fail_if_opened)
 
     with pytest.raises(ValueError, match="https"):
-        exporter_mod.push_signalfx(
+        signalfx_emit.push_signalfx(
             {"gauge": []},
             "secret-token",
             "http://ingest.us1.signalfx.com/v2/datapoint",
