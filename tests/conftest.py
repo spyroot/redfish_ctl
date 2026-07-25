@@ -150,6 +150,22 @@ def _vendor_fixture_dir(vendor):
 _DELL_JOB_ID = "JID_000000000001"      # Dell OEM DellJobService job id
 _DMTF_TASK_ID = "1"                     # DMTF TaskService monitor id (all non-Dell)
 
+# Actions with a DOCUMENTED synchronous realization: the vendor answers the POST
+# terminally (200 + a Base success message), never with a 202 task/job. Serving
+# the blanket 202+Location for these would fabricate an async realization the
+# vendor does not have — the same wrong-lens hazard as SubmitTestEvent below.
+# DellLCService.TestNetworkShare evidence (no live Dell box exists to trace —
+# the XR8620t corpus donor is decommissioned):
+# * iDRAC9 Redfish API Guide 4.20.20.20 pp.107-108: TestNetworkShare documents
+#   no 202 row and no job language, while sibling DellLCService actions document
+#   async explicitly (SupportAssistUploadLastCollection lists 202; SystemErase
+#   says "a job ID is returned").
+# * Dell's Ansible module idrac_diagnostics.py: test_network_share() POSTs with
+#   no job wait and parses errors as a sync @Message.ExtendedInfo body, while
+#   RunePSADiagnostics in the same file gets an explicit job wait.
+# * Dell's TestNetworkShareREDFISH.py: terminal at the POST, never polls a job.
+_SYNC_ACTION_SUFFIXES = ("delllcservice.testnetworkshare",)
+
 
 def _vendor_family(vendor):
     """Collapse a fixture-set name to its vendor family.
@@ -200,6 +216,8 @@ class MockRedfishService:
     * PATCH  -> deep-merges the body into state, 200 + a success message
     * POST   -> protocol-accurate per shape: ``SubmitTestEvent`` -> 204 (sync);
                 subscription create (``/Subscriptions``) -> 201 + ``Location``;
+                documented-sync actions (``_SYNC_ACTION_SUFFIXES``) -> 200 + a
+                Base success message, no task;
                 other ``/Actions/`` -> 202 with a ``Location`` task header; else 204.
                 The 202 task id is VENDOR-FAITHFUL: ``vendor="dell"`` returns an OEM
                 ``JID_`` job; every other vendor a plain DMTF TaskService id (never
@@ -298,6 +316,16 @@ class MockRedfishService:
             context.status_code = 201
             context.headers["Location"] = request.path.rstrip("/") + "/1"
             return ""
+        if path.rstrip("/").endswith(_SYNC_ACTION_SUFFIXES):
+            # Documented-sync actions (see _SYNC_ACTION_SUFFIXES) realize in
+            # place: 200 + a Base success message, no task and no Location.
+            import json
+            context.status_code = 200
+            return json.dumps(
+                {"@Message.ExtendedInfo": [{"MessageId": "Base.1.12.Success",
+                                            "Message": "Successfully Completed Request",
+                                            "Severity": "OK"}]}
+            )
         if "/actions/" in path:
             # A vendor that realizes an Action as a task returns 202 + a Location
             # header at the new task. The id is vendor-faithful (Dell JID_ OEM job
