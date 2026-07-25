@@ -41,7 +41,7 @@ def dell_raid_manager_factory():
     requests_mock = pytest.importorskip("requests_mock")
     started = []
 
-    def factory(service_body=None, post_body=None):
+    def factory(service_body=None, post_body=None, post_status=200):
         requests = []
 
         def get_cb(request, context):
@@ -58,7 +58,7 @@ def dell_raid_manager_factory():
 
         def post_cb(request, context):
             requests.append(request)
-            context.status_code = 200
+            context.status_code = post_status
             return json.dumps(post_body or {"Status": "Valid"})
 
         mocker = requests_mock.Mocker()
@@ -179,6 +179,34 @@ def test_dell_raid_check_values_posts_read_only_action_by_default(
         "VDPropNameArrayIn": ["RAIDLevel"],
         "VDPropValueArrayIn": ["RAID1"],
     }
+
+
+def test_dell_raid_check_values_non_2xx_is_not_reported_as_executed(
+    dell_raid_manager_factory,
+):
+    """A rejected validation POST fails closed instead of reporting execution."""
+    manager, requests = dell_raid_manager_factory(
+        post_status=405,
+        post_body={
+            "error": {
+                "code": "Base.1.12.ActionNotSupported",
+                "message": "The action is not supported.",
+            }
+        },
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.DellRaidCheckValues,
+        "dell-raid-check-values",
+        property_names=["RAIDLevel"],
+        property_values=["RAID1"],
+    )
+
+    posts = _post_requests(requests)
+    assert result.error is not None
+    assert result.data["executed"] is False
+    assert result.data["action"] == "#DellRaidService.CheckVDValues"
+    assert len(posts) == 1
 
 
 def test_dell_raid_check_values_rejects_invalid_property_without_posting(
