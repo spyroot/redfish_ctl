@@ -15,6 +15,7 @@ from typing import Iterable, Optional
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
 from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -208,15 +209,42 @@ class DellRaidCheckValues(IDracManager,
             json.dumps(payload),
             self.json_content_type,
         )
-        api_resp = self.default_post_success(response, expected=200)
         data = {
-            "executed": True,
+            "executed": False,
             "action": _CHECK_ACTION,
             "target": target,
             "payload": payload,
             "level": "read_only",
         }
+        try:
+            api_resp = self.default_post_success(response, expected=200)
+        except RedfishException as exc:
+            try:
+                data["response"] = response.json()
+            except ValueError:
+                pass
+            return CommandResult(
+                data,
+                preview.discovered,
+                None,
+                str(exc),
+            )
+
         data.update(self.api_success_msg(api_resp))
+        if api_resp == RedfishApiRespond.Error:
+            try:
+                data["response"] = response.json()
+            except ValueError:
+                pass
+            error = self._redfish_error or self.parse_error(response)
+            return CommandResult(
+                data,
+                preview.discovered,
+                None,
+                str(error or f"{_CHECK_ACTION} failed"),
+            )
+
+        data["executed"] = True
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             data["task_id"] = self.job_id_from_header(response)
         else:
