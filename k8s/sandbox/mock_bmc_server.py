@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Serve a captured Redfish corpus over a small HTTP endpoint."""
+"""Serve a captured Redfish corpus or a DSP2043 mockup tree over HTTP.
+
+Two mutually independent read modes exist: ``--corpus-dir`` serves a captured
+crawl flattened to ``_redfish_v1_*.json`` files (with optional write engines),
+and ``--mockup-dir`` serves a DMTF DSP2043 mockup profile natively, mapping
+each request path 1:1 onto ``<path>/index.json`` in the profile tree (GET-only,
+no synthesis, no rewriting).
+"""
 
 from __future__ import annotations
 
@@ -307,6 +314,263 @@ def fixture_for_redfish_path(corpus_dir: Path, request_path: str) -> Path | None
 
     key = "_" + path.strip("/").replace("/", "_") + ".json"
     return _build_fixture_index(Path(corpus_dir)).get(key.lower())
+
+
+# --- DSP2043 native mockup mode --------------------------------------------
+#
+# A DSP2043 mockup profile stores each Redfish resource as <path>/index.json
+# and the directory structure IS the API structure, 1:1. The mock's only job
+# in this mode is to map the request path onto that tree, read the file, and
+# return the DMTF JSON verbatim.
+
+MOCKUP_INDEX = "index.json"
+_MOCKUP_CONTENT_TYPES = {
+    ".xml": "application/xml",
+    ".yaml": "application/yaml",
+    ".yml": "application/yaml",
+}
+
+
+def mockup_service_root(mockup_dir: Path) -> Path:
+    """Resolve the service-root directory of a DSP2043 mockup profile.
+
+    Every 2026.1 bundle profile starts directly at the service root (the
+    profile root's ``index.json`` IS ``/redfish/v1``), but some mockup trees
+    nest the resources under a ``redfish/v1/`` prefix instead; both layouts
+    are probed here, prefix first.
+
+    :param mockup_dir: profile root directory (an extracted bundle profile).
+    :return: the directory whose ``index.json`` is the service root.
+    :raises FileNotFoundError: when neither layout's ``index.json`` exists.
+    """
+    root = Path(mockup_dir)
+    prefixed = root / "redfish" / "v1"
+    if (prefixed / MOCKUP_INDEX).is_file():
+        return prefixed
+    if (root / MOCKUP_INDEX).is_file():
+        return root
+    raise FileNotFoundError(
+        f"no DSP2043 service root under {root}: neither redfish/v1/index.json "
+        f"nor index.json exists"
+    )
+
+
+def mockup_version_object(mockup_dir: Path) -> bytes:
+    """Return the ``/redfish`` version object for a mockup profile.
+
+    DSP0266 1.24.0 section 6.7 Table 4 requires ``/redfish`` to serve the
+    version object. A ``redfish/v1``-prefixed profile ships it as
+    ``redfish/index.json``; a root-direct profile has no such file, so the
+    spec-defined document ``{"v1": "/redfish/v1/"}`` is synthesized — that one
+    payload is defined by the protocol, not vendor data.
+
+    :param mockup_dir: profile root directory (an extracted bundle profile).
+    :return: the version object as UTF-8 JSON bytes.
+    """
+    version_file = Path(mockup_dir) / "redfish" / MOCKUP_INDEX
+    if version_file.is_file():
+        return version_file.read_bytes()
+    return json.dumps({"v1": "/redfish/v1/"}).encode("utf-8")
+
+
+def mockup_file_for_redfish_path(
+    service_root: Path, request_path: str
+) -> Path | None:
+    """Map a Redfish request path 1:1 onto a DSP2043 mockup tree.
+
+    The resolution rule is the DSP2043 layout itself: ``/redfish/v1`` resolves
+    to the service root's ``index.json`` and any subpath resolves to
+    ``<service_root>/<subpath>/index.json``. Trailing slashes are ignored, so
+    both spellings of every URI resolve to the same resource (DSP0266 1.24.0
+    section 6.7 Table 5). Two spec-defined shapes are not ``index.json``
+    resources: ``/redfish/v1/$metadata`` is the XML metadata document, stored
+    by DSP2043 as ``$metadata/index.xml`` (DSP0266 section 6.7 Table 4), and a
+    direct file in the tree (e.g. ``openapi.yaml``) is served verbatim when
+    present. A containment guard keeps any ``..`` segment from escaping the
+    profile tree.
+
+    :param service_root: directory whose ``index.json`` is the service root.
+    :param request_path: raw request path to resolve.
+    :return: the file to serve, or None when the path is outside
+        ``/redfish/v1`` or has no file in the tree.
+    """
+    path = _normalize_request_path(request_path)
+    if path != "/redfish/v1" and not path.startswith("/redfish/v1/"):
+        return None
+    subpath = path[len("/redfish/v1"):].strip("/")
+    root = Path(service_root)
+    if not subpath:
+        return root / MOCKUP_INDEX
+    candidates = [root / subpath / MOCKUP_INDEX]
+    if subpath == "$metadata":
+        # DSP0266 1.24.0 section 6.7 Table 4: /redfish/v1/$metadata is the
+        # OData metadata DOCUMENT (XML, not JSON); DSP2043 stores it as
+        # $metadata/index.xml.
+        candidates.insert(0, root / "$metadata" / "index.xml")
+    candidates.append(root / subpath)
+    root_resolved = root.resolve()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if not resolved.is_relative_to(root_resolved):
+            # Containment guard: a decoded '..' segment in the URL must never
+            # resolve outside the mockup tree.
+            continue
+        if resolved.is_file():
+            return resolved
+    return None
+
+
+def _mockup_content_type(path: Path) -> str:
+    """Content type for a mockup file, chosen by suffix.
+
+    :param path: the resolved mockup file.
+    :return: ``application/xml``/``application/yaml`` for those suffixes,
+        else ``application/json``.
+    """
+    return _MOCKUP_CONTENT_TYPES.get(path.suffix.lower(), "application/json")
+
+
+class MockupRequestHandler(BaseHTTPRequestHandler):
+    """GET-only handler serving a DSP2043 mockup profile tree 1:1.
+
+    The request path maps directly onto the extracted profile directory
+    (``/redfish/v1/X/Y`` -> ``<service_root>/X/Y/index.json``) and the payload
+    is returned byte-faithful. Write verbs are refused with 405: a mockup tree
+    is a static spec artifact, not a stateful device.
+    """
+
+    server_version = "redfish-ctl-mock-bmc/1.0"
+    mockup_dir: Path
+    service_root: Path
+
+    def _send_bytes(
+        self,
+        status: int,
+        content: bytes,
+        content_type: str,
+        send_body: bool = True,
+    ) -> None:
+        """Send a response with the given status, body bytes, and content type.
+
+        :param status: HTTP status code to send.
+        :param content: response body bytes (used for Content-Length always).
+        :param content_type: value for the Content-Type header.
+        :param send_body: whether to write the body (False for HEAD).
+        """
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        if send_body:
+            self.wfile.write(content)
+
+    def _serve(self, send_body: bool) -> None:
+        """Serve the mockup file for the current request path.
+
+        :param send_body: whether to write the response body (False for HEAD).
+        """
+        path = _normalize_request_path(self.path)
+        if path == "/redfish":
+            # DSP0266 1.24.0 section 6.7 Table 4: /redfish is the spec-defined
+            # version object, served from redfish/index.json when the profile
+            # ships it and synthesized otherwise.
+            self._send_bytes(
+                200,
+                mockup_version_object(type(self).mockup_dir),
+                "application/json",
+                send_body,
+            )
+            return
+        target = mockup_file_for_redfish_path(type(self).service_root, self.path)
+        if target is None:
+            body = json.dumps(
+                {
+                    "error": {
+                        "code": "Base.1.0.GeneralError",
+                        "message": (
+                            f"The resource at the URI {path} was not found."
+                        ),
+                    }
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+            self._send_bytes(404, body, "application/json", send_body)
+            return
+        self._send_bytes(
+            200, target.read_bytes(), _mockup_content_type(target), send_body
+        )
+
+    def do_GET(self) -> None:
+        """Handle a GET request by serving the mapped mockup file."""
+        self._serve(send_body=True)
+
+    def do_HEAD(self) -> None:
+        """Handle a HEAD request by serving mockup headers without a body."""
+        self._serve(send_body=False)
+
+    def do_OPTIONS(self) -> None:
+        """Handle an OPTIONS request by advertising the read-only method set."""
+        self.send_response(204)
+        self.send_header("Allow", "GET, HEAD, OPTIONS")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _reject_write(self) -> None:
+        """Refuse a write verb with 405 — the mockup tree is read-only."""
+        content = b'{"error": "read-only DSP2043 mockup"}'
+        self.send_response(405)
+        self.send_header("Allow", "GET, HEAD, OPTIONS")
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def do_POST(self) -> None:
+        """Refuse a POST request — the mockup mode is GET-only."""
+        self._reject_write()
+
+    def do_PATCH(self) -> None:
+        """Refuse a PATCH request — the mockup mode is GET-only."""
+        self._reject_write()
+
+    def do_PUT(self) -> None:
+        """Refuse a PUT request — the mockup mode is GET-only."""
+        self._reject_write()
+
+    def do_DELETE(self) -> None:
+        """Refuse a DELETE request — the mockup mode is GET-only."""
+        self._reject_write()
+
+    def log_message(self, format: str, *args: object) -> None:
+        """Log a request line only when ``MOCK_BMC_VERBOSE`` is ``1``.
+
+        :param format: printf-style format string from the base handler.
+        """
+        if os.environ.get("MOCK_BMC_VERBOSE") == "1":
+            super().log_message(format, *args)
+
+
+def make_mockup_handler(mockup_dir: Path) -> type[MockupRequestHandler]:
+    """Build a request-handler class bound to a DSP2043 mockup profile.
+
+    :param mockup_dir: profile root directory (an extracted bundle profile).
+    :return: a ``MockupRequestHandler`` subclass configured for the profile.
+    :raises FileNotFoundError: if the directory is missing or holds no
+        service-root ``index.json`` in either supported layout.
+    """
+    root = Path(mockup_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"mockup directory not found: {root}")
+
+    class Handler(MockupRequestHandler):
+        pass
+
+    Handler.mockup_dir = root
+    Handler.service_root = mockup_service_root(root)
+    return Handler
 
 
 def _load_trace(trace_path: Path) -> dict[str, Any]:
@@ -1333,14 +1597,50 @@ def make_handler(
     return Handler
 
 
+def _select_handler(
+    corpus_dir: Path | None,
+    replay_trace: Path | None,
+    mutation_rules: Path | None,
+    seed: int,
+    mockup_dir: Path | None,
+) -> type[BaseHTTPRequestHandler]:
+    """Build the handler class the requested serving mode calls for.
+
+    :param corpus_dir: flattened-corpus directory (corpus mode).
+    :param replay_trace: optional ordered write-replay trace (corpus mode only).
+    :param mutation_rules: optional mutation-rules file (corpus mode only).
+    :param seed: RNG seed for mutation-rules failure injection.
+    :param mockup_dir: DSP2043 profile root; selects the GET-only mockup mode.
+    :return: the configured handler class.
+    :raises ValueError: when the mockup mode is combined with a write engine
+        or no serving directory is given.
+    """
+    if mockup_dir is not None:
+        if replay_trace is not None or mutation_rules is not None:
+            raise ValueError(
+                "--mockup-dir is GET-only; --replay/--mutation-rules apply "
+                "to corpus mode"
+            )
+        return make_mockup_handler(mockup_dir)
+    if corpus_dir is None:
+        raise ValueError("either a corpus dir or a mockup dir is required")
+    return make_handler(
+        corpus_dir,
+        replay_trace=replay_trace,
+        mutation_rules=mutation_rules,
+        seed=seed,
+    )
+
+
 @contextmanager
 def run_server(
     host: str,
     port: int,
-    corpus_dir: Path,
+    corpus_dir: Path | None = None,
     replay_trace: Path | None = None,
     mutation_rules: Path | None = None,
     seed: int = 0,
+    mockup_dir: Path | None = None,
 ) -> Iterator[ThreadingHTTPServer]:
     """Run the mock BMC server in a background thread as a context manager.
 
@@ -1353,15 +1653,12 @@ def run_server(
     :param replay_trace: optional ordered write-replay trace file.
     :param mutation_rules: optional order-independent mutation-rules file.
     :param seed: RNG seed for mutation-rules failure injection.
+    :param mockup_dir: DSP2043 profile root to serve natively (GET-only);
+        mutually exclusive with the write engines.
     """
     server = MockBMCServer(
         (host, port),
-        make_handler(
-            corpus_dir,
-            replay_trace=replay_trace,
-            mutation_rules=mutation_rules,
-            seed=seed,
-        ),
+        _select_handler(corpus_dir, replay_trace, mutation_rules, seed, mockup_dir),
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -1410,6 +1707,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Seed for mutation-rules failure injection (default 0, "
         "overridable via MOCK_BMC_SEED). Same seed replays the same failures.",
     )
+    parser.add_argument(
+        "--mockup-dir",
+        type=Path,
+        default=None,
+        help="Serve a DSP2043 mockup profile natively: each request path maps "
+        "1:1 to <path>/index.json under this directory (GET-only; "
+        "mutually exclusive with --replay/--mutation-rules).",
+    )
     return parser.parse_args(argv)
 
 
@@ -1426,15 +1731,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         server = MockBMCServer(
             (args.host, args.port),
-            make_handler(
+            _select_handler(
                 args.corpus_dir,
-                replay_trace=args.replay,
-                mutation_rules=args.mutation_rules,
-                seed=args.seed,
+                args.replay,
+                args.mutation_rules,
+                args.seed,
+                args.mockup_dir,
             ),
         )
         host, port = server.server_address
-        print(f"Serving Redfish corpus from {args.corpus_dir} on {host}:{port}")
+        if args.mockup_dir is not None:
+            print(f"Serving DSP2043 mockup from {args.mockup_dir} on {host}:{port}")
+        else:
+            print(f"Serving Redfish corpus from {args.corpus_dir} on {host}:{port}")
         server.serve_forever()
     except (FileNotFoundError, ValueError) as exc:
         print(f"mock-bmc: {exc}", file=sys.stderr)
