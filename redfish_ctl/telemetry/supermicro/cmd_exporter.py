@@ -24,7 +24,7 @@ from redfish_ctl.telemetry.exporter import build_telemetry_identity
 from redfish_ctl.telemetry.otlp import OtlpWriter
 from redfish_ctl.telemetry.prometheus import PrometheusWriter
 from redfish_ctl.telemetry.signalfx import SignalFxWriter
-from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
+from redfish_ctl.telemetry.supermicro.super_microexporter import SupermicroExporterReader
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,10 @@ class Exporter(SupermicroManager,
                name='exporter',
                metaclass=Singleton):
     """Read BMC telemetry and expose Prometheus or SignalFx metric output."""
+
+    # The concrete reader is bound here (registration) and constructed in
+    # __init__; the command depends only on the AbstractExporterReader contract.
+    reader_cls = SupermicroExporterReader
 
     _UNSUPPORTED_COLLECTOR_ERRORS = {
         "FailedDiscoverAction",
@@ -50,8 +54,9 @@ class Exporter(SupermicroManager,
     }
 
     def __init__(self, *args, **kwargs):
-        """Initialize the exporter command."""
+        """Initialize the exporter command and its telemetry reader."""
         super(Exporter, self).__init__(*args, **kwargs)
+        self._reader = self.reader_cls()
 
     @staticmethod
     @abstractmethod
@@ -558,7 +563,7 @@ class Exporter(SupermicroManager,
             result.name: result.rows
             for result in collector_results
         }
-        samples = build_metric_samples(
+        samples = self._reader.build_metric_samples(
             identity=identity,
             environment_rows=rows_by_collector["environment-metrics"],
             sensor_rows=rows_by_collector["sensors"],
