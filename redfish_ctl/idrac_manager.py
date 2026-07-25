@@ -114,52 +114,21 @@ class IDracManager(RedfishManager):
     # SET(Dell) while a non-Dell vendor never sees a Dell verb.
     _registry = collections.defaultdict(dict)
 
-    def __init__(self,
-                 host: Optional[str] = None,
-                 username: Optional[str] = None,
-                 password: Optional[str] = None,
-                 port: Optional[int] = 443,
-                 insecure: Optional[bool] = True,
-                 x_auth: Optional[str] = None,
-                 is_http: Optional[bool] = False,
-                 is_debug: Optional[bool] = False,
-                 log_level=logging.NOTSET):
-        """Default constructor requires credentials.
-           By default, the manager uses json to serialize a data to callee
-           and uses json content type.
+    def __init__(self, *args, log_level=logging.NOTSET, **kwargs):
+        """Initialize Dell-specific state on top of the shared connection.
 
-        :param host: BMC host or IP address.
-        :param username: BMC account username; defaults to root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
-        :param insecure: when True (the default) TLS certificate verification is
-            skipped. BMC controllers present self-signed certificates, so
-            verification is opt-in: pass ``insecure=False`` to verify the cert.
-        :param x_auth: X-Authentication header.
-        :param is_http: use plain HTTP instead of HTTPS for requests when True.
-        :param is_debug: when True, include exception tracebacks in error logs.
+        Host, username, password, port, and transport options are owned by
+        :class:`RedfishManager` and are forwarded unchanged.
+
+        :param args: positional arguments forwarded to ``RedfishManager``.
         :param log_level: logging level applied to this manager's logger.
+        :param kwargs: keyword arguments forwarded to ``RedfishManager``.
         """
-        super().__init__(host=host,
-                         username=username,
-                         password=password,
-                         port=port,
-                         insecure=insecure,
-                         is_http=is_http,
-                         x_auth=x_auth,
-                         is_debug=is_debug)
+        super().__init__(*args, **kwargs)
 
         self.logger = logging.getLogger(__name__)
         self._logger_level = log_level
         self.logger.setLevel(self._logger_level)
-
-        self.content_type = {'Content-Type': 'application/json; charset=utf-8'}
-        self.json_content_type = {'Content-Type': 'application/json; charset=utf-8'}
-
-        self._manage_servers_obs = []
-        self._manage_chassis_obs = []
-        # mainly to track query sent , for unit test
-        self.query_counter = 0
 
         # mapping between rest API respond to respected
         # string that we report to apper layer.
@@ -239,10 +208,6 @@ class IDracManager(RedfishManager):
         }
 
         self._redfish_error = None
-
-        # run time
-        self.action_targets = None
-        self.api_endpoints = None
 
     @property
     def idrac_ip(self) -> str:

@@ -2,15 +2,16 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Use `redfish_ctl system` as the first sanity check: it starts at the CLI, runs a self-registering
-command module, uses `IDracManager`, and ends in the generic Redfish HTTP client. The important rule
-is that Redfish stays product-neutral; Dell behavior sits above it.
+`RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, is the DMTF/shared command root.
+`IDracManager`, defined in `redfish_ctl/idrac_manager.py`, is the Dell command root. Use
+`redfish_ctl --vendor dell system` when tracing a Dell system command from the CLI to the HTTP client.
 
 ```text
 CLI (`redfish_main.py`, argparse)
+  -> selected manager's MRO-composed command registry
   -> command modules (`cmd_*.py`, `<domain>/cmd_*.py`)
-  -> `IDracManager` for iDRAC/Dell behavior and host-system selection
-  -> `RedfishManager` for product-neutral HTTP and response parsing
+  -> `RedfishManager` for DMTF commands and product-neutral HTTP
+  -> vendor manager for vendor commands and response semantics
   -> requests over Redfish HTTPS
 ```
 
@@ -19,11 +20,11 @@ CLI (`redfish_main.py`, argparse)
 - `RedfishManager`, defined in `redfish_ctl/redfish_manager.py`, owns connection settings, HTTP verbs,
   Redfish response parsing, and the `CommandResult(data, discovered, extra, error)` return shape. It
   never imports vendor packages.
-- `IDracManager`, defined in `redfish_ctl/idrac_manager.py`, adds Dell/iDRAC defaults, task/job polling,
-  Dell OEM helpers, and host ComputerSystem resolution.
-- Commands, defined in `redfish_ctl/cmd_*.py` and domain packages, subclass `IDracManager` with an
-  `ApiRequestType` and `name=`. They self-register through `__init_subclass__`, so adding a command is
-  adding a module, not editing a central switch.
+- `IDracManager` adds Dell/iDRAC defaults, OEM helpers, and Lifecycle Controller job handling. Its
+  request/response overrides preserve Dell job identifiers returned in either `Location` or JSON.
+- Shared DMTF commands subclass `RedfishManager`; Dell commands subclass `IDracManager`; other vendor
+  commands subclass their vendor manager. Commands self-register with an `ApiRequestType` and `name=`
+  through `__init_subclass__`.
 
 ## Vendor-Neutral Reads
 
@@ -57,7 +58,7 @@ The generic core never imports vendor packages.
 ## Host-System Selection
 
 Some hosts expose more than one ComputerSystem. A Supermicro GB300 can expose the host as `System_0`
-and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `IDracManager.discover_computer_system_ids()`,
+and the NVIDIA HGX baseboard as `HGX_Baseboard_0`. `RedfishManager.discover_computer_system_ids()`,
 `discover_manager_ids()`, and `_host_system()` prefer the member with `Bios` or `Boot` links so host
 commands route to the host system instead of a baseboard.
 
@@ -69,8 +70,8 @@ event loop. A future fleet proxy would build on those helpers; the proxy itself 
 
 ## Known Structural Debt
 
-- `IDracManager` is large; transport and retry behavior belongs lower in
-  `RedfishManager`.
+- `IDracManager` is large; shared transport and retry behavior belongs in `RedfishManager`, while
+  Dell Lifecycle Controller job semantics remain in `IDracManager`.
 - Power, boot, and BIOS control paths need library-callable APIs, not only the CLI
   argument path, so a future proxy and other callers can reuse them directly.
 - `firmware-update` exists as a guarded SimpleUpdate path. It requires a dry-run/confirm safety model;

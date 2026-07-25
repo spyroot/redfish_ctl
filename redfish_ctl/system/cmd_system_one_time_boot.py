@@ -138,10 +138,10 @@ class ImportOneTimeBoot(
             ok = self.default_post_success(self, response, expected=202)
 
             if ok:
-                job_id = self.job_id_from_header(response)
-                if job_id is None:
-                    self.job_id_from_respond(response)
-                if job_id is not None:
+                job_id = self.job_id_from_header(response, strict=False)
+                if not job_id:
+                    job_id = self.job_id_from_respond(response)
+                if job_id:
                     if not do_async:
                         data = self.fetch_task(job_id)
                     else:

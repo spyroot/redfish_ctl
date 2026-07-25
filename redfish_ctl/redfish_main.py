@@ -1,10 +1,7 @@
-"""Main entry for redfish_ctl
+"""CLI entrypoint for redfish_ctl.
 
-The main routine for redfish_ctl; the tool leverages the IDracManager class.
-to interact with a Redfish BMC.
-
-Each command registered dynamically and dispatch to respected execute method
-by invoking requests through the manager.
+Parses root options, builds the DMTF/vendor command tree, instantiates the
+selected manager, and dispatches one command.
 
 Author Mus spyroot@gmail.com
 """
@@ -440,11 +437,12 @@ def is_fleet_command(args) -> bool:
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
-def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
+def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -> None:
     """Main entry point.
 
     :param cmd_args: parsed CLI arguments for the selected command.
     :param command_name_to_cmd: mapping of command name to its (type, name) tuple.
+    :param manager_cls: selected neutral or vendor manager class.
     """
     # BMCs ship self-signed certs, so verification is opt-in via --verify-ssl.
     # We skip verification by default; --insecure stays as an explicit "skip".
@@ -464,41 +462,13 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.setup_otlp()
         tracing.install_termination_flush()
 
-    # the manager is the main interface main uses to interact with the BMC.
-    # --vendor selects the manager; absent it, the neutral RedfishManager.
-    vendor = getattr(cmd_args, "vendor", None)
-    if vendor == "dell":
-        redfish_api = IDracManager(host=cmd_args.redfish_host,
-                                   username=cmd_args.redfish_username,
-                                   password=cmd_args.redfish_password,
-                                   port=cmd_args.redfish_port,
-                                   insecure=insecure,
-                                   is_http=cmd_args.use_http,
-                                   is_debug=cmd_args.debug)
-    elif vendor == "hp":
-        redfish_api = IloManager(host=cmd_args.redfish_host,
-                                 username=cmd_args.redfish_username,
-                                 password=cmd_args.redfish_password,
-                                 port=cmd_args.redfish_port,
-                                 insecure=insecure,
-                                 is_http=cmd_args.use_http,
-                                 is_debug=cmd_args.debug)
-    elif vendor == "supermicro":
-        redfish_api = SupermicroManager(host=cmd_args.redfish_host,
-                                        username=cmd_args.redfish_username,
-                                        password=cmd_args.redfish_password,
-                                        port=cmd_args.redfish_port,
-                                        insecure=insecure,
-                                        is_http=cmd_args.use_http,
-                                        is_debug=cmd_args.debug)
-    else:
-        redfish_api = RedfishManager(host=cmd_args.redfish_host,
-                                     username=cmd_args.redfish_username,
-                                     password=cmd_args.redfish_password,
-                                     port=cmd_args.redfish_port,
-                                     insecure=insecure,
-                                     is_http=cmd_args.use_http,
-                                     is_debug=cmd_args.debug)
+    redfish_api = manager_cls(host=cmd_args.redfish_host,
+                              username=cmd_args.redfish_username,
+                              password=cmd_args.redfish_password,
+                              port=cmd_args.redfish_port,
+                              insecure=insecure,
+                              is_http=cmd_args.use_http,
+                              is_debug=cmd_args.debug)
 
     connectionless_mode = (
         is_network_scan(cmd_args)
@@ -641,21 +611,15 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
         console_error_printer(f"Error:{upc}")
 
 
-def create_cmd_tree(arg_parser, vendor=None, debug=False) -> Dict:
+def create_cmd_tree(arg_parser, manager, debug=False) -> Dict:
     """Create command tree structure.
 
-    The base registry (``IDracManager``) carries the shared/generic commands.
-    ``--vendor`` is the router: when set, that vendor manager's registry is layered
-    on top and *overrides* the base for a same-named verb, so one verb resolves to
-    the vendor-correct class. Example: ``--vendor supermicro exporter`` binds to
-    ``SupermicroManager``'s ``Exporter`` (scm_type ``SupermicroExporter``), while a
-    bare/DMTF ``exporter`` (once added under ``RedfishManager``) binds to that one.
-    The tool cannot detect the vendor before it connects, so the operator declares
-    it with ``--vendor`` and the tree is built accordingly.
+    The selected manager's ``get_registry()`` supplies the command set. The
+    neutral manager returns DMTF commands; a vendor manager returns DMTF plus its
+    vendor commands, with vendor entries overriding same-named DMTF entries.
 
     :param arg_parser: the root argument parser to attach subcommand parsers to.
-    :param vendor: optional ``--vendor`` router value (``supermicro``/``hp``/``dell``);
-        None builds only the base/shared command set.
+    :param manager: selected neutral or vendor manager class/instance.
     :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
@@ -673,35 +637,20 @@ def create_cmd_tree(arg_parser, vendor=None, debug=False) -> Dict:
         required=True
     )
 
-    # The base is the shared/DMTF registry (RedfishManager); the selected vendor's
-    # registry (if any) layers on top so a same-named verb resolves to the vendor
-    # class. Dell is itself a vendor scope (IDracManager): today its commands still
-    # register onto RedfishManager, so base and --vendor dell overlap and the bare
-    # tree carries the Dell verbs; once Dell moves to IDracManager's own registry,
-    # the bare tree collapses to the shared set and --vendor dell scopes Dell — no
-    # change needed here.
-    registries = [RedfishManager.get_registry()]
-    vendor_managers = {"dell": IDracManager,
-                       "supermicro": SupermicroManager,
-                       "hp": IloManager}
-    vendor_mgr = vendor_managers.get(vendor)
-    if vendor_mgr is not None:
-        registries.append(vendor_mgr.get_registry())
+    commands_registry = manager.get_registry()
 
-    # Resolve verb name -> command, letting a later (vendor) registry win, so the
-    # verb is registered exactly once with the vendor-correct class behind it.
+    # Resolve each CLI verb once from the manager-visible DMTF/vendor registry.
     resolved = {}
-    for commands_registry in registries:
-        for k in commands_registry:
-            for sub_key in commands_registry[k]:
-                cls = commands_registry[k][sub_key]
-                if not hasattr(cls, "register_subcommand"):
-                    continue
-                cli_arg_parser, cmd_name, cmd_help = cls.register_subcommand(cls)
-                if debug:
-                    action = "Overriding" if cmd_name in resolved else "Registering"
-                    logger.debug(f"{action} command {cmd_name} ({k} {sub_key})")
-                resolved[cmd_name] = (cli_arg_parser, cmd_help, k, sub_key)
+    for k in commands_registry:
+        for sub_key in commands_registry[k]:
+            cls = commands_registry[k][sub_key]
+            if not hasattr(cls, "register_subcommand"):
+                continue
+            cli_arg_parser, cmd_name, cmd_help = cls.register_subcommand(cls)
+            if debug:
+                action = "Overriding" if cmd_name in resolved else "Registering"
+                logger.debug(f"{action} command {cmd_name} ({k} {sub_key})")
+            resolved[cmd_name] = (cli_arg_parser, cmd_help, k, sub_key)
 
     for cmd_name, (cli_arg_parser, cmd_help, k, sub_key) in resolved.items():
         subparsers.add_parser(
@@ -734,7 +683,7 @@ def redfish_main_ctl():
         description='''redfish_ctl - a vendor-neutral command-line tool to drive server BMCs |n
                                      over the Redfish REST API: Dell iDRAC, Supermicro, HPE iLO, and |n
                                      generic DMTF Redfish. Supports both synchronous and asynchronous |n
-                                     calls. (idrac_ctl remains a backward-compatible alias.)''',
+                                     calls.''',
         epilog='''Docs and examples: https://github.com/spyroot/redfish_ctl |n
                                              The examples/ folder contains many ready-to-run scripts. |n
                                              Author: Mustafa Bayramov <spyroot@gmail.com>
@@ -869,21 +818,23 @@ def redfish_main_ctl():
     parser.add_argument(
         '--vendor', required=False, default=None,
         choices=('dell', 'hp', 'supermicro'),
-        help="route commands to a vendor's command set and manager. The tool "
-             "cannot detect the vendor before it connects, so pass e.g. "
-             "--vendor supermicro to reach Supermicro/GB300 commands such as "
-             "'exporter'. Omit for the shared/generic (and Dell) command set.")
+        help="omit for shared DMTF commands; pass --vendor dell, --vendor hp, "
+             "or --vendor supermicro for that vendor's command set and manager.")
     parser.add_argument('-v', '--version', action='version',
                         version="%(prog)s " + __version__)
 
-    # --vendor routes which registry builds the command tree, so it must be known
-    # before create_cmd_tree runs. A throwaway add_help=False scanner extracts it
-    # without stealing -h (the real parser, with the subcommands attached below,
-    # owns --help) and without choices-validating twice (the real parser does).
+    # Select one manager class before building the command tree. Its MRO-composed
+    # registry determines which DMTF and vendor subcommands argparse can expose.
     vendor_scan = argparse.ArgumentParser(add_help=False)
     vendor_scan.add_argument('--vendor', default=None)
     vendor_pre, _ = vendor_scan.parse_known_args()
-    cmd_dict = create_cmd_tree(parser, vendor=vendor_pre.vendor)
+    manager_classes = {
+        "dell": IDracManager,
+        "hp": IloManager,
+        "supermicro": SupermicroManager,
+    }
+    manager_cls = manager_classes.get(vendor_pre.vendor, RedfishManager)
+    cmd_dict = create_cmd_tree(parser, manager_cls)
     args = parser.parse_args()
     _sync_legacy_endpoint_attrs(args)
     unresolved_endpoint_conflicts = (
@@ -947,7 +898,7 @@ def redfish_main_ctl():
             )
             sys.exit(1)
     try:
-        main(args, cmd_dict)
+        main(args, cmd_dict, manager_cls)
     except AuthenticationFailed as af:
         console_error_printer(f"Error: {af}")
     except requests.exceptions.ConnectionError as http_error:
