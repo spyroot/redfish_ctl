@@ -32,6 +32,7 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
+from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_exceptions import (
     RedfishForbidden,
     RedfishMethodNotAllowed,
@@ -261,6 +262,101 @@ class RedfishManager:
         :return:
         """
         return dict(cls._registry)
+
+    @staticmethod
+    def base_parser(is_async: Optional[bool] = True,
+                    is_file_save: Optional[bool] = True,
+                    is_expanded: Optional[bool] = True,
+                    is_remote_share: Optional[bool] = False,
+                    is_reboot: Optional[bool] = False):
+        """Build the base optional parser shared by every subcommand.
+
+        Each subcommand extends the returned parser with its own flags. This is
+        vendor-neutral argparse construction, so it lives on the shared base and
+        is inherited by every vendor manager.
+
+        :param is_async: add the ``--async`` optional flag.
+        :param is_file_save: add the ``--filename`` save-to-file option.
+        :param is_expanded: add the ``--expanded`` expanded-query option.
+        :param is_remote_share: add the CIFS/NFS/HTTP remote-share options.
+        :param is_reboot: add the ``--reboot`` option (for cmds that reboot).
+        :return: the base :class:`argparse.ArgumentParser`.
+        """
+
+        cmd_parser = argparse.ArgumentParser(
+            add_help=False, formatter_class=CustomArgumentDefaultsHelpFormatter
+        )
+
+        output_parser = cmd_parser.add_argument_group('output', 'Output related options')
+        chassis_parser = cmd_parser.add_argument_group('chassis', 'Chassis state options')
+
+        if is_async:
+            cmd_parser.add_argument(
+                '-a', '--async', action='store_true',
+                required=False, dest="do_async",
+                default=False,
+                help="will use async call."
+            )
+
+        if is_expanded:
+            output_parser.add_argument(
+                '-e', '--expanded', action='store_true',
+                required=False, dest="do_expanded",
+                default=False,
+                help="expanded view, depend. it allows viewing more detail IDRAC data."
+            )
+        if is_file_save:
+            output_parser.add_argument(
+                '-f', '--filename', required=False, default="",
+                type=str,
+                help="filename, if we need to save a respond to a file."
+            )
+
+        if is_reboot:
+            chassis_parser.add_argument(
+                '-r', '--reboot', action='store_true',
+                required=False, dest="do_reboot",
+                default=False,
+                help="will reboot a host.")
+
+        # this optional args for remote share CIFS/NFS/HTTP etc.
+        if is_remote_share:
+            cmd_parser.add_argument(
+                '--ip_addr', required=True,
+                type=str, default=None,
+                help="ip address for CIFS|NFS."
+            )
+            cmd_parser.add_argument(
+                '--share_type', required=False,
+                type=str, default="CIFS",
+                help="share type CIFS|NFS."
+            )
+            cmd_parser.add_argument(
+                '--share_name', required=True,
+                type=str, default=None,
+                help="share name."
+            )
+            cmd_parser.add_argument(
+                '--remote_image', required=True,
+                type=str, default=None,
+                help="remote image. Example my_iso. "
+            )
+            cmd_parser.add_argument(
+                '--remote_username', required=False,
+                type=str, default="vmware",
+                help="remote username if required."
+            )
+            cmd_parser.add_argument(
+                '--remote_password', required=False,
+                type=str, default="123456",
+                help="password if required."
+            )
+            cmd_parser.add_argument(
+                '--remote_workgroup', required=False,
+                type=str, default="",
+                help="group name if required."
+            )
+        return cmd_parser
 
     @staticmethod
     def _pop_connection_value(
