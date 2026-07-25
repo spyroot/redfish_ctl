@@ -164,10 +164,10 @@ class RedfishManager:
             return loop
 
     def __init__(self,
-                 redfish_ip: Optional[str] = "",
-                 redfish_username: Optional[str] = "root",
-                 redfish_password: Optional[str] = "",
-                 redfish_port: Optional[int] = 443,
+                 host: Optional[str] = "",
+                 username: Optional[str] = "root",
+                 password: Optional[str] = "",
+                 port: Optional[int] = 443,
                  insecure: Optional[bool] = True,
                  is_http: Optional[bool] = False,
                  x_auth: Optional[str] = None,
@@ -177,10 +177,14 @@ class RedfishManager:
            By default, Redfish Manager uses json to serialize a data to callee
            and uses json content type.
 
-        :param redfish_ip: redfish IP or hostname
-        :param redfish_username: redfish username default is root
-        :param redfish_password: redfish password.
-        :param redfish_port: redfish TCP port (default 443); accepts an int or str.
+        host, username, password, port, insecure and is_http are the shared
+        common properties every BMC has; they live here ONCE and every vendor
+        manager (IDrac/Ilo/Supermicro) inherits them — no per-vendor copy.
+
+        :param host: BMC IP or hostname.
+        :param username: BMC account username; defaults to root.
+        :param password: BMC account password.
+        :param port: BMC TCP port (default 443); accepts an int or str.
         :param insecure: when True (the default) TLS certificate verification is
             skipped. BMCs ship self-signed certificates, so verification is
             opt-in: pass ``insecure=False`` to verify the server certificate.
@@ -188,14 +192,14 @@ class RedfishManager:
         :param x_auth: X-Authentication header.
         :param is_debug: when True, include exception tracebacks in error logs.
         """
-        self._redfish_ip = redfish_ip
-        self._username = redfish_username
-        self._password = redfish_password
+        self._redfish_ip = host
+        self._username = username
+        self._password = password
 
-        if isinstance(redfish_port, str):
-            redfish_port = int(redfish_port)
+        if isinstance(port, str):
+            port = int(port)
 
-        self._port = redfish_port
+        self._port = port
         # ``insecure`` means "skip TLS verification"; requests' ``verify`` is the
         # inverse, so verification is enabled only when insecure is explicitly off.
         self._is_verify_cert = not insecure

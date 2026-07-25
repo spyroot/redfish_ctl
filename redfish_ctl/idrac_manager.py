@@ -131,10 +131,10 @@ class IDracManager(RedfishManager):
         :param is_debug: when True, include exception tracebacks in error logs.
         :param log_level: logging level applied to this manager's logger.
         """
-        super().__init__(redfish_ip=host,
-                         redfish_username=username,
-                         redfish_password=password,
-                         redfish_port=port,
+        super().__init__(host=host,
+                         username=username,
+                         password=password,
+                         port=port,
                          insecure=insecure,
                          is_http=is_http,
                          x_auth=x_auth,
