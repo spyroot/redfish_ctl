@@ -110,7 +110,7 @@ class IDracManager(RedfishManager):
                  host: Optional[str] = None,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
-                 port: Optional[int] = None,
+                 port: Optional[int] = 443,
                  insecure: Optional[bool] = True,
                  x_auth: Optional[str] = None,
                  is_http: Optional[bool] = False,

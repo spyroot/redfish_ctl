@@ -129,41 +129,41 @@ def test_internal_dispatch_connection_key_removes_duplicate_host_arg():
     assert kwargs == {}
 
 
-def test_dispatch_constructs_registered_commands_with_legacy_keywords():
-    """Registered commands with legacy-only constructors still dispatch safely."""
+def test_dispatch_constructs_registered_commands_with_canonical_keywords():
+    """Dispatch constructs registered commands with canonical connection kwargs."""
 
-    class LegacyConstructorCommand(
+    class ConstructorProbeCommand(
             IDracManager,
             scm_type=ApiRequestType.SystemQuery,
-            name="legacy-constructor-compat"):
+            name="constructor-probe-compat"):
         constructed = None
 
         def __init__(
-                self, idrac_ip, idrac_username, idrac_password, idrac_port,
+                self, host, username, password, port,
                 insecure=True, is_http=False):
-            """Record legacy constructor kwargs and initialize the base manager.
+            """Record the canonical connection kwargs and initialize the base.
 
-            :param idrac_ip: BMC host passed by dispatch.
-            :param idrac_username: BMC username passed by dispatch.
-            :param idrac_password: BMC password passed by dispatch.
-            :param idrac_port: BMC port passed by dispatch.
+            :param host: BMC host passed by dispatch.
+            :param username: BMC username passed by dispatch.
+            :param password: BMC password passed by dispatch.
+            :param port: BMC port passed by dispatch.
             :param insecure: skip TLS verification flag.
             :param is_http: plain HTTP transport flag.
             :return: None.
             """
             self.__class__.constructed = {
-                "idrac_ip": idrac_ip,
-                "idrac_username": idrac_username,
-                "idrac_password": idrac_password,
-                "idrac_port": idrac_port,
+                "host": host,
+                "username": username,
+                "password": password,
+                "port": port,
                 "insecure": insecure,
                 "is_http": is_http,
             }
             super().__init__(
-                host=idrac_ip,
-                username=idrac_username,
-                password=idrac_password,
-                port=idrac_port,
+                host=host,
+                username=username,
+                password=password,
+                port=port,
                 insecure=insecure,
                 is_http=is_http,
             )
@@ -188,7 +188,7 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
 
     result = IDracManager.invoke(
         ApiRequestType.SystemQuery,
-        "legacy-constructor-compat",
+        "constructor-probe-compat",
         host="10.9.9.45",
         username="admin",
         password="secret",
@@ -198,17 +198,17 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
         path="/redfish/v1/",
     )
 
-    assert LegacyConstructorCommand.constructed == {
-        "idrac_ip": "10.9.9.45",
-        "idrac_username": "admin",
-        "idrac_password": "secret",
-        "idrac_port": 8443,
+    assert ConstructorProbeCommand.constructed == {
+        "host": "10.9.9.45",
+        "username": "admin",
+        "password": "secret",
+        "port": 8443,
         "insecure": True,
         "is_http": False,
     }
     assert result.data == {"path": "/redfish/v1/"}
 
-    LegacyConstructorCommand.constructed = None
+    ConstructorProbeCommand.constructed = None
     manager = SystemQuery(
         host="10.9.9.46",
         username="admin",
@@ -218,15 +218,15 @@ def test_dispatch_constructs_registered_commands_with_legacy_keywords():
     )
     sync_result = manager.sync_invoke(
         ApiRequestType.SystemQuery,
-        "legacy-constructor-compat",
+        "constructor-probe-compat",
         path="/redfish/v1/Managers",
     )
 
-    assert LegacyConstructorCommand.constructed == {
-        "idrac_ip": "10.9.9.46",
-        "idrac_username": "admin",
-        "idrac_password": "secret",
-        "idrac_port": 443,
+    assert ConstructorProbeCommand.constructed == {
+        "host": "10.9.9.46",
+        "username": "admin",
+        "password": "secret",
+        "port": 443,
         "insecure": True,
         "is_http": False,
     }

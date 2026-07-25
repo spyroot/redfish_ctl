@@ -553,7 +553,9 @@ class RedfishManager:
         if ":" in self._redfish_ip:
             return self._redfish_ip
         else:
-            if self._port != 443:
+            # A None or default 443 port yields no suffix (an explicit :None
+            # produced an unparseable URL); only a non-default port is appended.
+            if self._port and self._port != 443:
                 return f"{self._redfish_ip}:{self._port}"
             else:
                 return self._redfish_ip

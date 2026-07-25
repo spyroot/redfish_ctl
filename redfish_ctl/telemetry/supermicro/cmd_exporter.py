@@ -322,7 +322,7 @@ class Exporter(SupermicroManager,
             **identity_options,
         )
         if otlp_traces:
-            from . import tracing
+            from .. import tracing
             tracing.setup_otlp(
                 telemetry_identity.service_name,
                 telemetry_identity.resource_attributes(),
