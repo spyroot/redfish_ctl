@@ -5,6 +5,12 @@
   "Id": "RootService",
   "Name": "Root Service",
   "RedfishVersion": "1.15.0",
+  "Vendor": "Dell",
+  "Oem": {
+    "Dell": {
+      "@odata.type": "#DellServiceRoot.v1_0_0.ServiceRootSummary"
+    }
+  },
   "Systems": {
     "@odata.id": "/redfish/v1/Systems"
   },

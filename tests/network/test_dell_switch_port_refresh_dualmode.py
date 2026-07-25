@@ -39,6 +39,7 @@ def dell_switch_manager():
     service = MockRedfishService(
         DELL_CORPUS,
         index=_build_fixture_index(DELL_CORPUS),
+        vendor="dell",
     )
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)

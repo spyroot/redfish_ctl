@@ -23,6 +23,7 @@ tests/test_enum_auto_values.py
 tests/test_env_first.py
 tests/test_error_handler.py
 tests/test_fixture_catalog.py
+tests/test_fleet_async_profiles.py
 tests/test_gb300_node2_vendor_corpus.py
 tests/test_generic_vendor.py
 tests/test_gpu_oob_commands.py
@@ -37,6 +38,7 @@ tests/test_invoke_action_csdl.py
 tests/test_lenovo_vendor.py
 tests/test_main.py
 tests/test_main_rooting_g6.py
+tests/test_manager_constructor.py
 tests/test_package_imports.py
 tests/test_power_state_dualmode.py
 tests/test_query.py
@@ -65,6 +67,7 @@ tests/test_telemetry_submit_test_dualmode.py
 tests/test_utils.py
 tests/test_vendor_evidence.py
 tests/test_vendor_portability.py
+tests/test_vendor_profile.py
 tests/test_version_consistency.py
 tests/test_wait.py
 tests/test_wait_dualmode.py
