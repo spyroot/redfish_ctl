@@ -22,6 +22,12 @@ section 6.7 special URIs are covered: ``/redfish`` (a synthesized
 ``{"v1": "/redfish/v1/"}`` counts as matched), ``/redfish/v1/$metadata``
 (XML, compared as bytes), and service-root trailing-slash equivalence.
 
+The machine-readable sim contract (``specs/sim/dmtf-sim-contract.yaml``) names
+this tool as its conformance proof (``binding.conformance.proof``); the
+guarantees rows and DSP0266 6.7 URIs it proves are declared in
+:data:`CONTRACT_GUARANTEES_PROVEN` and :data:`SPEC_URIS_COVERED`, reconciled
+against the contract by ``tests/k8s/test_mockup_consistency.py``.
+
 Audience: agent | human. One JSON report on stdout, diagnostics on stderr.
 Exit 0 = consistent, 1 = at least one mismatch, 2 = usage/environment error
 (bare LFS pointer, unknown profile, a server without ``--mockup-dir``).
@@ -57,6 +63,21 @@ SERVICE_ROOT = "/redfish/v1"
 READY_DEADLINE_SECONDS = 15.0
 HTTP_TIMEOUT_SECONDS = 10.0
 _VALUE_REPR_LIMIT = 80
+
+#: Guarantees rows of ``specs/sim/dmtf-sim-contract.yaml`` this proof enforces:
+#: ``fidelity`` (JSON parsed-equal, ``$metadata`` byte-equal) and
+#: ``no_invention`` (absent from the bundle means 404, with the ``/redfish``
+#: version object as the single sanctioned synthesis).
+CONTRACT_GUARANTEES_PROVEN = ("fidelity", "no_invention")
+
+#: DSP0266 1.24.0 section 6.7 spec-defined URIs the checker exercises
+#: explicitly on every profile (the contract's required ``spec_uris`` rows).
+SPEC_URIS_COVERED = (
+    "/redfish",
+    "/redfish/v1/",
+    "/redfish/v1/odata",
+    "/redfish/v1/$metadata",
+)
 
 _EXTRACT_CACHE: dict[str, Path] = {}
 
@@ -492,7 +513,10 @@ def _check_special_uris(
     Covers ``/redfish`` (the version object — the profile's own
     ``redfish/index.json`` when shipped, else the synthesized
     ``{"v1": "/redfish/v1/"}``), ``/redfish/v1/$metadata`` (XML,
-    byte-compared when the bundle carries it), and trailing-slash
+    byte-compared when the bundle carries it), ``/redfish/v1/odata``
+    (JSON-equal when the profile ships it, a clean 404 when it does not —
+    many bundle profiles never reference it by ``@odata.id``, so without
+    this explicit probe it would go unchecked), and trailing-slash
     equivalence on the service root.
 
     :param base: the mock's base URL.
@@ -551,6 +575,37 @@ def _check_special_uris(
                 }
             )
 
+    checked += 1
+    odata_uri = f"{SERVICE_ROOT}/odata"
+    odata_file = service_root / "odata" / "index.json"
+    status, body = _http_get(base, odata_uri)
+    if odata_file.is_file():
+        served, error = _load_json_bytes(body)
+        expected_odata = json.loads(odata_file.read_text(encoding="utf-8"))
+        if status == 200 and error is None and served == expected_odata:
+            matched += 1
+        else:
+            mismatched.append(
+                {
+                    "uri": odata_uri,
+                    "status": status,
+                    "divergence": error
+                    or _first_divergence(expected_odata, served)
+                    or f"expected 200 with the OData service document, got {status}",
+                }
+            )
+    elif status == 404:
+        matched += 1
+    else:
+        mismatched.append(
+            {
+                "uri": odata_uri,
+                "status": status,
+                "divergence": "expected 404: the profile ships no OData "
+                "service document",
+            }
+        )
+
     if root_file is not None:
         checked += 1
         status, body = _http_get(base, SERVICE_ROOT + "/")
@@ -595,7 +650,7 @@ def _check_profile(
     absent: list[str] = []
     matched = 0
     checked = 0
-    special = {"/redfish", f"{SERVICE_ROOT}/$metadata"}
+    special = {"/redfish", f"{SERVICE_ROOT}/$metadata", f"{SERVICE_ROOT}/odata"}
 
     with _mock_server(serve_dir) as base:
         special_checked, special_matched = _check_special_uris(
