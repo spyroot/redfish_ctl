@@ -1,8 +1,8 @@
 """Dual-mode-style coverage for DellLCService.TestNetworkShare."""
-import json
 from pathlib import Path
 
 import pytest
+from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
@@ -17,77 +17,58 @@ DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz",
     "10.252.252.209",
 )
-DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 SERVICE_URI = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLCService"
 TARGET_URI = f"{SERVICE_URI}/Actions/DellLCService.TestNetworkShare"
 
 
-def _fixture_for_path(path):
-    """Return the extracted Dell fixture matching a Redfish path.
-
-    :param path: requests-mock request path.
-    :return: fixture path, or None when the corpus lacks the resource.
-    """
-    name = "_" + path.strip("/").replace("/", "_") + ".json"
-    return DELL_INDEX.get(name.lower())
-
-
 @pytest.fixture
-def dell_lc_manager():
-    """Serve the committed Dell corpus over requests-mock.
+def dell_lc_mock():
+    """Return a manager and mock service backed by the Dell XR8620t corpus.
 
-    :return: tuple of IDracManager and recorded requests.
+    TestNetworkShare is a documented-sync action: the vendor-faithful service
+    answers its POST with 200 plus a Base success message and never a task
+    (see ``_SYNC_ACTION_SUFFIXES`` in conftest for the Dell evidence).
+
+    :return: tuple of IDracManager and the recording MockRedfishService.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    requests = []
-
-    def get_cb(request, context):
-        requests.append(request)
-        fixture = _fixture_for_path(request.path)
-        if fixture is None:
-            context.status_code = 404
-            return json.dumps({"error": f"no fixture for {request.path}"})
-        context.status_code = 200
-        return fixture.read_text()
-
-    def post_cb(request, context):
-        requests.append(request)
-        context.status_code = 200
-        return json.dumps({
-            "@Message.ExtendedInfo": [{
-                "MessageId": "Base.1.12.Success",
-                "Message": "Successfully Completed Request",
-                "Severity": "OK",
-            }]
-        })
-
+    service = MockRedfishService(
+        DELL_CORPUS,
+        index=_build_fixture_index(DELL_CORPUS),
+        vendor="dell",
+    )
     with requests_mock.Mocker() as mocker:
-        mocker.get(requests_mock.ANY, text=get_cb)
-        mocker.post(requests_mock.ANY, text=post_cb)
-        manager = IDracManager(
-            idrac_ip="mock-dell-lc",
-            idrac_username="root",
-            idrac_password="mock",
-            insecure=True,
-            is_debug=False,
+        mocker.get(requests_mock.ANY, text=service.get_cb)
+        mocker.patch(requests_mock.ANY, text=service.patch_cb)
+        mocker.post(requests_mock.ANY, text=service.post_cb)
+        mocker.delete(requests_mock.ANY, text=service.delete_cb)
+        service.mocker = mocker
+        yield (
+            IDracManager(
+                idrac_ip="mock-dell-lc",
+                idrac_username="root",
+                idrac_password="mock",
+                insecure=True,
+                is_debug=False,
+            ),
+            service,
         )
-        yield manager, requests
 
 
-def _post_requests(requests):
-    """Return POST requests recorded by the mock Redfish transport.
+def _post_requests(service):
+    """Return POST requests recorded by the mock Redfish service.
 
-    :param requests: recorded requests-mock request objects.
+    :param service: the recording MockRedfishService.
     :return: list of POST requests.
     """
-    return [request for request in requests if request.method == "POST"]
+    return [request for request in service.requests if request.method == "POST"]
 
 
 def test_dell_lc_network_share_test_lists_target_without_mutating(
-    dell_lc_manager,
+    dell_lc_mock,
 ):
     """Without --host, the command lists the discovered action target only."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcNetworkShareTest,
@@ -107,14 +88,14 @@ def test_dell_lc_network_share_test_lists_target_without_mutating(
         "NFS",
         "TFTP",
     ]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_network_share_test_without_confirm_is_preview_only(
-    dell_lc_manager,
+    dell_lc_mock,
 ):
     """A host payload is resolved but not POSTed unless --confirm is present."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcNetworkShareTest,
@@ -135,12 +116,16 @@ def test_dell_lc_network_share_test_without_confirm_is_preview_only(
         "ProxySupport": "Off",
         "IgnoreCertWarning": "On",
     }
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
-def test_dell_lc_network_share_test_confirm_posts_payload(dell_lc_manager):
-    """--confirm POSTs TestNetworkShare to the discovered action target."""
-    manager, requests = dell_lc_manager
+def test_dell_lc_network_share_test_confirm_posts_payload(dell_lc_mock):
+    """--confirm POSTs TestNetworkShare; the action realizes synchronously.
+
+    The Dell-faithful answer is a terminal 200 success, so the result must
+    carry no fabricated ``task_id`` (the realization is sync, not a job).
+    """
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcNetworkShareTest,
@@ -152,13 +137,14 @@ def test_dell_lc_network_share_test_confirm_posts_payload(dell_lc_manager):
         confirm=True,
     )
 
-    posts = _post_requests(requests)
+    posts = _post_requests(service)
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["executed"] is True
     assert result.data["action"] == "#DellLCService.TestNetworkShare"
     assert result.data["target"] == TARGET_URI
     assert result.data["level"] == "reversible"
+    assert "task_id" not in result.data
     assert len(posts) == 1
     assert posts[0].path.lower() == TARGET_URI.lower()
     assert posts[0].json() == {
@@ -170,10 +156,10 @@ def test_dell_lc_network_share_test_confirm_posts_payload(dell_lc_manager):
 
 
 def test_dell_lc_network_share_test_rejects_invalid_share_type(
-    dell_lc_manager,
+    dell_lc_mock,
 ):
     """Inline allowable values reject an unsupported ShareType before POST."""
-    manager, requests = dell_lc_manager
+    manager, service = dell_lc_mock
 
     result = manager.sync_invoke(
         ApiRequestType.DellLcNetworkShareTest,
@@ -193,7 +179,7 @@ def test_dell_lc_network_share_test_rejects_invalid_share_type(
         "value": "Local",
         "allowed": ["CIFS", "FTP", "HTTP", "HTTPS", "NFS", "TFTP"],
     }]
-    assert _post_requests(requests) == []
+    assert _post_requests(service) == []
 
 
 def test_dell_lc_network_share_test_requires_nonempty_host():
