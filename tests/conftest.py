@@ -329,6 +329,40 @@ def _make_idrac(idrac_ip, username, password):
     )
 
 
+def _make_manager(vendor, host, username, password):
+    """Construct the vendor-appropriate manager so vendor-scoped commands resolve.
+
+    Under ``--vendor`` scoping the exporter, GPU-OOB, and TelemetryService
+    commands register on ``SupermicroManager`` (and HPE commands on
+    ``IloManager``), which shadow their own command registry. A test invoking
+    those commands must therefore use that vendor's manager, not the neutral
+    ``IDracManager`` whose (shared) registry does not carry them.
+
+    :param vendor: fixture-set name (``dell``/``supermicro``/``hpe``/...).
+    :param host: mock BMC host.
+    :param username: mock account username.
+    :param password: mock account password.
+    :return: a manager instance of the class matching the vendor family.
+    """
+    family = _vendor_family(vendor)
+    if family == "supermicro":
+        from redfish_ctl.supermico_manager import SupermicroManager
+        cls = SupermicroManager
+    elif family == "hpe":
+        from redfish_ctl.ilo_manager import IloManager
+        cls = IloManager
+    else:
+        from redfish_ctl.idrac_manager import IDracManager
+        cls = IDracManager
+    return cls(
+        host=host,
+        username=username,
+        password=password,
+        insecure=True,
+        is_debug=False,
+    )
+
+
 @pytest.fixture(autouse=True)
 def _reset_command_singletons():
     """Give every test fresh command singletons so no cached state leaks.
@@ -398,7 +432,7 @@ def redfish_mock_factory():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         _started.append(mocker)
-        return _make_idrac(f"mock-{vendor}", "root", "mock"), service
+        return _make_manager(vendor, f"mock-{vendor}", "root", "mock"), service
 
     yield _factory
     for _m in _started:
