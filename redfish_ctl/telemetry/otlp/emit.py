@@ -24,7 +24,7 @@ import os
 import time
 from typing import Callable, Iterable, Optional
 
-from .identity import RESOURCE_DIMENSIONS
+from ..identity import RESOURCE_DIMENSIONS
 
 # Identity dims that describe the emitting host -> OTel resource attributes.
 RESOURCE_DIM_KEYS = RESOURCE_DIMENSIONS
