@@ -235,6 +235,75 @@ def endpoint_defaults(strict: bool = True) -> EndpointConfig:
     )
 
 
+@dataclass(frozen=True)
+class DmtfSimEndpoint:
+    """Resolved endpoint for the persistent DMTF simulator.
+
+    :param host: Kubernetes Service hostname or BMC IP address.
+    :param port: simulator HTTP port.
+    :param is_http: always True for the DMTF simulator contract.
+    """
+
+    host: str
+    port: int
+    is_http: bool = True
+
+
+def required_dmtf_sim_endpoint() -> DmtfSimEndpoint:
+    """Return the mandatory persistent DMTF simulator endpoint.
+
+    The DMTF CI lane requires the canonical ``REDFISH_*`` names. Deprecated
+    ``IDRAC_*`` aliases remain available to normal redfish_ctl callers, but they
+    must not become the CI contract between the builder and redfish_ctl.
+
+    :return: validated simulator host, port, and transport.
+    :raises RuntimeError: when the endpoint is absent or malformed.
+    :raises ConfigurationConflict: when canonical and legacy values conflict.
+    """
+    # Fail explicitly when the builder did not supply the canonical contract.
+    if "REDFISH_IP" not in os.environ:
+        raise RuntimeError(
+            "REDFISH_IP is missing. The builder must provide the persistent "
+            "DMTF simulator Service hostname."
+        )
+
+    if "REDFISH_PORT" not in os.environ:
+        raise RuntimeError(
+            "REDFISH_PORT is missing. The builder must provide the persistent "
+            "DMTF simulator Service port."
+        )
+
+    # env_first preserves the repository-wide alias-conflict behavior.
+    host = (
+        env_first("REDFISH_IP", "IDRAC_IP", default=None, strict=True) or ""
+    ).strip()
+    port_raw = (
+        env_first("REDFISH_PORT", "IDRAC_PORT", default=None, strict=True) or ""
+    ).strip()
+
+    if not host:
+        raise RuntimeError("REDFISH_IP must not be empty")
+
+    if host.startswith(("http://", "https://")):
+        raise RuntimeError(
+            "REDFISH_IP must contain only a hostname or IP address, "
+            "not a URL scheme"
+        )
+
+    if "/" in host:
+        raise RuntimeError("REDFISH_IP must not contain a URI path")
+
+    try:
+        port = int(port_raw)
+    except ValueError as exc:
+        raise RuntimeError("REDFISH_PORT must be an integer") from exc
+
+    if not 1 <= port <= 65535:
+        raise RuntimeError("REDFISH_PORT must be between 1 and 65535")
+
+    return DmtfSimEndpoint(host=host, port=port, is_http=True)
+
+
 def exporter_identity_env(
         overridden: tuple[str, ...] = ()) -> dict[str, Optional[str]]:
     """Return conflict-aware environment values for exporter identity.

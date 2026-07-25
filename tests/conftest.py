@@ -434,3 +434,34 @@ def redfish_api(request):
         service = request.getfixturevalue("redfish_service")
         yield _make_idrac("mock-idrac", "root", "mock")
         _ = service  # keep the mock mounted for the test duration
+
+
+@pytest.fixture
+def dmtf_sim_endpoint(request: pytest.FixtureRequest):
+    """Return the mandatory endpoint for a ``dmtf_sim_live`` test.
+
+    Fails CLOSED: only a ``dmtf_sim_live`` test may use it, and it never skips —
+    a missing or malformed endpoint fails the test loudly (a skip would hide a
+    broken private-CI deploy). The endpoint is resolved by the single config
+    loader; no second environment variable is read here.
+
+    :param request: the pytest request, used to require the ``dmtf_sim_live`` marker.
+    :return: the validated persistent DMTF simulator endpoint.
+    :raises pytest.UsageError: when a test without the marker uses this fixture.
+    """
+    from redfish_ctl.config import (
+        ConfigurationConflict,
+        required_dmtf_sim_endpoint,
+    )
+
+    if request.node.get_closest_marker("dmtf_sim_live") is None:
+        raise pytest.UsageError(
+            "dmtf_sim_endpoint may only be used by tests marked dmtf_sim_live"
+        )
+    try:
+        return required_dmtf_sim_endpoint()
+    except (RuntimeError, ConfigurationConflict) as exc:
+        pytest.fail(
+            f"Persistent DMTF simulator endpoint is invalid: {exc}",
+            pytrace=False,
+        )

@@ -48,6 +48,7 @@ pythonpath = ["."]
 markers = [
     "live: integration test that requires a reachable iDRAC (set IDRAC_IP to run)",
     "schema: validates fixtures against DMTF Redfish schemas (run tools/fetch_schemas.sh first)",
+    "dmtf_sim_live: integration test against the deployed DMTF sim; fails closed (raises, never skips) when REDFISH_IP/REDFISH_PORT are unset. Runs only in private CI with -m dmtf_sim_live; the offline suite excludes it with -m 'not dmtf_sim_live'.",
 ]
 filterwarnings = [
     "ignore:Unverified HTTPS request",
