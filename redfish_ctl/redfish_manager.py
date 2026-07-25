@@ -16,7 +16,9 @@ import logging
 import re
 import threading
 import time
+import uuid
 from abc import abstractmethod
+from collections.abc import Mapping
 from contextlib import contextmanager
 from functools import cached_property
 from typing import Any, Callable, Dict, Hashable, Optional, Tuple
@@ -52,6 +54,7 @@ from .redfish_shared import (
 )
 from .redfish_task_state import TERMINAL_TASK_STATES, TaskState, TaskStatus
 from .telemetry import tracing
+from .telemetry.identity import service_instance_id_from_sources
 
 module_logger = logging.getLogger(__name__)
 
@@ -1366,6 +1369,56 @@ class RedfishManager:
             task_state.value if task_state is not None else "unknown",
         )
 
+    def discover_virtual_media_uri(self, do_async: Optional[bool] = False) -> str:
+        """Resolve the VirtualMedia collection URI, vendor-neutrally.
+
+        Dell hangs VirtualMedia off the ComputerSystem; iLO and Supermicro hang it
+        off a Manager. Check every Manager first, then the host System, returning
+        the first that advertises a VirtualMedia link. Falls back to the Dell
+        ``{system}/VirtualMedia`` subpath so existing Dell behavior is unchanged.
+
+        :param do_async: issue the underlying queries asynchronously when True.
+        :return: the VirtualMedia collection URI.
+        :raise ResourceNotFound: if no VirtualMedia collection can be resolved.
+        """
+        # Managers first for iLO/Supermicro/OpenBMC; keep the historical Dell
+        # System.Embedded.1 preference when both System and Manager advertise it.
+        manager_roots = []
+        try:
+            manager_roots.extend(self.discover_manager_ids() or [])
+        except Exception:
+            pass
+        try:
+            host_system = self.idrac_manage_servers
+        except Exception:
+            host_system = ""
+        system_roots = []
+        if not host_system:
+            try:
+                system_roots.extend(self.discover_computer_system_ids() or [])
+            except Exception:
+                pass
+        roots = []
+        if host_system.endswith("/System.Embedded.1"):
+            roots.append(host_system)
+        roots.extend(root for root in manager_roots if root not in roots)
+        if host_system and host_system not in roots:
+            roots.append(host_system)
+        roots.extend(root for root in system_roots if root not in roots)
+        for root in roots:
+            try:
+                data = self.base_query(root, do_async=do_async).data or {}
+            except Exception:
+                continue
+            link = data.get("VirtualMedia")
+            uri = link.get("@odata.id") if isinstance(link, dict) else None
+            if uri:
+                return uri
+        fallback_system = host_system or (system_roots[0] if system_roots else "")
+        if fallback_system:
+            return f"{fallback_system}/VirtualMedia"
+        raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
+
     @abstractmethod
     def api_success_msg(self,
                         api_respond: RedfishApiRespond,
@@ -1384,3 +1437,172 @@ class RedfishManager:
         :return: a dict
         """
         pass
+
+    @staticmethod
+    def _members(data):
+        """Return @odata.id strings from a Redfish collection.
+
+        :param data: parsed Redfish collection resource, or any value.
+        :return: list of member @odata.id strings; empty when data is not a collection.
+        """
+        if not isinstance(data, dict):
+            return []
+        return [m["@odata.id"] for m in data.get("Members", [])
+                if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
+
+    def _identity_resource(self, uri: str, redfish_cache, do_async: bool) -> dict:
+        """Read one identity-discovery resource, tolerating unsupported paths.
+
+        :param uri: Redfish resource URI.
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: resource mapping or an empty mapping.
+        :raises Exception: transport and non-404 failures from the Redfish query.
+        """
+        try:
+            result = self.base_query(
+                uri,
+                do_async=do_async,
+                redfish_cache=redfish_cache,
+            )
+        except ResourceNotFound:
+            return {}
+        return result.data if isinstance(result.data, dict) else {}
+
+    @staticmethod
+    def _identity_link(resource: Mapping, key: str) -> Optional[str]:
+        """Return a Redfish link URI from an identity-discovery resource.
+
+        :param resource: Redfish resource mapping.
+        :param key: linked property name.
+        :return: linked ``@odata.id`` or None.
+        """
+        link = resource.get(key)
+        if not isinstance(link, Mapping):
+            return None
+        uri = link.get("@odata.id")
+        return uri if isinstance(uri, str) and uri else None
+
+    @staticmethod
+    def _chassis_identity_rank(item: tuple[str, Mapping]) -> tuple[int, str]:
+        """Rank BMC/DC-SCM chassis ahead of unrelated enclosure resources.
+
+        :param item: pair of chassis URI and resource mapping.
+        :return: stable sort key with the most relevant chassis first.
+        """
+        uri, resource = item
+        description = " ".join(str(resource.get(key) or "")
+                               for key in ("Id", "Name", "Model"))
+        normalized = description.lower().replace("_", "-")
+        if "bmc" in normalized or "dc-scm" in normalized or "dcscm" in normalized:
+            return (0, uri)
+        if str(resource.get("ChassisType") or "").lower() in {"module", "component"}:
+            return (1, uri)
+        return (2, uri)
+
+    def _discover_service_instance_id(
+            self,
+            redfish_cache: RedfishResponseCache,
+            do_async: bool = False) -> Optional[str]:
+        """Derive a stable global service instance UUID from Redfish identity.
+
+        Source precedence is Manager UUID, BMC/DC-SCM chassis serial, burned-in
+        management MAC, configurable management MAC, then a random UUID fallback.
+
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: canonical service.instance.id UUID text, or None when no stable
+            source is available.
+        """
+        managers_collection = self._identity_resource(
+            RedfishApi.Managers, redfish_cache, do_async)
+        
+        manager_resources = []
+        for uri in sorted(self._members(managers_collection)):
+            manager_resources.append((
+                uri,
+                self._identity_resource(uri, redfish_cache, do_async),
+            ))
+
+        manager_uuids = [resource.get("UUID") for _, resource in manager_resources]
+        instance_id = service_instance_id_from_sources(
+            manager_uuids=manager_uuids,
+        )
+        if instance_id is not None:
+            return instance_id
+
+        chassis_collection = self._identity_resource(
+            RedfishApi.Chassis, redfish_cache, do_async)
+        chassis_resources = []
+        for uri in sorted(self._members(chassis_collection)):
+            chassis_resources.append((
+                uri,
+                self._identity_resource(uri, redfish_cache, do_async),
+            ))
+        chassis_resources.sort(key=self._chassis_identity_rank)
+        chassis_serials = [resource.get("SerialNumber")
+                           for _, resource in chassis_resources]
+
+        instance_id = service_instance_id_from_sources(
+            chassis_serials=chassis_serials,
+        )
+        if instance_id is not None:
+            return instance_id
+
+        mac_addresses = []
+        for _, manager in manager_resources:
+            collection_uri = self._identity_link(manager, "EthernetInterfaces")
+            if not collection_uri:
+                continue
+            collection = self._identity_resource(
+                collection_uri, redfish_cache, do_async)
+            for interface_uri in sorted(self._members(collection)):
+                interface = self._identity_resource(
+                    interface_uri, redfish_cache, do_async)
+                instance_id = service_instance_id_from_sources(
+                    permanent_macs=[interface.get("PermanentMACAddress")],
+                )
+                if instance_id is not None:
+                    return instance_id
+                mac_addresses.append(interface.get("MACAddress"))
+
+        return service_instance_id_from_sources(
+            mac_addresses=mac_addresses,
+        )
+
+    def _default_service_instance_id(
+            self,
+            redfish_cache: RedfishResponseCache,
+            do_async: bool = False) -> str:
+        """Return a stable discovered ID or a retryable process fallback.
+
+        A discovered BMC identity is cached permanently. A random fallback is
+        also process-stable, but discovery is retried on later scrapes so a
+        transient read failure cannot pin the fallback for the process lifetime.
+
+        :param redfish_cache: current scrape response cache.
+        :param do_async: whether the caller selected asynchronous queries.
+        :return: canonical service.instance.id UUID text.
+        """
+        discovered = getattr(self, "_derived_service_instance_id", None)
+        if discovered is not None:
+            return discovered
+        try:
+            discovered = self._discover_service_instance_id(
+                redfish_cache,
+                do_async=do_async,
+            )
+        except Exception as exc:  # an unreachable/malformed BMC must not crash the scrape
+            self.logger.debug("service.instance.id discovery failed: %s", exc)
+            discovered = None
+        if discovered is not None:
+            self._derived_service_instance_id = discovered
+            return discovered
+        fallback = getattr(self, "_fallback_service_instance_id", None)
+        if fallback is None:
+            fallback = str(uuid.uuid4())
+            self._fallback_service_instance_id = fallback
+            self.logger.warning(
+                "No stable Redfish service instance identity was available; "
+                "using a random UUID while discovery is retried")
+        return fallback

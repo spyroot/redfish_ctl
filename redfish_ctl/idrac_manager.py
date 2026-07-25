@@ -1519,56 +1519,6 @@ class IDracManager(RedfishManager):
             expected_status=expected_status, ignore_error_code=ignore_error_code,
         )
 
-    def discover_virtual_media_uri(self, do_async: Optional[bool] = False) -> str:
-        """Resolve the VirtualMedia collection URI, vendor-neutrally.
-
-        Dell hangs VirtualMedia off the ComputerSystem; iLO and Supermicro hang it
-        off a Manager. Check every Manager first, then the host System, returning
-        the first that advertises a VirtualMedia link. Falls back to the Dell
-        ``{system}/VirtualMedia`` subpath so existing Dell behavior is unchanged.
-
-        :param do_async: issue the underlying queries asynchronously when True.
-        :return: the VirtualMedia collection URI.
-        :raise ResourceNotFound: if no VirtualMedia collection can be resolved.
-        """
-        # Managers first for iLO/Supermicro/OpenBMC; keep the historical Dell
-        # System.Embedded.1 preference when both System and Manager advertise it.
-        manager_roots = []
-        try:
-            manager_roots.extend(self.discover_manager_ids() or [])
-        except Exception:
-            pass
-        try:
-            host_system = self.idrac_manage_servers
-        except Exception:
-            host_system = ""
-        system_roots = []
-        if not host_system:
-            try:
-                system_roots.extend(self.discover_computer_system_ids() or [])
-            except Exception:
-                pass
-        roots = []
-        if host_system.endswith("/System.Embedded.1"):
-            roots.append(host_system)
-        roots.extend(root for root in manager_roots if root not in roots)
-        if host_system and host_system not in roots:
-            roots.append(host_system)
-        roots.extend(root for root in system_roots if root not in roots)
-        for root in roots:
-            try:
-                data = self.base_query(root, do_async=do_async).data or {}
-            except Exception:
-                continue
-            link = data.get("VirtualMedia")
-            uri = link.get("@odata.id") if isinstance(link, dict) else None
-            if uri:
-                return uri
-        fallback_system = host_system or (system_roots[0] if system_roots else "")
-        if fallback_system:
-            return f"{fallback_system}/VirtualMedia"
-        raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
-
     @staticmethod
     def _flatten_action_targets(resource):
         """Map every ``#Type.Action`` (top-level and Oem) to its target URL.

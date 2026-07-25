@@ -9,14 +9,13 @@ normalizes them into the ``hw.*`` metric contract used by the GB300/NV72
 observability demo.
 """
 import logging
-import uuid
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Optional
 
 from redfish_ctl import SupermicroManager
 from redfish_ctl.cmd_exceptions import ResourceNotFound
-from redfish_ctl.idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from redfish_ctl.idrac_shared import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
 from redfish_ctl.telemetry import exporter
 from redfish_ctl.telemetry.exporter_cli import register_exporter_subcommand
@@ -68,172 +67,6 @@ class Exporter(SupermicroManager,
         """
         return register_exporter_subcommand(cls)
 
-    @staticmethod
-    def _members(data):
-        """Return @odata.id strings from a Redfish collection.
-
-        :param data: parsed Redfish collection resource, or any value.
-        :return: list of member @odata.id strings; empty when data is not a collection.
-        """
-        if not isinstance(data, dict):
-            return []
-        return [m["@odata.id"] for m in data.get("Members", [])
-                if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
-
-    def _identity_resource(self, uri: str, redfish_cache, do_async: bool) -> dict:
-        """Read one identity-discovery resource, tolerating unsupported paths.
-
-        :param uri: Redfish resource URI.
-        :param redfish_cache: current scrape response cache.
-        :param do_async: whether the caller selected asynchronous queries.
-        :return: resource mapping or an empty mapping.
-        :raises Exception: transport and non-404 failures from the Redfish query.
-        """
-        try:
-            result = self.base_query(
-                uri,
-                do_async=do_async,
-                redfish_cache=redfish_cache,
-            )
-        except ResourceNotFound:
-            return {}
-        return result.data if isinstance(result.data, dict) else {}
-
-    @staticmethod
-    def _identity_link(resource: Mapping, key: str) -> Optional[str]:
-        """Return a Redfish link URI from an identity-discovery resource.
-
-        :param resource: Redfish resource mapping.
-        :param key: linked property name.
-        :return: linked ``@odata.id`` or None.
-        """
-        link = resource.get(key)
-        if not isinstance(link, Mapping):
-            return None
-        uri = link.get("@odata.id")
-        return uri if isinstance(uri, str) and uri else None
-
-    @staticmethod
-    def _chassis_identity_rank(item: tuple[str, Mapping]) -> tuple[int, str]:
-        """Rank BMC/DC-SCM chassis ahead of unrelated enclosure resources.
-
-        :param item: pair of chassis URI and resource mapping.
-        :return: stable sort key with the most relevant chassis first.
-        """
-        uri, resource = item
-        description = " ".join(str(resource.get(key) or "")
-                               for key in ("Id", "Name", "Model"))
-        normalized = description.lower().replace("_", "-")
-        if "bmc" in normalized or "dc-scm" in normalized or "dcscm" in normalized:
-            return (0, uri)
-        if str(resource.get("ChassisType") or "").lower() in {"module", "component"}:
-            return (1, uri)
-        return (2, uri)
-
-    def _discover_service_instance_id(
-            self,
-            redfish_cache: RedfishResponseCache,
-            do_async: bool = False) -> Optional[str]:
-        """Derive a stable global service instance UUID from Redfish identity.
-
-        Source precedence is Manager UUID, BMC/DC-SCM chassis serial, burned-in
-        management MAC, configurable management MAC, then a random UUID fallback.
-
-        :param redfish_cache: current scrape response cache.
-        :param do_async: whether the caller selected asynchronous queries.
-        :return: canonical service.instance.id UUID text, or None when no stable
-            source is available.
-        """
-        managers_collection = self._identity_resource(
-            REDFISH_API.IDRAC_MANAGER, redfish_cache, do_async)
-        manager_resources = []
-        for uri in sorted(self._members(managers_collection)):
-            manager_resources.append((
-                uri,
-                self._identity_resource(uri, redfish_cache, do_async),
-            ))
-
-        manager_uuids = [resource.get("UUID") for _, resource in manager_resources]
-        instance_id = exporter.identity_mod.service_instance_id_from_sources(
-            manager_uuids=manager_uuids,
-        )
-        if instance_id is not None:
-            return instance_id
-
-        chassis_collection = self._identity_resource(
-            REDFISH_API.Chassis, redfish_cache, do_async)
-        chassis_resources = []
-        for uri in sorted(self._members(chassis_collection)):
-            chassis_resources.append((
-                uri,
-                self._identity_resource(uri, redfish_cache, do_async),
-            ))
-        chassis_resources.sort(key=self._chassis_identity_rank)
-        chassis_serials = [resource.get("SerialNumber")
-                           for _, resource in chassis_resources]
-        instance_id = exporter.identity_mod.service_instance_id_from_sources(
-            chassis_serials=chassis_serials,
-        )
-        if instance_id is not None:
-            return instance_id
-
-        mac_addresses = []
-        for _, manager in manager_resources:
-            collection_uri = self._identity_link(manager, "EthernetInterfaces")
-            if not collection_uri:
-                continue
-            collection = self._identity_resource(
-                collection_uri, redfish_cache, do_async)
-            for interface_uri in sorted(self._members(collection)):
-                interface = self._identity_resource(
-                    interface_uri, redfish_cache, do_async)
-                instance_id = exporter.identity_mod.service_instance_id_from_sources(
-                    permanent_macs=[interface.get("PermanentMACAddress")],
-                )
-                if instance_id is not None:
-                    return instance_id
-                mac_addresses.append(interface.get("MACAddress"))
-
-        return exporter.identity_mod.service_instance_id_from_sources(
-            mac_addresses=mac_addresses,
-        )
-
-    def _default_service_instance_id(
-            self,
-            redfish_cache: RedfishResponseCache,
-            do_async: bool = False) -> str:
-        """Return a stable discovered ID or a retryable process fallback.
-
-        A discovered BMC identity is cached permanently. A random fallback is
-        also process-stable, but discovery is retried on later scrapes so a
-        transient read failure cannot pin the fallback for the process lifetime.
-
-        :param redfish_cache: current scrape response cache.
-        :param do_async: whether the caller selected asynchronous queries.
-        :return: canonical service.instance.id UUID text.
-        """
-        discovered = getattr(self, "_derived_service_instance_id", None)
-        if discovered is not None:
-            return discovered
-        try:
-            discovered = self._discover_service_instance_id(
-                redfish_cache,
-                do_async=do_async,
-            )
-        except Exception as exc:  # an unreachable/malformed BMC must not crash the scrape
-            logger.debug("service.instance.id discovery failed: %s", exc)
-            discovered = None
-        if discovered is not None:
-            self._derived_service_instance_id = discovered
-            return discovered
-        fallback = getattr(self, "_fallback_service_instance_id", None)
-        if fallback is None:
-            fallback = str(uuid.uuid4())
-            self._fallback_service_instance_id = fallback
-            logger.warning(
-                "No stable Redfish service instance identity was available; "
-                "using a random UUID while discovery is retried")
-        return fallback
 
 
     @classmethod
