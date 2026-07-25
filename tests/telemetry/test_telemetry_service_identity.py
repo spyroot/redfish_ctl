@@ -22,7 +22,7 @@ from redfish_ctl.telemetry.exporter import (
     to_signalfx_body,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CORPUS_MANAGERS = (
     (

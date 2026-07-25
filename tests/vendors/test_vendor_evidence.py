@@ -9,7 +9,7 @@ import pytest
 from redfish_ctl.vendors import get_vendor
 from redfish_ctl.vendors.base import VendorCapabilities
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _evidence_path(note: str) -> Path:
