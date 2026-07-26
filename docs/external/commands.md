@@ -122,7 +122,7 @@ Safety labels:
 | `control-reset-defaults` | Reset a Redfish Control resource through discovered `#Control.ResetToDefaults`; lists reset-capable controls by default, requires `--confirm` to write. | Guarded |
 | `compute-query` | Read ComputerSystem settings. | Read |
 | `console-info` | Report serial, graphical, and shell console links per manager. | Read |
-| `current_boot` | Read current boot source details. | Read |
+| `current_boot` | Read ComputerSystem Boot configuration and current override fields. | Read |
 | `dell-lc-network-share-test` | Test Dell Lifecycle Controller network-share reachability; previews unless `--confirm` is given. | Guarded |
 | `dell-card-test-actions` | List or send Dell iDRAC card email, SNMP, and rsyslog test actions; dry-run by default and `--confirm` posts. | Guarded |
 | `dell-license-actions` | List or invoke Dell OEM license-management import, export, and delete actions; previews by default and `--confirm` posts. | Guarded |
@@ -195,6 +195,7 @@ Safety labels:
 | `metric-definitions` | Read TelemetryService metric definitions. | Read |
 | `metric-reports` | Read TelemetryService metric reports; `--report` filters by id substring. | Read |
 | `network-adapters` | Read chassis NetworkAdapters such as NICs and DPUs. | Read |
+| `nic-firmware` | Read NIC/DPU adapter firmware from NetworkAdapters and UpdateService/FirmwareInventory. | Read |
 | `network-adapter-reset` | Reset a discovered NetworkAdapter through `NetworkAdapter.Reset`; lists reset-capable adapters when no target is given, requires `--confirm` to write. | Guarded |
 | `network-ports` | Read NetworkAdapter port link state and speed. | Read |
 | `ntp-set` | Set or clear Manager NTP servers through standard ManagerNetworkProtocol or legacy Manager NTP resources; dry-run by default and `--confirm` applies an NTP-only PATCH. | Guarded |
@@ -268,6 +269,7 @@ redfish_ctl thermal
 redfish_ctl environment-metrics
 redfish_ctl leak-detectors
 redfish_ctl network-adapters
+redfish_ctl nic-firmware
 redfish_ctl nvlink-ports
 redfish_ctl component-integrity
 redfish_ctl actions

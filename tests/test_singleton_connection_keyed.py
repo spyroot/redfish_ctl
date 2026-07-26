@@ -19,7 +19,7 @@ import requests_mock as requests_mock_lib
 
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import ApiRequestType
-from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager import CommandResult, RedfishManager
 from redfish_ctl.system.cmd_system import SystemQuery
 
 HOST_A = "10.9.9.1"
@@ -102,7 +102,7 @@ def test_dispatch_constructs_registered_commands_with_canonical_keywords():
     """Dispatch constructs registered commands with canonical connection kwargs."""
 
     class ConstructorProbeCommand(
-            IDracManager,
+            RedfishManager,
             scm_type=ApiRequestType.SystemQuery,
             name="constructor-probe-compat"):
         constructed = None

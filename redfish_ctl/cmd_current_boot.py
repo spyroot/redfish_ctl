@@ -3,8 +3,7 @@
     redfish_ctl current_boot
     redfish_ctl current_boot --filename current_boot.json
 
-This cmd return Dell Boot Sources Configuration and the related
-resources.
+This command returns the standard ComputerSystem ``Boot`` configuration.
 
 Command provides the option to retrieve boot source from a Redfish endpoint and serialize
 back as caller as JSON, YAML, and XML. In addition, it automatically
@@ -18,12 +17,11 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from .idrac_manager import IDracManager
 from .redfish_api_common import ApiRequestType, Singleton
-from .redfish_manager import CommandResult
+from .redfish_manager import CommandResult, RedfishManager
 
 
-class GetCurrentBoot(IDracManager,
+class GetCurrentBoot(RedfishManager,
                      scm_type=ApiRequestType.CurrentBoot,
                      name='current_boot_query',
                      metaclass=Singleton):
@@ -45,13 +43,14 @@ class GetCurrentBoot(IDracManager,
         """
         cmd_parser = argparse.ArgumentParser(add_help=False)
         cmd_parser.add_argument('--async', action='store_true', required=False, dest="do_async",
-                                default=False, help="Will create a task and will not wait.")
+                                default=False,
+                                help="Use the asynchronous GET path.")
 
         cmd_parser.add_argument('-f', '--filename', required=False, type=str,
                                 default="",
                                 help="filename if we need to save a respond to a file.")
 
-        help_text = "command fetch the boot source for device/devices"
+        help_text = "read ComputerSystem Boot configuration and current override"
         return cmd_parser, "current_boot", help_text
 
     def execute(self,
@@ -74,14 +73,11 @@ class GetCurrentBoot(IDracManager,
                   f"do_async:{do_async} filename:{filename}")
             self.logger.debug(f"the rest of args: {kwargs}")
 
-        headers = {}
-        if data_type == "json":
-            headers.update(self.json_content_type)
-
-        r = f"{self._default_method}{self.redfish_ip}{self.idrac_manage_servers}"
-        response = self.api_get_call(r, headers)
-        self.default_error_handler(response)
-        data = response.json()
+        data = self.base_query(
+            self.managed_system_uri,
+            data_type=data_type,
+            do_async=do_async,
+        ).data
         if 'Boot' in data:
             data = data['Boot']
 

@@ -167,7 +167,16 @@ def _source_names(rows: list[dict[str, Any]]) -> set[str]:
     """Source fixture basenames from report rows."""
     names = set()
     for row in rows:
-        source = row.get("sourceFixture") or row.get("source") or row.get("file") or ""
+        names.update(
+            Path(str(source)).name
+            for source in row.get("sourceFixtures", [])
+        )
+        source = (
+            row.get("sourceFixture")
+            or row.get("source")
+            or row.get("file")
+            or ""
+        )
         if source:
             names.add(Path(str(source)).name)
     return names

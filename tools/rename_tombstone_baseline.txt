@@ -24,5 +24,4 @@ tests/test_emulator_smoke.py:1
 tests/test_hpe_vendor.py:1
 tests/test_package_imports.py:1
 tests/test_query.py:1
-tests/test_redfish_ctl_alias.py:8
-tests/test_telemetry_exporter.py:3
+tests/test_redfish_ctl_alias.py:7
