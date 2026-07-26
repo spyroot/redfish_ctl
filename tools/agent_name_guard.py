@@ -38,6 +38,8 @@ _AGENT_FILE_GLOBS = [
 # Directory prefixes whose entire contents are agent/internal-only.
 _AGENT_DIR_PREFIXES = (".codex/", ".claude/", ".agent-review/", ".internal/",
                        "docs/internal/", "inventory/")
+# Machine-readable public contracts allowed inside otherwise private inventory.
+_PUBLIC_INVENTORY_FILES = frozenset({"inventory/ci/go-no-go.yaml"})
 
 # Agent-tool names (word-bounded) plus specialist-agent role names (either separator).
 _IDENTITIES = [
@@ -139,8 +141,11 @@ def is_agent_file(path: str) -> bool:
     """Return whether a repo-relative path is an agent instruction/artifact file.
 
     :param path: a repo-relative file path (forward slashes).
-    :return: True if it matches an agent-file glob or lives under an agent-only directory.
+    :return: False for an exact public inventory contract; otherwise True for an
+        agent-file glob or path under an agent-only directory.
     """
+    if path in _PUBLIC_INVENTORY_FILES:
+        return False
     if path.startswith(_AGENT_DIR_PREFIXES):
         return True
     base = path.rsplit("/", 1)[-1]

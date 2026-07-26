@@ -5,7 +5,6 @@ allow_failure. It never runs a gate, so a registered gate that always exits 0, o
 load the registry at all, passes every existing check. These tests close that gap by executing the
 scripts and asserting they fail when they must.
 
-Author Mus spyroot@gmail.com
 """
 import os
 import shutil
@@ -75,6 +74,42 @@ def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     # Proves the registry parsed: the error lists the profiles it found rather than a load traceback.
     assert "merge" in combined, combined
     assert "FileNotFoundError" not in combined, combined
+
+
+def test_run_sh_rejects_an_unknown_focused_gate() -> None:
+    """A focused request cannot turn an unknown gate ID into a green no-op."""
+    proc = subprocess.run(
+        [
+            str(REPO_ROOT / "scripts" / "gates" / "run.sh"),
+            "--profile",
+            "merge",
+            "--gate",
+            "no-such-gate",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "unknown gate 'no-such-gate'" in combined, combined
+
+
+def test_run_sh_rejects_a_gate_from_another_profile() -> None:
+    """Focused validation must not run a gate outside the requested profile."""
+    proc = subprocess.run(
+        [
+            str(REPO_ROOT / "scripts" / "gates" / "run.sh"),
+            "--profile",
+            "merge",
+            "--gate",
+            "integration.namespace",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "belongs to profile 'integration', not 'merge'" in combined, combined
 
 
 def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
@@ -174,6 +209,26 @@ def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
     assert proc.returncode == 3, f"expected the local refusal (3), got {proc.returncode}: {combined}"
     assert "REFUSING" in combined, combined
     assert "unknown profile" not in combined, f"the guard let the runner start: {combined}"
+
+
+def test_check_sh_parses_a_focused_gate_but_refuses_local_execution() -> None:
+    """The focused syntax is accepted without weakening the Kubernetes guard."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"}
+    }
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", "unit.all"],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 3, combined
+    assert "REFUSING" in combined, combined
+    assert "unexpected argument" not in combined, combined
 
 
 @pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")

@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import yaml
+
 from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,3 +68,41 @@ def test_every_gate_declares_profile_and_mutates():
     for gate in registry["gates"]:
         assert gate.get("profile") in allowed, gate
         assert isinstance(gate.get("mutates"), bool), f"{gate.get('id')} lacks a bool 'mutates'"
+
+
+def test_focused_gitlab_job_matches_the_builder_consumer_contract():
+    """Internal API/web dispatch runs one registry gate through the guarded wrapper."""
+    ci = yaml.safe_load((REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8"))
+    registry = gate_meta._load_registry()
+    assert "focused-gate" in registry["diagnostic_jobs"]
+    assert "focused-gate" not in registry["required_jobs"]
+
+    workflow_rule = ci["workflow"]["rules"][0]
+    assert workflow_rule["variables"]["FOCUSED_GATE"] == "unit.all"
+    assert '!= "gitlab.com"' in workflow_rule["if"]
+    assert "web" in workflow_rule["if"]
+    assert "api" in workflow_rule["if"]
+
+    focused = ci["focused-gate"]
+    assert focused["script"] == [
+        './scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"'
+    ]
+
+    focused_rules = repr(focused["rules"])
+    assert '!= "gitlab.com"' in focused_rules
+    assert "web" in focused_rules
+    assert "api" in focused_rules
+    assert "FOCUSED_GATE" in focused_rules
+
+    for job_name in (
+        "gate-merge",
+        "gate-integration",
+        "k8s-live-check",
+        "deploy-apply",
+        "publish-github",
+    ):
+        rules = ci[job_name]["rules"]
+        assert rules[0].get("when") == "never", job_name
+        condition = rules[0].get("if", "")
+        assert '!= "gitlab.com"' in condition, job_name
+        assert "FOCUSED_GATE" in condition, job_name
