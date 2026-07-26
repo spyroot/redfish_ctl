@@ -17,6 +17,7 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 from typing import Iterable, Mapping, Optional
 
@@ -1027,18 +1028,18 @@ class SupermicroExporterReader(AbstractExporterReader):
         :param extract_rows: command-specific row extractor.
         :return: normalized collector outcome with duration and error state.
         """
-        started_at = exporter.time.monotonic()
+        started_at = time.monotonic()
         try:
             result = call()
         except Exception as exc:
-            duration = exporter.time.monotonic() - started_at
+            duration = time.monotonic() - started_at
             if self._is_unsupported_collector_error(exc):
                 return exporter.CollectorResult(
                     collector, False, True, duration, (), None)
             return exporter.CollectorResult(
                 collector, True, False, duration, (),
                 self._collector_error_kind(exc))
-        duration = exporter.time.monotonic() - started_at
+        duration = time.monotonic() - started_at
         if not hasattr(result, "data"):
             return exporter.CollectorResult(
                 collector, True, False, duration, (), "invalid_payload")
@@ -1135,7 +1136,7 @@ class SupermicroExporterReader(AbstractExporterReader):
         :param otlp_traces: enable trace emission while scraping.
         :return: complete scrape samples, including exporter health metrics.
         """
-        started_at = exporter.time.monotonic()
+        started_at = time.monotonic()
         redfish_cache = RedfishResponseCache()
         identity_options = identity_mod.resolve_identity_options(
             host_prefix=identity_host_prefix,
@@ -1266,11 +1267,11 @@ class SupermicroExporterReader(AbstractExporterReader):
                 self._collector_error_totals.get(key, 0.0) + 1.0
             )
         if scrape_ok:
-            self._last_success_timestamp_seconds = exporter.time.time()
+            self._last_success_timestamp_seconds = time.time()
         samples.extend(exporter.scrape_health_samples(
             identity,
             ok=scrape_ok,
-            duration_seconds=exporter.time.monotonic() - started_at,
+            duration_seconds=time.monotonic() - started_at,
             collector_results=collector_results,
             partial=scrape_partial,
             timestamp_seconds=self._last_success_timestamp_seconds,

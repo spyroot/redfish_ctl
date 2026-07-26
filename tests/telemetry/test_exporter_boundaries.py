@@ -6,6 +6,7 @@ import uuid
 
 import pytest
 
+import redfish_ctl.telemetry.supermicro.super_microexporter as supermicro_exporter
 from redfish_ctl.component_integrity.cmd_component_integrity import (
     QueryComponentIntegrity,
 )
@@ -120,7 +121,7 @@ def test_reader_preserves_last_success_and_cumulative_error_state(monkeypatch):
     """Reader-owned lifecycle metrics survive later scrape failures."""
     source = _ReaderSource()
     reader = SupermicroExporterReader(source)
-    monkeypatch.setattr(exporter.time, "time", lambda: 1234.0)
+    monkeypatch.setattr(supermicro_exporter.time, "time", lambda: 1234.0)
 
     first = reader.read(
         vendor="supermicro",

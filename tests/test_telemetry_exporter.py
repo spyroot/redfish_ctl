@@ -1316,8 +1316,10 @@ def test_signalfx_push_loop_jitters_sleep(monkeypatch):
     monotonic_values = iter([100.0, 105.0])
     monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 1.0)
-    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
-    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        signalfx_emit.time, "monotonic", lambda: next(monotonic_values)
+    )
+    monkeypatch.setattr(signalfx_emit.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
         signalfx_emit.run_signalfx_loop(
@@ -1361,8 +1363,10 @@ def test_signalfx_push_loop_continues_after_transient_push_error(monkeypatch):
     monotonic_values = iter([100.0, 101.0, 130.0, 132.0])
     monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 0.5)
-    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
-    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        signalfx_emit.time, "monotonic", lambda: next(monotonic_values)
+    )
+    monkeypatch.setattr(signalfx_emit.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
         signalfx_emit.run_signalfx_loop(
