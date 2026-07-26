@@ -156,7 +156,7 @@ class BiosQuery(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r: str = f"{self._default_method}{self.idrac_ip}{idrac_api}"
+        r: str = f"{self._default_method}{self.redfish_ip}{idrac_api}"
         if not do_async:
             response = self.api_get_call(r, headers)
             self.default_error_handler(response)
@@ -198,7 +198,7 @@ class BiosQuery(IDracManager,
             api_links = find_ids(data, REDFISH_JSON.Data_id)
             api_links = [u for u in api_links if idrac_api != u]
             for api_link in api_links:
-                r = f"{self._default_method}{self.idrac_ip}{api_link}"
+                r = f"{self._default_method}{self.redfish_ip}{api_link}"
                 if not do_async:
                     response = self.api_get_call(r, headers)
                     self.default_error_handler(response)

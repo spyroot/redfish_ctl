@@ -44,7 +44,6 @@ def test_constructor_accepts_canonical_connection_keywords():
     )
 
     assert cmd.host == "10.9.9.30:8443"
-    assert cmd.idrac_ip == "10.9.9.30:8443"
     assert cmd.username == "admin"
     assert cmd.password == "secret"
 
@@ -71,44 +70,15 @@ def test_canonical_connection_keywords_are_keyed_per_host():
     assert b.host == "10.9.9.32"
 
 
-def test_dispatch_connection_pop_cleans_mixed_public_aliases():
-    """External invoke kwargs do not leak duplicate connection aliases to commands."""
-    kwargs = {
-        "host": "10.9.9.40",
-        "idrac_ip": "10.9.9.41",
-        "path": "/redfish/v1/",
-    }
-
-    value = IDracManager._pop_connection_value(
-        kwargs, "host", "idrac_ip", "_redfish_host")
-
-    assert value == "10.9.9.40"
-    assert "host" not in kwargs
-    assert "idrac_ip" not in kwargs
-    assert kwargs == {"path": "/redfish/v1/"}
-
-
-def test_dispatch_connection_pop_falls_back_when_canonical_is_none():
-    """A None canonical value keeps the deprecated alias fallback working."""
-    kwargs = {"host": None, "idrac_ip": "10.9.9.42"}
-
-    value = IDracManager._pop_connection_value(
-        kwargs, "host", "idrac_ip", "_redfish_host")
-
-    assert value == "10.9.9.42"
-    assert kwargs == {}
-
-
 def test_internal_dispatch_connection_key_preserves_command_host_arg():
     """Internal connection keys avoid consuming subcommand-local host arguments."""
     kwargs = {
         "_redfish_host": "10.9.9.43",
-        "idrac_ip": "10.9.9.44",
         "host": "downloads.example.test",
     }
 
     value = IDracManager._pop_connection_value(
-        kwargs, "host", "idrac_ip", "_redfish_host")
+        kwargs, "host", "_redfish_host")
 
     assert value == "10.9.9.43"
     assert kwargs == {"host": "downloads.example.test"}
@@ -118,12 +88,11 @@ def test_internal_dispatch_connection_key_removes_duplicate_host_arg():
     """Duplicate public connection host values do not leak into command kwargs."""
     kwargs = {
         "_redfish_host": "10.9.9.43",
-        "idrac_ip": "10.9.9.44",
         "host": "10.9.9.43",
     }
 
     value = IDracManager._pop_connection_value(
-        kwargs, "host", "idrac_ip", "_redfish_host")
+        kwargs, "host", "_redfish_host")
 
     assert value == "10.9.9.43"
     assert kwargs == {}
@@ -243,8 +212,8 @@ def test_two_connections_get_distinct_instances():
     b = _cmd(HOST_B, password="pw-b", is_http=False)
 
     assert a is not b
-    assert a.idrac_ip == HOST_A
-    assert b.idrac_ip == HOST_B
+    assert a.host == HOST_A
+    assert b.host == HOST_B
     assert a._default_method == "http://"
     assert b._default_method == "https://"
 

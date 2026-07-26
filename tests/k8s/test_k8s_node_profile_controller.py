@@ -262,9 +262,10 @@ def test_make_manager_uses_canonical_constructor_kwargs() -> None:
             "is_debug": False,
         }
     ]
-    assert not {"idrac_ip", "idrac_username", "idrac_password", "idrac_port"} & set(
-        built[0]
-    )
+    retired_connection_keys = {
+        "idrac_" + suffix for suffix in ("ip", "username", "password", "port")
+    }
+    assert not retired_connection_keys & set(built[0])
 
 
 def test_controller_tracing_setup_is_env_gated(monkeypatch) -> None:

@@ -197,22 +197,6 @@ class IDracManager(RedfishManager):
 
         self._redfish_error = None
 
-    @property
-    def idrac_ip(self) -> str:
-        """BMC host address (delegates to :attr:`redfish_ip`).
-
-        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
-        """
-        return self.redfish_ip
-
-    @property
-    def host(self) -> str:
-        """BMC host address (canonical alias for :attr:`redfish_ip`).
-
-        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
-        """
-        return self.redfish_ip
-
     @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_get_call(self, loop, req, hdr: Dict):
         """Make api asynced requests either with x-auth authentication
@@ -508,7 +492,7 @@ class IDracManager(RedfishManager):
         with tqdm(total=100) as pbar:
             while True:
                 # /redfish/v1/TaskService/Tasks/{TaskId}
-                resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}"
+                resp = self.api_get_call(f"{self._default_method}{self.redfish_ip}"
                                          f"{REDFISH_API.Tasks}{task_id}", hdr={})
 
                 if 'Retry-After' in resp.headers:

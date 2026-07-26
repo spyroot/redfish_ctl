@@ -12,7 +12,7 @@ times each logical resource is requested, so we can assert:
 
 The walker is driven on an instance built with ``__init__`` bypassed: it only
 touches a handful of plain attributes plus ``base_query``, so a real network
-client is never constructed. The whole module runs green with no IDRAC_IP set.
+client is never constructed. The whole module runs green with no REDFISH_IP set.
 
 Author Mus spyroot@gmail.com
 """

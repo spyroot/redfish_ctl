@@ -460,12 +460,11 @@ class RedfishManager:
 
     @staticmethod
     def _pop_connection_value(
-            kwargs: dict, primary: str, legacy: str, internal: str):
-        """Pop a dispatch connection argument, accepting deprecated aliases.
+            kwargs: dict, primary: str, internal: str):
+        """Pop one canonical or private dispatch connection argument.
 
         :param kwargs: dispatch keyword arguments.
         :param primary: canonical keyword name.
-        :param legacy: deprecated alias keyword name.
         :param internal: private keyword used by sync dispatch to avoid
             colliding with subcommand-local ``host`` or ``port`` arguments.
         :return: the popped value.
@@ -473,21 +472,10 @@ class RedfishManager:
         """
         if internal in kwargs:
             value = kwargs.pop(internal)
-            kwargs.pop(legacy, None)
             if kwargs.get(primary) in (value, None):
                 kwargs.pop(primary, None)
             return value
-
-        if primary in kwargs:
-            value = kwargs.pop(primary)
-            legacy_value = kwargs.pop(legacy, None)
-            if value is not None:
-                return value
-            if legacy_value is not None:
-                return legacy_value
-            return value
-
-        return kwargs.pop(legacy)
+        return kwargs.pop(primary)
 
     @classmethod
     def invoke(cls,
@@ -500,19 +488,16 @@ class RedfishManager:
                       So we can register under same type sub-commands.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: command result returned by the registered command.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -546,19 +531,16 @@ class RedfishManager:
         :param name: a name.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: CommandResult.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -652,6 +634,14 @@ class RedfishManager:
                 return f"{self._redfish_ip}:{self._port}"
             else:
                 return self._redfish_ip
+
+    @property
+    def host(self) -> str:
+        """Return the canonical BMC host, including a non-default port.
+
+        :return: the normalized host used to build Redfish request URLs.
+        """
+        return self.redfish_ip
 
     @property
     def username(self) -> str:

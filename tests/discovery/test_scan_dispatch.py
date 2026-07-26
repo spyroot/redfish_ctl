@@ -1,7 +1,7 @@
 """Offline test for the credential-less scan dispatch used by redfish_main.
 
 In scan mode (bmc-scan, or discovery --network) redfish_main.main() dispatches via
-``redfish_api.invoke(...)`` with EMPTY idrac_ip/username/password — deliberately
+``redfish_api.invoke(...)`` with empty host/username/password — deliberately
 bypassing ``sync_invoke``'s non-empty-credential gate, because a segment scan has
 no target host and needs no credentials. The command-level tests route through
 ``sync_invoke`` with fixture creds and so never exercise this production path;

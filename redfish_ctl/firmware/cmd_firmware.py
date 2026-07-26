@@ -82,10 +82,10 @@ class FirmwareQuery(IDracManager,
             headers.update(self.json_content_type)
 
         if do_deep:
-            r = f"{self._default_method}{self.idrac_ip}/redfish/v1/UpdateService/" \
+            r = f"{self._default_method}{self.redfish_ip}/redfish/v1/UpdateService/" \
                 f"FirmwareInventory?$expand=*($levels=1)"
         else:
-            r = f"{self._default_method}{self.idrac_ip}/redfish/v1/UpdateService/FirmwareInventory"
+            r = f"{self._default_method}{self.redfish_ip}/redfish/v1/UpdateService/FirmwareInventory"
 
         if not do_async:
             response = self.api_get_call(r, headers)

@@ -63,7 +63,7 @@ Run the offline tests with live BMC variables unset:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
+  pytest -q
 ruff check <changed files>
 ```
 

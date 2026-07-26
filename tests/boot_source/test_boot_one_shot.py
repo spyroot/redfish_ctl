@@ -4,7 +4,7 @@
 
 Covers ``boot_one_shot`` (ApiRequestType.BootOneShot), a DMTF ComputerSystem
 Boot-override PATCH. The preview (dry-run / confirm=False) paths mutate nothing,
-so they run fully offline against the mock service and, when IDRAC_IP is set,
+so they run fully offline against the mock service and, when REDFISH_IP is set,
 against real hardware without touching boot config.
 
 Author Mus spyroot@gmail.com

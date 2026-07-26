@@ -11,11 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from ..config import (
-    ConfigurationConflict,
-    exporter_config_file,
-    exporter_credential_file,
-)
+from ..config import exporter_config_file, exporter_credential_file
 from . import identity as identity_mod
 from .metric_model import MetricDefinition, MetricSample, _definition
 
@@ -33,7 +29,7 @@ ISO_DURATION = re.compile(
     r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
     r")?$"
 )
-SECRET_ARG_NAMES = {"--password", "--idrac_password", "--idrac-password"}
+SECRET_ARG_NAMES = {"--password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 POLL_JITTER_FRACTION = 0.10
 
@@ -149,16 +145,13 @@ class CollectorResult:
     error_kind: Optional[str] = None
 
 
-# Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
-# the legacy IDRAC_* keys still work as a fallback during the rename.
 _EXPORTER_CRED_KEYS = frozenset({
     "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
-    "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
 })
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
-    Accepts REDFISH_IP/USERNAME/PASSWORD/PORT and the legacy IDRAC_* names.
+    Accepts the canonical REDFISH_IP/USERNAME/PASSWORD/PORT keys.
 
     :param path: path to the credential env file to read.
     :return: mapping of recognized credential keys to their unquoted values.
@@ -338,43 +331,24 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
     if not file_path:
         return
     values = load_exporter_env_file(file_path)
-    # (canonical namespace attr, legacy namespace attr, REDFISH_* key, legacy
-    # IDRAC_* key). Matching pairs are harmless; conflicting pairs fail closed.
-    # Legacy attrs keep older programmatic callers working.
     mapping = (
-        ("redfish_host", "idrac_ip", "REDFISH_IP", "IDRAC_IP"),
-        ("redfish_username", "idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
-        ("redfish_password", "idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
-        ("redfish_port", "idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
+        ("redfish_host", "REDFISH_IP"),
+        ("redfish_username", "REDFISH_USERNAME"),
+        ("redfish_password", "REDFISH_PASSWORD"),
+        ("redfish_port", "REDFISH_PORT"),
     )
-    for primary_attr, legacy_attr, redfish_key, idrac_key in mapping:
-        if (
-            redfish_key in values
-            and idrac_key in values
-            and values[redfish_key].strip() != values[idrac_key].strip()
-        ):
-            raise ConfigurationConflict(
-                f"Configuration conflict in {file_path}: "
-                f"use only {redfish_key} for this credential.")
-        attrs = [
-            attr
-            for attr in (primary_attr, legacy_attr)
-            if hasattr(args, attr)
-        ]
-        if not attrs:
+    for attr, key in mapping:
+        if not hasattr(args, attr):
             continue
-        attr = primary_attr if primary_attr in attrs else legacy_attr
-        key = redfish_key if redfish_key in values else idrac_key
         if key not in values:
             continue
-        is_password = attr in {"redfish_password", "idrac_password"}
+        is_password = attr == "redfish_password"
         current = getattr(args, attr, "")
         if current in ("", None, "root") or is_password:
             value = values[key]
-            is_port = attr in {"redfish_port", "idrac_port"}
+            is_port = attr == "redfish_port"
             value = int(value) if is_port else value
-            for target_attr in attrs:
-                setattr(args, target_attr, value)
+            setattr(args, attr, value)
 
 
 def scrape_health_samples(

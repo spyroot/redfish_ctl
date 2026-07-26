@@ -12,7 +12,7 @@ it counts how many TCP connections the client actually opens and *wedges* (drops
 new connections) once a small budget is exceeded — exactly what the real BMC did.
 A many-request "crawl" must then complete fully **without** tripping the wedge,
 which is only possible if the client reuses connections. No external network, no
-iDRAC, no IDRAC_IP required.
+iDRAC, no REDFISH_IP required.
 
 Author Mus spyroot@gmail.com
 """
