@@ -1,0 +1,56 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-post-create-success
+spec:
+  rules:
+    - id: method.post-create.success
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["7.5.2", "7.9", "8.3"]
+        statement: generic-post-create-success
+        wording: should
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: POST
+          operationKind: create
+          target:
+            kind: collection
+      expect:
+        alternatives:
+          - id: completed-with-created-representation-or-empty-body
+            status:
+              accept: {matcher: exact, values: [201]}
+              emitAllowed: true
+            headers:
+              Location:
+                presence: required
+                semantic: created_resource_uri
+            body:
+              presence: optional
+              represents: created_resource
+          - id: accepted-asynchronously
+            status:
+              accept: {matcher: exact, values: [202]}
+              emitAllowed: true
+            headers:
+              Location:
+                presence: required
+                semantic: task_monitor_uri
+            body:
+              presence: optional
+              ifPresent:
+                schema: Task
+          - id: completed-without-representation
+            status:
+              accept: {matcher: exact, values: [204]}
+              emitAllowed: true
+            body:
+              presence: forbidden
+      normative:
+        strength: recommended
+        keyword: should
