@@ -15,7 +15,6 @@ from typing import Optional
 
 from .redfish_shared import (
     RedfishApi,
-    RedfishApiRespond,
     RedfishJson,
     RedfishJsonSpec,
 )

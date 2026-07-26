@@ -4,7 +4,6 @@
     redfish_ctl subscription-delete --subscription <id-or-uri> --confirm
 """
 
-import asyncio
 import inspect
 import json
 from typing import Optional

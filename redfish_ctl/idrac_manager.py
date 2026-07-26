@@ -10,7 +10,6 @@ https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v4.x-seri
 
 Author Mus spyroot@gmail.com
 """
-import argparse
 import collections
 import functools
 import json
@@ -36,35 +35,33 @@ from .cmd_exceptions import (
     TaskIdUnavailable,
     UnexpectedResponse,
 )
-from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
+from .config import http_timeout
 from .decorators.fault_injection import (
     simulate_http_faults,
     simulate_http_faults_async,
 )
+from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_api_common import (
     REDFISH_API,
     REDFISH_JSON,
     ApiRequestType,
     ApiRespondString,
-    DellCliJobTypes,
-    HTTPMethod,
-    DellJobType,
     DellApplyTypes,
+    DellCliJobTypes,
     DellJobState,
+    DellJobType,
+    HTTPMethod,
     PowerState,
-    RedfishAction,
     RedfishApiRespond,
     ScheduleJobType,
 )
 from .redfish_api_common import ResetType as ResetType
-from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import (
     CommandResult,
     RedfishManager,
 )
-from .config import http_timeout
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
+from .redfish_shared import RedfishJson, RedfishJsonSpec
 from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')

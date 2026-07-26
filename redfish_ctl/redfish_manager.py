@@ -39,6 +39,12 @@ from .cmd_exceptions import (
 from .cmd_utils import save_if_needed
 from .config import http_backoff, http_pool, http_retries, http_timeout
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
+from .redfish_api_common import (
+    ApiRequestType,
+    ApiRespondString,
+    HTTPMethod,
+    RedfishAction,
+)
 from .redfish_exceptions import (
     RedfishForbidden,
     RedfishMethodNotAllowed,
@@ -48,12 +54,6 @@ from .redfish_exceptions import (
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
 from .redfish_respond_error import RedfishError
-from .redfish_api_common import (
-    ApiRequestType,
-    ApiRespondString,
-    HTTPMethod,
-    RedfishAction,
-)
 from .redfish_shared import (
     RedfishApi,
     RedfishApiRespond,
@@ -2421,7 +2421,7 @@ class RedfishManager:
         """
         managers_collection = self._identity_resource(
             RedfishApi.Managers, redfish_cache, do_async)
-        
+
         manager_resources = []
         for uri in sorted(self._members(managers_collection)):
             manager_resources.append((

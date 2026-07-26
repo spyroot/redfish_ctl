@@ -26,7 +26,13 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec, UncommittedPendingChanges
 from ..cmd_utils import from_json_spec
-from ..redfish_api_common import REDFISH_API, REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import (
+    REDFISH_API,
+    REDFISH_JSON,
+    ApiRequestType,
+    RedfishApiRespond,
+    Singleton,
+)
 from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 

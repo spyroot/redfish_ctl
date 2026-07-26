@@ -20,7 +20,7 @@ import urllib3
 from pygments import highlight
 
 from redfish_ctl.ilo_manager import IloManager
-from redfish_ctl.sensors import cmd_sensors
+
 from .redfish_exceptions import RedfishException
 from .version import __version__
 
@@ -48,10 +48,10 @@ from .cmd_utils import save_if_needed
 from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults, term_type
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .idrac_manager import IDracManager
-from .redfish_manager import RedfishManager
-from .supermico_manager import SupermicroManager
 from .redfish_api_common import RedfishAction, RedfishActionEncoder
+from .redfish_manager import RedfishManager
 from .redfish_query import RedfishQuery
+from .supermico_manager import SupermicroManager
 from .telemetry import tracing
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor

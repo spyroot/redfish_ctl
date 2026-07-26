@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from redfish_ctl.cmd_exceptions import InvalidArgument, UnsupportedAction
+from redfish_ctl.cmd_exceptions import UnsupportedAction
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 

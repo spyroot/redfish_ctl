@@ -28,7 +28,6 @@ from redfish_ctl.telemetry import identity as identity_mod
 from redfish_ctl.telemetry.exporter import _non_empty, jittered_interval
 from redfish_ctl.telemetry.metric_model import MetricSample
 
-
 SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 
 

@@ -21,7 +21,6 @@ from redfish_ctl.sensors.cmd_sensors import Sensors
 from redfish_ctl.thermal.cmd_leak_detectors import LeakDetectors
 from redfish_ctl.thermal.cmd_thermal import Thermal
 
-
 GENERIC_COMMANDS = (
     (ApiRequestType.ActionList, "action_list", ActionList),
     (ApiRequestType.SystemReset, "system_reset", SystemReset),

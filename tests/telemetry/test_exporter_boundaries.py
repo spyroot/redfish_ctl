@@ -26,7 +26,6 @@ from redfish_ctl.telemetry.supermicro.super_microexporter import (
     SupermicroExporterReader,
 )
 
-
 _INSTANCE_ID = str(uuid.UUID("cb0377f1-e3b9-4da9-9275-71825b2c6434"))
 
 _TOLERANT_COLLECTORS = (NvLinkPorts, MetricReports, QueryComponentIntegrity)

@@ -35,11 +35,15 @@ from redfish_ctl.telemetry.exporter import (
     _dim_value,
     _duration_seconds,
     _reading,
-    _sample as _catalog_sample,
     _with_dims,
+)
+from redfish_ctl.telemetry.exporter import (
+    _sample as _catalog_sample,
 )
 from redfish_ctl.telemetry.supermicro.metric_catalog import (
     metric_definition as supermicro_metric_definition,
+)
+from redfish_ctl.telemetry.supermicro.metric_catalog import (
     metric_definitions as supermicro_metric_definitions,
 )
 

@@ -1,6 +1,6 @@
 import collections
 
-from .redfish_manager import RedfishManager, CommandResult
+from .redfish_manager import CommandResult, RedfishManager
 
 
 class IloManager(RedfishManager):

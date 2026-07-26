@@ -9,7 +9,6 @@ to a file and consume asynchronously or synchronously.
 
 Author Mus spyroot@gmail.com
 """
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
