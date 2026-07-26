@@ -875,7 +875,8 @@ class RedfishManager:
 
         This helper waits only for the local HTTP request. Server-side Redfish
         Task and vendor Job lifecycles remain separate and are polled by their
-        dedicated commands using the returned task or job identifier.
+        dedicated commands using the identifier returned by the write operation
+        that created the server-side work.
 
         :param req: api method caller request.
         :param hdr: dict: http/https header
@@ -885,6 +886,7 @@ class RedfishManager:
         if loop is None:
             loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
+        self.query_counter += 1
         await self.async_default_error_handler(response)
         return response
 
@@ -1448,7 +1450,6 @@ class RedfishManager:
                     r, headers
                 )
             )
-            self.query_counter += 1
             allow_header = response.headers.get("Allow")
             data = response.json()
             data = select_payload(data)
