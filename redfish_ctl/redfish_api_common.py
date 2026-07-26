@@ -13,7 +13,12 @@ from enum import Enum, auto
 from json import JSONEncoder
 from typing import Optional
 
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
+from .redfish_shared import (
+    RedfishApi,
+    RedfishApiRespond,  # noqa: F401 - compatibility re-export
+    RedfishJson,
+    RedfishJsonSpec,
+)
 
 
 class ApiRequestType(Enum):
@@ -732,18 +737,6 @@ class DellApplyTypes:
     AtMaintenance = "AtMaintenanceWindowStart"
     OnReset = "OnReset"
     Immediate = "Immediate"
-
-
-class RedfishApiRespond(Enum):
-    """We need report to a client either redfish created task and accepted
-    or ok and success.  Note that some API has mismatch between
-    200/204  hence it better differentiate each case
-    """
-    Ok = auto()
-    Error = auto()
-    Created = auto()
-    Success = auto()
-    AcceptedTaskGenerated = auto()
 
 
 class ApiRespondString:

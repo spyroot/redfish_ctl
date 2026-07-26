@@ -1,6 +1,6 @@
 """Native OTLP output: the hw.* contract mapped onto the OTLP data model.
 
-The pure helpers (counter classification, OTEL_* config resolution) run always;
+The pure OTEL_* config helpers run always;
 the MetricsData construction needs the OpenTelemetry SDK and is importorskip-ed
 so it runs where `redfish_ctl[otlp]`/`[dev]` is installed and skips otherwise.
 """
@@ -11,28 +11,9 @@ import warnings
 import pytest
 
 from redfish_ctl.config import otlp_protocol
-from redfish_ctl.telemetry.exporter import MetricSample, metric_definition
-from redfish_ctl.telemetry.otlp import (
-    is_monotonic_counter,
-    resolve_otlp_config,
-)
+from redfish_ctl.telemetry.exporter import MetricSample
+from redfish_ctl.telemetry.otlp import resolve_otlp_config
 from redfish_ctl.telemetry.otlp.emit import _build_exporter
-
-
-def test_counter_classification():
-    """Cumulative totals are Sums; instantaneous values stay Gauges."""
-    assert is_monotonic_counter("hw.fabric.rx_bytes")
-    assert is_monotonic_counter("hw.fabric.crc_errors")
-    assert is_monotonic_counter("hw.fabric.link_down_count")
-    assert is_monotonic_counter("hw.energy_kwh")
-    assert metric_definition("hw.fabric.rx_bytes").kind == "counter"
-    assert metric_definition("hw.fabric.crc_errors").kind == "counter"
-    assert metric_definition("hw.fabric.link_down_count").kind == "counter"
-    assert metric_definition("hw.energy_kwh").kind == "counter"
-    assert not is_monotonic_counter("hw.power")
-    assert not is_monotonic_counter("hw.temperature")
-    assert not is_monotonic_counter("hw.fabric.rx_gbps")   # a rate, not a total
-    assert not is_monotonic_counter("hw.fabric.link_up")   # a boolean state
 
 
 def test_resolve_config_endpoint_and_headers_are_passthrough(monkeypatch):

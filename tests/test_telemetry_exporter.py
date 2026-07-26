@@ -16,10 +16,9 @@ import redfish_ctl.telemetry.http_util as http_util_mod
 import redfish_ctl.telemetry.signalfx.emit as signalfx_emit
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.config import ConfigurationConflict
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import ApiRequestType
-from redfish_ctl.redfish_manager import CommandResult, RedfishResponseCache
-from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
+from redfish_ctl.redfish_manager import CommandResult, RedfishManager, RedfishResponseCache
+from redfish_ctl.supermico_manager import SupermicroManager
 from redfish_ctl.telemetry.exporter import (
     CollectorResult,
     MetricSample,
@@ -27,18 +26,27 @@ from redfish_ctl.telemetry.exporter import (
     build_identity_dimensions,
     exporter_argv_uses_secret,
     load_exporter_env_file,
-    metric_definition,
-    metric_definitions,
 )
+from redfish_ctl.telemetry.identity import parse_dimension_pairs
+from redfish_ctl.telemetry.prometheus import render_prometheus_text
 from redfish_ctl.telemetry.signalfx import (
     _require_datapoint_url,
     resolve_signalfx_ingest_url,
     resolve_signalfx_token,
     to_signalfx_body,
 )
-from redfish_ctl.telemetry.prometheus import render_prometheus_text
-from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
-from redfish_ctl.telemetry.identity import parse_dimension_pairs
+from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
+from redfish_ctl.telemetry.supermicro.metric_catalog import (
+    metric_definition,
+    metric_definitions,
+)
+from redfish_ctl.telemetry.supermicro.super_microexporter import (
+    HEALTH_LABELS,
+    LINK_DOWN_REASONS,
+    RESET_TYPES,
+    STATE_LABELS,
+    build_metric_samples,
+)
 
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
 TEST_SERVICE_INSTANCE_ID = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
@@ -120,7 +128,7 @@ def gb300_exporter_manager():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = SupermicroManager(
             host="mock-gb300",
             username="root",
             password="mock",
@@ -562,7 +570,7 @@ def test_scrape_health_samples_report_success_and_duration():
     by_metric = {sample.metric: sample for sample in samples}
     assert by_metric["redfish_exporter_scrape_success"].value == 0
     assert by_metric["redfish_exporter_scrape_partial"].value == 1
-    assert by_metric["redfish_exporter_last_success_timestamp_seconds"].value == 0
+    assert by_metric["redfish_exporter_last_success_timestamp_seconds"].value == 1234
     assert by_metric["hw.scrape.ok"].value == 0
     assert by_metric["hw.scrape.ok"].dimensions["source"] == "exporter"
     assert by_metric["redfish_exporter_scrape_duration_seconds"].value == pytest.approx(
@@ -639,7 +647,8 @@ def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
     monkeypatch.setattr(
         manager, "base_query", lambda *a, **k: CommandResult({}, None, None, None))
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29", vendor="supermicro")
 
     up = _single_metric(samples, "hw.bmc.up")
     assert up.value == 1
@@ -670,7 +679,8 @@ def test_exporter_collect_samples_unreachable_bmc_reports_down(monkeypatch):
 
     monkeypatch.setattr(manager, "base_query", fake_base_query)
 
-    samples = manager.collect_samples(label_bmc_ip="172.25.230.29", vendor="dell")
+    samples = manager.collect_samples(
+        label_bmc_ip="172.25.230.29", vendor="supermicro")
 
     up = _single_metric(samples, "hw.bmc.up")
     assert up.value == 0
@@ -688,7 +698,8 @@ def test_scrape_health_signals_contract():
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        (Path(__file__).parent.parent
+         / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
     for row in spec.get("scrape_health_signals", []):
@@ -762,7 +773,7 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
 
     samples = manager.collect_samples(
         label_bmc_ip="172.25.230.29",
-        vendor="dell",
+        vendor="supermicro",
         service_instance_id=TEST_SERVICE_INSTANCE_ID,
     )
 
@@ -784,7 +795,7 @@ def test_exporter_collect_samples_reports_partial_supported_failure(monkeypatch)
         "node": "slot9",
         "server.address": "172.25.230.49",
         "bmc.ip": "172.25.230.29",
-        "vendor": "dell",
+        "vendor": "supermicro",
         "service.name": "redfish_ctl",
         "source": "exporter",
         "collector": "metric-reports",
@@ -812,7 +823,7 @@ def test_exporter_collect_samples_treats_unsupported_collectors_as_healthy(
 
     samples = manager.collect_samples(
         label_bmc_ip="172.25.230.29",
-        vendor="dell",
+        vendor="supermicro",
         service_instance_id=TEST_SERVICE_INSTANCE_ID,
     )
 
@@ -851,7 +862,7 @@ def test_exporter_collect_samples_classifies_malformed_collector_payload(
 
     samples = manager.collect_samples(
         label_bmc_ip="172.25.230.29",
-        vendor="dell",
+        vendor="supermicro",
         service_instance_id=TEST_SERVICE_INSTANCE_ID,
     )
 
@@ -873,7 +884,7 @@ def test_prometheus_text_preserves_contract_names_and_dimensions():
         metric_type="gauge",
     )
 
-    text = render_prometheus_text([sample])
+    text = render_prometheus_text([sample], metric_definition)
 
     assert "# HELP hw.power Power draw in watts." in text
     assert "# TYPE hw.power gauge" in text
@@ -895,7 +906,7 @@ def test_prometheus_text_uses_catalog_counter_type():
         unit="By",
     )
 
-    text = render_prometheus_text([sample])
+    text = render_prometheus_text([sample], metric_definition)
 
     assert "# HELP hw.fabric.rx_bytes Cumulative fabric receive bytes." in text
     assert "# TYPE hw.fabric.rx_bytes counter" in text
@@ -960,7 +971,10 @@ def test_metric_definition_catalog_registers_emitted_metrics():
 
     assert samples
     for sample in samples:
-        definition = metric_definition(sample.metric)
+        try:
+            definition = metric_definition(sample.metric)
+        except KeyError:
+            definition = exporter_mod.metric_definition(sample.metric)
         assert sample.metric_type == definition.kind
         assert sample.unit == definition.unit
 
@@ -970,24 +984,31 @@ def test_metric_definition_catalog_registers_emitted_metrics():
 
 
 def test_metric_catalog_yaml_matches_runtime_static_catalog():
-    """The checked-in catalog spec mirrors the runtime static definitions."""
+    """Shared and Supermicro specs mirror their runtime definitions."""
     import yaml
-    spec = yaml.safe_load(
-        (Path(__file__).parent.parent / "specs/telemetry/catalog.yaml")
-        .read_text(encoding="utf-8"))
-    runtime = metric_definitions()
-    rows = {row["name"]: row for row in spec["metrics"]}
+    spec_root = Path(__file__).parent.parent / "specs/telemetry"
+    shared_spec = yaml.safe_load(
+        (spec_root / "catalog.yaml").read_text(encoding="utf-8"))
+    supermicro_spec = yaml.safe_load(
+        (spec_root / "supermicro/catalog.yaml").read_text(encoding="utf-8"))
 
-    assert {"hw.power", "hw.fabric.rx_bytes", "hw.scrape.ok"} <= set(rows)
-    assert set(rows) == set(runtime)
-    for name, row in rows.items():
-        definition = runtime[name]
-        assert row["kind"] == definition.kind
-        assert row.get("unit") == definition.unit
-        assert row["prometheus_name"] == definition.prometheus_name
-        assert row["family"] == definition.family
+    catalogs = (
+        (shared_spec, exporter_mod.metric_definitions()),
+        (supermicro_spec, metric_definitions()),
+    )
+    for spec, runtime in catalogs:
+        rows = {row["name"]: row for row in spec["metrics"]}
+        assert set(rows) == set(runtime)
+        for name, row in rows.items():
+            definition = runtime[name]
+            assert row["kind"] == definition.kind
+            assert row.get("unit") == definition.unit
+            assert row["prometheus_name"] == definition.prometheus_name
+            assert row["family"] == definition.family
 
-    dynamic = spec["dynamic_families"][0]
+    assert "hw.scrape.ok" in exporter_mod.metric_definitions()
+    assert "hw.power" in metric_definitions()
+    dynamic = supermicro_spec["dynamic_families"][0]
     assert dynamic["prefix"] == "hw.gb300."
     assert dynamic["kind"] == "inferred"
 
@@ -1295,8 +1316,10 @@ def test_signalfx_push_loop_jitters_sleep(monkeypatch):
     monotonic_values = iter([100.0, 105.0])
     monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 1.0)
-    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
-    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        signalfx_emit.time, "monotonic", lambda: next(monotonic_values)
+    )
+    monkeypatch.setattr(signalfx_emit.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
         signalfx_emit.run_signalfx_loop(
@@ -1340,8 +1363,10 @@ def test_signalfx_push_loop_continues_after_transient_push_error(monkeypatch):
     monotonic_values = iter([100.0, 101.0, 130.0, 132.0])
     monkeypatch.setattr(signalfx_emit, "push_signalfx", fake_push)
     monkeypatch.setattr(exporter_mod.random, "random", lambda: 0.5)
-    monkeypatch.setattr(exporter_mod.time, "monotonic", lambda: next(monotonic_values))
-    monkeypatch.setattr(exporter_mod.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        signalfx_emit.time, "monotonic", lambda: next(monotonic_values)
+    )
+    monkeypatch.setattr(signalfx_emit.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop loop"):
         signalfx_emit.run_signalfx_loop(
@@ -1459,7 +1484,7 @@ def test_redfish_response_cache_loader_failure_wakes_waiters():
 
 def test_base_query_cache_shares_full_payload_across_key_selectors(monkeypatch):
     """Different root-key selectors reuse the same exact GET response."""
-    manager = IDracManager(
+    manager = RedfishManager(
         host="mock-gb300",
         username="root",
         password="mock",
@@ -1728,14 +1753,15 @@ def _enum_samples(rows):
 
 
 def test_expected_signals_contract():
-    """Every fixture row in specs/telemetry/expected_signals.yaml is emitted.
+    """Every Supermicro expected-signal fixture row is emitted.
 
     This is the M2 gap-closure gate: expected signals minus emitted signals
     must be empty, so the code can never silently drift from the contract.
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        (Path(__file__).parent.parent
+         / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     missing = []
     for row in spec["signals"]:
@@ -1753,13 +1779,14 @@ def test_state_allowlists_match_contract_spec():
     """Code allowlists equal the spec allowlists (G0 documentation truth)."""
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent / "specs/telemetry/expected_signals.yaml")
+        (Path(__file__).parent.parent
+         / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     allow = spec["allowlists"]
-    assert set(allow["health"]) == exporter_mod.HEALTH_LABELS | {"unknown"}
-    assert set(allow["state"]) == exporter_mod.STATE_LABELS | {"unknown"}
-    assert set(allow["reason"]) == exporter_mod.LINK_DOWN_REASONS | {"other"}
-    assert set(allow["reset_type"]) == exporter_mod.RESET_TYPES | {"other"}
+    assert set(allow["health"]) == HEALTH_LABELS | {"unknown"}
+    assert set(allow["state"]) == STATE_LABELS | {"unknown"}
+    assert set(allow["reason"]) == LINK_DOWN_REASONS | {"other"}
+    assert set(allow["reset_type"]) == RESET_TYPES | {"other"}
 
 
 def test_one_hot_state_samples_shape():
@@ -1770,7 +1797,11 @@ def test_one_hot_state_samples_shape():
         _report_row("Oem.Nvidia.LinkDownReasonCode", "PeerResetEvent",
                     report="HGX_ProcessorPortMetrics_0"),
     ])
-    by_metric = {s.metric: s for s in samples if s.metric.startswith(("hw.component", "hw.fabric"))}
+    by_metric = {
+        sample.metric: sample
+        for sample in samples
+        if sample.metric.startswith(("hw.component", "hw.fabric"))
+    }
     health = by_metric["hw.component.health"]
     assert health.value == 1.0
     assert health.dimensions["health"] == "warning"

@@ -31,7 +31,7 @@ from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "redfish_ctl"
 
-RESPOND_MEMBERS = {"Success", "Ok", "AcceptedTaskGenerated", "Error"}
+RESPOND_MEMBERS = {"Success", "Ok", "Created", "AcceptedTaskGenerated", "Error"}
 MUTATING_HELPERS = {"base_post", "base_patch", "base_delete"}
 MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confirm"}
 
@@ -42,13 +42,13 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/attribute/cmd_attribute_clear_pending.py:93 execute base_post",
     "redfish_ctl/attribute/cmd_attribute_update.py:94 execute base_patch",
     "redfish_ctl/bios/cmd_bios_clear_pending.py:81 execute base_post",
-    "redfish_ctl/bios/cmd_change_bios.py:369 execute base_patch",
+    "redfish_ctl/bios/cmd_change_bios.py:374 execute base_patch",
     "redfish_ctl/bios/cmd_change_boot_order.py:177 execute base_patch",
-    "redfish_ctl/boot_source/cmd_clear_pending.py:71 execute base_post",
+    "redfish_ctl/boot_source/cmd_clear_pending.py:69 execute base_post",
     "redfish_ctl/boot_source/cmd_enable.py:117 execute base_patch",
     "redfish_ctl/boot_source/cmd_update.py:175 execute base_patch",
-    "redfish_ctl/chassis/cmd_chasis_reset.py:115 execute base_post",
-    "redfish_ctl/chassis/cmd_update_chassis.py:119 execute base_patch",
+    "redfish_ctl/chassis/cmd_chasis_reset.py:114 execute base_post",
+    "redfish_ctl/chassis/cmd_update_chassis.py:118 execute base_patch",
     "redfish_ctl/dell_lc/cmd_dell_lc_api.py:57 execute base_post",
     "redfish_ctl/dell_lc/cmd_dell_lc_rs.py:56 execute base_post",
     "redfish_ctl/delloem/delloem_attach.py:90 execute base_post",
@@ -60,18 +60,18 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/jobs/cmd_job_apply.py:154 execute base_post",
     "redfish_ctl/jobs/cmd_job_del.py:65 execute base_delete",
     "redfish_ctl/jobs/cmd_job_delete_all.py:73 execute base_post",
-    "redfish_ctl/manager/cmd_manager_reset.py:99 execute base_post",
-    "redfish_ctl/manager/cmd_manager_time.py:124 execute base_patch",
+    "redfish_ctl/manager/cmd_manager_reset.py:98 execute base_post",
+    "redfish_ctl/manager/cmd_manager_time.py:123 execute base_patch",
     "redfish_ctl/storage/cmd_convert_none_raid.py:115 execute base_post",
     "redfish_ctl/storage/cmd_convert_to_raid.py:117 execute base_post",
     "redfish_ctl/system/cmd_system_config.py:119 execute base_post",
     "redfish_ctl/system/cmd_system_import.py:152 execute base_post",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:246 execute base_post",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:260 execute base_patch",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:267 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:99 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:208 execute base_post",
-    "redfish_ctl/volumes/cmd_initilize.py:81 execute base_post",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:247 execute base_post",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:261 execute base_patch",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:268 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:98 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:207 execute base_post",
+    "redfish_ctl/volumes/cmd_initilize.py:80 execute base_post",
 }
 
 

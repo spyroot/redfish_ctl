@@ -123,8 +123,6 @@ def test_write_path_405_returns_error_with_envelope():
     from self._redfish_error), so the non-raising return contract is unchanged."""
     manager = _base_manager()
     result = manager.read_api_respond(_WriteResp(405, _DMTF_ERROR_BODY), expected=204)
-    # compare by member name: the base uses redfish_api_common.RedfishApiRespond,
-    # a distinct enum from redfish_shared's, so identity comparison would fail.
-    assert result.name == "Error"
+    assert result is RedfishApiRespond.Error
     assert isinstance(manager._redfish_error, RedfishError)
     assert manager._redfish_error.status_code == 405

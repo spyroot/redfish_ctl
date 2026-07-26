@@ -1,4 +1,4 @@
-"""Map Redfish telemetry rows into Prometheus and SignalFx metrics."""
+"""Shared exporter config, identity, sample, and scrape-health helpers."""
 
 from __future__ import annotations
 
@@ -7,14 +7,7 @@ import math
 import os
 import random
 import re
-import sys
-import time
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
-from datetime import timezone
-from email.utils import parsedate_to_datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
@@ -23,21 +16,14 @@ from ..config import (
     exporter_config_file,
     exporter_credential_file,
 )
-from . import http_util
 from . import identity as identity_mod
 from .metric_model import MetricDefinition, MetricSample, _definition
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
 build_identity_dimensions = identity_mod.build_identity_dimensions
-build_telemetry_identity = identity_mod.build_legacy_gb300_identity
 common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
-COUNTER_SUFFIXES = (
-    "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
-)
-
-COUNTER_EXACT = frozenset({"hw.energy_kwh"})
 ISO_DURATION = re.compile(
     r"^P"
     r"(?:(?P<days>\d+(?:\.\d+)?)D)?"
@@ -53,149 +39,8 @@ POLL_JITTER_FRACTION = 0.10
 
 
 _COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
-_FABRIC_DIMS = _COMMON_DIMS + ("fabric", "system", "gpu", "port", "report")
 
 _STATIC_METRIC_DEFINITIONS = (
-    _definition("hw.power", unit="W", description="Power draw in watts."),
-    _definition("hw.energy_kwh", "counter", "kWh",
-                "Cumulative energy consumed in kilowatt-hours."),
-    _definition("hw.temperature", unit="Cel", description="Temperature in Celsius."),
-    _definition("hw.voltage", unit="V", description="Voltage reading."),
-    _definition("hw.fan_speed", unit="RPM", description="Fan speed in revolutions per minute."),
-    _definition("hw.gpu.power", unit="W", description="GPU power draw in watts.", family="gpu"),
-    _definition("hw.gpu.temperature", unit="Cel", description="GPU temperature.", family="gpu"),
-    _definition("hw.gpu.clock_mhz", unit="MHz", description="GPU operating clock.", family="gpu"),
-    _definition("hw.gpu.compute.utilization", unit="%",
-                description="GPU compute engine utilization.", family="gpu"),
-    _definition("hw.gpu.throttle.duration_seconds", "counter", "s",
-                description="GPU throttle duration in seconds.", family="gpu"),
-    _definition("hw.gpu.memory.bandwidth_utilization", unit="%",
-                description="GPU memory bandwidth utilization.", family="gpu"),
-    _definition("hw.gpu.memory.capacity_utilization", unit="%",
-                description="GPU memory capacity utilization.", family="gpu"),
-    _definition("hw.gpu.memory.clock_mhz", unit="MHz",
-                description="GPU memory operating speed.", family="gpu"),
-    _definition("hw.gpu.memory.ecc_errors", "counter", None,
-                "Cumulative GPU memory ECC error count.", family="gpu"),
-    _definition("hw.gpu.memory.row_remap_count", "counter", None,
-                "Cumulative GPU memory row-remap count.", family="gpu"),
-    _definition("hw.gpu.memory.row_remapping_failed", unit=None,
-                description="GPU memory row-remapping failure state.", family="gpu"),
-    _definition("hw.component.health", description="One-hot component health state.",
-                family="state"),
-    _definition("hw.component.health_rollup",
-                description="One-hot component aggregate health state.", family="state"),
-    _definition("hw.component.state", description="One-hot component enabled state.",
-                family="state"),
-    _definition("hw.component.last_reset_type",
-                description="One-hot component last reset type.", family="state"),
-    _definition("hw.power.edp_violation_state",
-                description="One-hot EDP violation state.", family="state"),
-    _definition("hw.power.break_performance_state",
-                description="One-hot power-break performance state.", family="state"),
-    _definition("hw.fabric.link_up", description="Fabric link-up state.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_down_reason",
-                description="One-hot fabric link-down reason.", family="fabric",
-                dimensions=_FABRIC_DIMS + ("reason",)),
-    _definition("hw.fabric.port_speed", unit="Gbps",
-                description="Fabric port negotiated speed.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.bit_error_rate", description="Fabric bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.effective_ber", description="Fabric effective bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_ber", description="Fabric raw bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_gbps", unit="Gbps",
-                description="Fabric receive bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_gbps", unit="Gbps",
-                description="Fabric transmit bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_rx_gbps", unit="Gbps",
-                description="Fabric raw receive bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_tx_gbps", unit="Gbps",
-                description="Fabric raw transmit bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_bytes", "counter", "By",
-                "Cumulative fabric receive bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_bytes", "counter", "By",
-                "Cumulative fabric transmit bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_bytes", "counter", "By",
-                "Cumulative fabric VL15 transmit bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_frames", "counter", None,
-                "Cumulative fabric receive frames.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_frames", "counter", None,
-                "Cumulative fabric transmit frames.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_packets", "counter", None,
-                "Cumulative fabric VL15 transmit packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.crc_errors", "counter", None,
-                "Cumulative fabric CRC errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.effective_errors", "counter", None,
-                "Cumulative fabric effective errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.fec_errors", "counter", None,
-                "Cumulative fabric FEC errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.malformed_packets", "counter", None,
-                "Cumulative malformed fabric packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_errors", "counter", None,
-                "Cumulative fabric raw errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_errors", "counter", None,
-                "Cumulative fabric receive errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_no_protocol_bytes", "counter", "By",
-                "Cumulative receive bytes without protocol.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_remote_physical_errors", "counter", None,
-                "Cumulative receive remote physical errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_switch_relay_errors", "counter", None,
-                "Cumulative receive switch relay errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.symbol_errors", "counter", None,
-                "Cumulative fabric symbol errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_discards", "counter", None,
-                "Cumulative fabric transmit discards.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_no_protocol_bytes", "counter", "By",
-                "Cumulative transmit bytes without protocol.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_wait", "counter", None,
-                "Cumulative fabric transmit wait events.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.intentional_link_down_count", "counter", None,
-                "Cumulative intentional link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_down_count", "counter", None,
-                "Cumulative link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_error_recovery_count", "counter", None,
-                "Cumulative link error recovery count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.unintentional_link_down_count", "counter", None,
-                "Cumulative unintentional link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_dropped", "counter", None,
-                "Cumulative fabric VL15 dropped packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.leak.state", description="Leak detector state.", family="chassis"),
-    _definition("hw.fabric.adapter_present", description="Network adapter presence.",
-                family="fabric"),
-    _definition("hw.component_integrity.enabled",
-                description="ComponentIntegrity enabled state.", family="component"),
     _definition("hw.scrape.ok", description="Exporter scrape success.", family="scrape",
                 liveness="scrape"),
     _definition("hw.scrape.duration_seconds", unit="s",
@@ -281,70 +126,15 @@ def metric_definitions() -> Mapping[str, MetricDefinition]:
 
 
 def metric_definition(metric_name: str) -> MetricDefinition:
-    """Return the catalog definition for ``metric_name``.
-
-    Curated ``hw.*`` metrics are registered statically. The GB300 MetricReport
-    catch-all family is generated deterministically from the metric name so new
-    firmware properties keep exporting without adding free-form backend logic.
+    """Return a shared exporter self-metric definition.
 
     :param metric_name: exported metric name.
-    :return: static or generated MetricDefinition.
-    :raises KeyError: when the metric is not registered and is not in a dynamic family.
+    :return: shared MetricDefinition.
+    :raises KeyError: when the metric belongs to a concrete vendor reader.
     """
     if metric_name in METRIC_DEFINITIONS:
         return METRIC_DEFINITIONS[metric_name]
-    if metric_name.startswith("hw.gb300."):
-        return MetricDefinition(
-            name=metric_name,
-            kind=_infer_metric_kind(metric_name),
-            unit=_infer_metric_unit(metric_name),
-            description="GB300 MetricReport numeric property.",
-            family="gb300",
-            dimensions=_COMMON_DIMS + ("property", "system", "gpu", "port",
-                                       "chassis", "index", "report"),
-        )
-    raise KeyError(f"metric {metric_name!r} is not registered in the catalog")
-
-
-def _infer_metric_kind(metric_name: str) -> str:
-    """Infer the metric kind for generated metric families.
-
-    :param metric_name: generated metric name.
-    :return: ``counter`` for monotonic totals, else ``gauge``.
-    """
-    if metric_name in COUNTER_EXACT:
-        return "counter"
-    if any(metric_name.endswith(suffix) for suffix in COUNTER_SUFFIXES):
-        return "counter"
-    return "gauge"
-
-
-def _infer_metric_unit(metric_name: str) -> Optional[str]:
-    """Infer a unit annotation for generated metric families.
-
-    :param metric_name: generated metric name.
-    :return: inferred unit string, or None when dimensionless or unknown.
-    """
-    lowered = metric_name.lower()
-    if lowered.endswith("_bytes"):
-        return "By"
-    if lowered.endswith("_gbps") or lowered.endswith("port_speed"):
-        return "Gbps"
-    if lowered.endswith("_mhz") or "_freq_" in lowered or "frequency" in lowered:
-        return "MHz"
-    if lowered.endswith("_seconds"):
-        return "s"
-    if lowered.endswith("_kwh") or "energy" in lowered:
-        return "kWh"
-    if "temp" in lowered or "temperature" in lowered:
-        return "Cel"
-    if "power" in lowered:
-        return "W"
-    if "voltage" in lowered:
-        return "V"
-    if "percent" in lowered or "utilization" in lowered:
-        return "%"
-    return None
+    raise KeyError(f"metric {metric_name!r} is not a shared exporter metric")
 
 
 @dataclass(frozen=True)
@@ -593,7 +383,9 @@ def scrape_health_samples(
         duration_seconds: float,
         collector_results: Iterable[CollectorResult] = (),
         partial: bool = False,
-        timestamp_seconds: Optional[float] = None) -> list[MetricSample]:
+        timestamp_seconds: Optional[float] = None,
+        collection_error_totals: Optional[Mapping[tuple[str, str], float]] = None,
+        ) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
     Includes ``hw.bmc.up`` — a per-BMC 0/1 liveness gauge carrying the full
@@ -607,10 +399,13 @@ def scrape_health_samples(
     :param collector_results: per-collector outcomes for exporter self-telemetry.
     :param partial: whether at least one supported collector failed while another
         collector still returned a usable result.
-    :param timestamp_seconds: wall-clock timestamp used for last-success freshness.
+    :param timestamp_seconds: wall-clock timestamp of the latest successful scrape.
+    :param collection_error_totals: cumulative error counts keyed by
+        ``(collector, error_kind)``; when omitted, current errors emit as 1.
     :return: scrape-level, collector-level, and deprecated compatibility samples.
     """
     dims = _with_dims(identity, source="exporter")
+    collector_results = tuple(collector_results)
     duration = _as_float(duration_seconds)
     safe_duration = max(0.0, duration if duration is not None else 0.0)
     health = [
@@ -624,19 +419,12 @@ def scrape_health_samples(
         _sample("redfish_exporter_scrape_duration_seconds", safe_duration, dims, "s"),
         _sample(
             "redfish_exporter_last_success_timestamp_seconds",
-            float(timestamp_seconds or 0.0) if ok else 0.0,
+            float(timestamp_seconds or 0.0),
             dims,
             "s",
         ),
         _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
-        # hw.bmc.up is a per-BMC 0/1 liveness gauge (Prometheus-style ``up``),
-        # emitted on EVERY scrape cycle regardless of outcome: 1 when the BMC
-        # scrape succeeds, 0 when it fails (connection error, timeout, auth
-        # failure, or a non-2xx ServiceRoot). Because it is emitted with the
-        # full exporter identity dimensions even on failure, a dashboard can
-        # tell an UNREACHABLE BMC (hw.bmc.up=0) apart from MISSING telemetry
-        # (no series at all). See specs/telemetry/expected_signals.yaml and
-        # gates.md; issue #402.
+        # Always emit hw.bmc.up so failed scrapes differ from absent series.
         _sample("hw.bmc.up", 1.0 if ok else 0.0, dims, None),
         _sample(
             "hw.scrape.duration_seconds",
@@ -682,15 +470,28 @@ def scrape_health_samples(
                 None,
             ),
         ])
-        if result.error_kind:
-            error_dims = collector_dims | {"error": _dim_value(result.error_kind)}
-            health.append(_sample(
-                "redfish_exporter_collection_errors_total",
-                1.0,
-                error_dims,
-                None,
-                metric_type="counter",
-            ))
+    if collection_error_totals is None:
+        error_totals = {
+            (result.name, result.error_kind): 1.0
+            for result in collector_results
+            if result.error_kind
+        }
+    else:
+        error_totals = collection_error_totals
+    for (collector, error_kind), total in sorted(error_totals.items()):
+        error_dims = _with_dims(
+            identity,
+            source="exporter",
+            collector=_dim_value(collector),
+            error=_dim_value(error_kind),
+        )
+        health.append(_sample(
+            "redfish_exporter_collection_errors_total",
+            float(total),
+            error_dims,
+            None,
+            metric_type="counter",
+        ))
     return health
 
 
@@ -706,7 +507,9 @@ def collector_scrape_status(results: Iterable[CollectorResult]) -> tuple[bool, b
         result for result in materialized
         if result.supported and not result.success
     ]
-    any_usable = any(result.success for result in materialized)
+    any_usable = any(
+        result.supported and result.success for result in materialized
+    )
     return not failed_supported, bool(failed_supported and any_usable)
 
 
@@ -800,7 +603,9 @@ def _sample(metric: str,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None,
-            metric_type: Optional[str] = None) -> MetricSample:
+            metric_type: Optional[str] = None,
+            definition_lookup: Callable[[str], MetricDefinition] = metric_definition,
+            ) -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
@@ -809,9 +614,11 @@ def _sample(metric: str,
     :param unit: source-provided unit annotation; the catalog's canonical unit wins.
     :param timestamp: optional sample timestamp.
     :param metric_type: optional caller classification, validated against the catalog.
+    :param definition_lookup: catalog resolver owned by the shared runtime or a
+        concrete vendor reader.
     :return: the assembled MetricSample.
     """
-    definition = metric_definition(metric)
+    definition = definition_lookup(metric)
     if metric_type is not None and metric_type != definition.kind:
         raise ValueError(
             f"{metric} type {metric_type!r} does not match catalog type "
@@ -841,15 +648,6 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
     return dims
 
 
-def _unit_for_metric(metric: str) -> Optional[str]:
-    """Return the catalog unit annotation for a metric.
-
-    :param metric: the metric name.
-    :return: configured unit or inferred dynamic-family unit.
-    """
-    return metric_definition(metric).unit
-
-
 def _dim_value(value) -> str:
     """Sanitize a value into a safe, bounded dimension string.
 
@@ -858,5 +656,3 @@ def _dim_value(value) -> str:
     """
     cleaned = DIM_VALUE_OK.sub("_", str(value)).strip("_")
     return (cleaned or "unknown")[:256]
-
-

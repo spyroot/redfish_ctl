@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from redfish_ctl.cmd_exceptions import InvalidArgument
+from redfish_ctl.cmd_exceptions import UnsupportedAction
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -127,7 +127,7 @@ def test_smc_clear_policies_no_capable_node_manager_raises(redfish_mock_factory)
     """A non-X10 corpus fails clearly before any POST is attempted."""
     manager, service = redfish_mock_factory("hpe")
 
-    with pytest.raises(InvalidArgument, match="no ClearAllPolicies-capable"):
+    with pytest.raises(UnsupportedAction, match="Unknown smc-clear-policies command"):
         manager.sync_invoke(
             ApiRequestType.SmcNodeManagerClearPolicies,
             "smc-clear-policies",

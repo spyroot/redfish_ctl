@@ -5,13 +5,14 @@ Author: Mus <spyroot@gmail.com>
 Before trusting a change, clear any live iDRAC environment and run the offline suite:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
 ruff check <changed>
 ```
 
-`REDFISH_IP`, `REDFISH_USERNAME`, and `REDFISH_PASSWORD` are read by the CLI and by the dual-mode test
-fixture. If `REDFISH_IP` is still exported from real hardware work, `redfish_api` switches to live mode,
-so unset those variables for the default suite.
+The CLI reads canonical `REDFISH_*` connection variables and accepts legacy
+`IDRAC_*` aliases. The dual-mode fixture can switch to live mode when either host
+variable is present, so unset both variable families for the default suite.
 
 ## Which Lane To Use
 
@@ -49,9 +50,9 @@ Worked examples:
 - `tests/test_vendor_portability.py` checks Supermicro system and manager discovery.
 - `tests/test_hpe_vendor.py` and `tests/test_ilo_gap_batch*.py` check HPE iLO read paths.
 - `tests/test_generic_vendor.py` checks the generic DMTF fallback corpus.
-- `tests/test_discover.py` checks `classify_vendor()` for Dell, HPE, Supermicro, and generic roots.
+- `tests/discover/test_discover.py` checks `classify_vendor()` for Dell, HPE, Supermicro, and generic roots.
 - `tests/test_discover_ids.py` checks multi-member system/manager discovery.
-- `tests/test_sensors.py` runs the generic `sensors` command against the Supermicro overlay.
+- `tests/sensors/test_sensors.py` runs the generic `sensors` command against the Supermicro overlay.
 
 **Emulator lane, opt-in.** `tests/test_emulator_smoke.py` targets an external `sushy-emulator --fake`
 process through `REDFISH_EMULATOR_URL`. It is skipped by default and validates generic Redfish
@@ -86,7 +87,8 @@ conda environment and keep the live variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest --cov=redfish_ctl
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest --cov=redfish_ctl
 ```
 
 ## Fleet And Concurrency Tests

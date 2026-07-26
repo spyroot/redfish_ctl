@@ -4,11 +4,14 @@ Covers key validation (RSA ok, DSA blocked, oversize/non-key rejected), the
 dry-run-by-default guard, the remove path, and the refusal on a non-HPE account.
 No real BMC and no network — resolution is mocked, writes are dry-run.
 """
+import pytest
+
 from redfish_ctl.accounts.cmd_account_sshkey import (
     MAX_SSH_KEY_BYTES,
     AccountImportSSHKey,
     validate_ssh_key,
 )
+from redfish_ctl.cmd_exceptions import UnsupportedAction
 from redfish_ctl.redfish_api_common import ApiRequestType
 
 RSA = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ0abcdef user@host"
@@ -63,12 +66,12 @@ def test_remove_builds_clear_action(redfish_mock_factory, monkeypatch):
 
 
 def test_refuses_non_hpe_account(redfish_mock_factory, monkeypatch):
-    """On a non-HPE account it refuses rather than sending an Oem.Hpe payload that won't apply."""
+    """A Supermicro manager cannot dispatch the HPE-only command."""
     mgr, _ = redfish_mock_factory("supermicro")
     monkeypatch.setattr(AccountImportSSHKey, "_resolve_account", _mock_resolve({"Supermicro": {}}))
-    res = mgr.sync_invoke(ApiRequestType.AccountImportSSHKey, "account-import-sshkey",
-                          acct_user="test", ssh_key=RSA, acct_confirm=True)
-    assert res.error and "HPE-only" in res.error
+    with pytest.raises(UnsupportedAction, match="Unknown account-import-sshkey command"):
+        mgr.sync_invoke(ApiRequestType.AccountImportSSHKey, "account-import-sshkey",
+                        acct_user="test", ssh_key=RSA, acct_confirm=True)
 
 
 def test_requires_target(redfish_mock_factory):

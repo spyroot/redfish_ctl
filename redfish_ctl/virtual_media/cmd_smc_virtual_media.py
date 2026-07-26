@@ -30,12 +30,12 @@ import argparse
 from abc import abstractmethod
 from typing import Any, Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from ..supermico_manager import SupermicroManager
 
 
-class SmcVirtualMediaMount(IDracManager,
+class SmcVirtualMediaMount(SupermicroManager,
                            scm_type=ApiRequestType.SmcVirtualMediaMount,
                            name='vm-mount',
                            metaclass=Singleton):
@@ -89,7 +89,8 @@ class SmcVirtualMediaMount(IDracManager,
         """
         result: dict[str, Any] = {"path": path, "status": None, "ok": False}
         try:
-            resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}{path}", {})
+            resp = self.api_get_call(
+                f"{self._default_method}{self.redfish_ip}{path}", {})
             if resp is None:
                 result["error"] = "no response"
                 return result

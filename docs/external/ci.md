@@ -37,9 +37,6 @@ One-time maintainer setup on PyPI (Project → Settings → Publishing → Add a
 `spyroot`, repo `redfish_ctl`, workflow `release.yml`. After that, releasing is just
 `tools/bump_version.py` → commit → push a `vX.Y.Z` tag; see [Releasing](releasing.md).
 
-The one-off `idrac_ctl` deprecation shim (`packaging/idrac_ctl_deprecation/`) is **not** automated —
-it is published manually and rarely.
-
 ## The runner and Node.js
 
 Jobs run on GitHub's `ubuntu-latest` hosted runner. Node.js appears **only** here, and only because

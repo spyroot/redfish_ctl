@@ -1,8 +1,5 @@
 """SignalFx (Splunk Observability) writer for telemetry samples.
 
-    redfish_ctl exporter --once --output signalfx --push-signalfx
-    redfish_ctl exporter --output signalfx --push-signalfx        # push on an interval
-
 The SignalFx backend wraps shared samples into ``/v2/datapoint`` envelopes,
 pushes them to Splunk ingest, and (with ``--verify-readback``) confirms the
 datapoints are visible in Splunk MTS — because a POST returning 200 is not proof

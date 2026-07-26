@@ -6,9 +6,9 @@ path is exercised through the Supermicro/OpenBMC-shaped mock (``Managers/BMC_0``
 with ``USB1``/``USB2``/``Slot_0``); the Dell path through the default mock tree.
 """
 
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.virtual_media.cmd_mount_cdrom import MountCdrom
 
 _INSERT = (ApiRequestType.VirtualMediaInsert, "mount_cdrom")
 
@@ -20,7 +20,7 @@ def _stub_fetch_task(monkeypatch):
     :return: None.
     """
     monkeypatch.setattr(
-        IDracManager,
+        MountCdrom,
         "fetch_task",
         lambda self, task_id: {"TaskState": "Completed"},
     )

@@ -1,16 +1,18 @@
-"""Two-vendor tests for the clear-pending boot-source action (BootOptionsClearPending).
+"""Dell tests for the clear-pending boot-source action (BootOptionsClearPending).
 
     redfish_ctl boot-options-clear
 
 Covers ``clear_pending`` (ApiRequestType.BootOptionsClearPending), a POST to the
 Dell OEM ``DellManager.ClearPending`` action. The action realizes as a task, so
-the mock returns 202 + a vendor-faithful task id: Dell yields its OEM ``JID_``
-job while a non-Dell tree yields a DMTF TaskService id. Both are asserted against
-the mock service's own ``JOB_ID`` so the vendor difference stays visible.
+the mock returns 202 + a Dell OEM ``JID_`` job. Non-Dell managers must not
+register this OEM command.
 
 Author Mus spyroot@gmail.com
 """
+import pytest
+
 from redfish_ctl.boot_source.cmd_clear_pending import BootOptionsClearPending
+from redfish_ctl.cmd_exceptions import UnsupportedAction
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -41,23 +43,11 @@ def test_clear_pending_realizes_dell_jid_job(redfish_mock, redfish_service, monk
     assert request.json() == {}
 
 
-def test_clear_pending_realizes_dmtf_task_on_supermicro(redfish_mock_factory, monkeypatch):
-    """On a non-Dell tree the same action realizes as a DMTF TaskService id."""
-    manager, service = redfish_mock_factory("supermicro")
-    task_state = {"TaskState": "Completed", "TaskStatus": "OK"}
-
-    def fetch_task(self, task_id):
-        """Return a terminal task state without polling a real BMC."""
-        assert task_id == service.JOB_ID
-        return task_state
-
-    monkeypatch.setattr(BootOptionsClearPending, "fetch_task", fetch_task)
-
-    result = manager.sync_invoke(
-        ApiRequestType.BootOptionsClearPending,
-        "clear_pending",
-    )
-    # non-Dell realizes a plain DMTF TaskService id, never a JID_ literal
-    assert not service.JOB_ID.startswith("JID_")
-    assert result.data["task_id"] == service.JOB_ID
-    assert result.data["task_state"] == task_state
+def test_clear_pending_is_not_registered_on_supermicro(redfish_mock_factory):
+    """A Supermicro manager cannot dispatch the DellManager OEM action."""
+    manager, _ = redfish_mock_factory("supermicro")
+    with pytest.raises(UnsupportedAction, match="Unknown clear_pending command"):
+        manager.sync_invoke(
+            ApiRequestType.BootOptionsClearPending,
+            "clear_pending",
+        )

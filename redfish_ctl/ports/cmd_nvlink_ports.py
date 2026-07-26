@@ -19,13 +19,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class NvLinkPorts(IDracManager,
+class NvLinkPorts(RedfishManager,
                   scm_type=ApiRequestType.NvLinkPorts,
                   name='nvlink-ports',
                   metaclass=Singleton):
@@ -58,12 +57,13 @@ class NvLinkPorts(IDracManager,
         return [m["@odata.id"] for m in data.get("Members", [])
                 if isinstance(m, dict) and isinstance(m.get("@odata.id"), str)]
 
-    def _link(self, data, key, do_async):
+    def _link(self, data, key, do_async, preserve_errors=False):
         """Follow a single ``{key: {@odata.id}}`` link, returning its body or {}.
 
         :param data: the parent resource body holding the link.
         :param key: the property name whose ``@odata.id`` link to follow.
         :param do_async: forwarded to base_query so the fetch can run async.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: the linked resource body dict, or {} if absent/unreachable.
         """
         link = (data or {}).get(key)
@@ -73,6 +73,8 @@ class NvLinkPorts(IDracManager,
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return {}
 
     def execute(self,
@@ -81,6 +83,7 @@ class NvLinkPorts(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Walk Systems -> GPU Processors -> NVLink Ports -> Metrics.
 
@@ -93,6 +96,8 @@ class NvLinkPorts(IDracManager,
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: CommandResult whose data is a list of per-port NVLink rows
             (empty when no Systems or GPU ports are exposed).
         """
@@ -101,31 +106,54 @@ class NvLinkPorts(IDracManager,
             systems = self.base_query(f"{RedfishApi.Version}/Systems",
                                       do_async=do_async).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return CommandResult(rows, None, None, None)
 
         for system_uri in self._members(systems):
             try:
                 sdata = self.base_query(system_uri, do_async=do_async).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
-            procs = self._link(sdata, "Processors", do_async)
+            procs = self._link(
+                sdata,
+                "Processors",
+                do_async,
+                preserve_errors=bool(preserve_errors),
+            )
             for proc_uri in self._members(procs):
                 try:
                     proc = self.base_query(proc_uri, do_async=do_async).data or {}
                 except Exception:
+                    if preserve_errors:
+                        raise
                     continue
                 if proc.get("ProcessorType") != "GPU":
                     continue
                 gpu_id = proc.get("Id") or proc_uri.rsplit("/", 1)[-1]
-                ports = self._link(proc, "Ports", do_async)
+                ports = self._link(
+                    proc,
+                    "Ports",
+                    do_async,
+                    preserve_errors=bool(preserve_errors),
+                )
                 for port_uri in self._members(ports):
                     try:
                         port = self.base_query(port_uri, do_async=do_async).data or {}
                     except Exception:
+                        if preserve_errors:
+                            raise
                         continue
                     if port.get("PortProtocol") != "NVLink":
                         continue
-                    metrics = self._link(port, "Metrics", do_async)
+                    metrics = self._link(
+                        port,
+                        "Metrics",
+                        do_async,
+                        preserve_errors=bool(preserve_errors),
+                    )
                     oem = (metrics.get("Oem") or {}).get("Nvidia") or {}
                     rows.append({
                         "System": system_uri.rsplit("/", 1)[-1],

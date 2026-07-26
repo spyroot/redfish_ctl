@@ -5,16 +5,16 @@ from redfish_ctl.redfish_manager import CommandResult
 
 
 def test_exporter_once_returns_prometheus_metrics_from_mock_reads(
-    redfish_api,
-    redfish_service,
+    redfish_mock_factory,
 ):
     """exporter --once renders Prometheus metrics using read-only Redfish GETs."""
-    result = redfish_api.sync_invoke(
+    manager, service = redfish_mock_factory("supermicro")
+    result = manager.sync_invoke(
         ApiRequestType.SupermicroExporter,
         "exporter",
         once=True,
         exporter_output="prometheus",
-        vendor="dell",
+        vendor="supermicro",
     )
 
     assert isinstance(result, CommandResult)
@@ -26,6 +26,6 @@ def test_exporter_once_returns_prometheus_metrics_from_mock_reads(
     assert "redfish_exporter_collector_success" in result.data
     assert "hw.scrape.ok" in result.data
     assert "hw.scrape.duration_seconds" in result.data
-    assert 'vendor="dell"' in result.data
-    assert redfish_service.requests
-    assert {request.method for request in redfish_service.requests} == {"GET"}
+    assert 'vendor="supermicro"' in result.data
+    assert service.requests
+    assert {request.method for request in service.requests} == {"GET"}
