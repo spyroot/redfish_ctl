@@ -290,6 +290,9 @@ def test_controller_image_runs_kopf_without_credentials() -> None:
     assert "FROM python:3.12-slim" in dockerfile
     assert "redfish_ctl" in dockerfile
     assert '".[otlp]"' in dockerfile
+    assert "opentelemetry.sdk.trace import TracerProvider" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.trace_exporter" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.metric_exporter" in dockerfile
     assert "kopf" in dockerfile
     assert "kubernetes" in dockerfile
     assert "USER redfish" in dockerfile
@@ -331,6 +334,10 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert kubectl_lines == ['kubectl --context "${KUBECTL_CONTEXT}" "$@"']
     assert "has_backend \"corpus-mock\"" in script
     assert "has_backend \"dmtf-sim\"" in script
+    assert "assert_dmtf_bundle" in script
+    assert "git check-attr filter" in script
+    assert "version https://git-lfs.github.com/spec/v1" in script
+    assert "shasum -a 256" in script
     assert "has_backend \"ilo-sim\"" in script
     assert "kind create cluster --name \"${KIND_CLUSTER_NAME}\"" in script
     assert "kind load docker-image redfish-ctl-mock-bmc:local" in script
@@ -353,6 +360,9 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert "assert_endpoint_condition" in script
     assert "wait_for_endpoint gb300-mock" in script
     assert "wait_for_endpoint dmtf-sim" in script
+    assert "assert_dmtf_profile_in_pod" in script
+    assert 'exec deploy/dmtf-sim --' in script
+    assert '${DMTF_PROFILE_ROOT}/TaskService/index.json' in script
     assert "dmtf-sim ProfileResolved True DmtfProfileSelected" in script
     assert "assert_endpoint_condition dmtf-sim Ready True PollSucceeded" in script
     assert "wait_for_endpoint ilo-sim" in script

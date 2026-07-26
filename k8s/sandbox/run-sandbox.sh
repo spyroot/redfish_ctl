@@ -9,6 +9,9 @@ SANDBOX_BACKENDS="${SANDBOX_BACKENDS:-corpus-mock,dmtf-sim}"
 STATUS_TIMEOUT_SECONDS="${STATUS_TIMEOUT_SECONDS:-180}"
 KUBECTL_CONTEXT="kind-${KIND_CLUSTER_NAME}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DMTF_BUNDLE_PATH="spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip"
+DMTF_CONTRACT_PATH="specs/sim/dmtf-sim-contract.yaml"
+DMTF_PROFILE_ROOT="/mockups/DSP2043_2026.1/public-rackmount1"
 
 cd "$REPO_ROOT"
 
@@ -52,6 +55,48 @@ validate_backends() {
 			;;
 		esac
 	done
+}
+
+# Summary: prove the pinned DSP2043 Git-LFS object is hydrated and unchanged.
+# Arguments: none.
+# Environment: none.
+# Stdout: one content-addressed bundle summary.
+# Stderr: missing/LFS-pointer/hash-drift diagnostics.
+# Exit: 0 when the hydrated bundle matches the simulator contract; nonzero otherwise.
+# Side effects: read-only Git attributes and file hashing.
+# Idempotency: repeated calls only inspect the checkout.
+# Cleanup: none.
+assert_dmtf_bundle() {
+	local actual_sha
+	local expected_sha
+
+	if ! git check-attr filter -- "$DMTF_BUNDLE_PATH" | grep -Fq 'filter: lfs'; then
+		printf 'DSP2043 bundle is not tracked by Git LFS: %s\n' \
+			"$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+	if [ ! -s "$DMTF_BUNDLE_PATH" ]; then
+		printf 'DSP2043 bundle is missing or empty: %s\n' "$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+	if head -n 1 "$DMTF_BUNDLE_PATH" | \
+		grep -Fqx 'version https://git-lfs.github.com/spec/v1'; then
+		printf 'DSP2043 bundle is an unhydrated Git-LFS pointer; run:\n' >&2
+		printf '  git lfs pull --include=%s\n' "$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+
+	expected_sha="$(
+		awk '$1 == "sha256:" {gsub(/"/, "", $2); print $2; exit}' \
+			"$DMTF_CONTRACT_PATH"
+	)"
+	actual_sha="$(shasum -a 256 "$DMTF_BUNDLE_PATH" | awk '{print $1}')"
+	if [ -z "$expected_sha" ] || [ "$actual_sha" != "$expected_sha" ]; then
+		printf 'DSP2043 bundle hash mismatch: expected %s, got %s\n' \
+			"${expected_sha:-missing-contract-hash}" "$actual_sha" >&2
+		return 1
+	fi
+	printf 'DSP2043 bundle verified: release=2026.1 sha256=%s\n' "$actual_sha"
 }
 
 section() {
@@ -178,6 +223,23 @@ assert_endpoint_condition() {
 		"$endpoint_name" "$condition_type" "$actual_status" "$actual_reason"
 }
 
+# Summary: prove the running simulator pod contains the required DSP2043 files.
+# Arguments: none.
+# Environment: NAMESPACE selects the sandbox namespace.
+# Stdout: one verified in-pod profile summary.
+# Stderr: kubectl or missing-file diagnostics.
+# Exit: 0 when ServiceRoot and TaskService JSON are present; nonzero otherwise.
+# Side effects: read-only Kubernetes exec calls.
+# Idempotency: repeated calls only inspect the running container.
+# Cleanup: none.
+assert_dmtf_profile_in_pod() {
+	kubectl_sandbox -n "${NAMESPACE}" exec deploy/dmtf-sim -- \
+		test -s "${DMTF_PROFILE_ROOT}/index.json"
+	kubectl_sandbox -n "${NAMESPACE}" exec deploy/dmtf-sim -- \
+		test -s "${DMTF_PROFILE_ROOT}/TaskService/index.json"
+	printf 'dmtf-sim pod contains DSP2043 ServiceRoot and TaskService JSON\n'
+}
+
 node_profile_field() {
 	kubectl_sandbox -n "${NAMESPACE}" \
 		get redfishnodeprofile "$1" -o "jsonpath=$2" 2>/dev/null || true
@@ -276,6 +338,11 @@ validate_backends
 require_tool docker
 require_tool kind
 require_tool kubectl
+if has_backend "dmtf-sim"; then
+	require_tool git
+	require_tool shasum
+	assert_dmtf_bundle
+fi
 
 section "building sandbox images"
 if has_backend "corpus-mock"; then
@@ -392,6 +459,7 @@ if has_backend "dmtf-sim"; then
 	kubectl_sandbox -n "${NAMESPACE}" \
 		rollout status deploy/dmtf-sim \
 		--timeout=120s
+	assert_dmtf_profile_in_pod
 fi
 kubectl_sandbox -n "${NAMESPACE}" \
 	rollout status deploy/redfish-endpoint-controller \

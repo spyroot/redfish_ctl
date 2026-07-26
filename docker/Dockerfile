@@ -45,7 +45,10 @@ RUN python -m pip install \
         --find-links=/wheelhouse \
         "redfish_ctl[otlp]" \
     && rm -rf /wheelhouse \
-    && python -m pip check
+    && python -m pip check \
+    && python -c "from opentelemetry.sdk.trace import TracerProvider; \
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; \
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter"
 
 USER redfish
 

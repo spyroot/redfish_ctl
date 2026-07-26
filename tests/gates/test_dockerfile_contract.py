@@ -22,6 +22,9 @@ def test_production_dockerfile_installs_local_otlp_wheel_as_non_root() -> None:
     assert "--find-links=/wheelhouse" in dockerfile
     assert "--no-index" in dockerfile
     assert '"redfish_ctl[otlp]"' in dockerfile
+    assert "opentelemetry.sdk.trace import TracerProvider" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.trace_exporter" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.metric_exporter" in dockerfile
     assert 'ENTRYPOINT ["redfish_ctl"]' in dockerfile
     assert "USER redfish" in dockerfile
 

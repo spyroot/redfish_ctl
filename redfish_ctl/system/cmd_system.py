@@ -95,14 +95,12 @@ class SystemQuery(RedfishManager,
                   f"do_deep: {do_deep}, do_async: {do_async}, "
                   f"save_dir: {save_dir}")
 
-        headers = {}
-        if data_type == "json":
-            headers.update(self.json_content_type)
-
-        r = f"{self._default_method}{self.redfish_ip}{self.managed_system_uri}"
-        response = self.api_get_call(r, headers)
-        self.default_error_handler(response)
-        data = response.json()
+        data = self.base_query(
+            self.managed_system_uri,
+            data_type=data_type,
+            do_async=do_async,
+            verbose=verbose,
+        ).data
         save_if_needed(filename, data, save_dir=save_dir)
 
         rest_endpoints = {}
@@ -114,11 +112,11 @@ class SystemQuery(RedfishManager,
                 rest_endpoints[k] = sub_rest
                 # deep walk
                 if do_deep:
-                    r = f"{self._default_method}{self.redfish_ip}{sub_rest}"
-                    response = self.api_get_call(r, headers)
-                    self.default_error_handler(response)
-                    if verbose:
-                        print(f"sending request {r} status code {response.status_code}")
-                    extra_data_dict[k] = response.json()
+                    extra_data_dict[k] = self.base_query(
+                        sub_rest,
+                        data_type=data_type,
+                        do_async=do_async,
+                        verbose=verbose,
+                    ).data
 
         return CommandResult(data, rest_endpoints, extra_data_dict, None)
