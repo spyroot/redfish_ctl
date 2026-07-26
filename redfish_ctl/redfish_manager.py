@@ -709,25 +709,29 @@ class RedfishManager:
                 "in the current state of the resources."
             )
 
-    @staticmethod
     async def async_default_error_handler(
-            response: requests.models.Response) -> bool:
-        """Default error handler for base query and redfish error code based on spec.
-        :param response:
-        :return:
+            self, response: requests.models.Response) -> RedfishApiRespond:
+        """Apply the synchronous Redfish status contract to an async GET.
+
+        :param response: completed async GET response.
+        :return: the shared Redfish response classification for a 2xx status.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on any other non-2xx status.
         """
-        if response.status_code >= 200 or response.status_code < 300:
-            return True
-        RedfishManager.redfish_error_handlers(response.status_code)
+        return self.default_error_handler(response)
 
     async def api_async_get_call(self, loop, req, hdr: Dict):
-        """Make api request either with x-auth authentication header or base authentication
-        to redfish endpoint.
+        """Await one GET without polling any server-side Task or Job.
+
+        Callers may schedule this coroutine concurrently across BMCs. Completion
+        means the HTTP response arrived; it never means a TaskService task or
+        vendor job reached a terminal state.
 
         :param loop: asyncio event loop
         :param req: request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
-        :return: request.
+        :return: completed HTTP response.
         """
         headers = {}
         headers.update(self.content_type)
@@ -740,6 +744,7 @@ class RedfishManager:
                 req,
                 verify=self._is_verify_cert,
                 headers=headers,
+                timeout=http_timeout(),
             )
         else:
             request_call = functools.partial(
@@ -747,8 +752,9 @@ class RedfishManager:
                 req,
                 verify=self._is_verify_cert,
                 auth=(self._username, self._password),
+                timeout=http_timeout(),
             )
-        return loop.run_in_executor(
+        return await loop.run_in_executor(
             None,
             tracing.traced_request_callable(req, "GET", request_call),
         )
@@ -865,7 +871,12 @@ class RedfishManager:
         return f"?$expand=*($levels={level})"
 
     async def api_async_get_until_complete(self, req: str, hdr: Dict, loop=None):
-        """Execute async get request
+        """Await and validate one GET transport response.
+
+        This helper waits only for the local HTTP request. Server-side Redfish
+        Task and vendor Job lifecycles remain separate and are polled by their
+        dedicated commands using the returned task or job identifier.
+
         :param req: api method caller request.
         :param hdr: dict: http/https header
         :param loop:  asyncio loop
@@ -874,8 +885,8 @@ class RedfishManager:
         if loop is None:
             loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
-        await self.async_default_error_handler(await response)
-        return await response
+        await self.async_default_error_handler(response)
+        return response
 
     @cached_property
     def _service_root(self):
@@ -1437,6 +1448,7 @@ class RedfishManager:
                     r, headers
                 )
             )
+            self.query_counter += 1
             allow_header = response.headers.get("Allow")
             data = response.json()
             data = select_payload(data)

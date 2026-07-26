@@ -1,4 +1,4 @@
-"""Async GET parity tests for the generic Redfish query path."""
+"""Async GET parity tests for the generic Redfish manager query path."""
 
 import pytest
 

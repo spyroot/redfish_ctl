@@ -199,13 +199,15 @@ class IDracManager(RedfishManager):
 
     @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_get_call(self, loop, req, hdr: Dict):
-        """Make api asynced requests either with x-auth authentication
-         header or base authentication.
-        If event loop is none it will create one.
+        """Await one Dell GET without polling its Task or Lifecycle job.
+
+        This is the vendor transport override used by concurrently scheduled
+        callers. Dell JID submission and later job polling remain separate.
+
         :param loop: asyncio event loop
         :param req: request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
-        :return: request.
+        :return: completed HTTP response.
         """
         headers = {}
         headers.update(self.content_type)
@@ -218,6 +220,7 @@ class IDracManager(RedfishManager):
                 req,
                 verify=self._is_verify_cert,
                 headers=headers,
+                timeout=http_timeout(),
             )
         else:
             request_call = functools.partial(
@@ -225,8 +228,9 @@ class IDracManager(RedfishManager):
                 req,
                 verify=self._is_verify_cert,
                 auth=(self._username, self._password),
+                timeout=http_timeout(),
             )
-        return loop.run_in_executor(
+        return await loop.run_in_executor(
             None,
             tracing.traced_request_callable(req, "GET", request_call),
         )
