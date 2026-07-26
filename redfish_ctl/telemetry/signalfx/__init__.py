@@ -2,8 +2,6 @@
 
 from .emit import (
     SIGNALFX_DATAPOINT_PATH,
-    _mts_query as _mts_query,
-    _require_datapoint_url as _require_datapoint_url,
     build_readback_result,
     push_signalfx,
     resolve_signalfx_ingest_url,
@@ -12,6 +10,12 @@ from .emit import (
     signalfx_metric_readback,
     to_signalfx_body,
     verify_signalfx_readback,
+)
+from .emit import (
+    _mts_query as _mts_query,
+)
+from .emit import (
+    _require_datapoint_url as _require_datapoint_url,
 )
 from .writer import SignalFxWriter
 
