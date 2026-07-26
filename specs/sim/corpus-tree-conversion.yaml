@@ -7,14 +7,14 @@
 schema: redfish_ctl.corpus_tree_conversion/v1
 
 lifecycle:
-  state: design-contract
-  implementation_available: false
+  state: implementation-candidate
+  implementation_available: true
+  activation_status: pending-authoritative-ci
   activation_requires:
-    - tools/corpus_tree.py implements every declared command
     - contract tests and converter behavior pass in authoritative CI
   note: >-
-    This file is the implementation handoff. It MUST NOT be presented as a
-    runnable converter until every activation requirement is satisfied.
+    The converter entrypoint exists, but a profile MUST NOT be published or
+    selected by the simulator until the authoritative CI requirement passes.
 
 purpose:
   source: tests/corpus/manifest.json
@@ -39,13 +39,25 @@ implementation:
     plan:
       mutates: false
       output: conversion report only
+      argv: >-
+        plan --manifest <path> --vendor <vendor> --model <model>
     materialize:
       mutates: true
       output: profile tree plus conversion report
-      precondition: the same input passes plan with zero blocking findings
+      precondition: the same input plan report has result=pass
+      argv: >-
+        materialize --manifest <path> --vendor <vendor> --model <model>
+        --output <directory>
     verify:
       mutates: false
       output: verification report for an existing profile tree
+      argv: >-
+        verify --manifest <path> --vendor <vendor> --model <model>
+        --output <directory>
+  exit_codes:
+    0: report result is pass
+    1: report result is fail
+    2: input, environment, or existing-output precondition error
   execution:
     network: forbidden
     credentials: forbidden
@@ -57,18 +69,43 @@ inputs:
     path: tests/corpus/manifest.json
     selector_fields: [vendor, model]
     required_fields: [vendor, model, tarball, arcname]
+    tarball_base:
+      repository_manifest: repository-root
+      external_test_manifest: manifest-parent
   archive:
     allowed_member_types: [regular-file, directory]
     reject_member_types: [absolute-path, path-traversal, symlink, hardlink, device]
     hydrated_lfs_required: true
     source_root: manifest.arcname
+    regular_file_layout: direct-children-only
+    extraction: none; validated members are read without filesystem extraction
+    limits:
+      members: 20000
+      bytes_per_regular_file: 67108864
+      total_uncompressed_bytes: 1073741824
   fixtures:
     json_glob: "_redfish_v1*.json"
     metadata_xml_name: "_redfish_v1_$metadata.xml"
     metadata_xml_policy: optional-or-record-missing
-    optional_route_map: rest_api_map.status.json
-    legacy_route_map: rest_api_map.npy
-    legacy_route_map_policy: optional-when-readable
+    optional_route_map:
+      name: corpus_routes.json
+      schema: redfish_ctl.corpus_routes/v1
+      shape:
+        schema: redfish_ctl.corpus_routes/v1
+        routes:
+          type: array
+          item_required_fields: [route, sourceFixture]
+      purpose: explicit route recovery for fixtures without a usable @odata.id
+    sidecars:
+      disposition: sidecar
+      names:
+        - corpus_manifest.json
+        - corpus_routes.json
+        - rest_api_map.status.json
+        - rest_api_map.npy
+      notes:
+        rest_api_map.status.json: HTTP status/error metadata, never route authority
+        rest_api_map.npy: legacy pickle-bearing data; converter MUST NOT load it
 
 profile_identity:
   expression: "<lowercase-vendor>-<lowercase-model>"
@@ -76,6 +113,25 @@ profile_identity:
   examples:
     - {vendor: dell, model: xr8620t, profile_id: dell-xr8620t}
     - {vendor: supermicro, model: gb300, profile_id: supermicro-gb300}
+
+known_source_findings:
+  - id: dell-xr8620t-canonical-alias-conflict
+    source_sha256: c8cb181ce22e6955b266bc4c0363daef431837f23444120e96c066456d3de3bb
+    observed_by: tools/corpus_tree.py plan
+    result: fail
+    classification: project-specific
+    counts:
+      input_regular_files: 995
+      emitted_files: 881
+      excluded_fragment_files: 70
+      unresolved_alias_files: 44
+    evidence: >-
+      The affected fixtures are reachable through a /Systems/... request path
+      but their top-level @odata.id identifies the corresponding /Chassis/...
+      canonical resource, so the two authoritative sources disagree.
+    resolution_required: >-
+      Keep the profile unpublished until a human-owned alias or source
+      precedence rule is added to this contract and covered by authoritative CI.
 
 # Route recovery is intentionally NOT a reverse filename operation. The
 # existing flattening function replaces '/' with '_', but real Redfish path
@@ -94,9 +150,15 @@ route_recovery:
       fragment: none
     normalize:
       - parse_as_uri_reference
-      - percent-decode-once-before-segmentation
+      - inspect-path-component-for-encoded-separators
+      - percent-decode-path-component-once
       - remove_one_trailing_slash_except_service_root
       - preserve_case
+    validation_order:
+      - reject-malformed-percent-encoding
+      - reject-encoded-slash-or-backslash-before-decoding
+      - percent-decode-path-component-once
+      - reject-unsafe-decoded-segments
     reject:
       - malformed_percent_encoding
       - empty_internal_segment
@@ -105,11 +167,14 @@ route_recovery:
       - backslash
       - nul
       - encoded_path_separator
+    relative_uri:
+      disposition: blocking-unresolved
+      reason: output routing requires an absolute path rooted at /redfish/v1
   ordered_sources:
     - id: explicit-route-map
       authority: >-
-        A route -> fixture entry from rest_api_map.status.json, or from the
-        legacy map when that map is safely readable.
+        A route + sourceFixture row from corpus_routes.json matching the safe
+        JSON schema declared under inputs.fixtures.optional_route_map.
     - id: top-level-odata-id
       authority: "A JSON object's top-level @odata.id."
     - id: discovered-odata-link
@@ -119,11 +184,17 @@ route_recovery:
     - id: service-root-anchor
       authority: >-
         The exact legacy filename _redfish_v1.json maps to /redfish/v1 only.
+    - id: metadata-anchor
+      authority: >-
+        The exact legacy filename _redfish_v1_$metadata.xml maps to
+        /redfish/v1/$metadata only.
   agreement:
     rule: all available authoritative sources for one fixture MUST resolve to one route
     disagreement: blocking-conflict
   forward_filename_check:
-    function: '"_" + route.strip("/").replace("/", "_") + ".json"'
+    json_function: '"_" + route.strip("/").replace("/", "_") + ".json"'
+    special:
+      /redfish/v1/$metadata: _redfish_v1_$metadata.xml
     comparison: case-insensitive
     mismatch: blocking-conflict
     mismatch_example:
@@ -134,7 +205,7 @@ route_recovery:
   traversal:
     start: /redfish/v1
     link_key: "@odata.id"
-    order: breadth-first-lexical
+    order: breadth-first-then-full-canonical-uri-lexical
     scope: all nested objects and arrays
     external_link_policy: record-excluded
   non_routes:
@@ -148,6 +219,10 @@ route_recovery:
     context_uri:
       key: "@odata.context"
       disposition: ignore-for-routing
+    captured_fragment_file:
+      filename_indicator: "#"
+      disposition: record-excluded
+      reason: legacy discovery persisted a client-side fragment as a file
 
 path_mapping:
   strip_prefix: /redfish/v1
@@ -206,9 +281,11 @@ payload_fidelity:
   json:
     validation: parse-to-object-or-array
     write: byte-for-byte-copy
+    invalid_disposition: unresolved
   xml:
     validation: well-formed
     write: byte-for-byte-copy
+    invalid_disposition: unresolved
   rewriting:
     odata_ids: forbidden
     vendor_oem_data: forbidden
@@ -221,9 +298,11 @@ payload_fidelity:
 collisions:
   source_fixture_to_multiple_routes: blocking
   multiple_source_fixtures_to_route: blocking
-  case_folded_destination_collision: blocking
+  case_folded_destination_collision: blocking-on-every-filesystem
   file_directory_collision: blocking
-  existing_output_mismatch: blocking
+  existing_output:
+    identical_bytes: allowed
+    different_bytes: blocking
 
 accountability:
   equation: >-
@@ -269,6 +348,8 @@ report:
     - sidecarFiles
     - conflictFiles
   mapping_fields: [route, sourceFixture, destination, sha256]
+  destination_base: profile-root
+  destination_format: relative-posix-path
   result_values: [pass, fail]
   pass_conditions:
     conflicts: 0
@@ -278,6 +359,7 @@ report:
 
 hashes:
   algorithm: sha256
+  source_input: raw-compressed-tarball-bytes
   mapping_content: raw-emitted-bytes
   tree_excludes: conversion-report
   tree_input: >-
