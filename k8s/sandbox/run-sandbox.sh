@@ -408,6 +408,7 @@ if has_backend "ilo-sim"; then
 fi
 if has_backend "dmtf-sim"; then
 	kubectl_sandbox apply -f k8s/sandbox/dmtf-sim.yaml
+	kubectl_sandbox apply -f k8s/sandbox/dmtf-credentials.yaml
 fi
 kubectl_sandbox apply -f k8s/controller/rbac.yaml
 kubectl_sandbox apply -f k8s/controller/deployment.yaml

@@ -18,6 +18,7 @@ DMTF_SAMPLE_ENDPOINT = (
 )
 ILO_SIM_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "ilo-sim.yaml"
 DMTF_SIM_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "dmtf-sim.yaml"
+DMTF_CREDENTIALS = REPO_ROOT / "k8s" / "sandbox" / "dmtf-credentials.yaml"
 CONTROLLER_DEPLOYMENT = REPO_ROOT / "k8s" / "controller" / "deployment.yaml"
 CONTROLLER_RBAC = REPO_ROOT / "k8s" / "controller" / "rbac.yaml"
 CONTROLLER_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.controller"
@@ -106,8 +107,8 @@ def test_ilo_sim_endpoint_points_at_hpe_emulator_secret_ref() -> None:
     assert secret["stringData"] == {"username": "root", "password": "root_password"}
 
 
-def test_dmtf_sim_endpoint_points_at_reference_service_without_credentials() -> None:
-    """The DMTF sample CR exercises the generic read path with no inline secrets."""
+def test_dmtf_sim_endpoint_points_at_reference_service_with_secret_ref() -> None:
+    """The DMTF endpoint references the sandbox credential Secret."""
     endpoint = yaml.safe_load(DMTF_SAMPLE_ENDPOINT.read_text(encoding="utf-8"))
 
     assert endpoint["apiVersion"] == "redfish.ctl.dev/v1alpha1"
@@ -119,11 +120,21 @@ def test_dmtf_sim_endpoint_points_at_reference_service_without_credentials() -> 
         "port": 80,
         "insecure": True,
         "pollInterval": "10s",
+        "secretRef": {"name": "dmtf-sim-credentials"},
     }
     sample_text = DMTF_SAMPLE_ENDPOINT.read_text(encoding="utf-8")
-    assert "secretRef" not in endpoint["spec"]
     assert "password" not in sample_text.lower()
     assert "username" not in sample_text.lower()
+
+
+def test_dmtf_sim_manifest_provides_public_demo_credentials() -> None:
+    """The DMTF-only backend ships public demo credentials."""
+    secret = yaml.safe_load(DMTF_CREDENTIALS.read_text(encoding="utf-8"))
+
+    assert secret["kind"] == "Secret"
+    assert secret["metadata"]["name"] == "dmtf-sim-credentials"
+    assert secret["metadata"]["namespace"] == "redfish-sandbox"
+    assert secret["stringData"] == {"username": "root", "password": "calvin"}
 
 
 def test_ilo_sim_manifest_deploys_hpe_emulator_service() -> None:
@@ -339,6 +350,7 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert "version https://git-lfs.github.com/spec/v1" in script
     assert "shasum -a 256" in script
     assert "has_backend \"ilo-sim\"" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/dmtf-credentials.yaml" in script
     assert "kind create cluster --name \"${KIND_CLUSTER_NAME}\"" in script
     assert "kind load docker-image redfish-ctl-mock-bmc:local" in script
     assert "kind load docker-image redfish-ctl-dmtf-sim:local" in script

@@ -10,3 +10,6 @@ spec:
   port: 80
   insecure: true
   pollInterval: 10s
+  # Created by k8s/sandbox/dmtf-credentials.yaml for basic-auth coverage.
+  secretRef:
+    name: dmtf-sim-credentials
