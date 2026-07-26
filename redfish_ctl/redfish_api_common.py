@@ -15,6 +15,7 @@ from typing import Optional
 
 from .redfish_shared import (
     RedfishApi,
+    RedfishApiRespond,  # noqa: F401 - compatibility re-export
     RedfishJson,
     RedfishJsonSpec,
 )
