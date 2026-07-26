@@ -1,3 +1,5 @@
+# Public schema-backed go/no-go contract; all other inventory remains private by default.
+# The schema is resolved through the exact shared revision in standards-binding.yaml.
 apiVersion: standards.spyroot.dev/v1alpha1
 kind: GoNoGoProfile
 metadata:
@@ -18,6 +20,7 @@ spec:
     createOrUpdateAllowed: false
 
   checks:
+    # Gate ids are defined by gates/manifest.yaml.
     required:
       - id: unit.all
         kind: command
@@ -58,6 +61,7 @@ spec:
     optional: []
 
   ci:
+    # The required status context is the .gitlab-ci.yml gate-merge job.
     requiredForMerge: true
     exactCommitRequired: true
     requiredContext: gate-merge

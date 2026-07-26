@@ -63,6 +63,12 @@ def test_ordinary_source_is_not_flagged():
     assert not agent_name_guard.is_agent_file("README.md")
 
 
+def test_public_go_no_go_contract_does_not_open_private_inventory():
+    """Only the schema-backed go/no-go profile is public under inventory/."""
+    assert not agent_name_guard.is_agent_file("inventory/ci/go-no-go.yaml")
+    assert agent_name_guard.is_agent_file("inventory/ci/private.yaml")
+
+
 def test_live_mainline_has_no_tracked_agent_files():
     """The published mainline currently tracks zero agent files (the gate passes here)."""
     assert agent_name_guard._agent_file_findings() == []
