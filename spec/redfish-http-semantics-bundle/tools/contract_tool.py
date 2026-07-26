@@ -11,12 +11,16 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import yaml
-from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_ROOT = ROOT / "contracts"
 SCHEMA_PATH = ROOT / "schemas" / "protocol-rule-set.schema.json"
 GENERATED = ROOT / "generated"
+DOCUMENT_SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+DOCUMENT_FIELDS = set(DOCUMENT_SCHEMA["properties"])
+DOCUMENT_REQUIRED = set(DOCUMENT_SCHEMA["required"])
+DOCUMENT_API_VERSION = DOCUMENT_SCHEMA["properties"]["apiVersion"]["const"]
+DOCUMENT_KINDS = set(DOCUMENT_SCHEMA["properties"]["kind"]["enum"])
 
 
 @dataclass(frozen=True)
@@ -100,15 +104,33 @@ def _iter_status_contexts(value: Any, path: str = "") -> Iterable[tuple[str, dic
             yield from _iter_status_contexts(child, f"{path}[{index}]")
 
 
+def _validate_document_shape(document: LoadedDocument) -> list[str]:
+    data = document.data
+    errors: list[str] = []
+    missing = sorted(DOCUMENT_REQUIRED - data.keys())
+    unexpected = sorted(data.keys() - DOCUMENT_FIELDS)
+    if missing:
+        errors.append(f"{document.path}: missing top-level fields: {missing}")
+    if unexpected:
+        errors.append(f"{document.path}: unexpected top-level fields: {unexpected}")
+    if data.get("apiVersion") != DOCUMENT_API_VERSION:
+        errors.append(f"{document.path}: unsupported apiVersion")
+    if data.get("kind") not in DOCUMENT_KINDS:
+        errors.append(f"{document.path}: unsupported kind {data.get('kind')!r}")
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("name"), str):
+        errors.append(f"{document.path}: metadata.name must be a string")
+    elif not metadata["name"]:
+        errors.append(f"{document.path}: metadata.name must not be empty")
+    if not isinstance(data.get("spec"), dict):
+        errors.append(f"{document.path}: spec must be a mapping")
+    return errors
+
+
 def validate_documents(documents: list[LoadedDocument]) -> list[str]:
     errors: list[str] = []
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
-
     for document in documents:
-        for error in sorted(validator.iter_errors(document.data), key=lambda e: list(e.path)):
-            location = ".".join(str(p) for p in error.path)
-            errors.append(f"{document.path}:{location}: {error.message}")
+        errors.extend(_validate_document_shape(document))
 
     rules = all_rules(documents)
     rule_ids: dict[str, Path] = {}

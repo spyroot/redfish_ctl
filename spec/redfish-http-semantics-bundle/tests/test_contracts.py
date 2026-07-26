@@ -26,6 +26,23 @@ def test_all_contracts_validate() -> None:
     assert contract_tool.validate_documents(documents) == []
 
 
+def test_document_shape_validation_rejects_unknown_top_level_field() -> None:
+    document = contract_tool.LoadedDocument(
+        path=Path("invalid.yaml"),
+        data={
+            "apiVersion": "redfish.semantics/v1alpha1",
+            "kind": "ProtocolRuleSet",
+            "metadata": {"name": "invalid"},
+            "spec": {},
+            "unexpected": True,
+        },
+    )
+
+    errors = contract_tool.validate_documents([document])
+
+    assert "invalid.yaml: unexpected top-level fields: ['unexpected']" in errors
+
+
 def test_subscription_create_is_exact_201_with_location() -> None:
     rule = load_event_rules()["event.subscription.create.completed"]
     assert rule["expect"]["status"]["accept"] == {"matcher": "exact", "values": [201]}
