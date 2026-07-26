@@ -120,7 +120,7 @@ def test_dispatch_constructs_registered_commands_with_canonical_keywords():
             :param is_http: plain HTTP transport flag.
             :return: None.
             """
-            self.__class__.constructed = {
+            ConstructorProbeCommand.constructed = {
                 "host": host,
                 "username": username,
                 "password": password,
