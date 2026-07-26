@@ -44,7 +44,11 @@ def _parse_root_cli(monkeypatch, *flags):
     _clear_endpoint_env(monkeypatch)
     monkeypatch.setattr(rm, "create_cmd_tree", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(rm, "is_local_command", lambda _args: True)
-    monkeypatch.setattr(rm, "main", lambda args, _commands: parsed.append(args))
+    monkeypatch.setattr(
+        rm,
+        "main",
+        lambda args, _commands, _manager_cls: parsed.append(args),
+    )
     monkeypatch.setattr(sys, "argv", ["redfish_ctl", *flags])
 
     rm.redfish_main_ctl()

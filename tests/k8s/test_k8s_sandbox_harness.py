@@ -13,7 +13,11 @@ KIND_CONFIG = REPO_ROOT / "k8s" / "sandbox" / "kind-config.yaml"
 SMOKE_SCRIPT = REPO_ROOT / "k8s" / "sandbox" / "run-sandbox.sh"
 SAMPLE_ENDPOINT = REPO_ROOT / "k8s" / "sandbox" / "redfish-endpoint-sample.yaml"
 ILO_SAMPLE_ENDPOINT = REPO_ROOT / "k8s" / "sandbox" / "redfish-endpoint-ilo-sim.yaml"
+DMTF_SAMPLE_ENDPOINT = (
+    REPO_ROOT / "k8s" / "sandbox" / "redfish-endpoint-dmtf-sim.yaml"
+)
 ILO_SIM_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "ilo-sim.yaml"
+DMTF_SIM_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "dmtf-sim.yaml"
 CONTROLLER_DEPLOYMENT = REPO_ROOT / "k8s" / "controller" / "deployment.yaml"
 CONTROLLER_RBAC = REPO_ROOT / "k8s" / "controller" / "rbac.yaml"
 CONTROLLER_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.controller"
@@ -101,6 +105,26 @@ def test_ilo_sim_endpoint_points_at_hpe_emulator_secret_ref() -> None:
     assert secret["stringData"] == {"username": "root", "password": "root_password"}
 
 
+def test_dmtf_sim_endpoint_points_at_reference_service_without_credentials() -> None:
+    """The DMTF sample CR exercises the generic read path with no inline secrets."""
+    endpoint = yaml.safe_load(DMTF_SAMPLE_ENDPOINT.read_text(encoding="utf-8"))
+
+    assert endpoint["apiVersion"] == "redfish.ctl.dev/v1alpha1"
+    assert endpoint["kind"] == "RedfishEndpoint"
+    assert endpoint["metadata"]["name"] == "dmtf-sim"
+    assert endpoint["metadata"]["namespace"] == "redfish-sandbox"
+    assert endpoint["spec"] == {
+        "address": "http://dmtf-sim.redfish-sandbox.svc.cluster.local",
+        "port": 80,
+        "insecure": True,
+        "pollInterval": "10s",
+    }
+    sample_text = DMTF_SAMPLE_ENDPOINT.read_text(encoding="utf-8")
+    assert "secretRef" not in endpoint["spec"]
+    assert "password" not in sample_text.lower()
+    assert "username" not in sample_text.lower()
+
+
 def test_ilo_sim_manifest_deploys_hpe_emulator_service() -> None:
     """The sandbox can run a real HPE iLO Redfish emulator backend."""
     docs = _yaml_documents(ILO_SIM_MANIFEST)
@@ -127,6 +151,46 @@ def test_ilo_sim_manifest_deploys_hpe_emulator_service() -> None:
     assert service["spec"]["ports"][0]["port"] == 443
     assert service["spec"]["ports"][0]["targetPort"] == "https"
     assert container["securityContext"]["allowPrivilegeEscalation"] is False
+
+
+def test_dmtf_sim_manifest_deploys_local_get_only_reference_service() -> None:
+    """The sandbox DMTF simulator serves the pinned DSP2043 rackmount profile."""
+    docs = _yaml_documents(DMTF_SIM_MANIFEST)
+    by_kind = {doc["kind"]: doc for doc in docs}
+
+    deployment = by_kind["Deployment"]
+    service = by_kind["Service"]
+    pod = deployment["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+
+    assert deployment["metadata"]["name"] == "dmtf-sim"
+    assert deployment["metadata"]["namespace"] == "redfish-sandbox"
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    assert container["image"] == "redfish-ctl-dmtf-sim:local"
+    assert container["args"] == [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--mockup-dir",
+        "/mockups/DSP2043_2026.1/public-rackmount1",
+    ]
+    assert container["readinessProbe"]["httpGet"] == {
+        "path": "/redfish/v1/",
+        "port": "http",
+    }
+    assert container["livenessProbe"]["httpGet"] == {
+        "path": "/redfish/v1/",
+        "port": "http",
+    }
+    assert container["securityContext"]["allowPrivilegeEscalation"] is False
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    assert service["metadata"]["name"] == "dmtf-sim"
+    assert service["spec"]["type"] == "ClusterIP"
+    assert service["spec"]["ports"][0]["port"] == 80
+    assert service["spec"]["ports"][0]["targetPort"] == "http"
 
 
 def test_controller_deployment_is_read_only_and_uses_local_image() -> None:
@@ -240,36 +304,50 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     ]
 
     assert mode & stat.S_IXUSR
-    assert "SANDBOX_BACKENDS=\"${SANDBOX_BACKENDS:-corpus-mock}\"" in script
+    assert "SANDBOX_BACKENDS=\"${SANDBOX_BACKENDS:-corpus-mock,dmtf-sim}\"" in script
+    assert "valid entries: corpus-mock, dmtf-sim, ilo-sim, all" in script
     assert "KUBECTL_CONTEXT=\"kind-${KIND_CLUSTER_NAME}\"" in script
     assert kubectl_lines == ['kubectl --context "${KUBECTL_CONTEXT}" "$@"']
     assert "has_backend \"corpus-mock\"" in script
+    assert "has_backend \"dmtf-sim\"" in script
     assert "has_backend \"ilo-sim\"" in script
     assert "kind create cluster --name \"${KIND_CLUSTER_NAME}\"" in script
     assert "kind load docker-image redfish-ctl-mock-bmc:local" in script
+    assert "kind load docker-image redfish-ctl-dmtf-sim:local" in script
     assert "kind load docker-image redfish-ctl-ilo-sim:local" in script
     assert "kind load docker-image redfish-ctl-controller:local" in script
     assert "kubectl_sandbox apply -f k8s/controller/redfish-endpoint-crd.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/mock-bmc.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/mock-credentials.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/dmtf-sim.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/ilo-sim.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/ilo-credentials.yaml" in script
     assert "kubectl_sandbox apply -f k8s/controller/rbac.yaml" in script
     assert "kubectl_sandbox apply -f k8s/controller/deployment.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-sample.yaml" in script
+    assert "kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-dmtf-sim.yaml" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml" in script
     assert "jsonpath={.status.powerState}" in script
+    assert ".status.conditions[?(@.type==" in script
+    assert "assert_endpoint_condition" in script
     assert "wait_for_endpoint gb300-mock" in script
+    assert "wait_for_endpoint dmtf-sim" in script
+    assert "dmtf-sim ProfileResolved True DmtfProfileSelected" in script
+    assert "assert_endpoint_condition dmtf-sim Ready True PollSucceeded" in script
     assert "wait_for_endpoint ilo-sim" in script
     assert "kubectl delete" not in script
     assert "docker push" not in script
 
 
-def test_sandbox_readme_documents_ilo_backend_selection() -> None:
+def test_sandbox_readme_documents_simulator_backend_selection() -> None:
     """Operators can opt into the simulator matrix from the sandbox docs."""
     readme = SANDBOX_README.read_text(encoding="utf-8")
 
     assert "SANDBOX_BACKENDS=corpus-mock,ilo-sim make k8s-sandbox" in readme
+    assert "SANDBOX_BACKENDS=dmtf-sim make k8s-sandbox" in readme
+    assert "DMTF DSP2043 simulator" in readme
+    assert "ProfileResolved=True/DmtfProfileSelected" in readme
+    assert "Ready=True/PollSucceeded" in readme
     assert "HPE iLO Redfish emulator" in readme
     assert "https://github.com/HewlettPackard/ilo-redfish-emulator" in readme
 
@@ -279,7 +357,8 @@ def test_sandbox_docs_show_teardown_and_plain_endpoint_listing() -> None:
     sandbox_readme = SANDBOX_README.read_text(encoding="utf-8")
     k8s_readme = K8S_README.read_text(encoding="utf-8")
 
-    assert "kind delete cluster --name redfish-sandbox" in sandbox_readme
+    assert "KEEP_CLUSTER=1 make k8s-sandbox" in sandbox_readme
+    assert "make k8s-sandbox-down" in sandbox_readme
     assert "$ kubectl get redfishendpoints\n" in k8s_readme
     assert "custom-columns" not in k8s_readme
 

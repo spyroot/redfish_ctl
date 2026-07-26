@@ -56,6 +56,11 @@ def _load_controller_module():
     return module
 
 
+def _conditions_by_type(status: dict) -> dict[str, dict]:
+    """Index Kubernetes status conditions by type."""
+    return {item["type"]: item for item in status["conditions"]}
+
+
 class FakeSpan:
     """Small span double that records attributes set by controller handlers."""
 
@@ -137,12 +142,14 @@ def test_build_status_reports_drift_without_apply_when_unapproved() -> None:
         "preview": {"kind": "bios-profile"},
     }
     assert status["appliedChanges"] == []
-    conditions = {item["type"]: item for item in status["conditions"]}
+    conditions = _conditions_by_type(status)
     assert conditions["Approved"]["status"] == "False"
     assert conditions["Approved"]["reason"] == "ApprovalRequired"
     assert conditions["DriftDetected"]["status"] == "True"
     assert conditions["Applied"]["status"] == "False"
     assert conditions["Applied"]["reason"] == "DryRun"
+    assert conditions["Ready"]["status"] == "True"
+    assert conditions["Ready"]["reason"] == "ReconciliationSucceeded"
     assert status["lastReconciled"] == "2026-07-10T22:40:00Z"
 
 
@@ -169,10 +176,10 @@ def test_reconcile_profile_requires_approval_before_confirming() -> None:
     assert calls == [
         {
             "manager": {
-                "idrac_ip": "mock-bmc",
-                "idrac_username": "root",
-                "idrac_password": "mock",
-                "idrac_port": 443,
+                "host": "mock-bmc",
+                "username": "root",
+                "password": "mock",
+                "port": 443,
                 "insecure": True,
                 "is_http": False,
                 "is_debug": False,
@@ -184,7 +191,80 @@ def test_reconcile_profile_requires_approval_before_confirming() -> None:
         }
     ]
     assert status["dryRun"] is True
-    assert {item["type"]: item["status"] for item in status["conditions"]}["Approved"] == "False"
+    conditions = _conditions_by_type(status)
+    assert conditions["Approved"]["status"] == "False"
+    assert conditions["Ready"]["status"] == "True"
+
+
+def test_reconcile_profile_default_dmtf_path_uses_redfish_manager_not_idrac(
+    monkeypatch,
+) -> None:
+    """Default node-profile reconciles use the neutral manager, never IDracManager."""
+    from redfish_ctl.idrac_manager import IDracManager
+    from redfish_ctl.redfish_manager import RedfishManager
+
+    module = _load_controller_module()
+    built: list[type] = []
+
+    def forbidden_idrac_init(self, *args, **kwargs):
+        raise AssertionError(
+            "DMTF node-profile controller path instantiated IDracManager"
+        )
+
+    def fake_reconcile(manager, desired, **kwargs):
+        built.append(type(manager))
+        return FakeResult(dry_run=not kwargs["confirm"])
+
+    monkeypatch.setattr(IDracManager, "__init__", forbidden_idrac_init)
+
+    status = module.reconcile_profile(
+        {
+            "endpoint": {"address": "mock-bmc", "port": 8443, "insecure": False},
+            "desiredState": {"biosProfile": "gb300-power-capped"},
+        },
+        credentials={"username": "root", "password": "mock"},
+        reconcile_func=fake_reconcile,
+        reconciled_at=datetime(2026, 7, 10, 22, 47, tzinfo=timezone.utc),
+    )
+
+    default_factory = module.reconcile_profile.__kwdefaults__["manager_factory"]
+    assert default_factory is RedfishManager
+    assert built == [RedfishManager]
+    assert status["dryRun"] is True
+    conditions = _conditions_by_type(status)
+    assert conditions["Approved"]["status"] == "False"
+    assert conditions["Ready"]["status"] == "True"
+
+
+def test_make_manager_uses_canonical_constructor_kwargs() -> None:
+    """Node-profile controller builds managers with host/username/password/port kwargs."""
+    module = _load_controller_module()
+    built: list[dict] = []
+
+    def factory(**kwargs):
+        built.append(kwargs)
+        return object()
+
+    module._make_manager(
+        {"address": "http://mock-bmc:8080", "port": 8443, "insecure": False},
+        {"username": "bmc-admin", "password": "secret"},
+        factory,
+    )
+
+    assert built == [
+        {
+            "host": "mock-bmc",
+            "username": "bmc-admin",
+            "password": "secret",
+            "port": 8080,
+            "insecure": False,
+            "is_http": True,
+            "is_debug": False,
+        }
+    ]
+    assert not {"idrac_ip", "idrac_username", "idrac_password", "idrac_port"} & set(
+        built[0]
+    )
 
 
 def test_controller_tracing_setup_is_env_gated(monkeypatch) -> None:
@@ -307,9 +387,11 @@ def test_reconcile_profile_confirms_only_for_matching_plan_hash() -> None:
             "result": {"kind": "bios-profile", "changed": True},
         }
     ]
-    conditions = {item["type"]: item for item in status["conditions"]}
+    conditions = _conditions_by_type(status)
     assert conditions["Approved"]["status"] == "True"
     assert conditions["Applied"]["status"] == "True"
+    assert conditions["Ready"]["status"] == "True"
+    assert conditions["Ready"]["reason"] == "ReconciliationSucceeded"
 
 
 def test_reconcile_profile_does_not_reapply_consumed_plan_hash() -> None:
@@ -349,7 +431,7 @@ def test_reconcile_profile_does_not_reapply_consumed_plan_hash() -> None:
     assert status["planHash"] == consumed_hash
     assert status["consumedPlanHash"] == consumed_hash
     assert status["appliedChanges"] == []
-    conditions = {item["type"]: item for item in status["conditions"]}
+    conditions = _conditions_by_type(status)
     assert conditions["Approved"]["status"] == "False"
     assert conditions["Approved"]["reason"] == "ApprovalConsumed"
 
@@ -381,7 +463,9 @@ def test_kopf_handler_reports_reconciler_load_errors_as_status(monkeypatch) -> N
     assert result is None
     assert patch["status"]["dryRun"] is True
     assert patch["status"]["drift"] is None
-    conditions = {item["type"]: item for item in patch["status"]["conditions"]}
+    conditions = _conditions_by_type(patch["status"])
     assert conditions["ReconcileAvailable"]["status"] == "False"
     assert conditions["ReconcileAvailable"]["reason"] == "BackendUnavailable"
     assert "unavailable" in conditions["ReconcileAvailable"]["message"]
+    assert conditions["Ready"]["status"] == "False"
+    assert conditions["Ready"]["reason"] == "BackendUnavailable"
