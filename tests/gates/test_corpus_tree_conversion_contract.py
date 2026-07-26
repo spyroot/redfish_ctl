@@ -38,6 +38,14 @@ def test_corpus_tree_conversion_routes_by_authority_not_filename_guessing():
     ]
     assert recovery["agreement"]["rule"].startswith("all available authoritative")
     assert recovery["agreement"]["disagreement"] == "blocking-conflict"
+    alias_policy = recovery["agreement"]["canonical_alias_subset"]
+    assert alias_policy["disposition"] == "record-excluded"
+    assert alias_policy["emitted"] == "canonical-source-fixture-only"
+    assert alias_policy["report_reason"] == "canonical-alias-subset"
+    assert alias_policy["any_missing_evidence"] == "blocking-conflict"
+    assert "alias-and-canonical-payloads-parse-to-equal-json" in alias_policy[
+        "required_evidence"
+    ]
     assert recovery["canonicalize_candidate"]["accept"]["scheme"] == "none"
     assert recovery["canonicalize_candidate"]["accept"]["authority"] == "none"
     assert {
@@ -176,6 +184,12 @@ def test_vendor_tree_conversion_is_fail_closed_and_not_dmtf_conformance():
         "identical_bytes": "allowed",
         "different_bytes": "blocking",
     }
+    assert contract["collisions"]["multiple_source_fixtures_to_route"] == {
+        "default": "blocking-for-every-claimant",
+        "exception": (
+            "canonical-alias-subset-excluded-before-collision-evaluation"
+        ),
+    }
     assert contract["payload_fidelity"]["rewriting"]["vendor_oem_data"] == (
         "forbidden"
     )
@@ -188,6 +202,11 @@ def test_vendor_tree_conversion_is_fail_closed_and_not_dmtf_conformance():
         2: "input, environment, or existing-output precondition error",
     }
     dell_finding = contract["known_source_findings"][0]
-    assert dell_finding["id"] == "dell-xr8620t-canonical-alias-conflict"
-    assert dell_finding["result"] == "fail"
-    assert dell_finding["counts"]["unresolved_alias_files"] == 44
+    assert dell_finding["id"] == "dell-xr8620t-canonical-alias-subset"
+    assert dell_finding["result"] == "pass"
+    assert dell_finding["counts"]["excluded_canonical_alias_files"] == 44
+    assert dell_finding["counts"]["unresolved_files"] == 0
+    assert dell_finding["alias_payload_comparison"] == {
+        "byte_identical": 41,
+        "json_equivalent": 3,
+    }

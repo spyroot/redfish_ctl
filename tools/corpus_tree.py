@@ -429,6 +429,70 @@ def _agreed_route(candidates: Iterable[Candidate]) -> str | None:
     return next(iter(routes)) if len(routes) == 1 else None
 
 
+def _canonical_alias_exclusion(
+    fixture: str,
+    candidates: dict[str, list[Candidate]],
+    parsed: dict[str, Any],
+    files: dict[str, bytes],
+    fixture_lookup: dict[str, list[str]],
+) -> dict[str, Any] | None:
+    """Describe a proven non-canonical alias that may be safely excluded.
+
+    An alias is eligible only when a discovered or explicit request route maps
+    to this fixture, its top-level ``@odata.id`` names a different canonical
+    route, the canonical fixture exists, and both payloads parse to equal JSON.
+    Any missing evidence or semantic difference keeps the normal blocking
+    disagreement behavior.
+    """
+
+    fixture_candidates = candidates.get(fixture, [])
+    top_routes = {
+        candidate.route
+        for candidate in fixture_candidates
+        if candidate.source == "top-level-odata-id"
+    }
+    if len(top_routes) != 1 or fixture not in parsed:
+        return None
+    canonical_route = next(iter(top_routes))
+    alias_routes = sorted(
+        {
+            candidate.route
+            for candidate in fixture_candidates
+            if candidate.source in {"discovered-odata-link", "explicit-route-map"}
+            and candidate.route != canonical_route
+            and _forward_filename(candidate.route).casefold() == fixture.casefold()
+        }
+    )
+    if not alias_routes:
+        return None
+    canonical_name = _forward_filename(canonical_route)
+    canonical_matches = fixture_lookup.get(canonical_name.casefold(), [])
+    if len(canonical_matches) != 1:
+        return None
+    canonical_fixture = canonical_matches[0]
+    if canonical_fixture == fixture or canonical_fixture not in parsed:
+        return None
+    canonical_routes = {
+        candidate.route for candidate in candidates.get(canonical_fixture, [])
+    }
+    if canonical_route not in canonical_routes:
+        return None
+    if parsed[fixture] != parsed[canonical_fixture]:
+        return None
+    return {
+        "reason": "canonical-alias-subset",
+        "route": alias_routes[0],
+        "aliasRoutes": alias_routes,
+        "canonicalRoute": canonical_route,
+        "canonicalSourceFixture": canonical_fixture,
+        "payloadComparison": (
+            "byte-identical"
+            if files[fixture] == files[canonical_fixture]
+            else "json-equivalent"
+        ),
+    }
+
+
 def _tree_sha256(payloads: dict[str, bytes]) -> str:
     digest = hashlib.sha256()
     for destination in sorted(payloads):
@@ -650,6 +714,55 @@ def build_conversion(
             )
             if target not in visited:
                 queue.append(target)
+
+    # A vendor may expose one canonical resource through an additional request
+    # path while returning the canonical @odata.id in both payloads.  Exclude
+    # that alias only when the canonical capture exists and the parsed payloads
+    # are equivalent; this preserves all unique data without inventing a route.
+    for fixture in fixture_names:
+        if status.get(fixture) in {"excluded", "unresolved"}:
+            continue
+        alias = _canonical_alias_exclusion(
+            fixture,
+            candidates,
+            parsed,
+            files,
+            fixture_lookup,
+        )
+        if alias is not None:
+            status[fixture] = "excluded"
+            reasons[fixture].append(alias)
+
+    # Detect duplicate canonical claims before the forward-filename check.
+    # Otherwise a badly named duplicate could be rejected alone while the
+    # other claimant was emitted, violating the all-claimants blocking rule.
+    fixtures_by_claimed_route: dict[str, list[str]] = defaultdict(list)
+    for fixture in fixture_names:
+        if status.get(fixture) in {"excluded", "unresolved"}:
+            continue
+        if issues.get(fixture):
+            continue
+        routes = {candidate.route for candidate in candidates.get(fixture, [])}
+        if len(routes) == 1:
+            fixtures_by_claimed_route[next(iter(routes))].append(fixture)
+    for route, fixtures in sorted(fixtures_by_claimed_route.items()):
+        if len(fixtures) < 2:
+            continue
+        conflict = {
+            "kind": "multiple-source-fixtures-to-route",
+            "route": route,
+            "sourceFixtures": sorted(fixtures),
+        }
+        conflicts.append(conflict)
+        for fixture in sorted(fixtures):
+            status[fixture] = "unresolved"
+            reasons[fixture].append(
+                {
+                    "reason": "multiple-source-fixtures-to-route",
+                    "route": route,
+                    "sourceFixtures": sorted(fixtures),
+                }
+            )
 
     route_by_fixture: dict[str, str] = {}
     for fixture in fixture_names:

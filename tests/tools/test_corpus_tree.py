@@ -32,6 +32,10 @@ VENDOR = "Acme"
 MODEL = "Rack1"
 PROFILE_ID = "acme-rack1"
 ARCNAME = "capture"
+CANONICAL_CHASSIS_ROUTE = "/redfish/v1/Chassis/Chassis_0"
+ALIAS_SYSTEM_ROUTE = "/redfish/v1/Systems/System_0"
+CANONICAL_CHASSIS_SOURCE = "_redfish_v1_Chassis_Chassis_0.json"
+ALIAS_SYSTEM_SOURCE = "_redfish_v1_Systems_System_0.json"
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -169,6 +173,26 @@ def _source_names(rows: list[dict[str, Any]]) -> set[str]:
     return names
 
 
+def _row_for_source(rows: list[dict[str, Any]], source_fixture: str) -> dict[str, Any]:
+    """Find one report row by source fixture basename."""
+    for row in rows:
+        source = row.get("sourceFixture") or row.get("source") or row.get("file") or ""
+        if Path(str(source)).name == source_fixture:
+            return row
+    raise AssertionError(f"no report row for {source_fixture}: {rows!r}")
+
+
+def _assert_accounting_balances(report: dict[str, Any]) -> None:
+    """Check the conversion accountability equation."""
+    counts = report["counts"]
+    assert counts["inputRegularFiles"] == (
+        counts["emittedFiles"]
+        + counts["excludedFiles"]
+        + counts["unresolvedFiles"]
+        + counts["sidecarFiles"]
+    )
+
+
 def _corpus_routes(routes: dict[str, str]) -> bytes:
     """Build the explicit route authority used by the conversion contract."""
     return _json_bytes(
@@ -255,6 +279,74 @@ def _happy_manifest(tmp_path: Path) -> Path:
     return _write_manifest(tmp_path, tarball)
 
 
+def _canonical_alias_files(alias_payload: bytes | None = None) -> dict[str, bytes]:
+    """Build a graph where Systems has an alias for a canonical Chassis resource."""
+    routes = {
+        "/redfish/v1": "_redfish_v1.json",
+        "/redfish/v1/Systems": "_redfish_v1_Systems.json",
+        ALIAS_SYSTEM_ROUTE: ALIAS_SYSTEM_SOURCE,
+        "/redfish/v1/Chassis": "_redfish_v1_Chassis.json",
+        CANONICAL_CHASSIS_ROUTE: CANONICAL_CHASSIS_SOURCE,
+    }
+    canonical_payload = (
+        b'{\n'
+        b'  "@odata.id": "/redfish/v1/Chassis/Chassis_0",\n'
+        b'  "Id": "Chassis_0",\n'
+        b'  "Links": {"ComputerSystems": [{"@odata.id": "/redfish/v1/Systems/System_0"}]},\n'
+        b'  "Name": "Canonical chassis"\n'
+        b'}\n'
+    )
+    return {
+        "corpus_routes.json": _corpus_routes(routes),
+        "rest_api_map.status.json": _status_sidecar(routes),
+        "rest_api_map.npy": b"legacy sidecar must not be loaded\n",
+        "_redfish_v1.json": _json_bytes(
+            {
+                "@odata.id": "/redfish/v1",
+                "Chassis": {"@odata.id": "/redfish/v1/Chassis"},
+                "Systems": {"@odata.id": "/redfish/v1/Systems"},
+            }
+        ),
+        "_redfish_v1_Systems.json": _json_bytes(
+            {
+                "@odata.id": "/redfish/v1/Systems",
+                "Members": [{"@odata.id": ALIAS_SYSTEM_ROUTE}],
+            }
+        ),
+        "_redfish_v1_Chassis.json": _json_bytes(
+            {
+                "@odata.id": "/redfish/v1/Chassis",
+                "Members": [{"@odata.id": CANONICAL_CHASSIS_ROUTE}],
+            }
+        ),
+        CANONICAL_CHASSIS_SOURCE: canonical_payload,
+        ALIAS_SYSTEM_SOURCE: alias_payload
+        or (
+            b'{"Name":"Canonical chassis","Links":{"ComputerSystems":[{"@odata.id":'
+            b'"/redfish/v1/Systems/System_0"}]},"Id":"Chassis_0","@odata.id":'
+            b'"/redfish/v1/Chassis/Chassis_0"}\n'
+        ),
+    }
+
+
+def _assert_canonical_alias_subset_report(report: dict[str, Any]) -> None:
+    """Check the canonical-alias-subset exclusion details."""
+    assert report["result"] == "pass"
+    mappings = {row["route"]: row for row in report["mappings"]}
+    assert CANONICAL_CHASSIS_ROUTE in mappings
+    assert ALIAS_SYSTEM_ROUTE not in mappings
+    assert Path(str(mappings[CANONICAL_CHASSIS_ROUTE]["sourceFixture"])).name == (
+        CANONICAL_CHASSIS_SOURCE
+    )
+
+    alias_row = _row_for_source(report["excluded"], ALIAS_SYSTEM_SOURCE)
+    assert alias_row["route"] == ALIAS_SYSTEM_ROUTE
+    assert alias_row["reason"] == "canonical-alias-subset"
+    assert alias_row["canonicalRoute"] == CANONICAL_CHASSIS_ROUTE
+    assert alias_row["canonicalSourceFixture"] == CANONICAL_CHASSIS_SOURCE
+    _assert_accounting_balances(report)
+
+
 def test_materialize_maps_redfish_paths_recursively_and_preserves_payload_bytes(
     tmp_path: Path,
 ) -> None:
@@ -333,6 +425,62 @@ def test_corpus_routes_and_top_level_odata_id_disagreement_blocks_plan(
     assert report["result"] == "fail"
     assert _source_names(report["conflicts"]) == {"_redfish_v1_Systems_System_0.json"}
     assert "disagree" in (proc.stdout + proc.stderr).lower() or report["conflicts"]
+
+
+def test_canonical_alias_subset_excludes_equal_systems_alias(tmp_path: Path) -> None:
+    """A parsed-equal Systems alias is excluded while the Chassis canonical emits."""
+    files = _canonical_alias_files()
+    assert files[CANONICAL_CHASSIS_SOURCE] != files[ALIAS_SYSTEM_SOURCE]
+    assert json.loads(files[CANONICAL_CHASSIS_SOURCE]) == json.loads(
+        files[ALIAS_SYSTEM_SOURCE]
+    )
+    manifest = _write_manifest(tmp_path, _write_tarball(tmp_path, files))
+    output = tmp_path / "out"
+
+    plan = _run_corpus_tree(tmp_path, "plan", manifest)
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    _assert_canonical_alias_subset_report(_stdout_report(plan))
+
+    materialized = _run_corpus_tree(tmp_path, "materialize", manifest, output)
+
+    assert materialized.returncode == 0, materialized.stdout + materialized.stderr
+    report = json.loads(_report_file(output).read_text(encoding="utf-8"))
+    _assert_canonical_alias_subset_report(report)
+
+    root = _profile_root(output)
+    canonical = root / "Chassis" / "Chassis_0" / "index.json"
+    assert canonical.read_bytes() == files[CANONICAL_CHASSIS_SOURCE]
+    assert not (root / "Systems" / "System_0").exists()
+
+
+def test_canonical_alias_subset_different_payload_blocks_plan(tmp_path: Path) -> None:
+    """A Systems alias with a different parsed payload remains blocking."""
+    different_alias = (
+        b'{"Name":"Different alias","Links":{"ComputerSystems":[{"@odata.id":'
+        b'"/redfish/v1/Systems/System_0"}]},"Id":"Chassis_0","@odata.id":'
+        b'"/redfish/v1/Chassis/Chassis_0"}\n'
+    )
+    files = _canonical_alias_files(alias_payload=different_alias)
+    assert json.loads(files[CANONICAL_CHASSIS_SOURCE]) != json.loads(
+        files[ALIAS_SYSTEM_SOURCE]
+    )
+    manifest = _write_manifest(tmp_path, _write_tarball(tmp_path, files))
+
+    proc = _run_corpus_tree(tmp_path, "plan", manifest)
+
+    assert proc.returncode != 0
+    report = _stdout_report(proc)
+    assert report["result"] == "fail"
+    blocking_sources = _source_names(report["conflicts"]) | _source_names(report["unresolved"])
+    assert ALIAS_SYSTEM_SOURCE in blocking_sources
+    excluded_alias = [
+        row
+        for row in report["excluded"]
+        if Path(str(row.get("sourceFixture", ""))).name == ALIAS_SYSTEM_SOURCE
+    ]
+    assert not any(row.get("reason") == "canonical-alias-subset" for row in excluded_alias)
+    _assert_accounting_balances(report)
 
 
 def test_malformed_query_traversal_and_fragment_routes_are_accounted(

@@ -115,23 +115,28 @@ profile_identity:
     - {vendor: supermicro, model: gb300, profile_id: supermicro-gb300}
 
 known_source_findings:
-  - id: dell-xr8620t-canonical-alias-conflict
+  - id: dell-xr8620t-canonical-alias-subset
     source_sha256: c8cb181ce22e6955b266bc4c0363daef431837f23444120e96c066456d3de3bb
+    tree_sha256: 242c76b9786347df51e5a39141f7ae1d40da36017f26c551aad2c5b145801801
     observed_by: tools/corpus_tree.py plan
-    result: fail
+    result: pass
     classification: project-specific
     counts:
       input_regular_files: 995
       emitted_files: 881
       excluded_fragment_files: 70
-      unresolved_alias_files: 44
+      excluded_canonical_alias_files: 44
+      unresolved_files: 0
+      conflict_files: 0
+    alias_payload_comparison:
+      byte_identical: 41
+      json_equivalent: 3
     evidence: >-
       The affected fixtures are reachable through a /Systems/... request path
       but their top-level @odata.id identifies the corresponding /Chassis/...
-      canonical resource, so the two authoritative sources disagree.
-    resolution_required: >-
-      Keep the profile unpublished until a human-owned alias or source
-      precedence rule is added to this contract and covered by authoritative CI.
+      canonical resource. Every canonical fixture exists and all 44 alias
+      payloads parse equal to it, so the aliases are explicitly excluded.
+    remaining_requirement: authoritative CI activation
 
 # Route recovery is intentionally NOT a reverse filename operation. The
 # existing flattening function replaces '/' with '_', but real Redfish path
@@ -191,6 +196,20 @@ route_recovery:
   agreement:
     rule: all available authoritative sources for one fixture MUST resolve to one route
     disagreement: blocking-conflict
+    canonical_alias_subset:
+      disposition: record-excluded
+      required_evidence:
+        - discovered-or-explicit-alias-route-forward-matches-source-fixture
+        - top-level-odata-id-identifies-a-different-canonical-route
+        - canonical-source-fixture-exists
+        - canonical-source-fixture-claims-the-canonical-route
+        - alias-and-canonical-payloads-parse-to-equal-json
+      emitted: canonical-source-fixture-only
+      report_reason: canonical-alias-subset
+      any_missing_evidence: blocking-conflict
+      note: >-
+        This is a declared subset policy, not route synthesis. The alternate
+        vendor URI is not served by the converted profile.
   forward_filename_check:
     json_function: '"_" + route.strip("/").replace("/", "_") + ".json"'
     special:
@@ -297,7 +316,9 @@ payload_fidelity:
 
 collisions:
   source_fixture_to_multiple_routes: blocking
-  multiple_source_fixtures_to_route: blocking
+  multiple_source_fixtures_to_route:
+    default: blocking-for-every-claimant
+    exception: canonical-alias-subset-excluded-before-collision-evaluation
   case_folded_destination_collision: blocking-on-every-filesystem
   file_directory_collision: blocking
   existing_output:
