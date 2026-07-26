@@ -197,3 +197,17 @@ def test_detects_missing_required_job(tmp_path, monkeypatch):
     monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
     failures, _ = gate_meta._check_gitlab(_valid_registry())
     assert any("required GitLab job missing" in f for f in failures)
+
+
+def test_detects_missing_diagnostic_job(tmp_path, monkeypatch):
+    """A declared diagnostic job must exist without becoming merge evidence."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [true]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    registry = _valid_registry()
+    registry["diagnostic_jobs"] = ["focused-gate"]
+    failures, _ = gate_meta._check_gitlab(registry)
+    assert any("diagnostic GitLab job missing" in f for f in failures)

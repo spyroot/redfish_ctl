@@ -2,8 +2,8 @@
 
 Reads ``gates/manifest.yaml`` (the single registry of every mandatory gate) and fails the
 build when the pipeline could silently skip, misroute, or mis-classify a gate.
-It is itself registered as the ``repo.meta`` gate and is run in CI via
-``tests/test_gate_meta.py``. Checks (a check whose inputs do not exist yet — no
+It is registered as the ``meta.gate-registry`` gate and is covered by
+``tests/gates/test_gate_meta.py``. Checks (a check whose inputs do not exist yet — no
 ``.gitlab-ci.yml``, no ``modules/`` — is reported as skipped, not failed):
 
     1. every required gate's command file exists
@@ -199,6 +199,9 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     for required in required_jobs:
         if required not in real_jobs:
             failures.append(f"required GitLab job missing: {required}")
+    for diagnostic in registry.get("diagnostic_jobs") or []:
+        if diagnostic not in real_jobs:
+            failures.append(f"diagnostic GitLab job missing: {diagnostic}")
     return failures, True
 
 
