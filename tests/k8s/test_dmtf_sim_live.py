@@ -10,7 +10,7 @@ the product-neutral ``RedfishManager`` lens is the one under test — no vendor
 ``is_http`` (a URL is derived locally when a raw request needs one; no second
 environment variable, no full URL passed to redfish_ctl).
 
-    redfish_ctl --ip "$REDFISH_IP" --port "$REDFISH_PORT" --use-http metric-definitions
+    redfish_ctl --host "$REDFISH_IP" --port "$REDFISH_PORT" --use-http metric-definitions
 
 Author Mus spyroot@gmail.com
 """

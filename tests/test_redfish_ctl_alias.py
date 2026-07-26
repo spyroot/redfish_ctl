@@ -4,6 +4,8 @@ Phase 1: `import redfish_ctl` and `from redfish_ctl.<sub> import ...` resolve to
 idrac_ctl modules (same objects). Phase 2: endpoint/credentials read REDFISH_* first,
 falling back to the legacy IDRAC_* names.
 """
+import sys
+
 import pytest
 
 from redfish_ctl.config import (
@@ -32,6 +34,23 @@ def _clear_endpoint_env(monkeypatch):
     """
     for name in _ENDPOINT_ENV:
         monkeypatch.delenv(name, raising=False)
+
+
+def _parse_root_cli(monkeypatch, *flags):
+    """Parse root CLI flags without registering or executing commands."""
+    from redfish_ctl import redfish_main as rm
+
+    parsed = []
+    _clear_endpoint_env(monkeypatch)
+    monkeypatch.setattr(rm, "create_cmd_tree", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(rm, "is_local_command", lambda _args: True)
+    monkeypatch.setattr(rm, "main", lambda args, _commands: parsed.append(args))
+    monkeypatch.setattr(sys, "argv", ["redfish_ctl", *flags])
+
+    rm.redfish_main_ctl()
+
+    assert len(parsed) == 1
+    return parsed[0]
 
 
 def test_idrac_ctl_is_redfish_ctl_alias():
@@ -192,3 +211,35 @@ def test_private_endpoint_override_tracker_is_filtered_from_command_kwargs():
     from redfish_ctl.redfish_main import _ROOT_CONNECTION_ARGS
 
     assert "_endpoint_cli_overrides" in _ROOT_CONNECTION_ARGS
+
+
+def test_use_http_canonical_flag_sets_use_http(monkeypatch):
+    """The canonical --use-http flag enables HTTP transport."""
+    args = _parse_root_cli(monkeypatch, "--use-http")
+
+    assert args.use_http is True
+
+
+def test_use_http_legacy_alias_sets_same_destination(monkeypatch):
+    """The legacy --use_http alias retains its existing behavior."""
+    args = _parse_root_cli(monkeypatch, "--use_http")
+
+    assert args.use_http is True
+
+
+def test_use_http_help_lists_canonical_flag_first(monkeypatch, capsys):
+    """CLI help presents the hyphenated spelling as the canonical form."""
+    from redfish_ctl import redfish_main as rm
+
+    _clear_endpoint_env(monkeypatch)
+    monkeypatch.setattr(rm, "create_cmd_tree", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(sys, "argv", ["redfish_ctl", "--help"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        rm.redfish_main_ctl()
+
+    assert exit_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--use-http" in help_text
+    assert "--use_http" in help_text
+    assert help_text.index("--use-http") < help_text.index("--use_http")

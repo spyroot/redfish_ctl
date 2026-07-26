@@ -740,8 +740,14 @@ def redfish_main_ctl():
         help="verify the BMC TLS certificate. Off by default because "
              "BMCs ship self-signed certs; opt in only with a trusted cert.")
     credentials.add_argument(
-        '--use_http', action='store_true', required=False, default=False,
-        help="use http instead https as transport.")
+        "--use-http",
+        "--use_http",
+        dest="use_http",
+        action="store_true",
+        required=False,
+        default=False,
+        help="use http instead of https as transport.",
+    )
 
     redfish_query = parser.add_argument_group(
         'redfish query', '# server-side Redfish GET query options')

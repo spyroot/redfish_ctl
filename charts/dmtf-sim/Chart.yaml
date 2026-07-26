@@ -1,0 +1,14 @@
+apiVersion: v2
+name: dmtf-sim
+description: DMTF DSP2043 Redfish mockup simulator for private Kubernetes validation.
+type: application
+version: 0.1.0
+appVersion: "2026.1"
+home: https://github.com/spyroot/redfish_ctl
+sources:
+  - https://github.com/spyroot/redfish_ctl
+keywords:
+  - redfish
+  - dmtf
+  - simulator
+  - kubernetes

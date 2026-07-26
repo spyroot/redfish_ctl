@@ -155,6 +155,30 @@ def test_kubernetes_schema_validates_a_non_empty_manifest_set() -> None:
     assert "kubernetes.schema: OK" in combined, combined
 
 
+def test_kubernetes_render_fails_when_helm_is_missing(tmp_path) -> None:
+    """The required chart render gate cannot silently skip a missing Helm."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    commands = {
+        "dirname": shutil.which("dirname"),
+        "python": sys.executable,
+    }
+    assert all(commands.values()), commands
+    for name, target in commands.items():
+        (command_dir / name).symlink_to(target)
+
+    script = REPO_ROOT / "scripts" / "gates" / "kubernetes" / "render.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": str(command_dir)},
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 1, combined
+    assert "helm not installed" in combined, combined
+
+
 def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
     """check.sh refuses the profile path when a single Kubernetes variable is exported.
 
