@@ -229,21 +229,23 @@ class IDracManager(RedfishManager):
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    headers=headers
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
             )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "GET", request_call),
+        )
 
     @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_get_call(

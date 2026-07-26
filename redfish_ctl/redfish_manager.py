@@ -745,21 +745,23 @@ class RedfishManager:
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    headers=headers
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
             )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "GET", request_call),
+        )
 
     def _http_session(self) -> requests.Session:
         """Return a cached keep-alive Session so many GETs reuse ONE connection.
