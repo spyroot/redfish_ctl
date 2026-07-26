@@ -11,7 +11,6 @@ caller can save to a file and consume asynchronously or synchronously.
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 

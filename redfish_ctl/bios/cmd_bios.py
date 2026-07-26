@@ -27,7 +27,6 @@ On time boot
 
 Author Mus spyroot@gmail.com
 """
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
@@ -141,7 +140,6 @@ class BiosQuery(IDracManager,
         :param filename: if filename signals  data must save to file, a bios setting to a file.
         :return:
         """
-        from_file = False
         idrac_api = f"{self.idrac_manage_servers}{REDFISH_API.BIOS}"
 
         if verbose:

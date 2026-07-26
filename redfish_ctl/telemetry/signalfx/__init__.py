@@ -2,8 +2,8 @@
 
 from .emit import (
     SIGNALFX_DATAPOINT_PATH,
-    _mts_query,
-    _require_datapoint_url,
+    _mts_query as _mts_query,
+    _require_datapoint_url as _require_datapoint_url,
     build_readback_result,
     push_signalfx,
     resolve_signalfx_ingest_url,
