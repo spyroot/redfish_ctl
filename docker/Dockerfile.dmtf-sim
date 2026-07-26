@@ -32,6 +32,12 @@ COPY --chown=dmtfsim:dmtfsim k8s/sandbox/mock_bmc_server.py \
 # simulator per profile: the container args pick the profile via --mockup-dir.
 COPY spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip /tmp/dsp2043.zip
 RUN python -m zipfile -e /tmp/dsp2043.zip /mockups/ \
+    && test -s /mockups/DSP2043_2026.1/public-rackmount1/index.json \
+    && test -s /mockups/DSP2043_2026.1/public-rackmount1/TaskService/index.json \
+    && python -m json.tool \
+        /mockups/DSP2043_2026.1/public-rackmount1/index.json >/dev/null \
+    && python -m json.tool \
+        /mockups/DSP2043_2026.1/public-rackmount1/TaskService/index.json >/dev/null \
     && rm /tmp/dsp2043.zip \
     && chown -R dmtfsim:dmtfsim /mockups
 

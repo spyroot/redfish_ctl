@@ -22,6 +22,7 @@ CONTROLLER_DEPLOYMENT = REPO_ROOT / "k8s" / "controller" / "deployment.yaml"
 CONTROLLER_RBAC = REPO_ROOT / "k8s" / "controller" / "rbac.yaml"
 CONTROLLER_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.controller"
 ILO_SIM_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.ilo-sim"
+DMTF_SIM_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.dmtf-sim"
 MAKEFILE = REPO_ROOT / "Makefile"
 SANDBOX_README = REPO_ROOT / "k8s" / "sandbox" / "README.md"
 K8S_README = REPO_ROOT / "k8s" / "README.md"
@@ -177,13 +178,17 @@ def test_dmtf_sim_manifest_deploys_local_get_only_reference_service() -> None:
         "/mockups/DSP2043_2026.1/public-rackmount1",
     ]
     assert container["readinessProbe"]["httpGet"] == {
-        "path": "/redfish/v1/",
+        "path": "/redfish/v1/TaskService",
         "port": "http",
     }
     assert container["livenessProbe"]["httpGet"] == {
         "path": "/redfish/v1/",
         "port": "http",
     }
+    assert (
+        container["readinessProbe"]["httpGet"]["path"]
+        != container["livenessProbe"]["httpGet"]["path"]
+    )
     assert container["securityContext"]["allowPrivilegeEscalation"] is False
     assert container["securityContext"]["readOnlyRootFilesystem"] is True
     assert container["securityContext"]["capabilities"]["drop"] == ["ALL"]
@@ -191,6 +196,22 @@ def test_dmtf_sim_manifest_deploys_local_get_only_reference_service() -> None:
     assert service["spec"]["type"] == "ClusterIP"
     assert service["spec"]["ports"][0]["port"] == 80
     assert service["spec"]["ports"][0]["targetPort"] == "http"
+
+
+def test_dmtf_sim_image_gates_required_dsp2043_resources() -> None:
+    """The image build fails unless ServiceRoot and TaskService are valid JSON."""
+    dockerfile = DMTF_SIM_DOCKERFILE.read_text(encoding="utf-8")
+
+    service_root = "/mockups/DSP2043_2026.1/public-rackmount1/index.json"
+    task_service = (
+        "/mockups/DSP2043_2026.1/public-rackmount1/TaskService/index.json"
+    )
+    assert "python -m zipfile -e /tmp/dsp2043.zip /mockups/" in dockerfile
+    assert f"test -s {service_root}" in dockerfile
+    assert f"test -s {task_service}" in dockerfile
+    assert dockerfile.count("python -m json.tool") == 2
+    assert service_root in dockerfile
+    assert task_service in dockerfile
 
 
 def test_controller_deployment_is_read_only_and_uses_local_image() -> None:

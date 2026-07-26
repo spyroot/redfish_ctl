@@ -31,7 +31,7 @@ def test_production_dockerfile_header_shows_safe_runtime_examples() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     header = "\n".join(dockerfile.splitlines()[:20])
 
-    assert "redfish-ctl --vendor dell system" in header
+    assert "redfish-ctl system" in header
     assert "--vendor supermicro exporter --output otlp" in header
     assert "REDFISH_PASSWORD=" not in dockerfile
     assert "IDRAC_PASSWORD=" not in dockerfile
@@ -44,7 +44,8 @@ def test_docker_docs_link_the_production_image_usage() -> None:
     readme = README.read_text(encoding="utf-8")
 
     assert "docker/Dockerfile" in docker_readme
-    assert "redfish-ctl --vendor dell system" in docker_readme
+    assert "docker/Dockerfile.dmtf-sim" in docker_readme
+    assert "redfish-ctl system" in docker_readme
     assert "--vendor supermicro exporter --output otlp" in docker_readme
     assert "credentials" in docker_readme.lower()
     assert "[Docker](docker/README.md)" in readme

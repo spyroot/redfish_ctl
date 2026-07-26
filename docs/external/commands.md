@@ -49,7 +49,7 @@ redfish_ctl sensors
 redfish_ctl environment-metrics
 redfish_ctl thermal
 redfish_ctl component-integrity
-redfish_ctl --vendor dell system
+redfish_ctl system
 redfish_ctl --vendor dell manager
 redfish_ctl --vendor dell chassis
 redfish_ctl --vendor dell firmware_inventory

@@ -59,8 +59,8 @@ export REDFISH_PASSWORD='your-password'
 # 3. Read something safe
 redfish_ctl --version                   # prints the installed version
 redfish_ctl sensors                     # shared DMTF sensor read
-redfish_ctl --vendor dell system        # Dell ComputerSystem read
-redfish_ctl --vendor dell system --yaml # same Dell data as YAML
+redfish_ctl system                      # shared DMTF ComputerSystem read
+redfish_ctl system --yaml               # same ComputerSystem data as YAML
 redfish_ctl --help                      # shared DMTF commands
 redfish_ctl --vendor supermicro --help  # DMTF + Supermicro commands
 ```
@@ -206,11 +206,11 @@ Start with a shared DMTF sensor read:
 redfish_ctl sensors
 ```
 
-For a Dell host ComputerSystem, select the Dell manager explicitly. If you have
-`jq` installed, this is a compact smoke check:
+For the host ComputerSystem, this is a compact smoke check when `jq` is
+installed:
 
 ```bash
-redfish_ctl --vendor dell --nocolor system | jq '.data | {Id, Name, PowerState}'
+redfish_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
 ```
 
 ## Common Reads

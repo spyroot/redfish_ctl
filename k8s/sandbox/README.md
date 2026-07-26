@@ -40,10 +40,10 @@ SANDBOX_BACKENDS=corpus-mock,ilo-sim make k8s-sandbox
 The smoke check waits until `.status.powerState` is populated on the selected
 sample resources. When `dmtf-sim` is selected, it also requires the endpoint to
 report `ProfileResolved=True/DmtfProfileSelected` and
-`Ready=True/PollSucceeded`. The corpus mock BMC serves only the committed GB300
-corpus; the DMTF simulator
-serves the pinned DSP2043 `public-rackmount1` profile and rejects mutating HTTP
-verbs; the iLO backend is an emulator service, not a live BMC.
+`Ready=True/PollSucceeded`; the DMTF backend is readiness-gated before those
+checks run. The corpus mock BMC serves only the committed GB300 corpus; the DMTF
+simulator serves the pinned DSP2043 `public-rackmount1` profile and rejects
+mutating HTTP verbs; the iLO backend is an emulator service, not a live BMC.
 
 Select an explicit backend set with `SANDBOX_BACKENDS`, consumed by
 `k8s/sandbox/run-sandbox.sh` and defaulting to `corpus-mock,dmtf-sim`.
