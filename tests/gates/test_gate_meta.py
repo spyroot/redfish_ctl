@@ -199,6 +199,12 @@ def test_registry_declares_exactly_one_diagnostic_focused_gate_job() -> None:
     assert "focused-gate" not in registry.get("required_jobs", [])
 
 
+def test_gitlab_uses_full_history_checkout_for_exact_ref_dispatches() -> None:
+    """Direct exact-ref pipelines need origin/main history for repo.format merge-base."""
+    variables = _ci_config().get("variables") or {}
+    assert variables.get("GIT_DEPTH") == "0"
+
+
 def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
     """Only one job may consume FOCUSED_GATE and it must go through check.sh."""
     jobs = _gitlab_jobs()

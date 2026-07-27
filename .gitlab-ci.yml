@@ -25,6 +25,9 @@ default:
     - eval "$(conda shell.bash hook)" && conda activate redfish_ctl
 
 variables:
+  # Direct exact-ref API pipelines need a full clone so changed-file gates can
+  # compute their merge base against origin/main deterministically.
+  GIT_DEPTH: "0"
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
