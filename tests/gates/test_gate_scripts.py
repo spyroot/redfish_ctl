@@ -19,6 +19,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = REPO_ROOT / "gates" / "manifest.yaml"
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
+RUN_SH = REPO_ROOT / "scripts" / "gates" / "run.sh"
 
 
 def _in_a_pod() -> bool:
@@ -37,6 +38,18 @@ def _registry() -> dict:
     :return: the parsed gates/manifest.yaml mapping.
     """
     return yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
+
+
+def _off_cluster_env() -> dict[str, str]:
+    """Return an environment that cannot satisfy check.sh's Kubernetes guard.
+
+    :return: a copy of the process environment with kube service variables removed.
+    """
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"}
+    }
 
 
 def test_registry_commands_exist_and_are_executable() -> None:
@@ -66,7 +79,7 @@ def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     executes real gates.
     """
     proc = subprocess.run(
-        [str(REPO_ROOT / "scripts" / "gates" / "run.sh"), "no-such-profile"],
+        [str(RUN_SH), "no-such-profile"],
         capture_output=True, text=True,
     )
     assert proc.returncode != 0, "an unknown profile must fail, not pass silently"
@@ -75,6 +88,38 @@ def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     # Proves the registry parsed: the error lists the profiles it found rather than a load traceback.
     assert "merge" in combined, combined
     assert "FileNotFoundError" not in combined, combined
+
+
+def test_run_sh_rejects_an_unknown_focused_gate_without_running_the_profile() -> None:
+    """A focused gate typo is a hard error before any profile gate starts.
+
+    API/web focused dispatch takes the gate id from CI variables, so the runner
+    must reject an unknown id instead of falling back to the full merge profile.
+    """
+    proc = subprocess.run(
+        [str(RUN_SH), "--profile", "merge", "--gate", "no.such-gate"],
+        capture_output=True, text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, "an unknown focused gate must fail closed"
+    assert "unknown gate 'no.such-gate'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
+
+
+def test_run_sh_rejects_a_focused_gate_profile_mismatch_without_running_it() -> None:
+    """A gate id is valid only in its registered profile.
+
+    This prevents a focused integration/deploy request from smuggling a merge
+    gate through a profile that has different safety and evidence semantics.
+    """
+    proc = subprocess.run(
+        [str(RUN_SH), "--profile", "integration", "--gate", "unit.all"],
+        capture_output=True, text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, "profile/gate mismatches must fail closed"
+    assert "gate 'unit.all' belongs to profile 'merge', not 'integration'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
 
 
 def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
@@ -195,9 +240,32 @@ def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
         capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
     )
     combined = proc.stdout + proc.stderr
-    assert proc.returncode == 3, f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    assert proc.returncode == 3, (
+        f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    )
     assert "REFUSING" in combined, combined
     assert "unknown profile" not in combined, f"the guard let the runner start: {combined}"
+
+
+def test_check_sh_accepts_focused_gate_syntax_but_preserves_local_refusal() -> None:
+    """`check.sh --profile merge --gate unit.all` parses, then refuses off-cluster.
+
+    The focused CI path needs this exact command shape, but the local laptop
+    guard remains the stronger invariant: parsing success must not become local
+    test execution.
+    """
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", "unit.all"],
+        capture_output=True, text=True, env=_off_cluster_env(), cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 3, (
+        f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    )
+    assert "REFUSING" in combined, combined
+    assert "unexpected argument" not in combined, combined
+    assert "unknown gate" not in combined, combined
+    assert "=== gate" not in combined, f"the guard let a gate start locally: {combined}"
 
 
 @pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
@@ -217,6 +285,24 @@ def test_check_sh_still_runs_in_cluster() -> None:
     combined = proc.stdout + proc.stderr
     assert "REFUSING" not in combined, f"the guard refused inside a real pod: {combined}"
     assert "unknown profile" in combined, combined
+
+
+@pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
+def test_check_sh_passes_focused_gate_to_the_runner_inside_cluster() -> None:
+    """Inside Kubernetes, focused arguments reach run.sh instead of local refusal.
+
+    The deliberately unknown gate keeps the test from recursively running the
+    unit gate while still proving the in-cluster path accepts focused syntax.
+    """
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", "no.such-gate"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 3, f"the guard refused inside a real pod: {combined}"
+    assert "REFUSING" not in combined, combined
+    assert "unknown gate 'no.such-gate'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
 
 
 def test_protected_apply_refuses_without_a_protected_pipeline() -> None:

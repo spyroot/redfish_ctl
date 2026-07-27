@@ -8,6 +8,39 @@ runner; a passing GitHub workflow is not merge evidence. The GitHub Actions
 workflows described below are supplemental public checks and release automation.
 For the release procedure, see [Releasing](releasing.md).
 
+## Internal validation paths
+
+The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
+Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
+merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
+`repo.format`; the job runs that one gate through the Kubernetes-guarded
+`scripts/check.sh` entrypoint. This exact-commit result is diagnostic evidence
+only, not merge or release evidence.
+
+The `gate-merge` job remains the merge authority. For an Internal GitLab API or
+web pipeline, the dispatcher sets `MERGE_PROFILE=merge` and omits
+`FOCUSED_GATE`; the pipeline then runs the complete merge profile and no
+integration, deployment, or publication job. Merge-request and default-branch
+pipelines continue to select `gate-merge` through their normal GitLab rules.
+
+### Run internal validation
+
+1. Use the project pipeline on Internal GitLab with the immutable
+   `sync/pr-<number>/<40-character-head-sha>` ref produced by the configured
+   Sync Now path. The pipeline commit must resolve to that exact head SHA.
+2. For diagnostic feedback, set `FOCUSED_GATE=unit.all` (or another
+   merge-profile gate ID) and leave `MERGE_PROFILE` unset. The pipeline must
+   create only `focused-gate`.
+3. For merge evidence, unset `FOCUSED_GATE` and set `MERGE_PROFILE=merge`. The
+   pipeline must create only `gate-merge`.
+4. Verify the terminal job is successful, its commit SHA equals the requested
+   head SHA, and its sanitized gate artifacts are available. A focused run ends
+   with `run.sh: gate <id> passed`; the authoritative run ends with
+   `run.sh: all merge gates passed`.
+
+Pipeline credentials come from the configured Internal GitLab CI binding; do
+not copy tokens into the repository or pass them on the command line.
+
 ## Supplemental `ci.yml` check
 
 Triggers on pushes to `main` and on every pull request.

@@ -20,6 +20,8 @@ spec:
     createOrUpdateAllowed: false
 
   checks:
+    # These focused checks require explicit per-gate evidence. They do not
+    # replace the separate exact-commit gate-merge status required by spec.ci.
     required:
       - id: unit.all
         kind: command
@@ -27,7 +29,9 @@ spec:
           - ./scripts/check.sh
           - --profile
           - merge
-        timeoutSeconds: 3600
+          - --gate
+          - unit.all
+        timeoutSeconds: 1800
         offline: true
         warningsAllowed: 0
         skippedRequiredTestsAllowed: 0
@@ -38,7 +42,9 @@ spec:
           - ./scripts/check.sh
           - --profile
           - merge
-        timeoutSeconds: 3600
+          - --gate
+          - repo.format
+        timeoutSeconds: 600
         offline: true
         findingsAllowed: 0
 
@@ -48,7 +54,9 @@ spec:
           - ./scripts/check.sh
           - --profile
           - merge
-        timeoutSeconds: 3600
+          - --gate
+          - meta.gate-registry
+        timeoutSeconds: 120
         offline: true
 
     optional: []
