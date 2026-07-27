@@ -10,7 +10,6 @@ from redfish_ctl.redfish_exceptions import RedfishForbidden, RedfishUnauthorized
 from redfish_ctl.redfish_manager import CommandResult, RedfishManager
 from redfish_ctl.redfish_respond_error import RedfishError
 
-
 _DMTF_ERROR_BODY = {
     "error": {
         "code": "Base.1.18.GeneralError",

@@ -31,12 +31,12 @@ from redfish_ctl.api import (
 )
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, ResourceNotFound
 from redfish_ctl.kube_client import get_core_v1_api
-from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.redfish_exceptions import (
     RedfishException,
     RedfishForbidden,
     RedfishUnauthorized,
 )
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.telemetry import tracing
 
 _LOGGER = logging.getLogger(__name__)

@@ -35,7 +35,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Iterator
 from urllib.parse import unquote, urlsplit
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = REPO_ROOT / "tests" / "corpus" / "manifest.json"
 REPORT_SCHEMA = "redfish_ctl.corpus_tree_conversion_report/v1"

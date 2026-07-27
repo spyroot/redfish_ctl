@@ -4,7 +4,6 @@ from pathlib import Path
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPO_ROOT / "specs" / "ci" / "protected-external-gates.yaml"
 
