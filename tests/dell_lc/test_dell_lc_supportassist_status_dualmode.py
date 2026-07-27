@@ -5,7 +5,11 @@ import pytest
 from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.actions.action_policy import Destructiveness, classify
+from redfish_ctl.actions.action_policy import (
+    ACTION_POLICY,
+    Destructiveness,
+    classify,
+)
 from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_status import (
     DellLcSupportAssistStatus,
 )
@@ -145,6 +149,45 @@ def test_dell_lc_supportassist_status_dry_run_does_not_post(
     assert result.data["level"] == "read_only"
     assert result.data["blocked"] is None
     assert result.data["payload"] == {}
+    assert _post_requests(service) == []
+
+
+@pytest.mark.parametrize(
+    ("action", "full_action_type"),
+    [
+        (
+            "auto-collect-schedule",
+            "#DellLCService.SupportAssistGetAutoCollectSchedule",
+        ),
+        ("eula-status", "#DellLCService.SupportAssistGetEULAStatus"),
+    ],
+)
+def test_dell_lc_supportassist_status_preserves_shared_guard(
+    dell_lc_corpus_mock,
+    monkeypatch,
+    action,
+    full_action_type,
+):
+    """A stricter policy still blocks the status POST without CLI intent."""
+    manager, service = dell_lc_corpus_mock
+    monkeypatch.setitem(
+        ACTION_POLICY,
+        full_action_type,
+        Destructiveness.DESTRUCTIVE,
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.DellLcSupportAssistStatus,
+        "dell-lc-supportassist-status",
+        action=action,
+    )
+
+    assert isinstance(result, CommandResult)
+    assert result.error is None
+    assert result.data["dry_run"] is True
+    assert result.data["action"] == full_action_type
+    assert result.data["level"] == "destructive"
+    assert result.data["blocked"] == "destructive action requires --confirm"
     assert _post_requests(service) == []
 
 
