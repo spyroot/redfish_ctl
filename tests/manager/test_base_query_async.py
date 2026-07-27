@@ -1,8 +1,13 @@
 """Async GET parity tests for the generic Redfish manager query path."""
 
+import asyncio
+import warnings
+from types import SimpleNamespace
+
 import pytest
 
 import redfish_ctl.idrac_manager as idrac_manager_module
+import redfish_ctl.redfish_manager as redfish_manager_module
 from redfish_ctl.cmd_current_boot import GetCurrentBoot
 from redfish_ctl.cmd_exceptions import ResourceNotFound
 from redfish_ctl.idrac_manager import IDracManager
@@ -77,6 +82,120 @@ def _stub_sync_get(monkeypatch, manager, response):
 
     monkeypatch.setattr(manager, "api_get_call", fake_get)
     return calls
+
+
+def test_event_loop_helper_creates_usable_loop_without_deprecation_warning(monkeypatch):
+    real_new_event_loop = asyncio.new_event_loop
+    real_set_event_loop = asyncio.set_event_loop
+    created = []
+
+    def record_new_event_loop():
+        loop = real_new_event_loop()
+        created.append(loop)
+        return loop
+
+    real_set_event_loop(None)
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "new_event_loop",
+        record_new_event_loop,
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        loop = RedfishManager._event_loop()
+
+    try:
+        assert created == [loop]
+        assert loop.run_until_complete(asyncio.sleep(0)) is None
+    finally:
+        loop.close()
+        real_set_event_loop(None)
+
+
+def test_event_loop_helper_reuses_installed_loop_without_deprecation_warning():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            resolved = RedfishManager._event_loop()
+        assert resolved is loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+def test_event_loop_helper_preserves_installed_loop_on_early_supported_python(
+    monkeypatch,
+):
+    loop = asyncio.new_event_loop()
+    policy_calls = []
+
+    class Policy:
+        @staticmethod
+        def get_event_loop():
+            policy_calls.append(True)
+            return loop
+
+    def reject_direct_lookup():
+        raise AssertionError("direct loop lookup must not run on early Python")
+
+    monkeypatch.setattr(
+        redfish_manager_module,
+        "sys",
+        SimpleNamespace(version_info=(3, 10, 0)),
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop_policy",
+        lambda: Policy(),
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop",
+        reject_direct_lookup,
+    )
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            resolved = RedfishManager._event_loop()
+        assert resolved is loop
+        assert policy_calls == [True]
+    finally:
+        loop.close()
+
+
+def test_event_loop_helper_avoids_deprecated_policy_on_python_314(monkeypatch):
+    loop = asyncio.new_event_loop()
+
+    def reject_policy_lookup():
+        raise AssertionError("deprecated policy lookup must not run on Python 3.14")
+
+    monkeypatch.setattr(
+        redfish_manager_module,
+        "sys",
+        SimpleNamespace(version_info=(3, 14, 0)),
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop_policy",
+        reject_policy_lookup,
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop",
+        lambda: loop,
+    )
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            resolved = RedfishManager._event_loop()
+        assert resolved is loop
+    finally:
+        loop.close()
 
 
 def test_base_query_async_2xx_returns_command_result_data(monkeypatch):

@@ -363,9 +363,9 @@ def test_query_with_retry_recovers_from_transient_error(tmp_path, monkeypatch):
     must back off and retry rather than skip the resource.
     """
     monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
-    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "4")
-    monkeypatch.setenv("IDRAC_DISCOVERY_BACKOFF", "0")
-    monkeypatch.setenv("IDRAC_DISCOVERY_PACE_MS", "0")
+    monkeypatch.setenv("REDFISH_DISCOVERY_RETRIES", "4")
+    monkeypatch.setenv("REDFISH_DISCOVERY_BACKOFF", "0")
+    monkeypatch.setenv("REDFISH_DISCOVERY_PACE_MS", "0")
     disc, _ = _make_discovery(tmp_path, {})
 
     calls = {"n": 0}
@@ -387,8 +387,8 @@ def test_query_with_retry_recovers_from_transient_error(tmp_path, monkeypatch):
 def test_query_with_retry_raises_after_exhausting(tmp_path, monkeypatch):
     """When every attempt drops, the last transport error is raised."""
     monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
-    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "3")
-    monkeypatch.setenv("IDRAC_DISCOVERY_BACKOFF", "0")
+    monkeypatch.setenv("REDFISH_DISCOVERY_RETRIES", "3")
+    monkeypatch.setenv("REDFISH_DISCOVERY_BACKOFF", "0")
     disc, _ = _make_discovery(tmp_path, {})
 
     calls = {"n": 0}
@@ -401,7 +401,7 @@ def test_query_with_retry_raises_after_exhausting(tmp_path, monkeypatch):
 
     with pytest.raises(requests.exceptions.ConnectionError):
         disc._query_with_retry("/redfish/v1/X")
-    assert calls["n"] == 3  # exactly IDRAC_DISCOVERY_RETRIES attempts
+    assert calls["n"] == 3  # exactly REDFISH_DISCOVERY_RETRIES attempts
 
 
 def test_query_with_retry_does_not_retry_non_transport(tmp_path, monkeypatch):
@@ -411,7 +411,7 @@ def test_query_with_retry_does_not_retry_non_transport(tmp_path, monkeypatch):
     RedfishNotFound is terminal and must reach the caller's handler unchanged.
     """
     monkeypatch.setattr(cmd_discovery.time, "sleep", lambda *_a, **_k: None)
-    monkeypatch.setenv("IDRAC_DISCOVERY_RETRIES", "4")
+    monkeypatch.setenv("REDFISH_DISCOVERY_RETRIES", "4")
     disc, _ = _make_discovery(tmp_path, {})
 
     calls = {"n": 0}
