@@ -60,7 +60,7 @@ class SmcVirtualMediaMount(SupermicroManager,
                              help="path to the ISO on the share, e.g. /dl/ubuntu.iso")
         cmd_arg.add_argument('--share_user', required=False, type=str, default="",
                              help="CIFS share username (optional; renamed to avoid the "
-                                  "global --idrac_password/user collision)")
+                                  "global credential-option collision)")
         cmd_arg.add_argument('--share_pass', required=False, type=str, default="",
                              help="CIFS share password (optional)")
         cmd_arg.add_argument('--unmount', action='store_true', dest="do_unmount",

@@ -42,9 +42,9 @@ def test_fixed_split_leaves_stale_baseline(monkeypatch, capsys):
 
 
 def test_idrac_underscore_not_penalized(monkeypatch, capsys):
-    """A single underscore flag (--idrac_ip) is fine — only BOTH spellings of
+    """A single underscore flag (--data_only) is fine — only BOTH spellings of
     one concept violate, not the underscore convention itself."""
-    monkeypatch.setattr(gate, "_flags", lambda: {"--idrac_ip", "--idrac_username"})
+    monkeypatch.setattr(gate, "_flags", lambda: {"--data_only", "--json_only"})
     monkeypatch.setattr(gate, "_baseline", lambda: set())
     assert gate.main() == 0
 

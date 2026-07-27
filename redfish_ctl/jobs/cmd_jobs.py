@@ -183,7 +183,7 @@ class JobList(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_members}" \
+        r = f"{self._default_method}{self.redfish_ip}{self.idrac_members}" \
             f"/Jobs?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)

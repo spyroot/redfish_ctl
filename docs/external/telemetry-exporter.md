@@ -75,9 +75,10 @@ being polled at the same instant.
 ## Credentials
 
 For exporter runs, keep BMC credentials in environment variables or a gitignored runtime file. Do not
-put the password on argv; the exporter rejects `--password` and `--idrac_password`.
-Use `REDFISH_*` names for new files. Legacy `IDRAC_*` names remain accepted, but if both namespaces
-are present for the same credential, different values fail closed instead of choosing a silent winner.
+put the password on argv; the exporter rejects `--password`.
+Credential files accept only `REDFISH_IP`, `REDFISH_USERNAME`,
+`REDFISH_PASSWORD`, and `REDFISH_PORT`; vendor-specific endpoint keys are
+ignored.
 
 `redfish-exporter.env`, created by the operator before runtime and ignored by the repository's
 `*.env` rule, is a simple `KEY=VALUE` file:

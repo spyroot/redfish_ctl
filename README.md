@@ -59,8 +59,8 @@ export REDFISH_PASSWORD='your-password'
 # 3. Read something safe
 redfish_ctl --version                   # prints the installed version
 redfish_ctl sensors                     # shared DMTF sensor read
-redfish_ctl --vendor dell system        # Dell ComputerSystem read
-redfish_ctl --vendor dell system --yaml # same Dell data as YAML
+redfish_ctl system                      # shared DMTF ComputerSystem read
+redfish_ctl system --yaml               # same ComputerSystem data as YAML
 redfish_ctl --help                      # shared DMTF commands
 redfish_ctl --vendor supermicro --help  # DMTF + Supermicro commands
 ```
@@ -191,9 +191,7 @@ export REDFISH_PORT=443
 ```
 
 Any of these can be overridden per-invocation by a CLI flag. The canonical flags are
-`--host`, `--username`, `--password`, and `--port`; the legacy aliases
-`--idrac_ip`, `--idrac_username`, `--idrac_password`, and `--idrac_port` still work for
-existing scripts.
+`--host`, `--username`, `--password`, and `--port`.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.
@@ -206,11 +204,11 @@ Start with a shared DMTF sensor read:
 redfish_ctl sensors
 ```
 
-For a Dell host ComputerSystem, select the Dell manager explicitly. If you have
-`jq` installed, this is a compact smoke check:
+For the host ComputerSystem, this is a compact smoke check when `jq` is
+installed:
 
 ```bash
-redfish_ctl --vendor dell --nocolor system | jq '.data | {Id, Name, PowerState}'
+redfish_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
 ```
 
 ## Common Reads
@@ -324,7 +322,7 @@ First-run problems are almost always the connection, not the command:
 - [Corpus library](docs/external/corpus-library.md) - manifest-indexed Redfish corpus tarballs and pull-all extraction.
 - [Docker](docker/README.md) - production image and Linux offline-test image usage.
 - [Fixture capture](docs/external/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
-- [CI/CD](docs/external/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
+- [CI/CD](docs/external/ci.md) - authoritative GitLab merge gates plus supplemental GitHub checks and releases.
 - [Architecture](docs/external/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
 - [Telemetry metrics](docs/external/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.

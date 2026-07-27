@@ -2,17 +2,21 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Before trusting a change, clear any live iDRAC environment and run the offline suite:
+For merge authority, runner placement, and required gate evidence, see
+[CI/CD Pipeline](ci.md). Do not treat laptop commands as merge evidence.
+
+Inside that approved CI environment, clear live connection variables before
+the offline suite:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
+  pytest -q
 ruff check <changed>
 ```
 
-The CLI reads canonical `REDFISH_*` connection variables and accepts legacy
-`IDRAC_*` aliases. The dual-mode fixture can switch to live mode when either host
-variable is present, so unset both variable families for the default suite.
+The CLI reads only the canonical `REDFISH_*` connection variables. The
+dual-mode fixture switches to live mode when `REDFISH_IP` is present, so unset
+the canonical connection variables for the default suite.
 
 ## Which Lane To Use
 
@@ -28,7 +32,7 @@ Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock
 by default and against approved hardware when `REDFISH_IP` is set. Tests that require hardware are
 marked `@pytest.mark.live` and skip without that variable.
 
-For approved live hardware only:
+For approved live hardware from an authorized Kubernetes job only:
 
 ```bash
 REDFISH_IP=<idrac> \
@@ -82,13 +86,14 @@ source files are baked into the image.
 
 ## Coverage
 
-Coverage is not a default gate yet. When you need a local report, install `pytest-cov` in the active
-conda environment and keep the live variables unset:
+Coverage is not a default gate yet. When an approved Kubernetes job needs a
+report, install `pytest-cov` in the project conda environment and keep the live
+variables unset:
 
 ```bash
 python -m pip install pytest-cov
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest --cov=redfish_ctl
+  pytest --cov=redfish_ctl
 ```
 
 ## Fleet And Concurrency Tests

@@ -11,9 +11,11 @@ Author Mus <spyroot@gmail.com>
 import pytest
 
 from redfish_ctl.actions.cmd_action_list import ActionList
+from redfish_ctl.cmd_current_boot import GetCurrentBoot
 from redfish_ctl.cmd_exceptions import UnsupportedAction
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.ilo_manager import IloManager
+from redfish_ctl.network.cmd_nic_firmware import NicFirmware
 from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.supermico_manager import SupermicroManager
@@ -37,6 +39,10 @@ def test_dmtf_registry_is_populated_with_known_generic_command():
     assert registry, "command registry is unexpectedly empty"
     assert ApiRequestType.ActionList in registry
     assert registry[ApiRequestType.ActionList].get("action_list") is ActionList
+    assert registry[ApiRequestType.CurrentBoot].get(
+        "current_boot_query"
+    ) is GetCurrentBoot
+    assert registry[ApiRequestType.NicFirmware].get("nic-firmware") is NicFirmware
 
 
 def test_dell_registry_composes_dmtf_commands():

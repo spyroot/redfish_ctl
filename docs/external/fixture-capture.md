@@ -66,7 +66,7 @@ filtered `tests/supermicro_gb300_corpus.tar.gz` LFS tarball, or overlay sets lik
 
    ```bash
    env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-     -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD pytest -q
+     pytest -q
    ```
 
 ## Path B — Curated fixture set (a few resources → one test)
@@ -238,8 +238,7 @@ The test should assert the command contract:
 - URL path or action target used by the command.
 - POST or PATCH payload for mutating commands.
 - `CommandResult` shape and key fields for read-only commands.
-- No live BMC dependency when both canonical `REDFISH_IP` and legacy `IDRAC_IP`
-  are unset.
+- No live BMC dependency when canonical `REDFISH_IP` is unset.
 
 ### Verification Gate
 
@@ -248,7 +247,6 @@ cleared:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
   pytest -q
 
 ruff check \
@@ -263,10 +261,9 @@ For docs-only changes to this SOP, run:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
   pytest -q
 
-ruff check docs/fixture-capture.md
+ruff check docs/external/fixture-capture.md
 ```
 
 If the offline suite needs a live BMC, the fixture is not ready. Stop and record:

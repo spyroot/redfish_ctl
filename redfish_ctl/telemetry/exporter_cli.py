@@ -38,7 +38,7 @@ def register_exporter_subcommand(cls):
     cmd_parser.add_argument(
         "--credential-file", dest="exporter_credential_file", default=None, type=str,
         help="gitignored KEY=VALUE runtime file for "
-             "REDFISH_IP/USERNAME/PASSWORD/PORT (legacy IDRAC_* also accepted)")
+             "the canonical REDFISH_IP/USERNAME/PASSWORD/PORT keys")
     cmd_parser.add_argument(
         "--exporter-config", dest="exporter_config_file", default=None, type=str,
         help="JSON exporter config spec for SignalFx ingest/token source and "

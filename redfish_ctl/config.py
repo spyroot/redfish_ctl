@@ -3,8 +3,8 @@
 Application code must receive canonical configuration values from here; it must
 never call ``os.getenv``, index ``os.environ``, or call :func:`env_first`
 directly. Centralizing env access in one loader means one place defines every
-setting, its canonical ``REDFISH_*`` name, its deprecated ``IDRAC_*`` alias, and
-its default - instead of the value being re-derived at each call site.
+setting, its canonical ``REDFISH_*`` name, and its default instead of the value
+being re-derived at each call site.
 
 The canonical setting model is specs/config/settings.yaml. :func:`env_first` is
 the raw primitive the loader is built on; typed accessors
@@ -55,13 +55,6 @@ class EndpointConfig:
     password: str
     port: int
 
-
-_ENDPOINT_ENV_NAMES = {
-    "host": ("REDFISH_IP", "IDRAC_IP"),
-    "username": ("REDFISH_USERNAME", "IDRAC_USERNAME"),
-    "password": ("REDFISH_PASSWORD", "IDRAC_PASSWORD"),
-    "port": ("REDFISH_PORT", "IDRAC_PORT"),
-}
 
 # Exporter identity environment names are defined here so telemetry callers do
 # not read process environment state outside the canonical configuration loader.
@@ -436,43 +429,23 @@ def csdl_dir() -> Optional[str]:
     return os.environ.get("REDFISH_CSDL_DIR")
 
 
-def endpoint_conflict_fields() -> set[str]:
-    """Return endpoint fields whose canonical and legacy env values disagree.
-
-    :return: field names with conflicting endpoint environment values.
-    """
-    conflicts: set[str] = set()
-    for field, names in _ENDPOINT_ENV_NAMES.items():
-        try:
-            env_first(*names)
-        except ConfigurationConflict:
-            conflicts.add(field)
-    return conflicts
-
-
 def endpoint_defaults(strict: bool = True) -> EndpointConfig:
-    """Return endpoint defaults from canonical env vars and legacy aliases.
+    """Return endpoint defaults from the canonical environment variables.
 
-    The canonical REDFISH_* names are resolved first. Deprecated IDRAC_* names
-    remain accepted as aliases through :func:`env_first`.
-
-    :param strict: when True, conflicting env aliases raise; when False, the
-        canonical-first value is returned for parser defaults so explicit CLI
-        flags can still disambiguate.
+    :param strict: forwarded to :func:`env_first` for a consistent loader API.
     :return: endpoint defaults for the root CLI parser.
-    :raises ConfigurationConflict: when canonical and legacy env vars disagree.
-    :raises ValueError: when REDFISH_PORT/IDRAC_PORT is not an integer.
+    :raises ValueError: when REDFISH_PORT is not an integer.
     """
     return EndpointConfig(
-        host=env_first("REDFISH_IP", "IDRAC_IP", default="", strict=strict) or "",
+        host=env_first("REDFISH_IP", default="", strict=strict) or "",
         username=env_first(
-            "REDFISH_USERNAME", "IDRAC_USERNAME",
+            "REDFISH_USERNAME",
             default="root", strict=strict) or "",
         password=env_first(
-            "REDFISH_PASSWORD", "IDRAC_PASSWORD",
+            "REDFISH_PASSWORD",
             default="", strict=strict) or "",
         port=int(env_first(
-            "REDFISH_PORT", "IDRAC_PORT", default="443", strict=strict)),
+            "REDFISH_PORT", default="443", strict=strict)),
     )
 
 
@@ -493,13 +466,10 @@ class DmtfSimEndpoint:
 def required_dmtf_sim_endpoint() -> DmtfSimEndpoint:
     """Return the mandatory persistent DMTF simulator endpoint.
 
-    The DMTF CI lane requires the canonical ``REDFISH_*`` names. Deprecated
-    ``IDRAC_*`` aliases remain available to normal redfish_ctl callers, but they
-    must not become the CI contract between the builder and redfish_ctl.
+    The DMTF CI lane requires the canonical ``REDFISH_*`` names.
 
     :return: validated simulator host, port, and transport.
     :raises RuntimeError: when the endpoint is absent or malformed.
-    :raises ConfigurationConflict: when canonical and legacy values conflict.
     """
     # Fail explicitly when the builder did not supply the canonical contract.
     if "REDFISH_IP" not in os.environ:
@@ -514,12 +484,9 @@ def required_dmtf_sim_endpoint() -> DmtfSimEndpoint:
             "DMTF simulator Service port."
         )
 
-    # env_first preserves the repository-wide alias-conflict behavior.
-    host = (
-        env_first("REDFISH_IP", "IDRAC_IP", default=None, strict=True) or ""
-    ).strip()
+    host = (env_first("REDFISH_IP", default=None, strict=True) or "").strip()
     port_raw = (
-        env_first("REDFISH_PORT", "IDRAC_PORT", default=None, strict=True) or ""
+        env_first("REDFISH_PORT", default=None, strict=True) or ""
     ).strip()
 
     if not host:

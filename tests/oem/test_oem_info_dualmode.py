@@ -10,9 +10,9 @@ def test_oem_info_dualmode_reports_dell_oem_rows_without_mutation(
     monkeypatch,
 ):
     """oem-info reports Dell OEM extensions through the mock transport."""
-    monkeypatch.delenv("IDRAC_IP", raising=False)
-    monkeypatch.delenv("IDRAC_USERNAME", raising=False)
-    monkeypatch.delenv("IDRAC_PASSWORD", raising=False)
+    monkeypatch.delenv("REDFISH_IP", raising=False)
+    monkeypatch.delenv("REDFISH_USERNAME", raising=False)
+    monkeypatch.delenv("REDFISH_PASSWORD", raising=False)
     redfish_api = request.getfixturevalue("redfish_api")
     redfish_service = request.getfixturevalue("redfish_service")
 

@@ -17,9 +17,8 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.redfish_api_common import ApiRequestType, Singleton
-from redfish_ctl.redfish_manager import CommandResult
+from redfish_ctl.redfish_manager import CommandResult, RedfishManager
 from redfish_ctl.redfish_shared import RedfishApi
 
 

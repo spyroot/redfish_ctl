@@ -29,10 +29,10 @@ application:
   # both set to different values is a hard conflict). interpreted=true means the
   # app parses/branches on the value.
   canonical:
-    REDFISH_IP:                         {alias: IDRAC_IP,                        interpreted: true}
-    REDFISH_USERNAME:                   {alias: IDRAC_USERNAME,                  interpreted: false, default: root}
-    REDFISH_PASSWORD:                   {alias: IDRAC_PASSWORD,                  interpreted: false, secret: true}
-    REDFISH_PORT:                       {alias: IDRAC_PORT,                      interpreted: true,  default: "443"}
+    REDFISH_IP:                         {alias: null, interpreted: true}
+    REDFISH_USERNAME:                   {alias: null, interpreted: false, default: root}
+    REDFISH_PASSWORD:                   {alias: null, interpreted: false, secret: true}
+    REDFISH_PORT:                       {alias: null, interpreted: true, default: "443"}
     REDFISH_HTTP_TIMEOUT:               {alias: IDRAC_HTTP_TIMEOUT,              interpreted: true,  default: "30"}
     REDFISH_HTTP_POOL:                  {alias: IDRAC_HTTP_POOL,                 interpreted: true,  default: "4"}
     REDFISH_HTTP_RETRIES:               {alias: IDRAC_HTTP_RETRIES,              interpreted: true,  default: "3"}
@@ -72,10 +72,6 @@ application:
   # env_first. read_direct=true records a site that still reads the legacy name
   # with no REDFISH_ precedence (see gate C baseline).
   legacy_aliases:
-    IDRAC_IP:                         {canonical: REDFISH_IP,                         read_direct: true}
-    IDRAC_USERNAME:                   {canonical: REDFISH_USERNAME,                   read_direct: true}
-    IDRAC_PASSWORD:                   {canonical: REDFISH_PASSWORD,                   read_direct: true}
-    IDRAC_PORT:                       {canonical: REDFISH_PORT,                       read_direct: false}
     IDRAC_HTTP_TIMEOUT:               {canonical: REDFISH_HTTP_TIMEOUT,               read_direct: false}
     IDRAC_HTTP_POOL:                  {canonical: REDFISH_HTTP_POOL,                  read_direct: false}
     IDRAC_HTTP_RETRIES:               {canonical: REDFISH_HTTP_RETRIES,               read_direct: false}
@@ -172,6 +168,6 @@ system:
 # registered as canonical, added as an alias, or used by a wrapper script).
 # Append-only.
 retired:
-  IDRACK_IP:       {reason: "typo (extra K) in first-commit error text only; code always read IDRAC_IP; fixed in 25aa93b9. Reintroducing would tell users to set a variable the tool never reads."}
-  IDRACK_USERNAME: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_USERNAME"}
-  IDRACK_PASSWORD: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_PASSWORD"}
+  IDRACK_IP:       {reason: "extra-K typo in first-commit error text only; fixed in 25aa93b9"}
+  IDRACK_USERNAME: {reason: "same extra-K typo family; fixed in 25aa93b9"}
+  IDRACK_PASSWORD: {reason: "same extra-K typo family; fixed in 25aa93b9"}

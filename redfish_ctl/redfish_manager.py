@@ -17,6 +17,7 @@ import logging
 import threading
 import time
 import uuid
+import warnings
 from abc import abstractmethod
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -163,16 +164,22 @@ class RedfishManager:
     def _event_loop() -> asyncio.AbstractEventLoop:
         """Return a usable event loop for a synchronous caller.
 
-        ``asyncio.get_event_loop()`` used to create a loop implicitly when none existed. Python 3.12
-        deprecated that and 3.14 removed it, so on 3.14 it raises RuntimeError and every async path in
-        this client dies before sending anything. Creating the loop explicitly when there is none keeps
-        one behaviour across 3.10 through 3.14.
+        Reuse an installed thread loop when available; otherwise create and install
+        one. Keep all callers off deprecated event-loop policy APIs while shielding
+        older supported runtimes from their historical direct-lookup warning.
 
-        :return: the running loop when one exists, otherwise a new loop installed for this thread.
+        :return: the current loop when configured, otherwise a new loop installed
+            for this thread.
         :raises RuntimeError: never — the no-loop case is handled by creating one.
         """
         try:
-            return asyncio.get_event_loop_policy().get_event_loop()
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="There is no current event loop",
+                    category=DeprecationWarning,
+                )
+                return asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -460,12 +467,11 @@ class RedfishManager:
 
     @staticmethod
     def _pop_connection_value(
-            kwargs: dict, primary: str, legacy: str, internal: str):
-        """Pop a dispatch connection argument, accepting deprecated aliases.
+            kwargs: dict, primary: str, internal: str):
+        """Pop one canonical or private dispatch connection argument.
 
         :param kwargs: dispatch keyword arguments.
         :param primary: canonical keyword name.
-        :param legacy: deprecated alias keyword name.
         :param internal: private keyword used by sync dispatch to avoid
             colliding with subcommand-local ``host`` or ``port`` arguments.
         :return: the popped value.
@@ -473,21 +479,10 @@ class RedfishManager:
         """
         if internal in kwargs:
             value = kwargs.pop(internal)
-            kwargs.pop(legacy, None)
             if kwargs.get(primary) in (value, None):
                 kwargs.pop(primary, None)
             return value
-
-        if primary in kwargs:
-            value = kwargs.pop(primary)
-            legacy_value = kwargs.pop(legacy, None)
-            if value is not None:
-                return value
-            if legacy_value is not None:
-                return legacy_value
-            return value
-
-        return kwargs.pop(legacy)
+        return kwargs.pop(primary)
 
     @classmethod
     def invoke(cls,
@@ -500,19 +495,16 @@ class RedfishManager:
                       So we can register under same type sub-commands.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: command result returned by the registered command.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -546,19 +538,16 @@ class RedfishManager:
         :param name: a name.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: CommandResult.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -654,6 +643,14 @@ class RedfishManager:
                 return self._redfish_ip
 
     @property
+    def host(self) -> str:
+        """Return the canonical BMC host, including a non-default port.
+
+        :return: the normalized host used to build Redfish request URLs.
+        """
+        return self.redfish_ip
+
+    @property
     def username(self) -> str:
         """Redfish account username.
 
@@ -719,25 +716,29 @@ class RedfishManager:
                 "in the current state of the resources."
             )
 
-    @staticmethod
     async def async_default_error_handler(
-            response: requests.models.Response) -> bool:
-        """Default error handler for base query and redfish error code based on spec.
-        :param response:
-        :return:
+            self, response: requests.models.Response) -> RedfishApiRespond:
+        """Apply the synchronous Redfish status contract to an async GET.
+
+        :param response: completed async GET response.
+        :return: the shared Redfish response classification for a 2xx status.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on any other non-2xx status.
         """
-        if response.status_code >= 200 or response.status_code < 300:
-            return True
-        RedfishManager.redfish_error_handlers(response.status_code)
+        return self.default_error_handler(response)
 
     async def api_async_get_call(self, loop, req, hdr: Dict):
-        """Make api request either with x-auth authentication header or base authentication
-        to redfish endpoint.
+        """Await one GET without polling any server-side Task or Job.
+
+        Callers may schedule this coroutine concurrently across BMCs. Completion
+        means the HTTP response arrived; it never means a TaskService task or
+        vendor job reached a terminal state.
 
         :param loop: asyncio event loop
         :param req: request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
-        :return: request.
+        :return: completed HTTP response.
         """
         headers = {}
         headers.update(self.content_type)
@@ -750,6 +751,7 @@ class RedfishManager:
                 req,
                 verify=self._is_verify_cert,
                 headers=headers,
+                timeout=http_timeout(),
             )
         else:
             request_call = functools.partial(
@@ -757,8 +759,9 @@ class RedfishManager:
                 req,
                 verify=self._is_verify_cert,
                 auth=(self._username, self._password),
+                timeout=http_timeout(),
             )
-        return loop.run_in_executor(
+        return await loop.run_in_executor(
             None,
             tracing.traced_request_callable(req, "GET", request_call),
         )
@@ -875,7 +878,13 @@ class RedfishManager:
         return f"?$expand=*($levels={level})"
 
     async def api_async_get_until_complete(self, req: str, hdr: Dict, loop=None):
-        """Execute async get request
+        """Await and validate one GET transport response.
+
+        This helper waits only for the local HTTP request. Server-side Redfish
+        Task and vendor Job lifecycles remain separate and are polled by their
+        dedicated commands using the identifier returned by the write operation
+        that created the server-side work.
+
         :param req: api method caller request.
         :param hdr: dict: http/https header
         :param loop:  asyncio loop
@@ -884,8 +893,9 @@ class RedfishManager:
         if loop is None:
             loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
-        await self.async_default_error_handler(await response)
-        return await response
+        self.query_counter += 1
+        await self.async_default_error_handler(response)
+        return response
 
     @cached_property
     def _service_root(self):

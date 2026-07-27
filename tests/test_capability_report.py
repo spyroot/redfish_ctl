@@ -74,9 +74,6 @@ def test_capability_report_cli_runs_without_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
     ):
         env.pop(name, None)
 

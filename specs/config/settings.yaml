@@ -5,9 +5,10 @@
 # receives these values as config, e.g. config.protocol.request_timeout, never by
 # calling os.getenv/env_first at the point of use.
 #
-# Naming: the canonical env var is REDFISH_*; the IDRAC_* form is a deprecated
-# alias honored via env_first(REDFISH_X, IDRAC_X). Multi-word CLI flags use the
-# dash form (enforced by gate repo.arg-consistency).
+# Naming: the canonical env var is REDFISH_*. A deprecated alias is honored only
+# when specs/config/environment.yaml lists it explicitly; endpoint variables are
+# canonical-only. Multi-word CLI flags use the dash form (enforced by gate
+# repo.arg-consistency).
 #
 # status: implemented  = wired through config today
 #         partial      = value exists but under a different flag/env
