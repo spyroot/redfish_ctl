@@ -2,7 +2,6 @@
 
 import asyncio
 import warnings
-from types import SimpleNamespace
 
 import pytest
 
@@ -126,35 +125,20 @@ def test_event_loop_helper_reuses_installed_loop_without_deprecation_warning():
         asyncio.set_event_loop(None)
 
 
-def test_event_loop_helper_preserves_installed_loop_on_early_supported_python(
+def test_event_loop_helper_avoids_deprecated_policy_on_early_supported_python(
     monkeypatch,
 ):
     loop = asyncio.new_event_loop()
-    policy_calls = []
 
-    class Policy:
-        @staticmethod
-        def get_event_loop():
-            policy_calls.append(True)
-            return loop
-
-    def reject_direct_lookup():
-        raise AssertionError("direct loop lookup must not run on early Python")
-
-    monkeypatch.setattr(
-        redfish_manager_module,
-        "sys",
-        SimpleNamespace(version_info=(3, 10, 0)),
-    )
     monkeypatch.setattr(
         redfish_manager_module.asyncio,
         "get_event_loop_policy",
-        lambda: Policy(),
+        lambda: pytest.fail("deprecated policy lookup must not run"),
     )
     monkeypatch.setattr(
         redfish_manager_module.asyncio,
         "get_event_loop",
-        reject_direct_lookup,
+        lambda: loop,
     )
 
     try:
@@ -162,7 +146,6 @@ def test_event_loop_helper_preserves_installed_loop_on_early_supported_python(
             warnings.simplefilter("error", DeprecationWarning)
             resolved = RedfishManager._event_loop()
         assert resolved is loop
-        assert policy_calls == [True]
     finally:
         loop.close()
 
@@ -173,11 +156,6 @@ def test_event_loop_helper_avoids_deprecated_policy_on_python_314(monkeypatch):
     def reject_policy_lookup():
         raise AssertionError("deprecated policy lookup must not run on Python 3.14")
 
-    monkeypatch.setattr(
-        redfish_manager_module,
-        "sys",
-        SimpleNamespace(version_info=(3, 14, 0)),
-    )
     monkeypatch.setattr(
         redfish_manager_module.asyncio,
         "get_event_loop_policy",

@@ -1,4 +1,4 @@
-"""Audit: event-loop lookup stays centralized and version-gates policy APIs.
+"""Audit: event-loop lookup stays centralized and avoids policy APIs.
 
 get_event_loop() raises RuntimeError on Python 3.14 (in the CI matrix) when no
 loop is running, killing every async Redfish path before it sends anything. The
@@ -98,11 +98,7 @@ def _raw_module_get_event_loop_calls(path: pathlib.Path) -> list[int]:
 
 def _deprecated_policy_calls(path: pathlib.Path) -> list[int]:
     """Return disallowed ``asyncio.get_event_loop_policy()`` call lines."""
-    allowed = _allowed_helper_call_lines(path, "get_event_loop_policy")
-    return [
-        line for line in _asyncio_attr_call_lines(path, "get_event_loop_policy")
-        if line not in allowed
-    ]
+    return _asyncio_attr_call_lines(path, "get_event_loop_policy")
 
 
 def test_audit_detects_uncentralized_get_event_loop_and_deprecated_policy(tmp_path):
@@ -138,7 +134,7 @@ def test_no_module_uses_raw_get_event_loop():
 
 def test_shared_helper_contains_one_direct_event_loop_lookup():
     assert len(_asyncio_attr_call_lines(_LOOP_HELPER, "get_event_loop")) == 1
-    assert len(_asyncio_attr_call_lines(_LOOP_HELPER, "get_event_loop_policy")) == 1
+    assert len(_asyncio_attr_call_lines(_LOOP_HELPER, "get_event_loop_policy")) == 0
     assert _raw_module_get_event_loop_calls(_LOOP_HELPER) == []
     assert _deprecated_policy_calls(_LOOP_HELPER) == []
 
