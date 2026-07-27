@@ -3,8 +3,8 @@
 get_event_loop() raises RuntimeError on Python 3.14 (in the CI matrix) when no
 loop is running, killing every async Redfish path before it sends anything. The
 package routes loop resolution through RedfishManager._event_loop(). This test
-AST-scans the package and permits the helper's version-scoped lookups while
-failing if either appears elsewhere.
+AST-scans the package, permits the helper's single direct lookup, and rejects
+policy lookup everywhere.
 
 Author Mus spyroot@gmail.com
 """

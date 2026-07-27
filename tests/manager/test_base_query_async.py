@@ -125,10 +125,18 @@ def test_event_loop_helper_reuses_installed_loop_without_deprecation_warning():
         asyncio.set_event_loop(None)
 
 
-def test_event_loop_helper_avoids_deprecated_policy_on_early_supported_python(
+def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     monkeypatch,
 ):
     loop = asyncio.new_event_loop()
+
+    def historical_direct_lookup():
+        warnings.warn(
+            "There is no current event loop",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return loop
 
     monkeypatch.setattr(
         redfish_manager_module.asyncio,
@@ -138,7 +146,7 @@ def test_event_loop_helper_avoids_deprecated_policy_on_early_supported_python(
     monkeypatch.setattr(
         redfish_manager_module.asyncio,
         "get_event_loop",
-        lambda: loop,
+        historical_direct_lookup,
     )
 
     try:
@@ -148,6 +156,22 @@ def test_event_loop_helper_avoids_deprecated_policy_on_early_supported_python(
         assert resolved is loop
     finally:
         loop.close()
+
+
+def test_event_loop_helper_does_not_hide_unrelated_deprecation(monkeypatch):
+    def unrelated_warning():
+        warnings.warn("unrelated asyncio deprecation", DeprecationWarning, stacklevel=2)
+
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop",
+        unrelated_warning,
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning, match="unrelated asyncio deprecation"):
+            RedfishManager._event_loop()
 
 
 def test_event_loop_helper_avoids_deprecated_policy_on_python_314(monkeypatch):

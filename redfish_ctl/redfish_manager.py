@@ -17,6 +17,7 @@ import logging
 import threading
 import time
 import uuid
+import warnings
 from abc import abstractmethod
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -164,14 +165,21 @@ class RedfishManager:
         """Return a usable event loop for a synchronous caller.
 
         Reuse an installed thread loop when available; otherwise create and install
-        one. Keep all callers off deprecated event-loop policy APIs.
+        one. Keep all callers off deprecated event-loop policy APIs while shielding
+        older supported runtimes from their historical direct-lookup warning.
 
         :return: the current loop when configured, otherwise a new loop installed
             for this thread.
         :raises RuntimeError: never — the no-loop case is handled by creating one.
         """
         try:
-            return asyncio.get_event_loop()
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="There is no current event loop",
+                    category=DeprecationWarning,
+                )
+                return asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
