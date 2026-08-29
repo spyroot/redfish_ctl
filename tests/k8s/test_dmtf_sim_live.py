@@ -10,14 +10,14 @@ the product-neutral ``RedfishManager`` lens is the one under test — no vendor
 ``is_http`` (a URL is derived locally when a raw request needs one; no second
 environment variable, no full URL passed to redfish_ctl).
 
-    redfish_ctl --ip "$REDFISH_IP" --port "$REDFISH_PORT" --use-http metric-definitions
+    redfish_ctl --host "$REDFISH_IP" --port "$REDFISH_PORT" --use-http metric-definitions
 
 Author Mus spyroot@gmail.com
 """
 import pytest
 import requests
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import RedfishManager
 
 pytestmark = pytest.mark.dmtf_sim_live
@@ -42,7 +42,7 @@ def test_metric_definitions_from_persistent_sim(dmtf_sim_endpoint):
         is_http=dmtf_sim_endpoint.is_http,
     )
     result = manager.sync_invoke(
-        ApiRequestType.MetricReportDefinitions,
+        ApiRequestType.SupermicroMetricReportDefinitions,
         "metric-definitions",
     )
     assert result.error is None

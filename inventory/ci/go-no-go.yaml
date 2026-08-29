@@ -1,0 +1,111 @@
+# Schema-backed merge-readiness profile. Gate identities come from
+# gates/manifest.yaml; scripts/check.sh is their guarded Kubernetes entrypoint.
+apiVersion: standards.spyroot.dev/v1alpha1
+kind: GoNoGoProfile
+metadata:
+  name: redfish_ctl
+
+spec:
+  targetBranch: main
+
+  standards:
+    bindingFile: standards-binding.yaml
+    requireExactRevision: true
+
+  environment:
+    manager: conda
+    file: environment.yml
+    nameFromFile: true
+    explicitName: ""
+    createOrUpdateAllowed: false
+
+  checks:
+    # These focused checks require explicit per-gate evidence. They do not
+    # replace the separate exact-commit gate-merge status required by spec.ci.
+    required:
+      - id: unit.all
+        kind: command
+        command:
+          - ./scripts/check.sh
+          - --profile
+          - merge
+          - --gate
+          - unit.all
+        timeoutSeconds: 1800
+        offline: true
+        warningsAllowed: 0
+        skippedRequiredTestsAllowed: 0
+
+      - id: repo.format
+        kind: command
+        command:
+          - ./scripts/check.sh
+          - --profile
+          - merge
+          - --gate
+          - repo.format
+        timeoutSeconds: 600
+        offline: true
+        findingsAllowed: 0
+
+      - id: meta.gate-registry
+        kind: command
+        command:
+          - ./scripts/check.sh
+          - --profile
+          - merge
+          - --gate
+          - meta.gate-registry
+        timeoutSeconds: 120
+        offline: true
+
+    optional: []
+
+  ci:
+    requiredForMerge: true
+    exactCommitRequired: true
+    requiredContext: gate-merge
+    requireStatusReadback: true
+    smokeRequiredFor:
+      - publish
+      - mirror
+      - promotion
+      - deploy
+      - apply
+
+  safety:
+    defaultOffline: true
+    forbiddenWithoutCurrentApproval:
+      - live-hardware
+      - live-cluster
+      - external-api
+      - real-credentials
+      - package-install
+      - environment-update
+      - deployment
+      - publication
+      - promotion
+      - destructive-operation
+
+  architecture:
+    rules: []
+
+  ownership:
+    authorityFiles: []
+    treatAuthorityAsSecretClass: true
+
+  documentation:
+    requiredFiles:
+      - README.md
+      - docs/external/ci.md
+    requireSafetyWarningsForProtectedActions: true
+    requireSetupAndExpectedOutputForNewUserFlows: true
+
+  secrets:
+    requirePublicBoundaryScan: true
+    forbiddenTrackedGlobs:
+      - "*.env"
+      - "*.pem"
+      - "*.key"
+      - "*kubeconfig*"
+      - ".internal/**"

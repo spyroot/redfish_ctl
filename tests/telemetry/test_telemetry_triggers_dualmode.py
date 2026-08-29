@@ -2,7 +2,7 @@
 
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -12,7 +12,7 @@ def test_telemetry_triggers_returns_hpe_threshold_rows_without_mutation(
     """telemetry-triggers reads HPE Trigger rows and never mutates the BMC."""
     manager, service = redfish_mock_factory("hpe")
 
-    result = manager.sync_invoke(ApiRequestType.Triggers, "telemetry-triggers")
+    result = manager.sync_invoke(ApiRequestType.SupermicroTriggers, "telemetry-triggers")
 
     assert isinstance(result, CommandResult)
     assert isinstance(result.data, list)

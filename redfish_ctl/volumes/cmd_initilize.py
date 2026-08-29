@@ -11,12 +11,11 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class VolumeInit(IDracManager,
+class VolumeInit(RedfishManager,
                  scm_type=ApiRequestType.VolumeInit,
                  name='chassis_service_query',
                  metaclass=Singleton):

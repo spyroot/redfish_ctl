@@ -82,6 +82,11 @@ def apply_merge_patch(target, patch):
     return result
 
 
+def _conditions_by_type(status: dict) -> dict[str, dict]:
+    """Index Kubernetes status conditions by type."""
+    return {item["type"]: item for item in status["conditions"]}
+
+
 class FakeApiServer:
     """In-memory RedfishEndpoint store with optimistic-concurrency status writes."""
 
@@ -244,16 +249,25 @@ class FakeSession:
 
 
 class FakeManager:
-    """Stand-in for IDracManager: records creds and a closable session."""
+    """Stand-in for the manager boundary: records creds and a closable session."""
 
-    def __init__(self, *, registry, behaviors, hang_event, idrac_ip, idrac_username,
-                 idrac_password, **_):
-        self.address = idrac_ip
-        self.username = idrac_username
-        self.password = idrac_password
-        self.behavior = behaviors.get(idrac_ip, "ok")
+    def __init__(
+        self,
+        *,
+        registry,
+        behaviors,
+        hang_event,
+        host,
+        username,
+        password,
+        **_,
+    ):
+        self.address = host
+        self.username = username
+        self.password = password
+        self.behavior = behaviors.get(host, "ok")
         self._hang_event = hang_event
-        self._session_cache = FakeSession(registry, idrac_ip)
+        self._session_cache = FakeSession(registry, host)
 
 
 def _address_temp(address: str) -> float:
@@ -381,7 +395,7 @@ def test_200_endpoints_reconcile_concurrently_without_cross_contamination(monkey
         address = f"bmc-{i:03d}"
         assert status["powerState"] == address, f"{name} got another BMC's power state"
         assert status["temperature"]["maxCelsius"] == float(i)
-        assert status["conditions"][0]["status"] == "True"
+        assert _conditions_by_type(status)["Ready"]["status"] == "True"
         assert status["consecutiveFailures"] == 0
 
     # Shared client: one config load for the whole fleet; one secret read per CR.
@@ -416,7 +430,7 @@ def test_conflict_on_status_write_is_retried_not_dropped(monkeypatch, module):
     status = server.status_of("fleet", "node-x")
     # The retried poll's result is what landed — status was persisted, not dropped.
     assert status["powerState"] == "bmc-042"
-    assert status["conditions"][0]["status"] == "True"
+    assert _conditions_by_type(status)["Ready"]["status"] == "True"
 
 
 def test_failing_bmc_does_not_starve_pool_or_leak_sockets(monkeypatch, module):
@@ -440,11 +454,14 @@ def test_failing_bmc_does_not_starve_pool_or_leak_sockets(monkeypatch, module):
 
     healthy = server.status_of("fleet", "node-000")
     assert healthy["powerState"] == "bmc-000"
-    assert healthy["conditions"][0]["status"] == "True"
+    assert _conditions_by_type(healthy)["Ready"]["status"] == "True"
 
     failed = server.status_of("fleet", "node-005")
-    assert failed["conditions"][0]["status"] == "False"
-    assert failed["conditions"][0]["reason"] == "BMCUnreachable"
+    failed_conditions = _conditions_by_type(failed)
+    assert failed_conditions["Reachable"]["status"] == "False"
+    assert failed_conditions["Reachable"]["reason"] == "BMCUnreachable"
+    assert failed_conditions["Ready"]["status"] == "False"
+    assert failed_conditions["Ready"]["reason"] == "BMCUnreachable"
     assert failed["consecutiveFailures"] == 1
     assert failed["nextPollAfter"]  # backoff recorded
     assert "powerState" not in failed  # no readings written on failure
@@ -554,7 +571,10 @@ def test_secret_rotation_mid_poll_uses_consistent_snapshot(monkeypatch, module):
     reconcile_once(module, server, "fleet", "node-rot")
     assert built[-1].password == "new-pw"  # poll 2 picks up the rotated Secret
 
-    assert server.status_of("fleet", "node-rot")["conditions"][0]["status"] == "True"
+    assert (
+        _conditions_by_type(server.status_of("fleet", "node-rot"))["Ready"]["status"]
+        == "True"
+    )
     assert registry.opened == registry.closed == 2  # no leaked session across rotation
 
 
@@ -587,7 +607,8 @@ def test_1000_endpoint_fleet_stress_bounded_calls_and_no_leaks(monkeypatch, modu
     assert counters["secret_reads"] == fleet
     # Every endpoint got a healthy status.
     assert all(
-        server.status_of("fleet", name)["conditions"][0]["status"] == "True"
+        _conditions_by_type(server.status_of("fleet", name))["Ready"]["status"]
+        == "True"
         for name in names
     )
 
@@ -617,7 +638,7 @@ def test_transient_read_failure_retains_prior_good_readings(monkeypatch, module)
     good = server.status_of("fleet", "node-flap")
     assert good["powerState"] == "bmc-007"
     assert good["temperature"]["maxCelsius"] == 7.0
-    assert good["conditions"][0]["status"] == "True"
+    assert _conditions_by_type(good)["Ready"]["status"] == "True"
 
     # Poll 2: the thermal read raises mid-poll.
     def boom_thermal(manager):
@@ -632,6 +653,8 @@ def test_transient_read_failure_retains_prior_good_readings(monkeypatch, module)
     assert after["temperature"]["maxCelsius"] == 7.0
     assert after["lastPolled"] == good["lastPolled"]  # not advanced by the failure
     # ...while the failure is surfaced, not silent.
-    assert after["conditions"][0]["status"] == "False"
+    after_conditions = _conditions_by_type(after)
+    assert after_conditions["Reachable"]["status"] == "False"
+    assert after_conditions["Ready"]["status"] == "False"
     assert after["consecutiveFailures"] == 1
     assert after["lastError"] == "thermal read failed"

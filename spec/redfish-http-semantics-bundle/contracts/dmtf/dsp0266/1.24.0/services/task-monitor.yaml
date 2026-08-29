@@ -1,0 +1,121 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-task-monitor
+spec:
+  rules:
+    - id: task.operation.accepted
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["8.3", "12.2"]
+        statement: asynchronous-operation-accepted
+        wording: shall
+      match:
+        exchange:
+          responder: redfish_service
+        condition:
+          processingState: pending
+      expect:
+        status:
+          accept: {matcher: exact, values: [202]}
+          emit: 202
+        headers:
+          Location:
+            presence: required
+            semantic: task_monitor_uri
+          Retry-After:
+            presence: optional
+        body:
+          presence: recommended
+          ifPresent:
+            schema: Task
+      effects:
+        operationState: pending
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: task.monitor.pending
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.2"]
+        statement: task-monitor-pending-poll
+        wording: shall
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: GET
+          target:
+            kind: task_monitor
+        condition:
+          processingState: pending
+      expect:
+        status:
+          accept: {matcher: exact, values: [202]}
+          emit: 202
+        headers:
+          Location:
+            presence: required
+            semantic: task_monitor_uri
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: task.monitor.completed
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.2"]
+        statement: task-monitor-completed-replays-initial-response
+        wording: shall
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: GET
+          target:
+            kind: task_monitor
+        condition:
+          processingState: completed
+      expect:
+        response:
+          status: initial_operation_final_status
+          headers: initial_operation_final_headers
+          body: initial_operation_final_body
+        examples:
+          postCreate: 201
+          mostOtherOperations: 200
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: task.monitor.expired
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.2"]
+        statement: completed-task-monitor-no-longer-retained
+        wording: may
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: GET
+          target:
+            kind: task_monitor
+        condition:
+          processingState: completed
+          monitorRetained: false
+      expect:
+        status:
+          accept: {matcher: one_of, values: [404, 410]}
+      normative:
+        strength: permitted
+        keyword: may

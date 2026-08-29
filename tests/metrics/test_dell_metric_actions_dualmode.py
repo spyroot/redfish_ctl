@@ -7,7 +7,7 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.metrics.cmd_dell_metric_actions import DellMetricActions
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -62,9 +62,9 @@ def dell_metric_manager():
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-metric",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-metric",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

@@ -1,14 +1,14 @@
 """Dual-mode tests for the storage-controllers query command (storage_query).
 
 Runs offline by default against the mock service and against real hardware when
-IDRAC_IP is set. storage_query is a pure read: it GETs the ``{system}/Storage``
+REDFISH_IP is set. storage_query is a pure read: it GETs the ``{system}/Storage``
 collection and returns the controller ids plus their Redfish URIs, so the tests
 also assert the command never issues a mutating request and stays vendor-neutral
 (no Dell ``JID_`` literal leaks into a read result).
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _CONTROLLER = "RAID.Integrated.1-1"

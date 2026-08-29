@@ -1,19 +1,10 @@
 """Meta-gate: enforce that the gate registry and pipeline stay internally consistent.
 
-Reads ``gates/manifest.yaml`` (the single registry of every mandatory gate) and fails the
-build when the pipeline could silently skip, misroute, or mis-classify a gate.
-It is itself registered as the ``repo.meta`` gate and is run in CI via
-``tests/test_gate_meta.py``. Checks (a check whose inputs do not exist yet — no
-``.gitlab-ci.yml``, no ``modules/`` — is reported as skipped, not failed):
-
-    1. every required gate's command file exists
-    2. every required gate's command file is executable
-    3. every mandatory gate ID is present in the registry
-    4. no GitLab job uses ``allow_failure: true``
-    5. every GitLab CI job carries the ``homelab-k8s`` runner tag
-    6. every module exposes validate/plan/apply/verify/rollback
-    7. any module (or gate) that applies also has verify AND rollback
-    8. no live-apply (``mutates: true``) job is reachable in a merge-request pipeline
+Reads ``gates/manifest.yaml`` (the single registry of every mandatory gate) and
+fails when registry, command, pipeline, runner, or mutation-safety contracts can
+silently drift. It is registered as ``meta.gate-registry`` and covered by
+``tests/gates/``. Checks whose optional inputs do not exist yet are reported as
+skipped rather than failed.
 
     python tools/gate_meta.py            # exit 0 = consistent, 1 = a check failed
 """
@@ -199,6 +190,9 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     for required in required_jobs:
         if required not in real_jobs:
             failures.append(f"required GitLab job missing: {required}")
+    for diagnostic in registry.get("diagnostic_jobs") or []:
+        if diagnostic not in real_jobs:
+            failures.append(f"diagnostic GitLab job missing: {diagnostic}")
     return failures, True
 
 

@@ -1,8 +1,9 @@
-"""Offline tests for the config-loader ratchet gate.
+"""Offline tests for the config-loader ban gate.
 
 The gate (tools/config_loader_gate.py) forbids a raw env read outside the loader
-(redfish_ctl/config.py), grandfathers existing reads, and demands a migrated
-read leave the baseline. Driven by monkeypatching the violation/baseline sets.
+(redfish_ctl/config.py). It is a plain ban with NO baseline: any scattered read
+fails, and every read must live in the loader. Driven by monkeypatching the
+violation set.
 
 Author Mus spyroot@gmail.com
 """
@@ -21,30 +22,22 @@ def test_import_line_not_matched():
     assert not gate._READ.search("from .config import env_first as env_first")
 
 
-def test_new_read_outside_loader_fails(monkeypatch, capsys):
-    """A read not in the baseline fails and is reported with its location."""
+def test_read_outside_loader_fails(monkeypatch, capsys):
+    """Any read outside the loader fails and is reported with its location.
+
+    There is no baseline, so a single scattered read is enough to fail the gate.
+    """
     monkeypatch.setattr(gate, "_violations", lambda: ["redfish_ctl/cmd_x.py:9"])
-    monkeypatch.setattr(gate, "_baseline", lambda: set())
     assert gate.main() == 1
     assert "cmd_x.py:9" in capsys.readouterr().out
 
 
-def test_baselined_read_allowed(monkeypatch):
-    """A grandfathered read passes."""
-    monkeypatch.setattr(gate, "_violations", lambda: ["redfish_ctl/cmd_x.py:9"])
-    monkeypatch.setattr(gate, "_baseline", lambda: {"redfish_ctl/cmd_x.py:9"})
+def test_no_scattered_reads_passes(monkeypatch):
+    """With no read outside the loader, the gate passes."""
+    monkeypatch.setattr(gate, "_violations", lambda: [])
     assert gate.main() == 0
 
 
-def test_migrated_read_leaves_stale_baseline(monkeypatch, capsys):
-    """Once a read is migrated into the loader, its baseline entry is stale and
-    the gate demands removal — the ratchet only tightens."""
-    monkeypatch.setattr(gate, "_violations", lambda: [])
-    monkeypatch.setattr(gate, "_baseline", lambda: {"redfish_ctl/cmd_x.py:9"})
-    assert gate.main() == 1
-    assert "stale" in capsys.readouterr().out.lower()
-
-
 def test_real_repo_gate_is_clean():
-    """The shipped baseline covers the real repo — main() returns 0."""
+    """Every env read lives in the loader, so main() returns 0 on the real repo."""
     assert gate.main() == 0

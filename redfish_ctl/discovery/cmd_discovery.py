@@ -18,10 +18,9 @@ from typing import Optional
 
 import requests
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
-from ..redfish_shared import env_first
+from ..config import discovery_backoff, discovery_pace_ms, discovery_retries
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 # Upper bound on how deep recursive_discovery will walk below a top-level
 # resource. Real Redfish trees are far shallower than this; the bound exists
@@ -69,7 +68,7 @@ def _write_json_atomic(path: str, payload: dict) -> None:
 LOG_ENTRY_MEMBER_RE = re.compile(r"/LogServices/[^/]+/Entries/.+")
 
 
-class Discovery(IDracManager,
+class Discovery(RedfishManager,
                 scm_type=ApiRequestType.Discovery,
                 name='discovery',
                 metaclass=Singleton):
@@ -121,7 +120,7 @@ class Discovery(IDracManager,
         cmd_parser.add_argument(
             '--network', required=False, dest='scan_network', type=str, default=None,
             help="scan a network segment (CIDR, e.g. 192.168.254.0/24) for Redfish "
-                 "BMCs instead of crawling one host; needs no idrac_ip/credentials")
+                 "BMCs instead of crawling one host; needs no target host/credentials")
         cmd_parser.add_argument(
             '--port', required=False, dest='scan_port', type=int, default=443,
             help="with --network: HTTPS port to probe (default 443)")
@@ -218,12 +217,9 @@ class Discovery(IDracManager,
         :return: the ``base_query`` CommandResult.
         :raises: the last transport exception if all attempts fail.
         """
-        attempts = max(1, int(env_first(
-            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
-        backoff = float(env_first(
-            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
-        pace = float(env_first(
-            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+        attempts = max(1, int(discovery_retries()))
+        backoff = float(discovery_backoff())
+        pace = float(discovery_pace_ms()) / 1000.0
         last_exc = None
         for attempt in range(attempts):
             try:
@@ -255,12 +251,9 @@ class Discovery(IDracManager,
         :return: ``(int status_code, body, Optional[str] allow_header)``.
         :raises: the last transport exception if every attempt fails.
         """
-        attempts = max(1, int(env_first(
-            "REDFISH_DISCOVERY_RETRIES", "IDRAC_DISCOVERY_RETRIES", default="4")))
-        backoff = float(env_first(
-            "REDFISH_DISCOVERY_BACKOFF", "IDRAC_DISCOVERY_BACKOFF", default="2.0"))
-        pace = float(env_first(
-            "REDFISH_DISCOVERY_PACE_MS", "IDRAC_DISCOVERY_PACE_MS", default="0")) / 1000.0
+        attempts = max(1, int(discovery_retries()))
+        backoff = float(discovery_backoff())
+        pace = float(discovery_pace_ms()) / 1000.0
         req = f"{self._default_method}{self.redfish_ip}{resource_path}"
         last_exc = None
         for attempt in range(attempts):

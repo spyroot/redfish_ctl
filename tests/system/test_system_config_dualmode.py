@@ -4,11 +4,24 @@ import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system_config import ExportSystemConfig
 from redfish_ctl.system.cmd_system_import import ImportSystemConfig  # noqa: F401
 from redfish_ctl.system.cmd_system_one_time_boot import ImportOneTimeBoot  # noqa: F401
+
+
+class _JsonJobResponse:
+    """Accepted Dell response that carries its job id only in JSON."""
+
+    status_code = 202
+    headers = {}
+    text = '{"id": "JID_JSON_ONLY"}'
+
+    @staticmethod
+    def json():
+        """Return the Dell response body."""
+        return {"id": "JID_JSON_ONLY"}
 
 
 def test_system_export_posts_expected_payload_in_mock_mode(
@@ -67,6 +80,41 @@ def test_one_time_boot_import_rejects_invalid_shutdown_type_before_post(
         )
 
     assert all(request.method != "POST" for request in redfish_service.requests)
+
+
+def test_one_time_boot_uses_json_job_id_when_location_is_absent(
+    redfish_mock,
+    monkeypatch,
+    tmp_path,
+):
+    """The Dell JSON job-id fallback is assigned and used for task polling."""
+    config = tmp_path / "system.xml"
+    config.write_text("<SystemConfiguration />")
+    task_state = {"TaskState": "Completed", "TaskStatus": "OK"}
+    fetched = []
+
+    monkeypatch.setattr(
+        ImportOneTimeBoot,
+        "api_post_call",
+        lambda *_args, **_kwargs: _JsonJobResponse(),
+    )
+
+    def fetch_task(self, job_id):
+        fetched.append(job_id)
+        return task_state
+
+    monkeypatch.setattr(ImportOneTimeBoot, "fetch_task", fetch_task)
+
+    result = redfish_mock.sync_invoke(
+        ApiRequestType.ImportOneTimeBoot,
+        "import_sysconfig",
+        config=str(config),
+        shutdown_type="Graceful",
+        host_power_state="Off",
+    )
+
+    assert fetched == ["JID_JSON_ONLY"]
+    assert result.data == task_state
 
 
 def test_system_import_missing_config_rejects_before_post(

@@ -6,7 +6,8 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_main import create_cmd_tree
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -48,7 +49,7 @@ def test_query_idrac_returns_requested_resource(redfish_api):
 def test_get_command_is_registered_with_positional_uri():
     """get registers as an operator-friendly alias for raw URI reads."""
     parser = argparse.ArgumentParser()
-    commands = create_cmd_tree(parser)
+    commands = create_cmd_tree(parser, IDracManager)
 
     assert "get" in commands
     parsed = parser.parse_args(["get", SYSTEM_RESOURCE])
