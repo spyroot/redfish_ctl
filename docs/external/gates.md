@@ -77,6 +77,11 @@ API-scoped token. Run it only in the configured protected CI environment:
 python -m tools.splunk_full_coverage_gate --token-env SPLUNK_API_TOKEN
 ```
 
+For exact-revision fleet verification, use the build identity check documented in
+[Telemetry metrics](telemetry-metrics.md#build-identity-and-fleet-read-back). It requires
+the complete host inventory and fails on missing, stale, or mixed `hw.build_info`
+identities.
+
 See [Telemetry metrics](telemetry-metrics.md#scheduled-splunk-liveness) for
 `always_on` and `condition_gated` semantics.
 

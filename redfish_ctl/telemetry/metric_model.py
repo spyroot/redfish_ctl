@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Mapping, Optional
 
 METRIC_KINDS = frozenset({"gauge", "counter", "cumulative_counter"})
+METRIC_AVAILABILITY = frozenset({"self", "baseline", "capability", "event"})
 
 
 @dataclass(frozen=True)
@@ -28,11 +29,17 @@ class MetricDefinition:
     family: str = "telemetry"
     dimensions: tuple[str, ...] = ()
     liveness: str = "signal"
+    availability: str = "baseline"
+    profile_required: bool = False
 
     def __post_init__(self) -> None:
         """Validate and normalize the immutable definition."""
         if self.kind not in METRIC_KINDS:
             raise ValueError(f"unknown metric kind {self.kind!r} for {self.name}")
+        if self.availability not in METRIC_AVAILABILITY:
+            raise ValueError(
+                f"unknown availability {self.availability!r} for {self.name}"
+            )
         if not self.prometheus_name:
             object.__setattr__(self, "prometheus_name", self.name)
         object.__setattr__(self, "dimensions", tuple(self.dimensions))
@@ -57,7 +64,9 @@ def _definition(
         description: str = "",
         family: str = "telemetry",
         dimensions: tuple[str, ...] = (),
-        liveness: str = "signal") -> MetricDefinition:
+        liveness: str = "signal",
+        availability: str = "baseline",
+        profile_required: bool = False) -> MetricDefinition:
     """Construct a catalog definition with concise defaults.
 
     :param name: exported metric name.
@@ -67,6 +76,8 @@ def _definition(
     :param family: broad metric family used by specs and docs.
     :param dimensions: expected dimension keys for this metric family.
     :param liveness: liveness role, usually ``signal`` or ``scrape``.
+    :param availability: inherent availability class from the telemetry catalog.
+    :param profile_required: whether deployment profiles must require the metric.
     :return: immutable MetricDefinition.
     """
     return MetricDefinition(
@@ -77,4 +88,6 @@ def _definition(
         family=family,
         dimensions=dimensions,
         liveness=liveness,
+        availability=availability,
+        profile_required=profile_required,
     )

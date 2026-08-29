@@ -5,6 +5,7 @@ DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile"
 DOCKER_README = REPO_ROOT / "docker" / "README.md"
 README = REPO_ROOT / "README.md"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+MAKEFILE = REPO_ROOT / "Makefile"
 
 
 def _effective_ignore_rules(path: Path) -> list[str]:
@@ -53,6 +54,19 @@ def test_production_dockerfile_header_shows_safe_runtime_examples() -> None:
     assert "REDFISH_PASSWORD=" not in dockerfile
     assert ("IDRAC_" + "PASSWORD=") not in dockerfile
     assert "DOCKERHUB_TOKEN" not in dockerfile
+
+
+def test_production_dockerfile_preserves_injected_build_revision() -> None:
+    """The production image exposes its source revision to runtime telemetry."""
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+
+    assert "ARG REDFISH_BUILD_REVISION=unknown" in dockerfile
+    assert "REDFISH_BUILD_REVISION=${REDFISH_BUILD_REVISION}" in dockerfile
+    assert "org.opencontainers.image.revision=${REDFISH_BUILD_REVISION}" in dockerfile
+
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    assert "BUILD_REVISION ?= $(shell git rev-parse --verify HEAD" in makefile
+    assert '--build-arg REDFISH_BUILD_REVISION="$(BUILD_REVISION)"' in makefile
 
 
 def test_docker_docs_link_the_production_image_usage() -> None:

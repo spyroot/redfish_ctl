@@ -204,19 +204,32 @@ The gate computes `expected signals − emitted signals` over the fixtures and r
 
 ### R1 — Exporter self-signals
 
-```
-hw.scrape.source.ok{source="thermal"} 0|1
-hw.scrape.source.duration_seconds{source="thermal"}
-hw.scrape.source.errors_total{source="thermal", error_class="timeout"}
-hw.scrape.sources_attempted
-hw.scrape.sources_succeeded
-hw.scrape.sources_failed
-hw.scrape.bmc_requests_total{method="GET", source="thermal", status_class="2xx"}
+```text
+redfish_exporter_scrape_success 0|1
+redfish_exporter_scrape_partial 0|1
+redfish_exporter_scrape_duration_seconds
+redfish_exporter_last_success_timestamp_seconds
+redfish_exporter_collector_success{collector="thermal"} 0|1
+redfish_exporter_collector_supported{collector="thermal"} 0|1
+redfish_exporter_collector_duration_seconds{collector="thermal"}
+redfish_exporter_collector_samples{collector="thermal"}
+redfish_exporter_collection_errors_total{collector="thermal", error="timeout"}
+hw.scrape.ok 0|1
+hw.scrape.duration_seconds
+hw.bmc.up 0|1
+hw.build_info{commit="<build-revision>", version="<package-version>",
+              schema_contract_version="<catalog-version>"} 1
 ```
 
-Gate: every listed self-signal is emitted each scrape cycle and covered by the same
-fixture-driven expected-signal check as M2; a per-source failure changes
-`hw.scrape.source.ok` for that source only.
+Gate: scrape-level signals are emitted every cycle. Collector signals are emitted for
+each attempted collector, and `redfish_exporter_collection_errors_total` is emitted for
+observed collector/error pairs. Fixture-driven checks require metric definitions and
+samples to agree across the supported output backends.
+
+Deployment currency is a profile-required extension of this gate. It must verify the
+complete host inventory at one exact build revision and telemetry catalog version.
+Operational inputs and read-back steps live in
+[Telemetry metrics](../../docs/external/telemetry-metrics.md#build-identity-and-fleet-read-back).
 
 ### R2 — Push-loop survival
 

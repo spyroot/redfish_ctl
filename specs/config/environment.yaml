@@ -55,6 +55,13 @@ application:
     REDFISH_EXPORTER_SERVICE_INSTANCE_ID: {alias: IDRAC_EXPORTER_SERVICE_INSTANCE_ID, interpreted: true}
     REDFISH_EXPORTER_SERVICE_VERSION:    {alias: IDRAC_EXPORTER_SERVICE_VERSION,  interpreted: false}
     REDFISH_EXPORTER_SERVICE_CRITICALITY: {alias: IDRAC_EXPORTER_SERVICE_CRITICALITY, interpreted: false}
+    REDFISH_BUILD_REVISION:
+      alias: null
+      interpreted: false
+      default: unknown
+      note: >-
+        docker/Dockerfile build argument or deployment environment supplies
+        the exact source revision
     # canonical-only (no IDRAC_* alias by design — do not auto-generate one)
     REDFISH_SCHEME:                     {alias: null, interpreted: false, default: https}
     REDFISH_CSDL_DIR:                   {alias: null, interpreted: true}
