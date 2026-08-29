@@ -11,7 +11,7 @@ from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
-    Path(__file__).parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
+    Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz", "10.252.252.209"
 )
 TELEMETRY_SERVICE = "/redfish/v1/TelemetryService"
 SUBMIT_TARGET = (

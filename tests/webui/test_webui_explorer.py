@@ -23,7 +23,8 @@ from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.webui import catalog, server
 
 GB300_CORPUS = corpus_dir(
-    Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
+    Path(__file__).parent.parent / "supermicro_gb300_corpus.tar.gz",
+    "172.25.230.37",
 )
 GB300_INDEX = {p.name.lower(): p for p in GB300_CORPUS.glob("*.json")}
 
