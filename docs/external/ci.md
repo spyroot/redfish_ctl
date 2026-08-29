@@ -49,6 +49,33 @@ pipelines continue to select `gate-merge` through their normal GitLab rules.
 Pipeline credentials come from the configured Internal GitLab CI binding; do
 not copy tokens into the repository or pass them on the command line.
 
+## Protected DMTF simulator deployment
+
+Run the simulator deployment only from the protected default-branch pipeline
+in Internal GitLab. The exact provider template is allow-listed by
+`trusted_includes` in `gates/manifest.yaml`; see [Trusted provider
+includes](gates.md#trusted-provider-includes). The pipeline supplies
+`BUILDER_PROJECT_CONSUMER=redfish_ctl`, `DMTF_RELEASE`, and
+`PROJECT_LIVE_TEST_COMMAND`. The provider binding supplies `REDFISH_IP` and
+`REDFISH_PORT` to the live test.
+
+1. Play `project-service-image-publish` and
+   `project-service-chart-publish`. Their exact-commit receipts supply the
+   image repository, image digest, chart version, and source commit; the chart
+   has no mutable tag fallback.
+2. Wait for `project-service-deploy-plan`, then play
+   `project-service-deploy`. Both mutation jobs are protected, serialized, and
+   unavailable to merge-request pipelines.
+3. Require terminal success from `project-service-verify`,
+   `project-service-live-test`, and `project-service-release-evidence`. The
+   live test reads `/redfish/v1/` through `RedfishManager`; a pod readiness
+   probe or HTTP status alone is not the release evidence.
+
+`project-service-rollback` is the protected manual recovery path. The pull
+credential prerequisite is documented under [Private DMTF simulator
+image](secrets.md#private-dmtf-simulator-image), and the served resource
+contract is [Redfish Simulator Contract](simulator-contract.md).
+
 ## Supplemental `ci.yml` check
 
 Triggers on pushes to `main` and on every pull request.

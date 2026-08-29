@@ -6,7 +6,13 @@ if ! command -v shellcheck >/dev/null 2>&1; then
   echo "repo.shellcheck: shellcheck not installed in this gate environment" >&2
   exit 1
 fi
-mapfile -t files < <(git ls-files 'scripts/*.sh' 'scripts/gates/**/*.sh' 'docker/**/*.sh')
+mapfile -t files < <(
+  git ls-files \
+    'scripts/*.sh' \
+    'scripts/gates/**/*.sh' \
+    'scripts/gates/**/*.bash' \
+    'docker/**/*.sh'
+)
 # The repo tracks shell scripts under these pathspecs, so an empty set means the listing failed or the
 # pathspecs went stale — not that there is nothing to check. Passing here would mean the gate proved
 # nothing, so it fails instead.

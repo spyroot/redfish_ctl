@@ -61,7 +61,18 @@ Provide both as masked, protected CI variables or through the configured secret
 provider. Do not reuse the exporter ingest token: ingest and API-query scopes
 serve different endpoints. See [Telemetry liveness checks](gates.md#telemetry-liveness-checks).
 
-## Image pull (only if the images are private)
+## Image pull
+
+### Private DMTF simulator image
+
+`harbor-registry-pull`, defined by the Builder project-service binding and
+provisioned by its protected bootstrap, is the image-pull `Secret` referenced
+by `charts/dmtf-sim/values.yaml`. It must exist in the `dmtf-bmc` namespace;
+operators do not copy its credential into chart values or pipeline variables.
+See [Protected DMTF simulator deployment](ci.md#protected-dmtf-simulator-deployment)
+for the publish and deploy sequence.
+
+### Public GHCR images
 
 The published images (`redfish-ctl`, `redfish-ctl-controller`, `redfish-ctl-mock-bmc`) are intended to
 be public on GHCR, so no pull secret is needed. Verify with an anonymous pull before assuming it:

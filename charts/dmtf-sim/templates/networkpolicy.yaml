@@ -19,6 +19,11 @@ spec:
   ingress:
     - from:
         - podSelector: {}
+        {{- range .Values.networkPolicy.allowedNamespaceLabels }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.containerPort }}

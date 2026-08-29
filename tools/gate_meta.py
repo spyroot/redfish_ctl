@@ -171,6 +171,134 @@ def _script_lines(job: dict) -> list[str]:
     return [str(line) for line in script]
 
 
+def _include_key(include: object) -> tuple[str, str, str] | None:
+    """Return the immutable identity of one supported GitLab project include.
+
+    :param include: parsed item from the top-level GitLab ``include`` value.
+    :return: ``(project, ref, file)`` for a complete project include, otherwise
+        ``None``.
+    """
+    if not isinstance(include, dict):
+        return None
+    project = include.get("project")
+    ref = include.get("ref")
+    file = include.get("file")
+    if not all(isinstance(value, str) and value for value in (project, ref, file)):
+        return None
+    return project, ref, file
+
+
+def _trusted_include_contract(
+    registry: dict,
+) -> tuple[set[tuple[str, str, str]], dict[str, dict]]:
+    """Return closed-world include identities and external template contracts.
+
+    :param registry: parsed gate registry containing ``trusted_includes``.
+    :return: immutable include identities plus hidden-template contracts by name.
+    """
+    identities: set[tuple[str, str, str]] = set()
+    templates: dict[str, dict] = {}
+    for include in registry.get("trusted_includes") or []:
+        identity = _include_key(include)
+        if identity is not None:
+            identities.add(identity)
+        for template in include.get("templates") or []:
+            templates[template["name"]] = template
+    return identities, templates
+
+
+def _check_trusted_includes(
+    ci: dict, registry: dict
+) -> tuple[list[str], dict[str, dict]]:
+    """Validate exact external includes and return their allowed templates.
+
+    The gate never downloads provider YAML. It trusts only an exact commit and
+    closed-world template list declared in the schema-validated local registry;
+    GitLab resolves that immutable content before any job can start.
+
+    :param ci: parsed GitLab pipeline.
+    :param registry: parsed gate registry.
+    :return: validation failures and allowed external template contracts.
+    """
+    expected, templates = _trusted_include_contract(registry)
+    raw_includes = ci.get("include") or []
+    includes = raw_includes if isinstance(raw_includes, list) else [raw_includes]
+    observed: set[tuple[str, str, str]] = set()
+    failures: list[str] = []
+    for include in includes:
+        identity = _include_key(include)
+        if identity is None:
+            failures.append(
+                "gitlab: every external include must declare project, exact ref, and file"
+            )
+            continue
+        if identity not in expected:
+            failures.append(
+                "gitlab: include is not an exact registry-trusted provider artifact: "
+                f"{identity[0]}@{identity[1]}:{identity[2]}"
+            )
+            continue
+        observed.add(identity)
+    for missing in sorted(expected - observed):
+        failures.append(
+            "gitlab: trusted provider include is declared but not consumed: "
+            f"{missing[0]}@{missing[1]}:{missing[2]}"
+        )
+    return failures, templates
+
+
+def _external_templates(job: dict) -> list[str]:
+    """Return normalized template names from a job's ``extends`` value.
+
+    :param job: parsed GitLab job.
+    :return: ordered template names, or an empty list when not extended.
+    """
+    value = job.get("extends")
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    return []
+
+
+def _merge_request_explicitly_blocked(job: dict) -> bool:
+    """Report whether the leading rule explicitly denies merge requests.
+
+    GitLab evaluates rules in order. A leading matching rule with ``when:
+    never`` makes later protected-branch rules unreachable from a merge request.
+
+    :param job: parsed GitLab job.
+    :return: True when merge-request pipelines are explicitly denied.
+    """
+    rules = job.get("rules") or []
+    if not rules or not isinstance(rules[0], dict):
+        return False
+    return rules[0] == {
+        "if": '$CI_PIPELINE_SOURCE == "merge_request_event"',
+        "when": "never",
+    }
+
+
+def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
+    """Require the exact local rule fence for a provider-owned template.
+
+    :param job: parsed local wrapper job.
+    :param protected_when: required protected-ref behavior from the registry.
+    :return: True only for MR deny, protected-ref action, then terminal deny.
+    """
+    return (job.get("rules") or []) == [
+        {
+            "if": '$CI_PIPELINE_SOURCE == "merge_request_event"',
+            "when": "never",
+        },
+        {
+            "if": '$CI_COMMIT_REF_PROTECTED == "true"',
+            "when": protected_when,
+        },
+        {"when": "never"},
+    ]
+
+
 def _check_smoke_inventory(registry: dict) -> list[str]:
     """Enforce exact closed-world coverage of the required GitLab jobs.
 
@@ -280,11 +408,7 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
         return [], False
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
-    failures: list[str] = []
-    if "include" in ci:
-        failures.append(
-            "gitlab: top-level 'include:' makes the pipeline unanalyzable by the meta-gate — jobs "
-            "can be defined outside .gitlab-ci.yml; inline them or teach the meta-gate to resolve it")
+    failures, trusted_templates = _check_trusted_includes(ci, registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
     for name, job in real_jobs.items():
@@ -293,19 +417,51 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
         tags = job["tags"] if "tags" in job else default_tags
         if runner_tag not in (tags or []):
             failures.append(f"gitlab job {name}: missing runner tag '{runner_tag}'")
-        # A live-apply/deploy job must not run in a merge-request pipeline.
-        text = repr(job.get("rules")) + repr(job.get("only"))
-        looks_apply = ("apply" in name or "deploy" in name or job.get("mutates") is True)
-        if looks_apply and "merge_request" in text:
-            failures.append(f"gitlab job {name}: live-apply reachable in a merge-request pipeline")
         # Fail closed on a job whose effective body this gate cannot resolve.
-        unresolved = [key for key in ("extends", "trigger") if key in job]
-        if unresolved:
+        extended = _external_templates(job)
+        unknown_templates = sorted(set(extended) - set(trusted_templates))
+        if "trigger" in job:
             failures.append(
-                f"gitlab job {name}: uses {'/'.join(unresolved)} — the meta-gate cannot resolve its "
-                f"effective tags/allow_failure/rules; inline the job body")
-        elif "script" not in job:
-            failures.append(f"gitlab job {name}: no script — not analyzable, inline the job body")
+                f"gitlab job {name}: uses trigger — the meta-gate cannot resolve its effective job")
+        elif "extends" in job and not extended:
+            failures.append(f"gitlab job {name}: has an invalid extends value")
+        elif unknown_templates:
+            failures.append(
+                f"gitlab job {name}: extends untrusted external templates: {unknown_templates}")
+        elif extended:
+            if len(extended) != 1:
+                failures.append(
+                    f"gitlab job {name}: exactly one trusted external template is required")
+                continue
+            contract = trusted_templates[extended[0]]
+            protected_when = "manual" if contract["mutates"] else "on_success"
+            if "tags" not in job:
+                failures.append(
+                    f"gitlab job {name}: trusted external job must declare local runner tags")
+            if job.get("allow_failure") is not False:
+                failures.append(
+                    f"gitlab job {name}: trusted external job must declare allow_failure:false")
+            if not _protected_template_rules_match(
+                job, protected_when
+            ):
+                failures.append(
+                    f"gitlab job {name}: trusted external job does not preserve "
+                    "the registry-declared protected rules")
+            if not job.get("stage"):
+                failures.append(
+                    f"gitlab job {name}: trusted external job must declare a local stage")
+        else:
+            protected_action = any(
+                token in name
+                for token in ("apply", "deploy", "publish", "rollback")
+            )
+            if protected_action and not _merge_request_explicitly_blocked(job):
+                failures.append(
+                    f"gitlab job {name}: mutation is not explicitly denied "
+                    "in a merge-request pipeline")
+            if "script" not in job:
+                failures.append(
+                    f"gitlab job {name}: no script — not analyzable, inline the job body")
     required_jobs = registry.get("required_jobs") or []
     if not required_jobs:
         failures.append(

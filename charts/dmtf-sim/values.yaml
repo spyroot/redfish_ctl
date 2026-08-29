@@ -1,8 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: harbor.rnd.embedings.ai:30443/spyroot/redfish-dmtf-sim
-  tag: "2026.1"
+  repository: ""
   digest: ""
   pullPolicy: IfNotPresent
 
@@ -29,6 +28,9 @@ serviceAccount:
 
 networkPolicy:
   enabled: true
+  allowedNamespaceLabels:
+    - homelab.embedings.ai/ci-class: validation
+    - homelab.embedings.ai/ci-class: protected
 
 resources:
   requests:
