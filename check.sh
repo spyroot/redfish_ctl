@@ -49,6 +49,19 @@ spec:
       evidencePath: reports/smoke/gate-integration.json
       cleanupPolicy: reports-only
       releaseBlocking: true
+
+    - job: gate-scheduled
+      class: protected-live
+      command: ./scripts/check.sh --profile scheduled
+      requiredTools: [bash, conda, git, git-lfs, python3]
+      artifactUnderTest:
+        type: repository-and-splunk-liveness
+        digestSource: git-commit-and-metric-catalogs
+      mutation: read-only-api
+      timeoutSeconds: 1800
+      evidencePath: reports/smoke/gate-scheduled.json
+      cleanupPolicy: reports-only
+      releaseBlocking: true
 YAML
 }
 
