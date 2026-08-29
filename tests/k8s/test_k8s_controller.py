@@ -447,14 +447,6 @@ def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
         attributes=None,
         links=(),
     ):
-        """Capture controller root creation arguments.
-
-        :param name: requested span name.
-        :param parent_policy: requested parent policy.
-        :param attributes: creation-time span attributes.
-        :param links: creation-time span links.
-        :return: context manager yielding a fake span.
-        """
         span_calls.append((parent_policy, dict(attributes or {}), tuple(links)))
         span = FakeSpan(name)
         span.attributes.update(attributes or {})

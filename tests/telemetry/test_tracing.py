@@ -527,23 +527,13 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
     render_span_ids = []
 
     class FakeManager:
-        """Emit one tagged CLIENT span at each BMC lifecycle phase."""
-
         redfish_vendor = "Dell"
 
         def __init__(self, **kwargs):
-            """Capture the target host supplied by CLI construction.
-
-            :param kwargs: manager constructor arguments.
-            """
             self.host = kwargs["host"]
 
         @staticmethod
         def _request(phase):
-            """Emit one tagged request span for a lifecycle phase.
-
-            :param phase: lifecycle phase label.
-            """
             with tracing.client_span(
                 f"https://bmc.example.test/redfish/v1/{phase}",
                 "GET",
@@ -552,26 +542,11 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
                 pass
 
         def check_api_version(self):
-            """Emit the preflight request and report success.
-
-            :return: True after the simulated version check.
-            """
             self._request("preflight")
             return True
 
         def sync_invoke(self, api_call, name, **kwargs):
-            """Simulate manager dispatch with the legacy optional inner span.
-
-            :param api_call: command request type.
-            :param name: command implementation name.
-            :param kwargs: dispatch controls.
-            :return: successful command result.
-            """
             def execute():
-                """Emit the command request and return its result.
-
-                :return: successful command result.
-                """
                 self._request("command")
                 return CommandResult({"value": 1}, None, None, None)
 
@@ -587,41 +562,21 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
 
         @property
         def idrac_manager_version(self):
-            """Return a Dell manager version after a simulated request.
-
-            :return: simulated Dell manager version.
-            """
             self._request("idrac-version")
             return "7.0"
 
         @property
         def redfish_version(self):
-            """Return a Redfish version after a simulated request.
-
-            :return: simulated Redfish version.
-            """
             self._request("redfish-version")
             return "1.20.0"
 
     def fake_process_response(_args, result):
-        """Capture the active render span and return command data.
-
-        :param _args: unused CLI arguments.
-        :param result: command result being rendered.
-        :return: command result data.
-        """
         from opentelemetry.trace import get_current_span
 
         render_span_ids.append(get_current_span().get_span_context().span_id)
         return result.data
 
     def fake_json_printer(_data, _args, colorized=False):
-        """Capture the active span at final output.
-
-        :param _data: rendered data.
-        :param _args: unused CLI arguments.
-        :param colorized: unused color-output flag.
-        """
         from opentelemetry.trace import get_current_span
 
         render_span_ids.append(get_current_span().get_span_context().span_id)
