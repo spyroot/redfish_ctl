@@ -11,7 +11,8 @@ the call site.
 
 Ratchet: known orphaned calls are grandfathered in tools/span_root_baseline.txt;
 a NEW un-spanned call fails, and a wrapped one must leave the baseline. The
-loader/tracing modules that define the primitives are exempt.
+configuration loader, tracing primitives, and non-BMC telemetry transports are
+exempt.
 
 Author Mus spyroot@gmail.com
 """
@@ -61,6 +62,12 @@ _FACTORY_RESULTS = {
     "urllib.request.build_opener": "urllib.request.OpenerDirector",
 }
 _HTTP_MODULES = {"requests", "httpx", "aiohttp", "urllib.request", "urllib3"}
+_EXEMPT_FILES = {
+    "redfish_ctl/config.py",
+    "redfish_ctl/telemetry/exporter.py",
+    "redfish_ctl/telemetry/http_util.py",
+    "redfish_ctl/telemetry/tracing.py",
+}
 
 
 def _target_name(node: ast.AST) -> str | None:
@@ -447,7 +454,7 @@ def _violations() -> list[str]:
     files = subprocess.check_output(
         ["git", "ls-files", "redfish_ctl/*.py", "redfish_ctl/**/*.py"]).decode().split()
     for f in files:
-        if f.endswith(("config.py", "telemetry/exporter.py", "telemetry/tracing.py")):
+        if f in _EXEMPT_FILES:
             continue
         tree = ast.parse(pathlib.Path(f).read_text(encoding="utf-8"))
         _walk(tree, False, f, out)  # module scope is untraced by default
