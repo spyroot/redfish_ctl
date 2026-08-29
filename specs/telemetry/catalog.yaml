@@ -1,0 +1,15 @@
+version: 1
+description: Shared exporter self-metric definitions for redfish_ctl telemetry export.
+metrics:
+  - {name: hw.scrape.ok, kind: gauge, prometheus_name: hw.scrape.ok, family: scrape}
+  - {name: hw.scrape.duration_seconds, kind: gauge, unit: s, prometheus_name: hw.scrape.duration_seconds, family: scrape}
+  - {name: hw.bmc.up, kind: gauge, prometheus_name: hw.bmc.up, family: scrape}
+  - {name: redfish_exporter_scrape_success, kind: gauge, prometheus_name: redfish_exporter_scrape_success, family: exporter}
+  - {name: redfish_exporter_scrape_partial, kind: gauge, prometheus_name: redfish_exporter_scrape_partial, family: exporter}
+  - {name: redfish_exporter_scrape_duration_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_scrape_duration_seconds, family: exporter}
+  - {name: redfish_exporter_last_success_timestamp_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_last_success_timestamp_seconds, family: exporter}
+  - {name: redfish_exporter_collector_success, kind: gauge, prometheus_name: redfish_exporter_collector_success, family: exporter}
+  - {name: redfish_exporter_collector_supported, kind: gauge, prometheus_name: redfish_exporter_collector_supported, family: exporter}
+  - {name: redfish_exporter_collector_duration_seconds, kind: gauge, unit: s, prometheus_name: redfish_exporter_collector_duration_seconds, family: exporter}
+  - {name: redfish_exporter_collector_samples, kind: gauge, prometheus_name: redfish_exporter_collector_samples, family: exporter}
+  - {name: redfish_exporter_collection_errors_total, kind: counter, prometheus_name: redfish_exporter_collection_errors_total, family: exporter}

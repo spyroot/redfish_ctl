@@ -10,21 +10,20 @@ action is DESTRUCTIVE: without ``--confirm`` the command only previews the POST.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..config import named_env
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _LICENSE_INSTALL_ACTION = "#LicenseService.Install"
 
 
-class LicenseInstall(RedfishManagerBase,
+class LicenseInstall(RedfishManager,
                      scm_type=ApiRequestType.LicenseInstall,
                      name="license-install",
                      metaclass=Singleton):
@@ -199,9 +198,10 @@ class LicenseInstall(RedfishManagerBase,
             env_name = password_env.strip()
             if not env_name:
                 raise InvalidArgument("password environment variable name cannot be empty")
-            if env_name not in os.environ:
+            value = named_env(env_name)
+            if value is None:
                 raise InvalidArgument(f"password environment variable '{env_name}' is not set")
-            return os.environ[env_name]
+            return value
         if password_file is not None:
             path = Path(password_file).expanduser()
             try:

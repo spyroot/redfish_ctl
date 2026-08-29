@@ -72,6 +72,36 @@ python tools/corpus.py pull --vendor supermicro --model gb300
 python tools/corpus.py extract-all --vendor dell --dest /tmp/dell_corpus
 ```
 
+## Diff a corpus against a live BMC
+
+`live-diff` compares one corpus against a live Redfish endpoint, read-only
+(GET requests only, routed through the project client). Only STABLE
+identity/config fields are compared — Manufacturer, Model, firmware versions,
+boot allowable values, and the BIOS attribute key set — so volatile state
+(power, sensor readings) never reports as drift. Resources are discovered from
+the ServiceRoot collection links and their `Members` lists, so the same walk
+covers every vendor's member naming:
+
+```bash
+python tools/corpus.py live-diff --vendor supermicro --model gb300 --ip <bmc-ip>
+python tools/corpus.py live-diff --vendor dell --model xr8620t --ip <bmc-ip> --dry-run
+```
+
+`--dry-run` prints the fetch plan (the discovered resource paths) without
+touching the network. The JSON report goes to stdout and diagnostics to stderr; the exit
+code is 0 on match (gaps included), 1 on drift, 2 on a usage or environment
+error. Credentials resolve from the gitignored inventory file or the
+`REDFISH_USERNAME`/`REDFISH_PASSWORD` environment variables — never from argv.
+
+`self-check` runs the same comparison engine with the corpus on BOTH sides —
+no network, no credentials — which validates a newly added corpus walks
+cleanly through the generic discovery:
+
+```bash
+python tools/corpus.py self-check                     # every pulled corpus
+python tools/corpus.py self-check --vendor hpe        # one vendor
+```
+
 ## Use a corpus from a test
 
 Tests do not unpack tarballs by hand — they call the shared extractor

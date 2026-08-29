@@ -7,9 +7,8 @@ import argparse
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _COLLECTIONS = {
@@ -31,7 +30,7 @@ def _target_id_arg(value: str) -> str:
     return target_id
 
 
-class AssetTagSet(RedfishManagerBase,
+class AssetTagSet(RedfishManager,
                   scm_type=ApiRequestType.AssetTagSet,
                   name="asset-tag-set",
                   metaclass=Singleton):

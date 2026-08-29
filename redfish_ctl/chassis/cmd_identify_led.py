@@ -7,9 +7,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _COLLECTIONS = {
@@ -19,7 +18,7 @@ _COLLECTIONS = {
 _PROPERTIES = {"LocationIndicatorActive", "IndicatorLED"}
 
 
-class IdentifyLed(RedfishManagerBase,
+class IdentifyLed(RedfishManager,
                   scm_type=ApiRequestType.IdentifyLed,
                   name="identify-led",
                   metaclass=Singleton):

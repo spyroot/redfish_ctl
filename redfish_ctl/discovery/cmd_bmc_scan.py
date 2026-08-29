@@ -18,13 +18,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from .net_scan import scan_segment
 
 
-class BmcScan(RedfishManagerBase,
+class BmcScan(RedfishManager,
              scm_type=ApiRequestType.BmcScan,
              name='bmc-scan',
              metaclass=Singleton):

@@ -1,0 +1,27 @@
+# Files sanctioned to mention a renamed-away name (idrac_ctl -> redfish_ctl),
+# as path:count. The legitimate surface is the compat-alias machinery and
+# recorded history; every other row is drain-work for the docs cleanup.
+# A new file or a grown count fails the gate; a cleanup must shrink its row.
+.github/workflows/release.yml:2
+CHANGELOG.md:2
+docker/Dockerfile:1
+docker/Dockerfile.controller:1
+docker/Dockerfile.dockerignore:2
+docker/Dockerfile.explorer:1
+docker/Dockerfile.test:2
+idrac_ctl/__init__.py:5
+packaging/idrac_ctl_deprecation/setup.py:9
+scripts/live_sanity_check/captures/supermicro/gb300/virtual_media_eject.err.json:2
+setup.py:4
+tests/attribute/test_attribute_dualmode.py:2
+tests/attribute/test_cmd_attribute_update.py:2
+tests/discovery/test_discovery_import.py:3
+tests/gates/test_redfish_schema.py:1
+tests/manager/test_manager_reset_dualmode.py:1
+tests/test_cmd_utils.py:1
+tests/test_cmd_utils_save.py:1
+tests/test_emulator_smoke.py:1
+tests/test_hpe_vendor.py:1
+tests/test_package_imports.py:1
+tests/test_query.py:1
+tests/test_redfish_ctl_alias.py:7

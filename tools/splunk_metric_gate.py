@@ -44,6 +44,7 @@ DEFAULT_METRICS = [
     "hw.temperature",
     "hw.power",
     "hw.scrape.ok",
+    "hw.bmc.up",
 ]
 
 

@@ -13,12 +13,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ExportSystemConfig(RedfishManagerBase,
+class ExportSystemConfig(IDracManager,
                          scm_type=ApiRequestType.SystemConfigQuery,
                          name='sysconfig_query',
                          metaclass=Singleton):
@@ -111,7 +111,7 @@ class ExportSystemConfig(RedfishManagerBase,
         if "Clone" in export_use or "Replace" in export_use:
             payload["ExportUse"] = export_use
 
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ExportSystemConfiguration"
 
         # json_pd = json.dumps(payload)

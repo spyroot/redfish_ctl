@@ -14,12 +14,12 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootSourceUpdate(RedfishManagerBase,
+class BootSourceUpdate(IDracManager,
                        scm_type=ApiRequestType.BootSourceUpdate,
                        name='update',
                        metaclass=Singleton):

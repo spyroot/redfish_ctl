@@ -1,0 +1,54 @@
+# DMTF DSP2043 mockup simulator image for the Kubernetes sandbox.
+#
+# Serves a DSP2043 mockup profile natively over read-only HTTP: every request
+# path maps 1:1 to <path>/index.json in the extracted profile tree. Stateless
+# by construction — nothing is written, nothing drifts, nothing needs a reset.
+#
+# Build (the bundle is Git-LFS tracked; run `git lfs pull` first):
+#   docker build -f docker/Dockerfile.dmtf-sim -t redfish-ctl-dmtf-sim:local .
+# Run locally (defaults to the public-rackmount1 profile):
+#   docker run --rm -p 8080:8080 redfish-ctl-dmtf-sim:local
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Pin a numeric uid/gid so Kubernetes can verify runAsNonRoot without a
+# runAsUser override (a named user cannot be checked at admission).
+RUN groupadd --system --gid 10001 dmtfsim \
+    && useradd \
+        --system \
+        --uid 10001 \
+        --gid dmtfsim \
+        --home-dir /home/dmtfsim \
+        --create-home \
+        dmtfsim
+
+WORKDIR /app
+
+COPY --chown=dmtfsim:dmtfsim k8s/sandbox/mock_bmc_server.py \
+    /app/mock_bmc_server.py
+# Bake every profile of the pinned DSP2043 bundle so one image stamps out a
+# simulator per profile: the container args pick the profile via --mockup-dir.
+COPY spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip /tmp/dsp2043.zip
+RUN python -m zipfile -e /tmp/dsp2043.zip /mockups/ \
+    && test -s /mockups/DSP2043_2026.1/public-rackmount1/index.json \
+    && test -s /mockups/DSP2043_2026.1/public-rackmount1/TaskService/index.json \
+    && python -m json.tool \
+        /mockups/DSP2043_2026.1/public-rackmount1/index.json >/dev/null \
+    && python -m json.tool \
+        /mockups/DSP2043_2026.1/public-rackmount1/TaskService/index.json >/dev/null \
+    && rm /tmp/dsp2043.zip \
+    && chown -R dmtfsim:dmtfsim /mockups
+
+USER dmtfsim
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python -c \
+        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/redfish/v1/', timeout=2).close()"
+
+ENTRYPOINT ["python", "/app/mock_bmc_server.py"]
+CMD ["--host", "0.0.0.0", "--port", "8080", \
+     "--mockup-dir", "/mockups/DSP2043_2026.1/public-rackmount1"]

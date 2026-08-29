@@ -32,7 +32,10 @@ request_span:
     - redfish.path_family
   optional:
     - http.response.status_code
-    - redfish.action
+    - redfish.action.name
+    - redfish.action.type
+    - redfish.action.target
+    - redfish.action.level
     - redfish.vendor
     - redfish.task.state
     - bmc.ip

@@ -1,0 +1,1859 @@
+"""Dell iDRAC manager and Dell-specific Redfish semantics.
+
+Shared DMTF commands and transport live on :class:`RedfishManager`. Dell
+commands inherit this class when they need iDRAC status mapping, Lifecycle
+Controller ``JID_`` extraction, or Dell task/job completion behavior. The two
+manager layers intentionally keep separate HTTP implementations because Dell
+can return a job id in either the ``Location`` header or its JSON response body.
+
+https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v4.x-series/idrac9_4.00.00.00_redfishapiguide_pub/redfish-resources?guid=guid-d3e85da8-5d22-4eb1-82ff-d2fdd4cd7730&lang=en-us
+
+Author Mus spyroot@gmail.com
+"""
+import collections
+import functools
+import json
+import logging
+import re
+import time
+from abc import abstractmethod
+from datetime import datetime
+from functools import cached_property
+from typing import Dict, Optional, Tuple
+
+import requests
+from tqdm import tqdm
+
+from .cmd_exceptions import (
+    AuthenticationFailed,
+    DeleteRequestFailed,
+    InvalidArgumentFormat,
+    MissingMandatoryArguments,
+    PatchRequestFailed,
+    PostRequestFailed,
+    ResourceNotFound,
+    TaskIdUnavailable,
+    UnexpectedResponse,
+)
+from .config import http_timeout
+from .decorators.fault_injection import (
+    simulate_http_faults,
+    simulate_http_faults_async,
+)
+from .idrac_task_state import IdracTaskState, IdracTaskStatus
+from .redfish_api_common import (
+    REDFISH_API,
+    REDFISH_JSON,
+    ApiRequestType,
+    ApiRespondString,
+    DellApplyTypes,
+    DellCliJobTypes,
+    DellJobState,
+    DellJobType,
+    HTTPMethod,
+    PowerState,
+    RedfishApiRespond,
+    ScheduleJobType,
+)
+from .redfish_api_common import ResetType as ResetType
+from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
+from .redfish_manager import (
+    CommandResult,
+    RedfishManager,
+)
+from .redfish_shared import RedfishJson, RedfishJsonSpec
+from .telemetry import tracing
+
+module_logger = logging.getLogger('redfish_ctl.idrac_manager')
+
+
+def _simulated_connection_error() -> BaseException:
+    """Build the exception a dropped BMC connection raises (SIMULATE_NETWORK_FAILURE).
+
+    :return: a requests ConnectionError mirroring a real transport-level failure, so the
+        downstream error handling and recorded span match a genuine network drop.
+    """
+    return requests.exceptions.ConnectionError(
+        "simulated network failure (SIMULATE_NETWORK_FAILURE)"
+    )
+
+
+def _simulated_read_timeout() -> BaseException:
+    """Build the exception a stalled BMC read raises (SIMULATE_NETWORK_TIMEOUT).
+
+    :return: a requests ReadTimeout mirroring a real read-timeout failure, so the
+        downstream error handling and recorded span match a genuine stalled read.
+    """
+    return requests.exceptions.ReadTimeout(
+        "simulated network timeout (SIMULATE_NETWORK_TIMEOUT)"
+    )
+
+
+class IDracManager(RedfishManager):
+    """
+    IDracManager Class, interact with a Redfish endpoint via REST API interface
+    """
+
+    # Dell owns its own command registry, exactly like SupermicroManager and
+    # IloManager. Without this shadow, Dell commands would register into the
+    # shared RedfishManager._registry (the DMTF base) and leak into every
+    # vendor's tree; with it, get_registry's MRO-merge gives Dell SET(DMTF) +
+    # SET(Dell) while a non-Dell vendor never sees a Dell verb.
+    _registry = collections.defaultdict(dict)
+    uses_dell_job_semantics = True
+
+    def __init__(self, *args, log_level=logging.NOTSET, **kwargs):
+        """Initialize Dell-specific state on top of the shared connection.
+
+        Host, username, password, port, and transport options are owned by
+        :class:`RedfishManager` and are forwarded unchanged.
+
+        :param args: positional arguments forwarded to ``RedfishManager``.
+        :param log_level: logging level applied to this manager's logger.
+        :param kwargs: keyword arguments forwarded to ``RedfishManager``.
+        """
+        super().__init__(*args, **kwargs)
+
+        self.logger = logging.getLogger(__name__)
+        self._logger_level = log_level
+        self.logger.setLevel(self._logger_level)
+
+        # mapping between rest API respond to respected
+        # string that we report to apper layer.
+        self._api_respond_to_string = {
+            RedfishApiRespond.Ok: ApiRespondString.Ok,
+            RedfishApiRespond.Error: ApiRespondString.Error,
+            RedfishApiRespond.Success: ApiRespondString.Success,
+            RedfishApiRespond.AcceptedTaskGenerated: ApiRespondString.AcceptedTaskGenerated,
+
+        }
+
+        # a mapping from http status code to result of request.
+        # the BMC is not consistent with the return code, so it is not very clear
+        # case when 200 is ok and 201 is something else. So it API per API
+        # Thus default success has extra field, so we can always
+        # pass what we expect for particular cmd.
+
+        #  Redfish spec 202 Request has been accepted for processing
+        #  but the processing has not been completed
+        self._http_code_mapping = {
+            200: RedfishApiRespond.Ok,
+            201: RedfishApiRespond.Created,
+            202: RedfishApiRespond.AcceptedTaskGenerated,
+            204: RedfishApiRespond.Success,
+        }
+
+        # mapping a string state to enum, so each cmd can just check a state
+        # without doing any string if else branches.
+        self._job_state_mapping = {
+            "Scheduled": DellJobState.Scheduled,
+            "Running": DellJobState.Running,
+            "Completed": DellJobState.Completed,
+            "Downloaded": DellJobState.Downloaded,
+            "Downloading": DellJobState.Downloading,
+            "Scheduling": DellJobState.Scheduling,
+            "Waiting": DellJobState.Waiting,
+            "Failed": DellJobState.Failed,
+            "CompletedWithErrors": DellJobState.CompletedWithErrors,
+            "RebootFailed": DellJobState.RebootFailed,
+            "RebootCompleted": DellJobState.RebootCompleted,
+            "RebootPending": DellJobState.RebootPending,
+            "PendingActivation": DellJobState.PendingActivation,
+            "Unknown": DellJobState.Unknown,
+        }
+
+        # mapping a task state string to enum
+        # without doing any string if else branches.
+        self._task_state_mapping = {
+            "New": IdracTaskState.New,
+            "Running": IdracTaskState.Starting,
+            "Starting": IdracTaskState.Starting,
+            "Suspended": IdracTaskState.Suspended,
+            "Interrupted": IdracTaskState.Interrupted,
+            "Pending": IdracTaskState.Pending,
+            "Stopping": IdracTaskState.Stopping,
+            "Completed": IdracTaskState.Completed,
+            "Killed": IdracTaskState.Killed,
+            "Exception": IdracTaskState.Exception,
+            "Service": IdracTaskState.Service,
+            "Canceling": IdracTaskState.Canceling,
+            "Cancelled": IdracTaskState.Cancelled
+        }
+
+        # mapping from cli to job types
+        self._cli_job_type_mapping = {
+            DellCliJobTypes.Bios_Config.value: DellJobType.BIOSConfiguration.value,
+            DellCliJobTypes.OsDeploy.value: DellJobType.OSDeploy.value,
+            DellCliJobTypes.FirmwareUpdate.value: DellJobType.FirmwareUpdate.value,
+            DellCliJobTypes.RebootNoForce.value: DellJobType.RebootNoForce.value
+        }
+
+        # mapping from string to task status enum
+        self._task_status_mapping = {
+            "ok": IdracTaskStatus.Ok,
+            "warning": IdracTaskStatus.Warning,
+            "critical": IdracTaskStatus.Critical
+        }
+
+        self._redfish_error = None
+
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
+    async def api_async_get_call(self, loop, req, hdr: Dict):
+        """Await one Dell GET without polling its Task or Lifecycle job.
+
+        This is the vendor transport override used by concurrently scheduled
+        callers. Dell JID submission and later job polling remain separate.
+
+        :param loop: asyncio event loop
+        :param req: request
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: completed HTTP response.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
+                timeout=http_timeout(),
+            )
+        else:
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
+                timeout=http_timeout(),
+            )
+        return await loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "GET", request_call),
+        )
+
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
+    def api_get_call(
+            self, req: str, hdr: Dict) -> requests.models.Response:
+        """Make api request either with x-auth authentication header or redfish_ctl.
+        :param req:  request
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: request.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        # Bound every GET so a hung/unreachable BMC can't block a crawl or an
+        # unattended telemetry poll forever. Override via REDFISH_HTTP_TIMEOUT.
+        timeout = http_timeout()
+
+        # Reuse one pooled keep-alive connection across GETs (see _http_session):
+        # opening a fresh TLS connection per request wedges fragile BMCs.
+        session = self._http_session()
+
+        get_kwargs = {"verify": self._is_verify_cert, "timeout": timeout}
+        if self.x_auth is not None:
+            headers.update({'X-Auth-Token': self.x_auth})
+        else:
+            get_kwargs["auth"] = (self._username, self._password)
+
+        # CLIENT span for the BMC call (no-op unless tracing is enabled); the BMC
+        # renders as one inferred downstream service via peer.service.
+        with tracing.client_span(req, "GET") as span:
+            try:
+                response = session.get(req, headers=headers, **get_kwargs)
+            except Exception as exc:  # timeout / connection error → failed span
+                tracing.record_exception(span, exc)
+                raise
+            tracing.record_response(span, response.status_code)
+            return response
+
+    @staticmethod
+    def job_id_from_respond(
+            response: requests.models.Response) -> str:
+        """Parse a Dell Lifecycle Controller job id (``JID_...``) from the body.
+
+        Some Dell responses carry the job id as ``id``, ``Id``, ``JobID``, or
+        ``JID`` instead of returning a ``Location`` header. A body without a JID
+        is a normal outcome for the caller's two-surface fallback.
+
+        :param response: Dell write response.
+        :return: the ``JID_...`` job id, or ``""`` when the body carries none.
+        """
+        if response is None:
+            return ""
+        try:
+            body = response.json()
+        except (ValueError, TypeError, AttributeError):
+            body = None
+        if isinstance(body, dict):
+            for key in ("id", "Id", "JobID", "JID"):
+                value = body.get(key)
+                if isinstance(value, str) and value.startswith("JID_"):
+                    return value
+        try:
+            text = response.text if hasattr(response, "text") else json.dumps(body)
+        except (TypeError, ValueError):
+            text = ""
+        match = re.search(r"JID_[0-9A-Za-z]+", text or "")
+        return match.group(0) if match else ""
+
+    def job_id_from_response(
+            self,
+            response: requests.models.Response,
+            strict: bool = True,
+            ) -> str:
+        """Return a Dell Lifecycle Controller JID from header or JSON body.
+
+        Dell firmware versions are not consistent about which response surface
+        carries the job id. The header helper returns ``""`` when called in
+        non-strict mode, so fallback must use truthiness rather than ``is None``.
+
+        :param response: accepted Dell write response.
+        :param strict: raise when neither response surface carries a JID.
+        :return: Dell ``JID_...`` value, or ``""`` in non-strict mode.
+        :raises TaskIdUnavailable: when strict and no job id is available.
+        """
+        job_id = self.task_id_from_header(response, strict=False)
+        if not job_id:
+            job_id = self.job_id_from_respond(response)
+        if not job_id and strict:
+            raise TaskIdUnavailable(
+                "Dell accepted the request but returned no task id in "
+                "the Location header or response body"
+            )
+        return job_id
+
+    @staticmethod
+    def job_id_from_header(
+            response: requests.models.Response,
+            strict: bool = True) -> str:
+        """Compatibility name for Dell callers reading a JID from Location.
+
+        :param response: accepted Dell write response.
+        :param strict: raise when the Location header carries no task id.
+        :return: Dell JID from the Location header, or ``""`` in non-strict mode.
+        """
+        return RedfishManager.task_id_from_header(response, strict=strict)
+
+    def parse_task_id(self, data) -> str:
+        """Return a Dell job id from a response or ``CommandResult`` wrapper.
+
+        :param data: Dell HTTP response or command result carrying one in
+            ``extra``.
+        :return: Dell JID from ``Location`` or the response body, else ``""``.
+        :raises ValueError: when ``data`` is neither supported input shape.
+        """
+        if data is None:
+            return ""
+        if hasattr(data, "extra"):
+            response = data.extra
+        elif isinstance(data, requests.models.Response):
+            response = data
+        else:
+            raise ValueError("Unknown data type.")
+        if response is None:
+            return ""
+        return self.job_id_from_response(response, strict=False)
+
+    def get_job(self,
+                job_id: str,
+                data_type: Optional[str] = "json",
+                do_async: Optional[bool] = False) -> dict:
+        """Query information for particular job from dell oem.
+        Respond is information about a specific configuration Job scheduled
+        by or being executed by a Redfish service's Job Service.
+        :param job_id: iDRAC job_id JID_744718373591
+        :param do_async: note async will subscribe to an event loop.
+        :param data_type: json or xml
+        :return: CommandResult.
+        """
+        headers = {}
+        if data_type == "json":
+            headers.update(self.json_content_type)
+
+        r = f"{self.idrac_members}/Oem/Dell/Jobs/{job_id}"
+        return self.base_query(r, do_expanded=True, do_async=do_async).data
+
+    @staticmethod
+    def update_progress(resp_data, old_value):
+        """Get a percent computed from respond, if something dodgy
+        will return old value.
+        :param resp_data: response
+        :param old_value:  old value
+        :return:
+        """
+        # update percent_done and progress bar
+        if REDFISH_JSON.DellPercentComplete in resp_data:
+            try:
+                percent_done = int(resp_data[REDFISH_JSON.DellPercentComplete])
+                return percent_done
+            except TypeError:
+                pass
+
+        return old_value
+
+    def get_task_state(
+            self, resp: requests.models.Response
+    ) -> Tuple[IdracTaskState, IdracTaskStatus]:
+        """Parse response and return task state and status,
+        if resp has no json payload and JSONDecodeError raised , return Unknown state.
+
+        if the TaskStatus or TaskState key is absent from the response, UnexpectedResponse is raised.
+
+        :param resp: a requests.models.Response object.
+        :return:  redfish_ctl.IdracTaskState and redfish_ctl.IdracTaskStatus
+        :raise  redfish_ctl.UnexpectedResponse: If the response body does not
+            contain a task state.
+        """
+        try:
+            resp_data = resp.json()
+        except requests.exceptions.JSONDecodeError as json_err:
+            self.logger.error(
+                f"failed parse response to get a task state. {str(json_err)}"
+            )
+            return IdracTaskState.Unknown, IdracTaskStatus.Warning
+
+        # dodge case
+        if REDFISH_JSON.DellTaskStatus not in resp_data or REDFISH_JSON.DellTaskState not in resp_data:
+            raise UnexpectedResponse(f"IDRAC returned a {resp_data}, neither task state nor status is present..")
+
+        resp_state = resp_data[REDFISH_JSON.DellTaskState]
+        resp_status = resp_data[REDFISH_JSON.DellTaskStatus]
+
+        # update state and status.
+        task_state = self._task_state_mapping[resp_state]
+        task_status = self._task_status_mapping[resp_status.lower()]
+        return task_state, task_status
+
+    def fetch_task(self,
+                   task_id: str,
+                   sleep_time: Optional[int] = 10,
+                   wait_for: Optional[int] = 0,
+                   wait_for_state: Optional[IdracTaskState] = IdracTaskState.Unknown,
+                   ) -> IdracTaskState:
+
+        """Synchronous fetch a job from the BMC and wait for job completion.
+
+        A job on the BMC is the Task and contains information about a task
+        that the Redfish Task Service schedules or executes.
+
+        Tasks represent operations that we want to wait.
+        Example we applied a change that create a task, and we need wait for completion.
+
+        Note: that caller can provide wait_for_state that will unblock waiting loop,
+        for example if we don't want wait for completion or error.  i.e.
+        Running or Scheduled is sufficient criterion.
+        (It useful for async io type of request)
+
+        if server return  404 or  410:
+        - if a state was update caller will get last known state.
+        - if a state never updated caller will get Unknown.
+
+        THus, for a caller it amke sense to re-check task services.
+
+        :param wait_for: by default, we wait status code 200 based on spec.
+                         in case API return something else. 204 for example.
+        :param task_id: task id as it returned from a task by task services.
+        :param sleep_time: a default sleep and wait, if server ask for retry_after, it takes precedence
+                           only if retry_after > sleep_time.
+        :param wait_for_state: wait a specific state. Example caller only care
+                               it Running and will resume later to monitor progress
+
+        :return: Nothing
+        :raise AuthenticationFailed MissingResource
+        """
+        last_update = 0
+        percent_done = 0
+
+        # job might be already done.
+        jb = self.get_job(task_id)
+
+        # if job scheduler or scheduling it make sense to wait otherwise we return state
+        # we expect a JobState
+        if REDFISH_JSON.DellJobState in jb:
+
+            current_state = jb[REDFISH_JSON.DellJobState]
+            if current_state not in self._job_state_mapping:
+                raise UnexpectedResponse(f"IDRAC returned a {current_state} job type that we don't know.")
+            _ = self._job_state_mapping[current_state]
+            if current_state == DellJobState.Scheduled.value or current_state == DellJobState.Scheduling.value \
+                    or current_state == DellJobState.Running.value:
+                self.logger.info(f"Job {task_id} is {current_state}.. waiting for completion.")
+            else:
+                self.logger.info(f"Job {task_id} is {current_state}..bouncing off.")
+                return self._job_state_mapping[current_state]
+
+        # in case server will ask to wait.
+        retry_after = 0
+        # initial state we don't know
+        task_state = IdracTaskState.Unknown
+        with tqdm(total=100) as pbar:
+            while True:
+                # /redfish/v1/TaskService/Tasks/{TaskId}
+                resp = self.api_get_call(f"{self._default_method}{self.redfish_ip}"
+                                         f"{REDFISH_API.Tasks}{task_id}", hdr={})
+
+                if 'Retry-After' in resp.headers:
+                    retry_after = int(resp.headers["Retry-After"])
+                    self.logger.info(
+                        f"Remote server responded "
+                        f"with Retry-After {retry_after}"
+                    )
+                if resp.status_code == 401:
+                    self.logger.error("task service returned 401")
+                    raise AuthenticationFailed("Authentication failed.")
+                # if server failed, meanwhile HTTP exception propagate
+                # up on the stack.
+                if resp.status_code > 499:
+                    self.logger.critical(
+                        f"task service return http error code "
+                        f"{resp.status_code}"
+                    )
+                    break
+                # Cancellation: A subsequent GET request on the task monitor URI
+                # returns either the HTTP 410 Gone or 404 Not Found status code.
+                elif resp.status_code == 404 or resp.status_code == 410:
+                    self.logger.info(f"task service returned {resp.status_code}")
+                    # at the end we check a state and return it might fail, exception etc.
+                    break
+                # if client expect something else than 200 or something else, we return result.
+                elif 0 < wait_for == resp.status_code:
+                    task_state, task_status = self.get_task_state(resp)
+                    return task_state
+                # As long as the operation is in process, the service shall return the HTTP 202 Accepted status code
+                # when the client performs a GET request on the task monitor URI.
+                elif resp.status_code == 202:
+                    self.logger.info("task service returned 202")
+                    # state acquisition and update state
+                    resp_data = resp.json()
+                    task_state, task_status = self.get_task_state(resp)
+                    self.logger.info(f"Updating state, new state "
+                                     f"{task_state.value}, status {task_status.value}")
+
+                    # update description so caller see.
+                    pbar.set_description(task_state.value)
+                    if (task_status == IdracTaskStatus.Critical
+                            or task_status == IdracTaskStatus.Warning):
+                        # we bounce, if status not ok
+                        break
+
+                    percent_done = self.update_progress(resp_data, percent_done)
+                    if percent_done > last_update:
+                        last_update = percent_done
+                        inc = percent_done - pbar.n
+                        pbar.update(n=inc)
+
+                    # update retry time, we've been asked
+                    if retry_after > sleep_time:
+                        sleep_time = retry_after
+                    time.sleep(sleep_time)
+
+                # The appropriate HTTP status code, such as but not limited to 200 OK
+                # for most operations or 201 Created for POST to create a resource.
+                # if client passed wait_for for example 204 we need have handle for 200
+                elif resp.status_code == 200:
+                    task_state, task_status = self.get_task_state(resp)
+                    self.logger.info(
+                        f"Server return status code 200, Task state "
+                        f"{task_state.value}, {task_status.value}"
+                    )
+                    return task_state
+                # client wait for specific state
+                elif task_state == wait_for_state:
+                    self.logger.info(f"caller asked for wait for a state {wait_for_state.value}")
+                    task_state, task_status = self.get_task_state(resp)
+                    return task_state
+                else:
+                    # in all other cases update state and go back sleep.
+                    task_state, task_status = self.get_task_state(resp)
+                    self.logger.error("unexpected status code", resp.status_code)
+                    if retry_after > sleep_time:
+                        sleep_time = retry_after
+                    time.sleep(sleep_time)
+
+        return task_state
+
+    def default_error_handler(
+            self, response: requests.models.Response) -> RedfishApiRespond:
+        """Normalize a non-2xx Redfish response per the Redfish error contract.
+
+        A success code returns its mapped ``RedfishApiRespond``. Every error code
+        is normalized through :meth:`RedfishManager.parse_error`, so the raised
+        exception carries the parsed :class:`RedfishError` envelope (HTTP status,
+        ``error.code``/``error.message`` and every ``@Message.ExtendedInfo``
+        entry) as its primary value — never a generic string — including for an
+        unsupported-operation ``501``/``404``/``405``/``409``. See
+        docs/external/redfish-error-contract.md.
+
+        :param response: the Redfish HTTP response to classify.
+        :return: the mapped ``RedfishApiRespond`` for a 2xx success code.
+        :raises AuthenticationFailed: on HTTP 401, carrying the parsed error.
+        :raises RedfishForbidden: on HTTP 403, carrying the parsed error.
+        :raises ResourceNotFound: on HTTP 404, carrying the parsed error.
+        :raises UnexpectedResponse: on any other error code, carrying the parsed error.
+        """
+        code = response.status_code
+        if 200 <= code < 300:
+            return self._http_code_mapping.get(code, RedfishApiRespond.Success)
+        self._redfish_error = RedfishManager.parse_error(response)
+        if code == 401:
+            raise AuthenticationFailed(self._redfish_error)
+        if code == 403:
+            raise RedfishForbidden(self._redfish_error)
+        if code == 404:
+            raise ResourceNotFound(self._redfish_error)
+        raise UnexpectedResponse(self._redfish_error)
+
+    def check_api_version(self):
+        """Check the Dell LC Service API set, falling back to the generic root.
+
+        Probes the Dell Lifecycle Controller service (OEM ``DellLCService`` under
+        ``IDRAC_DELL_MANAGERS``) first; on 404 — a non-Dell controller, or a Dell
+        without the LC service — it defers to the vendor-neutral service-root probe
+        on :class:`RedfishManager`. On success it records the LC service document on
+        ``self.api_endpoints`` and its action targets on ``self.action_targets``.
+
+        :return: a tuple of (service document, list of action target URIs).
+        """
+        headers = {}
+        headers.update(self.json_content_type)
+        r = f"{self._default_method}" \
+            f"{self.redfish_ip}" \
+            f"{REDFISH_API.IDRAC_DELL_MANAGERS}" \
+            f"{REDFISH_API.IDRAC_LLC}"
+
+        response = self.api_get_call(r, headers)
+        if response.status_code == 404:
+            # Non-Dell / no LC service: use the vendor-neutral service-root probe.
+            return super().check_api_version()
+        self.default_error_handler(response)
+
+        data = response.json()
+        self.api_endpoints = data
+        if REDFISH_JSON.Actions in self.api_endpoints:
+            actions = self.api_endpoints[REDFISH_JSON.Actions]
+            action_keys = actions.keys()
+            self.action_targets = [actions[k]['target'] for k in action_keys]
+
+        return self.api_endpoints, self.action_targets
+
+    @staticmethod
+    @abstractmethod
+    def default_json_printer(
+            json_data,
+            sort: Optional[bool] = True,
+            indents: Optional[int] = 4):
+        """default json stdout printer, it mainly used for debug.
+        :param json_data:
+        :param indents:
+        :param sort:
+        :return:
+        """
+        if isinstance(json_data, requests.models.Response):
+            json_data = json_data.json()
+
+        if isinstance(json_data, str):
+            json_raw = json.dumps(
+                json.loads(json_data), sort_keys=sort, indent=indents
+            )
+        else:
+            json_raw = json.dumps(
+                json_data, sort_keys=sort, indent=indents
+            )
+        print(json_raw)
+
+    @cached_property
+    def version_api(self, data_type: Optional[str] = "json") -> bool:
+        """Return true if IDRAC version 6.0 i.e. a new version.
+
+        :param data_type: content type to request; json or xml.
+        :return: True when the iDRAC firmware is 6.00.00.00 or newer, else False.
+        """
+        headers = {}
+        if data_type == "json":
+            headers.update(self.json_content_type)
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers" \
+            f"/iDRAC.Embedded.1?$select=FirmwareVersion"
+        response = self.api_get_call(r, headers)
+        self.default_error_handler(response)
+        data = response.json()
+        if 'FirmwareVersion' in data:
+            fw = data["FirmwareVersion"]
+            self.logger.info(f"IDRAC firmware {fw}")
+            return int(data["FirmwareVersion"].replace(".", "")) >= 6000000
+
+        return False
+
+    def select_cert(self) -> CommandResult:
+        """Return cert
+        :return:
+        """
+        r = f"{self.idrac_members}/Attributes"
+        return self.base_query(r, select_target="SecurityCertificate.*")
+
+    def select_network_adapters(self) -> CommandResult:
+        """Return the BMC NICs
+        :return:
+        """
+        r = f"{self.idrac_members}/Attributes"
+        return self.base_query(r, select_target="NIC.*")
+
+    def select_info(self) -> CommandResult:
+        """Return server info
+        :return:
+        """
+        r = f"{self.idrac_members}/Attributes"
+        return self.base_query(r, select_target="ServerInfo.*")
+
+    def bios_version(self) -> CommandResult:
+        """Return bios version
+        :return:
+        """
+        r = f"{self.idrac_manage_servers}/Attributes"
+        return self.base_query(r, select_target="Attributes/SystemBiosVersion")
+
+    def server_model_name(self) -> CommandResult:
+        """Return server model name
+        :return:
+        """
+        r = f"{self.idrac_manage_servers}/Attributes"
+        return self.base_query(r, select_target="Attributes/SystemModelName")
+
+    def select_server_info(self) -> CommandResult:
+        """Return the BMC certificate
+        :return:
+        """
+        r = f"{self.idrac_manage_servers}/Attributes"
+        return self.base_query(r, select_target="Info.*")
+
+    @staticmethod
+    def filter_attribute(cls,
+                         json_data,
+                         attr_filter: Optional[str]):
+        """Filter attribute from json_data
+        :param cls:
+        :param json_data:
+        :param attr_filter:
+        :return:
+        """
+        if attr_filter is not None and len(attr_filter) > 0 and 'Attributes' in json_data:
+            attr_filter = attr_filter.strip()
+            if "," in attr_filter:
+                attr_filters = attr_filter.split(",")
+                if len(attr_filters) > 0:
+                    json_data = dict((a, json_data['Attributes'][attr])
+                                     for attr in json_data['Attributes'] for a in attr_filters
+                                     if a.lower() in attr.lower())
+            else:
+                json_data = dict((attr, json_data['Attributes'][attr])
+                                 for attr in json_data['Attributes']
+                                 if attr_filter.lower() in attr.lower())
+        return json_data
+
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
+    def api_delete_call(
+            self, req, hdr: Dict) -> requests.models.Response:
+        """Make api request for delete method.
+        :param req: request
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: request.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            headers.update({'X-Auth-Token': self.x_auth})
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
+                headers=headers,
+            )
+        return tracing.traced_request(req, "DELETE", request_call)
+
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
+    def api_post_call(
+            self, req: str, payload: str, hdr: dict) -> requests.models.Response:
+        """Make HTTP post request.
+        :param req: path to a path request
+        :param payload:  json payload
+        :param hdr: header that will append.
+        :return: response.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            headers.update({'X-Auth-Token': self.x_auth})
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
+            )
+        return tracing.traced_request(req, "POST", request_call)
+
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
+    async def api_async_post_call(
+            self, loop, req: str, payload: str, hdr: Dict):
+        """Make post api request either with x-auth authentication header or redfish_ctl.
+        :param loop:  asyncio event loop
+        :param req:  request
+        :param payload:  json payload
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: request.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.post,
+                req,
+                data=payload,
+                headers=headers,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
+            )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "POST", request_call),
+        )
+
+    async def api_async_patch_until_complete(
+            self, r: str,
+            payload: str,
+            hdr: Dict,
+            loop=None,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
+        """Make async patch api request until completion , it issues post with x-auth
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
+
+        :param expected:
+        :param ignore_error_code:
+        :param r: request.
+        :param hdr: http header.
+        :param loop: asyncio loop
+        :param payload: json payload
+        :return:
+        """
+        if loop is None:
+            loop = self._event_loop()
+        response = await self.api_async_patch_call(loop, r, payload, hdr)
+        api_respond_status = await self.async_default_patch_success(
+            await response, expected=expected, ignore_error_code=ignore_error_code)
+        return await response, api_respond_status
+
+    async def api_async_delete_until_complete(
+            self, r: str,
+            payload: str,
+            hdr: Dict,
+            loop=None,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
+        """Make async patch api request until completion , it issues post with x-auth
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
+
+        :param expected:
+        :param ignore_error_code:
+        :param r: request.
+        :param hdr: http header.
+        :param loop: asyncio loop
+        :param payload: json payload
+        :return:
+        """
+        if loop is None:
+            loop = self._event_loop()
+        response = await self.api_async_delete_call(loop, r, payload, hdr)
+        api_respond_status = await self.async_default_delete_success(
+            await response, expected=expected, ignore_error_code=ignore_error_code)
+        return await response, api_respond_status
+
+    async def api_async_post_until_complete(
+            self, r: str,
+            payload: str,
+            hdr: Dict,
+            loop=None,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0
+    ) -> Tuple[requests.models.Response, RedfishApiRespond]:
+        """Make async post api request until completion , it issues post with x-auth
+        authentication header or redfish_ctl. Caller can use this in asyncio routine.
+
+        :param expected:
+        :param r: request.
+        :param hdr: http header
+        :param ignore_error_code: error code that we need ignore.
+        :param loop: asyncio loop
+        :param payload: json payload
+        :return:
+        """
+        if loop is None:
+            loop = self._event_loop()
+        response = await self.api_async_post_call(loop, r, payload, hdr)
+        api_respond_status = await self.async_default_post_success(
+            await response, ignore_error_code=ignore_error_code, expected=expected
+        )
+        return await response, api_respond_status
+
+    @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
+    def api_patch_call(
+            self, req: str, payload: str, hdr: dict, ) -> requests.models.Response:
+        """Make api patch request.
+        :param req: path to a path request
+        :param payload: json payload
+        :param hdr: header that will append.
+        :return: response.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            headers.update({'X-Auth-Token': self.x_auth})
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
+            )
+        return tracing.traced_request(req, "PATCH", request_call)
+
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
+    async def api_async_patch_call(
+            self, loop, req, payload: str, hdr: Dict):
+        """Make async post api request either with
+        x-auth authentication header or redfish_ctl.
+
+        :param loop:  asyncio event loop
+        :param req:  request
+        :param payload:  json payload
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: request.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.patch,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
+            )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "PATCH", request_call),
+        )
+
+    @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
+    async def api_async_delete_call(
+            self, loop, req, payload: str, hdr: Dict):
+        """Make async delete api request either with
+        x-auth authentication header or redfish_ctl.
+
+        :param loop:  asyncio event loop
+        :param req:  request
+        :param payload:  json payload
+        :param hdr: http header dict that will append to HTTP/HTTPS request.
+        :return: request.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+
+        if self.x_auth is not None:
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+            )
+        else:
+            request_call = functools.partial(
+                requests.delete,
+                req,
+                data=payload,
+                verify=self._is_verify_cert,
+                headers=headers,
+                auth=(self._username, self._password),
+            )
+        return loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "DELETE", request_call),
+        )
+
+    def read_api_respond(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default success handler,  Check for status code.
+        In case of critical error raise exception. If exception expected
+        i.e. operation canceled.
+
+        Expected allow to overwrite if API return expect something different
+        200, 201, 202, 204
+
+        :param response: requests.models.Response: responses
+        :param ignore_error_code: error code to ignore.
+        :param expected:  Option status code that we caller consider success.
+        :return: RedfishApiRespond if httm method request succeed
+        :raise RedfishException if HTTP method failed.
+        """
+        # if location in the header , job created
+        self.logger.debug(f"read_api_respond response code {response.status_code}")
+
+        if response.headers is not None \
+                and RedfishJsonSpec.Location in response.headers:
+            return RedfishApiRespond.AcceptedTaskGenerated
+
+        if response.status_code == expected:
+            return self._http_code_mapping[response.status_code]
+
+        if ignore_error_code > 0 and ignore_error_code == response.status_code:
+            return self._http_code_mapping[response.status_code]
+
+        if 200 <= response.status_code < 300:
+            return self._http_code_mapping[response.status_code]
+
+        # Normalize the write-path error per the Redfish error contract: every
+        # raised exception carries the parsed RedfishError envelope (status,
+        # error.code, @Message.ExtendedInfo), never a flattened string. 405/409
+        # keep returning RedfishApiRespond.Error (the caller reads the envelope
+        # from self._redfish_error), so the return contract is unchanged.
+        self._redfish_error = IDracManager.parse_error(response)
+        if 300 <= response.status_code < 500:
+            if response.status_code == 400:
+                raise RedfishException(self._redfish_error)
+            if response.status_code == 401:
+                raise RedfishUnauthorized(self._redfish_error)
+            if response.status_code == 403:
+                raise RedfishForbidden(self._redfish_error)
+            if response.status_code == 404:
+                raise ResourceNotFound(self._redfish_error)
+            return RedfishApiRespond.Error
+        raise RedfishException(self._redfish_error)
+
+    def default_patch_success(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default delete success handler,  Check for status code.
+        and raise exception.  Default handler to check post
+        request respond.
+
+        :param response: HTTP response
+        :param ignore_error_code: error code to ignore.
+        :param expected:  Option status code that we caller consider success.
+        :return:
+        :raise: DeleteRequestFailed if POST Method failed
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    def default_post_success(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 200,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default post success handler. Map the response status or raise on failure.
+
+        :param response: HTTP response.
+        :param expected: status code the caller considers success.
+        :param ignore_error_code: HTTP status code to treat as success.
+        :return: RedfishApiRespond mapped from the response status.
+        :raise RedfishException: if the response reports a failure status.
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    def default_delete_success(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 200,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default delete success handler,  Check for status code.
+        and raise exception.  Default handler to check post
+        request respond.
+
+        :param response: HTTP response
+        :param ignore_error_code: error code to ignore.
+        :param expected:  Option status code that we caller consider success.
+        :return:
+        :raise; DeleteRequestFailed if POST Method failed
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    async def async_default_post_success(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default error handler, for post
+        :param expected:
+        :param response: response HTTP response.
+        :param ignore_error_code: ignore HTTP statue error.
+        :return: True or False and if failed raise exception
+        :raise  PostRequestFailed
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    async def async_default_delete_success(
+            self,
+            response: requests.models.Response,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default error handler, for post
+        :param ignore_error_code:
+        :param expected:
+        :param response: response HTTP response.
+        :return: True or False and if failed raise exception
+        :raise  PostRequestFailed
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    async def async_default_patch_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Default error handler for patch http method.
+        :param expected:
+        :param response: response HTTP response.
+        :param ignore_error_code: ignore HTTP statue error.
+        :return: True or False and if failed raise exception
+        """
+        return self.read_api_respond(
+            response, expected=expected, ignore_error_code=ignore_error_code
+        )
+
+    @staticmethod
+    def _redact_sensitive_payload(payload):
+        """Return a copy of a request payload with secret-like fields masked.
+
+        :param payload: JSON-compatible request payload.
+        :return: payload copy safe for debug logging.
+        """
+        sensitive_exact = {"apikey", "api_key", "accesskey", "access_key"}
+        sensitive_suffixes = ("password", "secret", "token")
+
+        if isinstance(payload, dict):
+            redacted = {}
+            for key, value in payload.items():
+                key_text = str(key).lower()
+                if key_text in sensitive_exact or key_text.endswith(sensitive_suffixes):
+                    redacted[key] = "********"
+                else:
+                    redacted[key] = IDracManager._redact_sensitive_payload(value)
+            return redacted
+        if isinstance(payload, list):
+            return [
+                IDracManager._redact_sensitive_payload(value)
+                for value in payload
+            ]
+        return payload
+
+
+    def base_request_respond(
+            self,
+            resource: str,
+            method: HTTPMethod,
+            payload: Optional[dict] = None,
+            do_async: Optional[bool] = False,
+            data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 200,
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
+        """A base http post/patch/delete method.
+
+        Return result as command result named tuples and RedfishApiRespond
+        reflect API respond enum based on HTTP/HTTPS status replay
+
+        :param method: http method POST/PATCH etc.
+        :param ignore_error_code: error code that don't consider an error.
+                                  main for case when job , task canceled.
+                                  and we don't consider 404 not found as error.
+        :param resource:  a request to api,  /redfish/v1/
+        :param payload: a json payload if payload is empty caller need pass empty dict
+        :param do_async: for asynced request.
+        :param data_type: a data-type json/xml
+        :param expected_status: expected status code depend on patch msg.
+        :return: Tuple of CommandResult, RedfishApiRespond
+        """
+        headers = {}
+        if data_type == "json":
+            headers.update(self.json_content_type)
+
+        pd = payload if payload is not None else {}
+        log_payload = self._redact_sensitive_payload(pd)
+
+        self.logger.debug(f"Issuing {method} request to "
+                          f"resource: {resource}, "
+                          f"payload: {json.dumps(log_payload)}")
+
+        err = None
+        response = None
+        api_resp = RedfishApiRespond.Error
+        self._redfish_error = None
+        try:
+            r = f"{self._default_method}{self.redfish_ip}{resource}"
+            if not do_async:
+                if method == HTTPMethod.PATCH:
+                    response = self.api_patch_call(
+                        r, json.dumps(pd), headers
+                    )
+                    api_resp = self.default_patch_success(
+                        response, expected=expected_status,
+                        ignore_error_code=ignore_error_code
+                    )
+                if method == HTTPMethod.POST:
+                    response = self.api_post_call(
+                        r, json.dumps(pd), headers
+                    )
+                    api_resp = self.default_post_success(
+                        response, expected=expected_status,
+                        ignore_error_code=ignore_error_code
+                    )
+                if method == HTTPMethod.DELETE:
+                    response = self.api_delete_call(
+                        r, headers
+                    )
+                    api_resp = self.default_delete_success(
+                        response, expected=expected_status,
+                        ignore_error_code=ignore_error_code
+                    )
+            else:
+                loop = self._event_loop()
+                # The api_async_*_until_complete helpers return
+                # (Response, RedfishApiRespond) - the same order the sync branch
+                # above binds. Unpacking them the other way round bound the enum
+                # to `response` and the Response object to `api_resp`, so on the
+                # async path parse_json_respond_msg() received an enum and
+                # api_success_msg() did a dict lookup with a Response as the key,
+                # raising KeyError AFTER the write had already been sent.
+                if method == HTTPMethod.PATCH:
+                    response, api_resp = loop.run_until_complete(
+                        self.api_async_patch_until_complete(
+                            r, json.dumps(pd), headers,
+                            expected=expected_status,
+                            ignore_error_code=ignore_error_code
+                        )
+                    )
+                if method == HTTPMethod.POST:
+                    response, api_resp = loop.run_until_complete(
+                        self.api_async_post_until_complete(
+                            r, json.dumps(pd), headers,
+                            expected=expected_status,
+                            ignore_error_code=ignore_error_code
+                        )
+                    )
+                if method == HTTPMethod.DELETE:
+                    response, api_resp = loop.run_until_complete(
+                        self.api_async_delete_until_complete(
+                            r, json.dumps(pd), headers,
+                            expected=expected_status,
+                            ignore_error_code=ignore_error_code
+                        )
+                    )
+        except PatchRequestFailed as pf:
+            self.logger.critical(
+                pf, exc_info=self._is_debug
+            )
+            err = pf
+        except PostRequestFailed as pf:
+            self.logger.critical(
+                pf, exc_info=self._is_debug
+            )
+            err = pf
+        except DeleteRequestFailed as pf:
+            self.logger.critical(
+                pf, exc_info=self._is_debug)
+            err = pf
+
+        redfish_resp = None
+        if response is not None:
+            redfish_resp = self.parse_json_respond_msg(response)
+
+        # if task id available, we fetch task/job id from header
+        # and include in return api
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
+            task_id = self.job_id_from_response(response)
+            return CommandResult(
+                {"task_id": task_id}, None, None, None), api_resp
+
+        api_resp_msg = self.api_success_msg(api_resp)
+        if redfish_resp is not None:
+            api_resp_msg.update(api_resp_msg)
+        if api_resp == RedfishApiRespond.Error and err is None:
+            err = self._redfish_error
+            if err is None and response is not None:
+                err = self.parse_error(response)
+
+        return CommandResult(api_resp_msg, None, None, err), api_resp
+
+    def base_post(self,
+                  resource: str,
+                  payload: Optional[dict] = None,
+                  do_async: Optional[bool] = False,
+                  data_type: Optional[str] = "json",
+                  expected_status: Optional[int] = 204,
+                  ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
+        """Base http post request for redfish remote api.
+
+        Returns CommandResult and data field contain a data payload.
+        If such data is present. In most case post doesn't return anything.
+
+        Method return a tuple CommandResult, RedfishApiRespond
+        provide option if post accepted , ok status just ok or failed.
+
+        Meanwhile, in case error CommandResult. Error
+        store Redfish error if any.
+
+        :param ignore_error_code:
+        :param resource: a remote redfish api resource
+        :param payload: a json payload
+        :param do_async: whether we do asyncio or not
+        :param data_type: a default data type json or xml.
+        :param expected_status: in case we expect http status that different from spec.
+        :return: Tuple[CommandResult, RedfishApiRespond]
+        :raise: PostRequestFailed for all error that we can't handle.
+                i.e. error like api return are not exception.
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.POST, payload=payload,
+            do_async=do_async, data_type=data_type,
+            expected_status=expected_status, ignore_error_code=ignore_error_code,
+        )
+
+    def base_patch(
+            self,
+            resource: str,
+            payload: Optional[dict] = None,
+            do_async: Optional[bool] = False,
+            data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
+        """Base http post request for redfish remote api.
+
+        Returns CommandResult and data field contain a data payload.
+        If such data is present. In most case post doesn't return anything.
+
+        Method return a tuple CommandResult, RedfishApiRespond
+        provide option if post accepted , ok status just ok or failed.
+
+        Meanwhile, in case error CommandResult. Error
+        store Redfish error if any.
+
+        :param ignore_error_code:
+        :param resource: a remote redfish api resource
+        :param payload: a json payload
+        :param do_async: whether we do asyncio or not
+        :param data_type: a default data type json or xml.
+        :param expected_status: in case we expect http status that different from spec.
+        :return: Tuple[CommandResult, RedfishApiRespond]
+        :raise: PostRequestFailed for all error that we can't handle.
+                i.e. error like api return are not exception.
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.PATCH, payload=payload,
+            do_async=do_async, data_type=data_type,
+            expected_status=expected_status, ignore_error_code=ignore_error_code,
+        )
+
+    def base_delete(
+            self,
+            resource: str,
+            payload: Optional[dict] = None,
+            do_async: Optional[bool] = False,
+            data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple[CommandResult, RedfishApiRespond]:
+        """Base http delete request for redfish remote api.
+
+        Returns CommandResult and data field contain a data payload.
+        If such data is present. In most case post doesn't return anything.
+
+        Method return a tuple CommandResult, RedfishApiRespond
+        provide option if post accepted , ok status just ok or failed.
+
+        Meanwhile, in case error CommandResult. Error
+        store Redfish error if any.
+
+        :param ignore_error_code:
+        :param resource: a remote redfish api resource
+        :param payload: a json payload
+        :param do_async: whether we do asyncio or not
+        :param data_type: a default data type json or xml.
+        :param expected_status: in case we expect http status that different from spec.
+        :return: Tuple[CommandResult, RedfishApiRespond]
+        :raise: PostRequestFailed for all error that we can't handle.
+                i.e. error like api return are not exception.
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.DELETE, payload=payload,
+            do_async=do_async, data_type=data_type,
+            expected_status=expected_status, ignore_error_code=ignore_error_code,
+        )
+
+
+    def reboot(
+            self,
+            do_watch: Optional[bool] = False,
+            power_state_attr: Optional[str] = "PowerState",
+            default_reboot_type: Optional[ResetType] = ResetType.ForceRestart.value) -> CommandResult:
+        """Reboot a chassis, if chassis in power down state.
+
+        Reboot on power down state is no op, method return
+        chassis data. caller need check CommandResult data
+        and if required Change power state.
+
+        :param do_watch: if reboot respond with task_id, do watch
+                         passed to reboot and block reboot complete.
+        :param default_reboot_type: ResetType.ForceRestart: type reboot.
+        :param power_state_attr:  is attribute method check
+                to determine chassis up or in power done state.
+        :return:
+        """
+        # state of chassis
+        cmd_chassis = self.sync_invoke(
+            ApiRequestType.ChassisQuery,
+            "chassis_service_query",
+            data_filter=power_state_attr
+        )
+
+        if cmd_chassis.error is not None:
+            self.logger.info(
+                "Failed to fetch a chassis power state. Chassis return error."
+            )
+            return cmd_chassis
+
+        if isinstance(cmd_chassis.data, dict) and REDFISH_JSON.PowerState in cmd_chassis.data:
+            pd_state = cmd_chassis.data[power_state_attr]
+            if pd_state.lower() == 'on':
+                return self.sync_invoke(
+                    ApiRequestType.ComputerSystemReset, "reboot",
+                    reset_type=default_reboot_type,
+                    do_wait=do_watch
+                )
+            else:
+                self.logger.info(
+                    f"Can't reboot a host, "
+                    f"chassis power state in {pd_state} state."
+                )
+                return CommandResult({}, None, None, None)
+        else:
+            self.logger.info(
+                "Failed to acquire current power state."
+            )
+
+        return cmd_chassis
+
+    @cached_property
+    def idrac_firmware(self) -> str:
+        """Shared method return the BMC firmware
+        :return: str: firmware.
+        """
+        api_return = self.base_query(self.idrac_members,
+                                     key=REDFISH_JSON.FirmwareVersion)
+        return api_return.data
+
+    def idrac_last_reset(self) -> datetime:
+        """Shared method returns the BMC last reset time as datatime
+        :return: datetime
+        """
+        idrac_reset_time = None
+        api_return = self.base_query(self.idrac_members,
+                                     key=REDFISH_JSON.LastResetTime)
+        try:
+            idrac_reset_time = datetime.fromisoformat(api_return.data)
+        except ValueError as ve:
+            self.logger.error(ve)
+        return idrac_reset_time
+
+    def idrac_current_time(self) -> datetime:
+        """Shared method return the BMC current time, if the BMC
+        return none ISO format
+        :return: datetime
+        """
+        idrac_time = None
+        api_return = self.base_query(self.idrac_members,
+                                     key=REDFISH_JSON.Datatime)
+        try:
+            idrac_time = datetime.fromisoformat(api_return.data)
+        except ValueError as ve:
+            self.logger.error(ve)
+        return idrac_time
+
+    @staticmethod
+    def local_time_iso():
+        """return local time in iso format
+        :return: the BMC local time
+        """
+        current_date = datetime.now()
+        return current_date.isoformat()
+
+    def idrac_time_offset(self):
+        """
+        :return:  the BMC time zone
+        """
+        api_resp = self.base_query(self.idrac_members,
+                                   key=REDFISH_JSON.DateTimeLocalOffset)
+        return api_resp.data
+
+    @cached_property
+    def idrac_manage_chassis(self) -> str:
+        """Shared method return the BMC managed chassis list as json
+        :return: str: manage chassis i.e. /redfish/v1/Chassis/System.Embedded.1
+        """
+        api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
+        if api_resp.data is not None and REDFISH_JSON.ManageChassis in api_resp.data:
+            if isinstance(api_resp.data, dict):
+                manage_chassis = api_resp.data[REDFISH_JSON.ManageChassis]
+                self._manage_chassis_obs = manage_chassis
+                return self.value_from_json_list(
+                    manage_chassis, REDFISH_JSON.Data_id
+                )
+        else:
+            self.logger.error("")
+        return ""
+
+    @cached_property
+    def idrac_managers_count(self) -> str:
+        """Return manager count. typically it 1
+        :return:
+        """
+        cmd_result = self.base_query(f"{REDFISH_API.IDRAC_MANAGER}")
+        return cmd_result.data["Members@odata.count"]
+
+    @cached_property
+    def idrac_manager_version(self) -> str:
+        """Remote BMC version.
+        :return:
+        """
+        cmd_result = self.base_query(
+            f"{REDFISH_API.IDRAC_MANAGER}", key=REDFISH_JSON.Members)
+
+        # the tool only manages one instance.
+        member_list = cmd_result.data
+        if len(member_list) > 1:
+            logging.warning("idrac manage more than one entity")
+        elif len(member_list) == 1:
+            member = member_list[-1]
+            if RedfishJson.Data_id in member:
+                member_target = member[RedfishJson.Data_id]
+                cmd_result = self.base_query(
+                    member_target,
+                    key=REDFISH_JSON.IDracFirmwareVersion
+                )
+                return cmd_result.data
+        else:
+            raise ResourceNotFound("no iDRAC manager member found")
+
+    @cached_property
+    def idrac_id(self):
+        """Shared method return the manager id, i.e. System.Embedded.1
+        id cached all follow-up calls and will return cached result.
+        :return:
+        """
+        self.base_query(self.idrac_manage_servers, key=REDFISH_JSON.Id)
+        api_resp = self.base_query(self.idrac_manage_servers, key=REDFISH_JSON.Id)
+        if api_resp is None:
+            self.logger.critical(f"failed obtain {REDFISH_JSON.Id}")
+        return api_resp.data
+
+
+    @staticmethod
+    def schedule_job_request(
+            reboot_type: ScheduleJobType,
+            start_time_isofmt: Optional[str],
+            duration_time: Optional[int]) -> dict:
+        """Create a JSON payload for schedule a job, either
+        somewhere in future or OnReset.
+
+        :param reboot_type: reboot type, ScheduleJobType
+        :param start_time_isofmt: start time for a job in ISO format.
+        :param duration_time: duration for a job
+        :return:
+        """
+        if reboot_type == ScheduleJobType.NoReboot:
+            pd = {
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.InMaintenance,
+                    REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
+                    REDFISH_JSON.MaintenanceWindowDuration: duration_time
+                }
+            }
+        elif reboot_type == ScheduleJobType.AutoReboot:
+            pd = {
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.AtMaintenance,
+                    REDFISH_JSON.MaintenanceWindowStartTime: start_time_isofmt,
+                    REDFISH_JSON.MaintenanceWindowDuration: duration_time
+                }
+            }
+        elif reboot_type == ScheduleJobType.OnReset:
+            pd = {
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.OnReset
+                }
+            }
+        elif reboot_type == ScheduleJobType.Immediate:
+            pd = {
+                REDFISH_JSON.RedfishSettingsApplyTime: {
+                    REDFISH_JSON.ApplyTime: DellApplyTypes.Immediate
+                }
+            }
+        else:
+            raise InvalidArgumentFormat(
+                "Invalid settings apply time.")
+        return pd
+
+    @staticmethod
+    def make_future_job_ts(start_date: str,
+                           start_time: str,
+                           is_json_string=False) -> str:
+        """Make a future time for a maintenance task.
+
+        Specifically @Redfish.MaintenanceWindow
+
+        It takes start_date in format YYYY-MM-DD
+        and starts time in format HH:MM:SS and return
+        JSON string time in ISO format.
+
+        "2023-02-08T01:01:01.000001"
+
+       :param start_date: start date for a job YYYY-MM-DD
+       :param start_time: a start time for a job HH:MM:SS
+       :param is_json_string: return a JSON string when True, else a plain string.
+       :return: the future timestamp in ISO 8601 format (JSON-encoded when
+           ``is_json_string`` is True).
+       :raise: MissingMandatoryArguments if mandatory args missing.
+       :raise: InvalidArgumentFormat if format of the input is invalid.
+       """
+        if start_date is None or len(start_date) == 0:
+            raise MissingMandatoryArguments(
+                "A maintenance job requires a start date.")
+
+        if start_time is None or len(start_time) == 0:
+            raise MissingMandatoryArguments(
+                "A maintenance job requires a start time.")
+        try:
+            local_timestamp = datetime.now()
+            ts = f'{start_date}T{start_time}.000001'
+            start_timestamp = datetime.fromisoformat(ts)
+            if start_timestamp < local_timestamp:
+                raise InvalidArgumentFormat(
+                    f"Start time is in the past local time "
+                    f"{str(local_timestamp)} {str(start_timestamp)}")
+
+            # note we always parse to make sure we can convert.
+            json_str = json.dumps(start_timestamp.isoformat())
+            if is_json_string:
+                return json_str
+            else:
+                return start_timestamp.isoformat()
+        except ValueError as ve:
+            raise InvalidArgumentFormat(str(ve))
+        except TypeError as te:
+            raise InvalidArgumentFormat(str(te))
+
+    def create_apply_time_req(self,
+                              apply: str,
+                              start_date: str,
+                              start_time: str,
+                              default_duration):
+        """
+        The settings apply time and operation apply time annotations
+        enable an operation to be performed during a maintenance window
+        :param apply: apply-time selector: auto-boot, maintenance, or on-reset.
+        :param start_date: a date as string
+        :param start_time: a start time for a future job
+        :param default_duration: a duration
+        :return: the settings apply-time request payload built by
+            :meth:`schedule_job_request`.
+        :raise InvalidArgumentFormat will raise in case we can't parse args
+        :raise ValueError if unknown apply type
+        """
+        if apply.strip().lower() == "auto-boot":
+            start_timestamp = self.make_future_job_ts(start_date, start_time)
+            return self.schedule_job_request(
+                ScheduleJobType.AutoReboot,
+                start_time_isofmt=start_timestamp,
+                duration_time=default_duration
+            )
+        elif apply.strip().lower() == "maintenance":
+            start_timestamp = self.make_future_job_ts(start_date, start_time)
+            return self.schedule_job_request(
+                ScheduleJobType.NoReboot,
+                start_time_isofmt=start_timestamp,
+                duration_time=default_duration
+            )
+        elif apply.strip().lower() == "on-reset":
+            return self.schedule_job_request(
+                ScheduleJobType.OnReset,
+                start_time_isofmt=None,
+                duration_time=None
+            )
+        else:
+            raise ValueError("Unknown apply time")
+
+    def api_success_msg(self,
+                        api_respond: RedfishApiRespond,
+                        message_key: Optional[str] = "message",
+                        message=None) -> Dict:
+        """A default api success respond,
+        Return dict contains Status, and it describes whether rest return
+        ok, accepted or success.
+
+        if message and msg key provide msg key added to a dict.
+        for example if we want to add extra information about success.
+
+        :param api_respond: respond enum. we report to upper ok, accepted, success.
+        :param message_key: key we need add extra
+        :param message: message information data
+        :return: a dict
+        """
+        return_dict = {
+            "Status": self._api_respond_to_string[api_respond]
+        }
+
+        if message is not None:
+            return_dict[message_key] = message
+
+        return return_dict
+
+    @property
+    def power_state(self) -> PowerState:
+        """
+        :return:
+        """
+        cmd_result = self.base_query(self.idrac_manage_chassis,
+                                     do_async=False,
+                                     do_expanded=True)
+
+        if cmd_result.error is not None:
+            return PowerState.Unknown
+
+        if REDFISH_JSON.PowerState not in cmd_result.data:
+            raise UnexpectedResponse(f"{REDFISH_JSON.PowerState} not present in respond.")
+
+        power_state = cmd_result.data[REDFISH_JSON.PowerState]
+        if 'On' in power_state:
+            return PowerState.On
+        if 'Off' in power_state:
+            return PowerState.Off
+
+    def chassis_string_property(self, property_name: str) -> str:
+        """ Return chassis string property
+        :param property_name:
+        :return:
+        """
+        cmd_result = self.base_query(self.idrac_manage_chassis,
+                                     do_async=False,
+                                     do_expanded=True)
+
+        if property_name not in cmd_result.data:
+            raise UnexpectedResponse(f"{property_name} not present in respond.")
+
+        json_property = cmd_result.data[property_name]
+        if not isinstance(json_property, str):
+            raise UnexpectedResponse(f"{property_name} must be a string.")
+
+        return cmd_result.data[property_name]
+
+    @cached_property
+    def serial(self) -> str:
+        """return chassis serial number
+        :return: str: chassis serial number
+        """
+        return self.chassis_string_property("SerialNumber")
+
+    @cached_property
+    def chassis_type(self) -> str:
+        """return chassis type
+        :return: str: chassis type
+        """
+        return self.chassis_string_property("ChassisType")
+
+    @cached_property
+    def chassis_uuid(self) -> str:
+        """return chassis uuid
+        :return: str: chassis uuid
+        """
+        return self.chassis_string_property("UUID")
+
+    # def sysmgmt(self):

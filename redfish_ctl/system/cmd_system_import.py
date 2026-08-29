@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
-class ImportSystemConfig(RedfishManagerBase,
+class ImportSystemConfig(IDracManager,
                          scm_type=ApiRequestType.ImportSystem,
                          name='import_sysconfig',
                          metaclass=Singleton):
@@ -144,7 +144,7 @@ class ImportSystemConfig(RedfishManagerBase,
                    "ShareParameters": {"Target": "ALL"}
                    }
 
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ImportSystemConfiguration"
 
         data = {}

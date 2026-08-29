@@ -10,13 +10,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishJson
 
 
-class BiosQueryPending(RedfishManagerBase,
+class BiosQueryPending(RedfishManager,
                        scm_type=ApiRequestType.BiosQueryPending,
                        name='bios_query_pending',
                        metaclass=Singleton):
@@ -62,7 +61,7 @@ class BiosQueryPending(RedfishManagerBase,
         :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
-        target_api = f"{self.idrac_manage_servers}/Bios/Settings"
+        target_api = f"{self.managed_system_uri}/Bios/Settings"
         if data_filter:
             do_expanded = True
 

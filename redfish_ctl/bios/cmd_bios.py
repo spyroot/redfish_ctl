@@ -27,21 +27,20 @@ On time boot
 
 Author Mus spyroot@gmail.com
 """
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed, find_ids, from_json_spec
-from ..custom_argparser.customer_argdefault import BiosSubcommand
-from ..custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API
-from ..redfish_manager_shared import REDFISH_JSON
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..cmd_utils import find_ids, from_json_spec, save_if_needed
+from ..custom_argparser.customer_argdefault import (
+    BiosSubcommand,
+    CustomArgumentDefaultsHelpFormatter,
+)
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BiosQuery(RedfishManagerBase,
+class BiosQuery(IDracManager,
                 scm_type=ApiRequestType.BiosQuery,
                 name='bios_inventory',
                 metaclass=Singleton):
@@ -141,7 +140,6 @@ class BiosQuery(RedfishManagerBase,
         :param filename: if filename signals  data must save to file, a bios setting to a file.
         :return:
         """
-        from_file = False
         idrac_api = f"{self.idrac_manage_servers}{REDFISH_API.BIOS}"
 
         if verbose:
@@ -156,7 +154,7 @@ class BiosQuery(RedfishManagerBase,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r: str = f"{self._default_method}{self.idrac_ip}{idrac_api}"
+        r: str = f"{self._default_method}{self.redfish_ip}{idrac_api}"
         if not do_async:
             response = self.api_get_call(r, headers)
             self.default_error_handler(response)
@@ -198,7 +196,7 @@ class BiosQuery(RedfishManagerBase,
             api_links = find_ids(data, REDFISH_JSON.Data_id)
             api_links = [u for u in api_links if idrac_api != u]
             for api_link in api_links:
-                r = f"{self._default_method}{self.idrac_ip}{api_link}"
+                r = f"{self._default_method}{self.redfish_ip}{api_link}"
                 if not do_async:
                     response = self.api_get_call(r, headers)
                     self.default_error_handler(response)

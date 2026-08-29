@@ -9,28 +9,15 @@ BMC and returns the command's JSON result. Only allow-listed read commands from
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlsplit
 
-from ..redfish_manager_base import RedfishManagerBase
+from ..config import endpoint_defaults, named_env
+from ..idrac_manager import IDracManager
 from .catalog import CATALOG, catalog_json, resolve
-
-
-def _env_first(*names: str, default: str = "") -> str:
-    """Return the first set environment variable value (REDFISH_* before IDRAC_*).
-
-    :param default: value returned when none of ``names`` is set.
-    :return: the first non-empty environment value, or ``default``.
-    """
-    for name in names:
-        value = os.environ.get(name)
-        if value:
-            return value
-    return default
 
 
 def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
@@ -39,7 +26,7 @@ def invoke_command(manager: Any, command: str, **kwargs: Any) -> dict[str, Any]:
     Only allow-listed read commands are dispatched; an unknown name raises KeyError
     as a guard against invoking any mutating action.
 
-    :param manager: RedfishManagerBase used to dispatch the command.
+    :param manager: IDracManager used to dispatch the command.
     :param command: allow-listed read command name from the catalog.
     :return: ``{"ok": True, "data": ...}`` on success, or
         ``{"ok": False, "error": ..., "data": ...}`` on a command error.
@@ -195,7 +182,7 @@ class _Handler(BaseHTTPRequestHandler):
     # serializes the actual command invocations so concurrent POSTs can't
     # interleave on that session and return each other's payloads.
     invoke_lock = threading.Lock()
-    manager_factory = None  # callable[[], RedfishManagerBase]
+    manager_factory = None  # callable[[], IDracManager]
     target_label = ""
 
     def log_message(self, *_a: Any) -> None:
@@ -205,7 +192,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _get_manager(self) -> Any:
         """Return the shared manager, building it once under the manager lock.
 
-        :return: the lazily constructed RedfishManagerBase instance.
+        :return: the lazily constructed IDracManager instance.
         """
         with self.manager_lock:
             if self.__class__.manager is None:
@@ -281,26 +268,29 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def make_manager_factory():
-    """Build a factory that constructs the tool's RedfishManagerBase from env/flags.
+    """Build a factory that constructs the tool's IDracManager from env/flags.
 
     :return: tuple of (manager factory callable, ``"address:port"`` target label).
     """
-    address = _env_first("REDFISH_IP", "IDRAC_IP")
-    username = _env_first("REDFISH_USERNAME", "IDRAC_USERNAME", default="root")
-    password = _env_first("REDFISH_PASSWORD", "IDRAC_PASSWORD")
-    port = int(_env_first("REDFISH_PORT", "IDRAC_PORT", default="443"))
-    scheme = _env_first("REDFISH_SCHEME", default="https")
+    # Canonical endpoint resolution lives in the config loader. Scheme is
+    # resolved separately because it is not part of EndpointConfig.
+    endpoint = endpoint_defaults(strict=False)
+    address = endpoint.host
+    username = endpoint.username
+    password = endpoint.password
+    port = endpoint.port
+    scheme = named_env("REDFISH_SCHEME", "https")
 
-    def factory() -> RedfishManagerBase:
-        """Construct a RedfishManagerBase from the captured connection settings.
+    def factory() -> IDracManager:
+        """Construct a IDracManager from the captured connection settings.
 
-        :return: a new RedfishManagerBase for the configured BMC.
+        :return: a new IDracManager for the configured BMC.
         """
-        return RedfishManagerBase(
-            idrac_ip=address,
-            idrac_username=username,
-            idrac_password=password,
-            idrac_port=port,
+        return IDracManager(
+            host=address,
+            username=username,
+            password=password,
+            port=port,
             insecure=True,
             is_http=(scheme == "http"),
             is_debug=False,
@@ -322,7 +312,7 @@ class ExplorerServer(ThreadingHTTPServer):
 
 
 def run_server(bind_host: str = "0.0.0.0", bind_port: int = 8299) -> None:  # pragma: no cover
-    """Serve the explorer, reading the target BMC from REDFISH_*/IDRAC_* env.
+    """Serve the explorer, reading the target BMC from REDFISH_* env.
 
     :param bind_host: interface address to bind the HTTP server to.
     :param bind_port: TCP port to listen on.

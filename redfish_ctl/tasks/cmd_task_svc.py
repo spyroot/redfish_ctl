@@ -11,12 +11,12 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class Manager(RedfishManagerBase,
+class Manager(IDracManager,
               scm_type=ApiRequestType.ManagerQuery,
               name='task_svc_query',
               metaclass=Singleton):
@@ -58,7 +58,7 @@ class Manager(RedfishManagerBase,
         if data_type == "json":
             headers.update(self.json_content_type)
         target = "/redfish/v1/TaskService"
-        r = f"{self._default_method}{self.idrac_ip}{target}"
+        r = f"{self._default_method}{self.redfish_ip}{target}"
         response = self.api_get_call(r, headers)
         data = response.json()
         redfish_actions = self.discover_redfish_actions(self, data)

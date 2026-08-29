@@ -1,13 +1,12 @@
-"""Reset a host ComputerSystem (ComputerSystem.Reset), vendor-neutral + guarded.
+"""Reset a host ComputerSystem through the shared DMTF command set.
 
-    redfish_ctl system-reset --reset_type GracefulRestart            # dry-run preview
-    redfish_ctl system-reset --reset_type GracefulRestart --confirm  # actually reset
+    redfish_ctl system-reset --reset_type GracefulRestart
+    redfish_ctl system-reset --reset_type GracefulRestart --confirm
 
 Powers/reboots the host via the ComputerSystem's own ``#ComputerSystem.Reset``
-action, discovered from the resource (no hardcoded Dell path), so it works on the
-host system whatever its id (System_0, System.Embedded.1, ...). The host system is
-resolved through ``idrac_manage_servers`` (which prefers the Bios/Boot-bearing
-host over a GPU baseboard).
+action, discovered from the resource rather than a hardcoded URI. The shared
+manager's ``managed_system_uri`` resolver prefers the Bios/Boot-bearing host
+over an accelerator baseboard.
 
 DESTRUCTIVE: this disrupts the running host, so it defaults to a DRY-RUN — it
 prints the resolved target + payload and POSTs nothing — until you pass
@@ -18,12 +17,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class SystemReset(RedfishManagerBase,
+class SystemReset(RedfishManager,
                   scm_type=ApiRequestType.SystemReset,
                   name='system_reset',
                   metaclass=Singleton):
@@ -80,7 +78,7 @@ class SystemReset(RedfishManagerBase,
                  POST) unless ``--confirm`` is given, otherwise the reset response.
         """
         return self.invoke_action(
-            self.idrac_manage_servers,
+            self.managed_system_uri,
             "Reset",
             payload={"ResetType": reset_type},
             full_action_type="#ComputerSystem.Reset",

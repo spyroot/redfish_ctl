@@ -10,12 +10,11 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ManagerReset(RedfishManagerBase,
+class ManagerReset(RedfishManager,
                    scm_type=ApiRequestType.ManagerReset,
                    name='manager_reset',
                    metaclass=Singleton):
@@ -88,7 +87,7 @@ class ManagerReset(RedfishManagerBase,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        t = f"{self.idrac_members}/Actions/Manager.Reset"
+        t = f"{self.manager_uri}/Actions/Manager.Reset"
         if do_graceful:
             pd = {
                 "ResetType": "GracefulRestart"

@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_manager import CommandResult
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
 from redfish_ctl.webui import catalog, server
 
 GB300_CORPUS = corpus_dir(
@@ -119,8 +119,8 @@ def test_invoke_nic_firmware_end_to_end_against_corpus():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=cb)
-        manager = RedfishManagerBase(
-            idrac_ip="mock-gb300", idrac_username="root", idrac_password="x",
+        manager = IDracManager(
+            host="mock-gb300", username="root", password="x",
             insecure=True, is_debug=False,
         )
         out = server.invoke_command(manager, "nic-firmware")

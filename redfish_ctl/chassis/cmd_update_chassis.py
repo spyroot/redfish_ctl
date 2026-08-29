@@ -17,12 +17,11 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ChassisUpdate(RedfishManagerBase,
+class ChassisUpdate(RedfishManager,
                     scm_type=ApiRequestType.ChassisUpdate,
                     name='update_chassis',
                     metaclass=Singleton):

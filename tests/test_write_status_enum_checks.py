@@ -19,7 +19,7 @@ from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
 from redfish_ctl.bios.cmd_change_boot_order import ChangeBootOrder
 from redfish_ctl.boot_source.cmd_update import BootSourceUpdate
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate
-from redfish_ctl.redfish_manager_shared import RedfishApiRespond
+from redfish_ctl.redfish_api_common import RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system_import import ImportSystemConfig
 
@@ -29,8 +29,8 @@ MOCK_SERVERS = "/redfish/v1/Systems/System.Embedded.1"
 def _cmd(cls):
     """A command instance with mock credentials (offline; nothing contacted)."""
     return cls(
-        idrac_ip="mock-idrac", idrac_username="root",
-        idrac_password="mock", insecure=True, is_debug=False,
+        host="mock-idrac", username="root",
+        password="mock", insecure=True, is_debug=False,
     )
 
 

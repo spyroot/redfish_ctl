@@ -5,10 +5,13 @@ set -euo pipefail
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-redfish-sandbox}"
 KIND_CONFIG="${KIND_CONFIG:-k8s/sandbox/kind-config.yaml}"
 NAMESPACE="${NAMESPACE:-redfish-sandbox}"
-SANDBOX_BACKENDS="${SANDBOX_BACKENDS:-corpus-mock}"
+SANDBOX_BACKENDS="${SANDBOX_BACKENDS:-corpus-mock,dmtf-sim}"
 STATUS_TIMEOUT_SECONDS="${STATUS_TIMEOUT_SECONDS:-180}"
 KUBECTL_CONTEXT="kind-${KIND_CLUSTER_NAME}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DMTF_BUNDLE_PATH="spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip"
+DMTF_CONTRACT_PATH="specs/sim/dmtf-sim-contract.yaml"
+DMTF_PROFILE_ROOT="/mockups/DSP2043_2026.1/public-rackmount1"
 
 cd "$REPO_ROOT"
 
@@ -39,7 +42,7 @@ validate_backends() {
 
 	for selected in "${BACKENDS[@]}"; do
 		case "$selected" in
-		corpus-mock | ilo-sim | all)
+		corpus-mock | dmtf-sim | ilo-sim | all)
 			;;
 		"")
 			printf 'SANDBOX_BACKENDS contains an empty backend\n' >&2
@@ -47,11 +50,53 @@ validate_backends() {
 			;;
 		*)
 			printf 'unknown SANDBOX_BACKENDS entry: %s\n' "$selected" >&2
-			printf 'valid entries: corpus-mock, ilo-sim, all\n' >&2
+			printf 'valid entries: corpus-mock, dmtf-sim, ilo-sim, all\n' >&2
 			exit 2
 			;;
 		esac
 	done
+}
+
+# Summary: prove the pinned DSP2043 Git-LFS object is hydrated and unchanged.
+# Arguments: none.
+# Environment: none.
+# Stdout: one content-addressed bundle summary.
+# Stderr: missing/LFS-pointer/hash-drift diagnostics.
+# Exit: 0 when the hydrated bundle matches the simulator contract; nonzero otherwise.
+# Side effects: read-only Git attributes and file hashing.
+# Idempotency: repeated calls only inspect the checkout.
+# Cleanup: none.
+assert_dmtf_bundle() {
+	local actual_sha
+	local expected_sha
+
+	if ! git check-attr filter -- "$DMTF_BUNDLE_PATH" | grep -Fq 'filter: lfs'; then
+		printf 'DSP2043 bundle is not tracked by Git LFS: %s\n' \
+			"$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+	if [ ! -s "$DMTF_BUNDLE_PATH" ]; then
+		printf 'DSP2043 bundle is missing or empty: %s\n' "$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+	if head -n 1 "$DMTF_BUNDLE_PATH" | \
+		grep -Fqx 'version https://git-lfs.github.com/spec/v1'; then
+		printf 'DSP2043 bundle is an unhydrated Git-LFS pointer; run:\n' >&2
+		printf '  git lfs pull --include=%s\n' "$DMTF_BUNDLE_PATH" >&2
+		return 1
+	fi
+
+	expected_sha="$(
+		awk '$1 == "sha256:" {gsub(/"/, "", $2); print $2; exit}' \
+			"$DMTF_CONTRACT_PATH"
+	)"
+	actual_sha="$(shasum -a 256 "$DMTF_BUNDLE_PATH" | awk '{print $1}')"
+	if [ -z "$expected_sha" ] || [ "$actual_sha" != "$expected_sha" ]; then
+		printf 'DSP2043 bundle hash mismatch: expected %s, got %s\n' \
+			"${expected_sha:-missing-contract-hash}" "$actual_sha" >&2
+		return 1
+	fi
+	printf 'DSP2043 bundle verified: release=2026.1 sha256=%s\n' "$actual_sha"
 }
 
 section() {
@@ -131,6 +176,68 @@ assert_corpus_status() {
 	fi
 	printf 'RedfishEndpoint %s status verified: health=%s temperature.count=%s\n' \
 		"$endpoint_name" "$health" "$temp_count"
+}
+
+# Summary: verify one named endpoint condition and reason.
+# Arguments: endpoint name, condition type, expected status, expected reason.
+# Environment: NAMESPACE selects the sandbox namespace.
+# Stdout: one verified condition summary.
+# Stderr: kubectl failures or the expected-versus-observed mismatch.
+# Exit: 0 on a match; nonzero on a read failure or mismatch.
+# Side effects: read-only Kubernetes API calls.
+# Idempotency: repeated calls only read current status.
+# Cleanup: none.
+assert_endpoint_condition() {
+	local endpoint_name="$1"
+	local condition_type="$2"
+	local expected_status="$3"
+	local expected_reason="$4"
+	local actual_status
+	local actual_reason
+	local status_path
+	local reason_path
+
+	status_path="{.status.conditions[?(@.type==\"${condition_type}\")].status}"
+	reason_path="{.status.conditions[?(@.type==\"${condition_type}\")].reason}"
+
+	actual_status="$(
+		kubectl_sandbox -n "${NAMESPACE}" \
+			get redfishendpoint "$endpoint_name" \
+			-o "jsonpath=${status_path}"
+	)"
+	actual_reason="$(
+		kubectl_sandbox -n "${NAMESPACE}" \
+			get redfishendpoint "$endpoint_name" \
+			-o "jsonpath=${reason_path}"
+	)"
+
+	if [ "$actual_status" != "$expected_status" ] || \
+		[ "$actual_reason" != "$expected_reason" ]; then
+		printf 'RedfishEndpoint %s condition %s expected %s/%s, got %s/%s\n' \
+			"$endpoint_name" "$condition_type" \
+			"$expected_status" "$expected_reason" \
+			"$actual_status" "$actual_reason" >&2
+		return 1
+	fi
+	printf 'RedfishEndpoint %s condition %s=%s reason=%s\n' \
+		"$endpoint_name" "$condition_type" "$actual_status" "$actual_reason"
+}
+
+# Summary: prove the running simulator pod contains the required DSP2043 files.
+# Arguments: none.
+# Environment: NAMESPACE selects the sandbox namespace.
+# Stdout: one verified in-pod profile summary.
+# Stderr: kubectl or missing-file diagnostics.
+# Exit: 0 when ServiceRoot and TaskService JSON are present; nonzero otherwise.
+# Side effects: read-only Kubernetes exec calls.
+# Idempotency: repeated calls only inspect the running container.
+# Cleanup: none.
+assert_dmtf_profile_in_pod() {
+	kubectl_sandbox -n "${NAMESPACE}" exec deploy/dmtf-sim -- \
+		test -s "${DMTF_PROFILE_ROOT}/index.json"
+	kubectl_sandbox -n "${NAMESPACE}" exec deploy/dmtf-sim -- \
+		test -s "${DMTF_PROFILE_ROOT}/TaskService/index.json"
+	printf 'dmtf-sim pod contains DSP2043 ServiceRoot and TaskService JSON\n'
 }
 
 node_profile_field() {
@@ -231,6 +338,11 @@ validate_backends
 require_tool docker
 require_tool kind
 require_tool kubectl
+if has_backend "dmtf-sim"; then
+	require_tool git
+	require_tool shasum
+	assert_dmtf_bundle
+fi
 
 section "building sandbox images"
 if has_backend "corpus-mock"; then
@@ -243,6 +355,12 @@ if has_backend "ilo-sim"; then
 	docker build \
 		-f docker/Dockerfile.ilo-sim \
 		-t redfish-ctl-ilo-sim:local \
+		.
+fi
+if has_backend "dmtf-sim"; then
+	docker build \
+		-f docker/Dockerfile.dmtf-sim \
+		-t redfish-ctl-dmtf-sim:local \
 		.
 fi
 docker build \
@@ -266,6 +384,9 @@ fi
 if has_backend "ilo-sim"; then
 	kind load docker-image redfish-ctl-ilo-sim:local --name "${KIND_CLUSTER_NAME}"
 fi
+if has_backend "dmtf-sim"; then
+	kind load docker-image redfish-ctl-dmtf-sim:local --name "${KIND_CLUSTER_NAME}"
+fi
 kind load docker-image redfish-ctl-controller:local --name "${KIND_CLUSTER_NAME}"
 
 section "applying sandbox resources"
@@ -285,6 +406,10 @@ if has_backend "ilo-sim"; then
 	kubectl_sandbox apply -f k8s/sandbox/ilo-sim.yaml
 	kubectl_sandbox apply -f k8s/sandbox/ilo-credentials.yaml
 fi
+if has_backend "dmtf-sim"; then
+	kubectl_sandbox apply -f k8s/sandbox/dmtf-sim.yaml
+	kubectl_sandbox apply -f k8s/sandbox/dmtf-credentials.yaml
+fi
 kubectl_sandbox apply -f k8s/controller/rbac.yaml
 kubectl_sandbox apply -f k8s/controller/deployment.yaml
 if has_backend "corpus-mock"; then
@@ -299,6 +424,9 @@ fi
 if has_backend "ilo-sim"; then
 	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-ilo-sim.yaml
 fi
+if has_backend "dmtf-sim"; then
+	kubectl_sandbox apply -f k8s/sandbox/redfish-endpoint-dmtf-sim.yaml
+fi
 
 if [ "$cluster_reused" = "1" ]; then
 	# On a reused cluster the :local image tag is unchanged, so `kubectl apply`
@@ -310,6 +438,9 @@ if [ "$cluster_reused" = "1" ]; then
 	fi
 	if has_backend "ilo-sim"; then
 		kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/ilo-sim
+	fi
+	if has_backend "dmtf-sim"; then
+		kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/dmtf-sim
 	fi
 	kubectl_sandbox -n "${NAMESPACE}" rollout restart deploy/redfish-endpoint-controller
 fi
@@ -325,6 +456,12 @@ if has_backend "ilo-sim"; then
 		rollout status deploy/ilo-sim \
 		--timeout=120s
 fi
+if has_backend "dmtf-sim"; then
+	kubectl_sandbox -n "${NAMESPACE}" \
+		rollout status deploy/dmtf-sim \
+		--timeout=120s
+	assert_dmtf_profile_in_pod
+fi
 kubectl_sandbox -n "${NAMESPACE}" \
 	rollout status deploy/redfish-endpoint-controller \
 	--timeout=120s
@@ -336,6 +473,12 @@ if has_backend "corpus-mock"; then
 fi
 if has_backend "ilo-sim"; then
 	wait_for_endpoint ilo-sim
+fi
+if has_backend "dmtf-sim"; then
+	wait_for_endpoint dmtf-sim
+	assert_endpoint_condition \
+		dmtf-sim ProfileResolved True DmtfProfileSelected
+	assert_endpoint_condition dmtf-sim Ready True PollSucceeded
 fi
 
 # Write/CONVERGE leg: drive the RedfishNodeProfile plan -> approve -> apply path.

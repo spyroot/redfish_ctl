@@ -11,12 +11,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class TasksList(RedfishManagerBase,
+class TasksList(RedfishManager,
                 scm_type=ApiRequestType.TasksList,
                 name='chassis_service_query',
                 metaclass=Singleton):

@@ -8,19 +8,16 @@ redfish_ctl boot-source --dev NIC.Slot.8-1
 
 Author Mus spyroot@gmail.com
 """
-import asyncio
-
 from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class BootSource(RedfishManagerBase,
+class BootSource(IDracManager,
                  scm_type=ApiRequestType.QueryBootOption,
                  name='boot_source_query',
                  metaclass=Singleton):
@@ -86,7 +83,7 @@ class BootSource(RedfishManagerBase,
 
         boot_data_sources = {}
         for full_dev_path in cmd_result.data:
-            r = f"{self._default_method}{self.idrac_ip}{full_dev_path}?$expand=*($levels=1)"
+            r = f"{self._default_method}{self.redfish_ip}{full_dev_path}?$expand=*($levels=1)"
             if not do_async:
                 response = self.api_get_call(r, headers)
                 self.default_error_handler(response)

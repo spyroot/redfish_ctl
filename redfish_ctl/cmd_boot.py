@@ -11,18 +11,17 @@ caller can save to a file and consume asynchronously or synchronously.
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
 from .cmd_exceptions import ResourceNotFound
 from .cmd_utils import find_ids, save_if_needed
-from .redfish_manager_base import RedfishManagerBase
-from .redfish_manager_shared import ApiRequestType, Singleton
+from .idrac_manager import IDracManager
+from .redfish_api_common import ApiRequestType, Singleton
 from .redfish_manager import CommandResult
 
 
-class BootQuery(RedfishManagerBase,
+class BootQuery(IDracManager,
                 scm_type=ApiRequestType.BootQuery,
                 name='boot_query',
                 metaclass=Singleton):
@@ -80,7 +79,7 @@ class BootQuery(RedfishManagerBase,
         # Dell exposes a proprietary BootSources collection; standard Redfish
         # (Supermicro/OpenBMC, HPE) does not, so BootSources 404s there. Try Dell's
         # path, then fall back to the ComputerSystem's standard Boot object.
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}/BootSources"
+        r = f"{self._default_method}{self.redfish_ip}{self.idrac_manage_servers}/BootSources"
 
         try:
             if not do_async:
@@ -103,7 +102,7 @@ class BootQuery(RedfishManagerBase,
         extra_actions = find_ids(data, "@odata.id")
         extra_data = None
         if do_deep:
-            extra_data = [self.api_get_call(f"{self._default_method}{self.idrac_ip}{a}", headers).json()
+            extra_data = [self.api_get_call(f"{self._default_method}{self.redfish_ip}{a}", headers).json()
                           for a in extra_actions]
 
         return CommandResult(data, None, extra_data, None)

@@ -8,8 +8,14 @@ if command -v yamllint >/dev/null 2>&1; then
   echo "repo.yaml: OK (yamllint)"
 else
   python - <<'PY'
-import subprocess, sys, yaml
-files = [f for f in subprocess.check_output(["git","ls-files","*.yml","*.yaml"]).decode().split() if "__" not in f]
+import re, subprocess, sys, yaml
+files = [
+    f
+    for f in subprocess.check_output(
+        ["git", "ls-files", "*.yml", "*.yaml"]
+    ).decode().split()
+    if "__" not in f and not re.match(r"charts/[^/]+/templates/", f)
+]
 bad=[]
 for f in files:
     try:
