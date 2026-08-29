@@ -207,6 +207,24 @@ def _trusted_include_contract(
     return identities, templates
 
 
+def _trusted_external_jobs(registry: dict) -> dict[str, dict]:
+    """Return concrete jobs supplied by exact trusted provider includes.
+
+    Concrete provider jobs are not present in the consumer YAML before GitLab
+    resolves the include. Their closed-world contract therefore lives beside
+    the immutable include identity and is used for required-job and smoke
+    coverage without copying the provider job into this repository.
+
+    :param registry: parsed gate registry containing ``trusted_includes``.
+    :return: external job contracts keyed by exact job name.
+    """
+    jobs: dict[str, dict] = {}
+    for include in registry.get("trusted_includes") or []:
+        for job in include.get("jobs") or []:
+            jobs[job["name"]] = job
+    return jobs
+
+
 def _check_trusted_includes(
     ci: dict, registry: dict
 ) -> tuple[list[str], dict[str, dict]]:
@@ -350,9 +368,10 @@ def _check_smoke_inventory(registry: dict) -> list[str]:
         failures.append(f"smoke records reference non-required CI jobs: {extra}")
 
     real_jobs = _real_gitlab_jobs(ci)
+    external_jobs = _trusted_external_jobs(registry)
     for record in records:
         job = record["job"]
-        ci_job = real_jobs.get(job)
+        ci_job = real_jobs.get(job) or external_jobs.get(job)
         if ci_job is None:
             failures.append(f"smoke record references missing GitLab job: {job}")
             continue
@@ -409,8 +428,45 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
     failures, trusted_templates = _check_trusted_includes(ci, registry)
+    trusted_external_jobs = _trusted_external_jobs(registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
+    external_names = [
+        job["name"]
+        for include in registry.get("trusted_includes") or []
+        for job in include.get("jobs") or []
+    ]
+    duplicate_external_names = sorted(
+        {name for name in external_names if external_names.count(name) > 1}
+    )
+    if duplicate_external_names:
+        failures.append(
+            f"duplicate trusted external jobs: {duplicate_external_names}"
+        )
+    for name, contract in trusted_external_jobs.items():
+        if name in real_jobs:
+            failures.append(
+                f"gitlab job {name}: local definition shadows a trusted concrete provider job"
+            )
+        if contract.get("required") is not True:
+            failures.append(f"gitlab job {name}: trusted provider job must be required")
+        if contract.get("allowFailure") is not False:
+            failures.append(
+                f"gitlab job {name}: trusted provider job must set allowFailure:false"
+            )
+        if contract.get("mutates") is not False:
+            failures.append(
+                f"gitlab job {name}: mutating concrete provider jobs require "
+                "a local protected wrapper"
+            )
+        if runner_tag not in (contract.get("tags") or []):
+            failures.append(
+                f"gitlab job {name}: trusted provider job is missing runner tag '{runner_tag}'"
+            )
+        if not contract.get("stage") or not contract.get("script"):
+            failures.append(
+                f"gitlab job {name}: trusted provider job lacks analyzable stage or script"
+            )
     for name, job in real_jobs.items():
         if job.get("allow_failure") is True:
             failures.append(f"gitlab job {name}: allow_failure:true is forbidden")
@@ -467,11 +523,18 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
         failures.append(
             "registry declares no required_jobs while .gitlab-ci.yml exists — the required-jobs "
             "check would silently pass")
+    known_jobs = set(real_jobs) | set(trusted_external_jobs)
     for required in required_jobs:
-        if required not in real_jobs:
+        if required not in known_jobs:
             failures.append(f"required GitLab job missing: {required}")
+    undeclared_external_jobs = sorted(set(trusted_external_jobs) - set(required_jobs))
+    if undeclared_external_jobs:
+        failures.append(
+            "trusted required provider jobs are absent from required_jobs: "
+            f"{undeclared_external_jobs}"
+        )
     for diagnostic in registry.get("diagnostic_jobs") or []:
-        if diagnostic not in real_jobs:
+        if diagnostic not in known_jobs:
             failures.append(f"diagnostic GitLab job missing: {diagnostic}")
     return failures, True
 

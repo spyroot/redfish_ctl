@@ -7,12 +7,15 @@
 # Job rules below isolate diagnostic, merge, integration, protected deployment,
 # scheduled canary, and publication paths. Operator guidance lives in
 # docs/external/ci.md.
-stages: [validate, integration, deploy, publish]
+stages: [project-ci-validation, validate, integration, deploy, publish]
 
 include:
   - project: spyroot/builder
-    ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
+    ref: 1511171608f913833004e29558468d8e481fd947
     file: /ci/templates/project-service.yml
+  - project: spyroot/builder
+    ref: 1511171608f913833004e29558468d8e481fd947
+    file: /ci/templates/project-ci-resource-jobs.yml
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
 # git-lfs, gate tools); this project supplies its dependencies via environment.yml.
@@ -38,6 +41,8 @@ variables:
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
+  EXPECTED_PROVIDER_REVISION: 1511171608f913833004e29558468d8e481fd947
+  PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
   BUILDER_PROJECT_CONSUMER: redfish_ctl
   DMTF_RELEASE: "2026.1"
   PROJECT_LIVE_TEST_COMMAND: >-
@@ -68,25 +73,12 @@ variables:
         ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
         $MERGE_PROFILE == "merge"
 
-focused-gate:
-  stage: validate
-  tags: [homelab-k8s]
-  rules:
-    - *focused-dispatch
-    - when: never
-  script:
-    # A focused result proves only this gate at this commit. It is not merge or release evidence.
-    - ./scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"
-  artifacts:
-    when: always
-    paths:
-      - reports/gate-report.sanitized.json
-      - reports/gates/
-
 gate-merge:
   stage: validate
   tags: [homelab-k8s]
   rules:
+    - if: '$PROJECT_CI_PROFILE == "focused" || $PROJECT_CI_PROFILE == "full"'
+      when: never
     - <<: *focused-dispatch
       when: never
     - *merge-profile-dispatch
