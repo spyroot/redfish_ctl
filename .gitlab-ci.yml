@@ -101,7 +101,7 @@ gate-merge:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - ./scripts/check.sh --list
-    - ./scripts/check.sh --profile "${MERGE_PROFILE:-merge}"
+    - ./scripts/check.sh --profile merge
   artifacts:
     when: always
     paths:

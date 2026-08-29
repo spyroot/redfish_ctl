@@ -102,16 +102,26 @@ def _runner_digest(env: Mapping[str, str], root: Path) -> str:
     :return: sha256 digest.
     :raises EvidenceError: when no immutable matching digest is available.
     """
-    value = (
-        env.get("CI_JOB_IMAGE_DIGEST")
-        or env.get("PROJECT_CI_IMAGE_DIGEST")
-        or env.get("TOOLBOX_VALIDATION_IMAGE_DIGEST")
-        or ""
-    ).strip()
-    if not value:
-        image = env.get("CI_JOB_IMAGE", "").strip()
-        if "@" in image:
-            value = image.rsplit("@", 1)[1]
+    image = env.get("CI_JOB_IMAGE", "").strip()
+    image_digest = image.rsplit("@", 1)[1] if "@" in image else ""
+    asserted_digests = [
+        env[name].strip()
+        for name in (
+            "CI_JOB_IMAGE_DIGEST",
+            "PROJECT_CI_IMAGE_DIGEST",
+            "TOOLBOX_VALIDATION_IMAGE_DIGEST",
+        )
+        if env.get(name, "").strip()
+    ]
+    if image_digest:
+        if any(value != image_digest for value in asserted_digests):
+            raise EvidenceError("runner digest assertion disagrees with CI_JOB_IMAGE")
+        value = image_digest
+    else:
+        unique_assertions = set(asserted_digests)
+        if len(unique_assertions) != 1:
+            raise EvidenceError("approved runner image digest is missing or ambiguous")
+        value = unique_assertions.pop()
     if not _DIGEST_RE.fullmatch(value):
         raise EvidenceError("approved runner image digest is missing or not immutable")
     ci = yaml.safe_load((root / ".gitlab-ci.yml").read_text(encoding="utf-8"))

@@ -223,6 +223,19 @@ def test_evidence_rejects_missing_or_mutable_runner_identity(tmp_path: Path) -> 
             root=root,
         )
     env = _ci_env_for(root)
+    env["PROJECT_CI_IMAGE_DIGEST"] = "sha256:" + ("0" * 64)
+    with pytest.raises(EvidenceError, match="disagrees with CI_JOB_IMAGE"):
+        build_evidence(
+            kind="job",
+            name="gate-merge",
+            command="./scripts/check.sh --profile merge",
+            status="passed",
+            return_code=0,
+            observations=_gate_observations(),
+            env=env,
+            root=root,
+        )
+    env = _ci_env_for(root)
     del env["CI_PIPELINE_ID"]
     with pytest.raises(EvidenceError, match="CI_PIPELINE_ID"):
         build_evidence(
@@ -370,6 +383,10 @@ def test_required_jobs_publish_exact_job_and_smoke_evidence() -> None:
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     smoke = _yaml(REPO_ROOT / "inventory/ci/smoke-tests.yaml")
     smoke_jobs = {record["job"] for record in smoke["spec"]["smokeTests"]}
+    assert ci["gate-merge"]["script"] == [
+        "./scripts/check.sh --list",
+        "./scripts/check.sh --profile merge",
+    ]
     for job_name in registry["required_jobs"]:
         assert job_name in ci
         paths = _artifact_paths(ci[job_name])
