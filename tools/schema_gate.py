@@ -44,9 +44,11 @@ def _fetch_exact(repository: str, revision: str) -> tempfile.TemporaryDirectory:
     if job_token:
         env.update(
             {
-                "GIT_CONFIG_COUNT": "1",
-                "GIT_CONFIG_KEY_0": "http.extraHeader",
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": f"http.{repository}.extraHeader",
                 "GIT_CONFIG_VALUE_0": f"JOB-TOKEN: {job_token}",
+                "GIT_CONFIG_KEY_1": "http.followRedirects",
+                "GIT_CONFIG_VALUE_1": "false",
             }
         )
     commands = [
@@ -77,8 +79,10 @@ def _fetch_exact(repository: str, revision: str) -> tempfile.TemporaryDirectory:
                 env=env,
             )
             if proc.returncode != 0:
+                repository_name = repository.rstrip("/").rsplit("/", 1)[-1]
                 raise SchemaGateError(
-                    f"exact contract fetch failed at {command[1]} (exit {proc.returncode})"
+                    f"exact contract fetch failed for {repository_name} "
+                    f"at {command[0]} (exit {proc.returncode})"
                 )
         head = subprocess.run(
             ["git", "-C", workspace.name, "rev-parse", "HEAD"],
@@ -164,6 +168,10 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
         raise SchemaGateError("Builder project-ci-cpu-validation is not required")
     if not IMMUTABLE_IMAGE.fullmatch(str(imported.get("image", ""))):
         raise SchemaGateError("Builder project-ci-cpu-validation image is not immutable")
+    if str(imported.get("image")) != default_image:
+        raise SchemaGateError(
+            "Builder project-ci-cpu-validation image disagrees with the tracked default"
+        )
     tags = imported.get("tags") or []
     if "homelab-k8s" not in tags or "homelab-k8s-validation" not in tags:
         raise SchemaGateError("Builder project-ci-cpu-validation runner tags are incomplete")
@@ -243,7 +251,15 @@ def main() -> int:
     """CLI adapter for the repository schema gate."""
     try:
         run()
-    except (OSError, SchemaGateError, json.JSONDecodeError, yaml.YAMLError) as exc:
+    except (
+        KeyError,
+        OSError,
+        SchemaGateError,
+        subprocess.SubprocessError,
+        TypeError,
+        json.JSONDecodeError,
+        yaml.YAMLError,
+    ) as exc:
         print(f"repo.schemas: {exc}", file=sys.stderr)
         return 1
     print("repo.schemas: OK")

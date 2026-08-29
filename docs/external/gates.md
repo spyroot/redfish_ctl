@@ -13,10 +13,11 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 ```
 ./scripts/check.sh --list                 # enumerate every registered gate
 ./scripts/check.sh --profile merge         # run all merge gates (in-cluster only; refuses off-cluster)
-./scripts/gates/run.sh <profile>           # runner invoked by configured CI
 ```
 
 Off-cluster, `check.sh --profile` refuses; a gate never runs on a workstation.
+The configured CI invokes `scripts/gates/run.sh` internally; operators must use
+the guarded `scripts/check.sh` entry point.
 See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
 
 ## Profiles
@@ -53,7 +54,7 @@ it without executing a gate.
 | `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
-| `repo.schemas` | merge | no | the registry and tracked Standards/Builder bindings validate against their exact pinned schemas | a schema, revision, or provider-include mismatch |
+| `repo.schemas` | merge | no | the registry and tracked bindings validate against pinned Standards schemas and the pinned Builder provider tree/template fetched with the project job token | a schema, revision, provider-include, or upstream job-token allow-list mismatch |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
 | `unit.all` | merge | no | the offline unit suite | any test fails |
@@ -72,7 +73,12 @@ it without executing a gate.
 | `mutation.serialized` | deploy | no | a mutation lock is held (no concurrent apply) | no lock held |
 | `mutation.verify-required` | deploy | no | the applied module exposes a verify step | module has no `verify.sh` |
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
-| `evidence.sanitized` | merge | no | the evidence directory exists and contains no secret-shaped content | the directory is missing, scanning fails, or a secret-shaped token is found |
+| `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
+
+The `repo.schemas` gate uses the current Internal GitLab project job token to
+fetch the pinned Standards schemas and Builder provider tree/template. The
+Standards and Builder projects must allow `redfish_ctl` job-token read access; a
+missing allow-list entry fails without prompting for credentials.
 
 ## Telemetry liveness checks
 

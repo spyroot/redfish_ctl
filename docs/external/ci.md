@@ -59,18 +59,14 @@ The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
 Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
 merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
 `repo.format`; the job runs that one gate through the Kubernetes-guarded
-`scripts/check.sh` entrypoint. This exact-commit result is diagnostic evidence
-only, not merge or release evidence. Because the exact Builder include also
-selects `project-ci-cpu-validation` when `FOCUSED_GATE` is present, a focused
-pipeline is green only when both diagnostic jobs finish successfully.
-
-The `gate-merge` job remains the merge authority. For an Internal GitLab API or
-web pipeline, the dispatcher sets `MERGE_PROFILE=merge` and omits
-`FOCUSED_GATE`; the pipeline then runs the complete merge profile and no
-integration, deployment, or publication job. Merge-request and default-branch
-pipelines continue to select `gate-merge` through their normal GitLab rules.
-Builder profile dispatch uses the `project-ci-cpu-validation` job from the
-exact-revision shared include declared in `.gitlab-ci.yml`.
+`scripts/check.sh` entrypoint. The exact Builder include also selects
+`project-ci-cpu-validation`; both diagnostic jobs must pass, but the narrowed
+Builder job omits release-blocking smoke evidence. Merge evidence requires the
+complete profile: direct Internal GitLab pipelines run `gate-merge`, while
+Builder `full` dispatch runs the imported `project-ci-cpu-validation` job. Both
+full paths execute every merge gate and publish required smoke; a focused result
+cannot replace them. Merge-request and default-branch pipelines continue to
+select `gate-merge` through their normal GitLab rules.
 
 ### Manual Internal GitLab API or web dispatch
 
@@ -98,6 +94,9 @@ runner digest. Warning/skip counts come from captured gate output; cleanup comes
 from tracked-state comparison; exact identity comes from independent Git
 read-back; and sanitization is recorded only after a quiet content scan and
 atomic file read-back.
+
+The upstream access prerequisite for `repo.schemas` is documented in
+[Gates](gates.md#selected-gate-summary).
 
 ## Protected DMTF simulator deployment
 

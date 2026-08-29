@@ -13,7 +13,7 @@ project_ci_main() {
   local selected_profile="${PROJECT_CI_PROFILE:-}"
   local -a args=(--profile merge)
 
-  if [ -n "$focused_gate" ] && [ -n "$selected_profile" ]; then
+  if [ -n "$focused_gate" ] && [ "$selected_profile" = "full" ]; then
     echo "project_ci_entrypoint.sh: focused gate and profile are mutually exclusive" >&2
     return 2
   fi

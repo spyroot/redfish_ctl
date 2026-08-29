@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -93,12 +94,13 @@ def _standards_revision(root: Path) -> str:
     return revision
 
 
-def _runner_digest(env: Mapping[str, str]) -> str:
-    """Resolve the immutable approved runner image digest.
+def _runner_digest(env: Mapping[str, str], root: Path) -> str:
+    """Resolve and verify the immutable approved runner image digest.
 
     :param env: environment mapping supplied by the protected runner/provider.
+    :param root: repository root containing the tracked CI image binding.
     :return: sha256 digest.
-    :raises EvidenceError: when no immutable digest is available.
+    :raises EvidenceError: when no immutable matching digest is available.
     """
     value = (
         env.get("CI_JOB_IMAGE_DIGEST")
@@ -112,6 +114,11 @@ def _runner_digest(env: Mapping[str, str]) -> str:
             value = image.rsplit("@", 1)[1]
     if not _DIGEST_RE.fullmatch(value):
         raise EvidenceError("approved runner image digest is missing or not immutable")
+    ci = yaml.safe_load((root / ".gitlab-ci.yml").read_text(encoding="utf-8"))
+    configured_image = str((ci.get("default") or {}).get("image", ""))
+    configured_digest = configured_image.rsplit("@", 1)[-1]
+    if not _DIGEST_RE.fullmatch(configured_digest) or value != configured_digest:
+        raise EvidenceError("runner image digest does not match tracked CI configuration")
     return value
 
 
@@ -123,7 +130,7 @@ def _identity(env: Mapping[str, str], root: Path) -> dict[str, object]:
         "pipeline_id": _required(env, "CI_PIPELINE_ID"),
         "commit": _commit(env, root),
         "standards_revision": _standards_revision(root),
-        "runner_digest": _runner_digest(env),
+        "runner_digest": _runner_digest(env, root),
         "artifact_digest": None,
     }
 
@@ -210,6 +217,34 @@ def _required_tools(tools: Sequence[str]) -> list[str]:
     return [tool for tool in tools if shutil.which(tool) is None]
 
 
+def select_release_blocking_smoke(
+    inventory: Mapping[str, object],
+    *,
+    job_name: str,
+    selected_gate: str | None,
+) -> Mapping[str, object] | None:
+    """Select one full-profile smoke record, suppressing narrowed runs.
+
+    :param inventory: parsed closed-world smoke inventory.
+    :param job_name: current CI job name.
+    :param selected_gate: narrowed gate id, or ``None`` for a full profile.
+    :return: the matching record only for a full-profile execution.
+    :raises EvidenceError: when the inventory duplicates the job record.
+    """
+    spec = inventory.get("spec")
+    records = spec.get("smokeTests", []) if isinstance(spec, Mapping) else []
+    matches = [
+        record
+        for record in records
+        if isinstance(record, Mapping) and record.get("job") == job_name
+    ]
+    if len(matches) > 1:
+        raise EvidenceError(f"duplicate smoke inventory for {job_name}")
+    if selected_gate is not None:
+        return None
+    return matches[0] if matches else None
+
+
 def observe_gate(
     *,
     command: str,
@@ -237,7 +272,7 @@ def observe_gate(
     if stdout:
         print(stdout, end="")
     if stderr:
-        print(stderr, end="", file=os.sys.stderr)
+        print(stderr, end="", file=sys.stderr)
     combined = f"{stdout}\n{stderr}"
     warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(combined)]
     warnings = max(warning_counts, default=0)

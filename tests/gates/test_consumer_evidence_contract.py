@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from tools.ci_evidence import (
     EvidenceError,
     build_evidence,
     build_smoke_evidence,
+    select_release_blocking_smoke,
     write_evidence,
 )
 
@@ -49,6 +51,12 @@ def _ci_env(job: str = "gate-merge") -> dict[str, str]:
 
 def _root(tmp_path: Path) -> Path:
     """Create the minimum repository identity needed by evidence builders."""
+    (tmp_path / ".gitlab-ci.yml").write_text(
+        yaml.safe_dump(
+            {"default": {"image": f"registry.example/toolbox@{DIGEST}"}}
+        ),
+        encoding="utf-8",
+    )
     (tmp_path / "standards-binding.yaml").write_text(
         yaml.safe_dump({"spec": {"source": {"revision": STANDARDS_REVISION}}}),
         encoding="utf-8",
@@ -202,6 +210,19 @@ def test_evidence_rejects_missing_or_mutable_runner_identity(tmp_path: Path) -> 
             root=root,
         )
     env = _ci_env_for(root)
+    env["CI_JOB_IMAGE"] = "registry.example/toolbox@sha256:" + ("0" * 64)
+    with pytest.raises(EvidenceError, match="tracked CI configuration"):
+        build_evidence(
+            kind="job",
+            name="gate-merge",
+            command="./scripts/check.sh --profile merge",
+            status="passed",
+            return_code=0,
+            observations=_gate_observations(),
+            env=env,
+            root=root,
+        )
+    env = _ci_env_for(root)
     del env["CI_PIPELINE_ID"]
     with pytest.raises(EvidenceError, match="CI_PIPELINE_ID"):
         build_evidence(
@@ -315,6 +336,34 @@ def test_evidence_sanitization_happens_before_atomic_write(tmp_path: Path) -> No
     assert not output.exists()
 
 
+def test_focused_execution_cannot_emit_release_blocking_smoke() -> None:
+    """A narrowed gate cannot publish smoke that represents a full profile."""
+    inventory = {
+        "spec": {
+            "smokeTests": [
+                {
+                    "job": "project-ci-cpu-validation",
+                    "class": "wiring",
+                }
+            ]
+        }
+    }
+    assert (
+        select_release_blocking_smoke(
+            inventory,
+            job_name="project-ci-cpu-validation",
+            selected_gate="unit.all",
+        )
+        is None
+    )
+    selected = select_release_blocking_smoke(
+        inventory,
+        job_name="project-ci-cpu-validation",
+        selected_gate=None,
+    )
+    assert selected == inventory["spec"]["smokeTests"][0]
+
+
 def test_required_jobs_publish_exact_job_and_smoke_evidence() -> None:
     """Every required job publishes its own schema-backed evidence paths."""
     registry = _yaml(REPO_ROOT / "gates/manifest.yaml")
@@ -389,6 +438,10 @@ def test_dispatch_consumes_builder_full_profile_and_provider_credentials() -> No
     assert proc.returncode == 2
     assert "mutually exclusive" in (proc.stdout + proc.stderr)
 
+    proc = _run_check(["--list", "--timeout", "30"])
+    assert proc.returncode == 2
+    assert "require --dispatch" in (proc.stdout + proc.stderr)
+
 
 def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
     """The imported Builder job cannot run a focused gate and full profile together."""
@@ -407,6 +460,33 @@ def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
     )
     assert proc.returncode == 2
     assert "mutually exclusive" in (proc.stdout + proc.stderr)
+
+
+def test_project_ci_entrypoint_accepts_focused_builder_profile(tmp_path: Path) -> None:
+    """The Builder focused profile delegates exactly one selected merge gate."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    adapter = scripts / PROJECT_CI_ENTRYPOINT.name
+    shutil.copyfile(PROJECT_CI_ENTRYPOINT, adapter)
+    adapter.chmod(0o755)
+    check = scripts / "check.sh"
+    check.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$@"\n', encoding="utf-8")
+    check.chmod(0o755)
+    proc = subprocess.run(
+        [str(adapter)],
+        cwd=tmp_path,
+        env={
+            **_off_cluster_env(),
+            "FOCUSED_GATE": "unit.all",
+            "PROJECT_CI_PROFILE": "focused",
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.splitlines() == ["--profile", "merge", "--gate", "unit.all"]
 
 
 def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:

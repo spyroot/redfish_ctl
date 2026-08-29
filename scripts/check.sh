@@ -239,8 +239,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 if $list; then
-  if [ -n "$profile" ] || [ -n "$gate" ] || $dispatch; then
-    echo "check.sh: --list cannot be combined with --profile, --gate, or --dispatch" >&2
+  if [ -n "$profile" ] || [ -n "$gate" ] || $dispatch || \
+    [ "${#dispatch_args[@]}" -gt 0 ] || $dispatch_apply || \
+    $dispatch_confirm || $dispatch_dry_run; then
+    echo "check.sh: --list cannot be combined with gate or Builder controls" >&2
     exit 2
   fi
   _list

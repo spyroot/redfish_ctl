@@ -62,6 +62,7 @@ from tools.ci_evidence import (
     build_smoke_evidence,
     observe_gate,
     observe_smoke,
+    select_release_blocking_smoke,
     write_evidence,
 )
 
@@ -95,14 +96,21 @@ job_name = os.environ.get("CI_JOB_NAME", "")
 smoke_inventory = yaml.safe_load(
     pathlib.Path("inventory/ci/smoke-tests.yaml").read_text(encoding="utf-8")
 )
-smoke_records = [
-    record
-    for record in smoke_inventory.get("spec", {}).get("smokeTests", [])
-    if record.get("job") == job_name
-]
-if len(smoke_records) > 1:
-    print(f"EVIDENCE FAILED: duplicate smoke inventory for {job_name}", file=sys.stderr)
+try:
+    smoke_record = select_release_blocking_smoke(
+        smoke_inventory,
+        job_name=job_name,
+        selected_gate=selected_gate,
+    )
+except EvidenceError as exc:
+    print(f"EVIDENCE FAILED: {exc}", file=sys.stderr)
     sys.exit(1)
+if selected_gate:
+    print(
+        "run.sh: focused execution omits release-blocking smoke evidence "
+        f"for {job_name}"
+    )
+pathlib.Path("reports").mkdir(parents=True, exist_ok=True)
 run_status = "passed"
 run_return_code = 0
 job_observations = {
@@ -160,14 +168,14 @@ for gate in gates:
 
 job_observations["return_code"] = run_return_code
 
-if smoke_records:
+if smoke_record:
     try:
         smoke_observations = observe_smoke(
-            record=smoke_records[0],
+            record=smoke_record,
             gate_observations=job_observations,
         )
         smoke_evidence = build_smoke_evidence(
-            record=smoke_records[0],
+            record=smoke_record,
             gate_observations=job_observations,
             smoke_observations=smoke_observations,
         )
