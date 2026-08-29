@@ -20,12 +20,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
-class RaidServiceQuery(RedfishManagerBase,
+class RaidServiceQuery(IDracManager,
                        scm_type=ApiRequestType.RaidServiceQuery,
                        name='raid_service_query',
                        metaclass=Singleton):
@@ -75,7 +75,7 @@ class RaidServiceQuery(RedfishManagerBase,
         # (not a hardcoded System.Embedded.1) and degrade gracefully off Dell,
         # where standard RAID is driven via the Storage/Volumes commands instead.
         system_id = self.idrac_manage_servers.rsplit("/", 1)[-1]
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Dell/Systems/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Dell/Systems/" \
             f"{system_id}/DellRaidService"
 
         try:

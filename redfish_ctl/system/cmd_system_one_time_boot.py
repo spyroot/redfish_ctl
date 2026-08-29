@@ -15,13 +15,13 @@ from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, PostRequestFailed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
 class ImportOneTimeBoot(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.ImportOneTimeBoot,
     name='import_sysconfig',
     metaclass=Singleton):
@@ -129,19 +129,17 @@ class ImportOneTimeBoot(
                    "ShareParameters": {"Target": "ALL"}
                    }
 
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ImportSystemConfiguration"
 
         data = {}
         try:
             response = self.api_post_call(r, json.dumps(payload), headers)
-            ok = self.default_post_success(self, response, expected=202)
+            ok = self.default_post_success(response, expected=202)
 
             if ok:
-                job_id = self.job_id_from_header(response)
-                if job_id is None:
-                    self.job_id_from_respond(response)
-                if job_id is not None:
+                job_id = self.job_id_from_response(response, strict=False)
+                if job_id:
                     if not do_async:
                         data = self.fetch_task(job_id)
                     else:

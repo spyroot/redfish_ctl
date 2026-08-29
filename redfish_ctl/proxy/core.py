@@ -16,12 +16,12 @@ from redfish_ctl.api import (
     get_system,
     get_thermal,
 )
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.telemetry.exporter import (
     MetricSample,
     build_identity_dimensions,
-    build_metric_samples,
 )
+from redfish_ctl.telemetry.supermicro.super_microexporter import build_metric_samples
 
 
 @dataclass(frozen=True)
@@ -447,7 +447,7 @@ class ReadOnlyProxy:
         metric_report_rows = _list_payload(
             _optional_command(
                 manager,
-                ApiRequestType.MetricReports,
+                ApiRequestType.SupermicroMetricReports,
                 "metric-reports",
                 do_expanded=do_expanded,
             )

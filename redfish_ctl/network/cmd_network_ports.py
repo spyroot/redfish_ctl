@@ -16,12 +16,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class NetworkPorts(RedfishManagerBase,
+class NetworkPorts(RedfishManager,
                    scm_type=ApiRequestType.NetworkPorts,
                    name='network-ports',
                    metaclass=Singleton):

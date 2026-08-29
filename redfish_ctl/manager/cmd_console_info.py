@@ -15,12 +15,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ConsoleInfo(RedfishManagerBase,
+class ConsoleInfo(RedfishManager,
                   scm_type=ApiRequestType.ConsoleInfo,
                   name='console-info',
                   metaclass=Singleton):

@@ -2,15 +2,13 @@
 
     python tools/splunk_metric_gate.py
     python tools/splunk_metric_gate.py hw.health hw.fabric.link_down_reason
-    python tools/splunk_metric_gate.py --since-minutes 30 --metrics-file specs/telemetry/gate-metrics.txt
+    python tools/splunk_metric_gate.py --metrics-file specs/telemetry/gate-metrics.txt
 
 For every expected metric name the gate queries the Splunk Observability
 metric-time-series API (``https://api.<realm>.signalfx.com/v2/metrictimeseries``)
-and passes only when at least one time series exists AND was updated inside
-the freshness window. Exit code 0 = every metric seen, 1 = any miss, 2 =
-configuration error. Designed to run inside the fleet dev container, where
-the entrypoint already exports the token and realm; nothing here prints
-credential values.
+and passes only when at least one returned time series has ``active: true``.
+Exit code 0 = every metric flowing, 1 = any inactive/missing/error result, 2 =
+configuration error. Nothing here prints credential values.
 
 Configuration precedence (CLI > env), per the operator contract:
 
@@ -25,12 +23,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+from redfish_ctl.config import (
+    signalfx_access_token,
+    signalfx_api_token,
+    signalfx_realm,
+)
 
 # The P0 telemetry set: health/state enums plus a core signal from each
 # long-standing family, so a green gate means the whole pipeline is live.
@@ -44,6 +46,7 @@ DEFAULT_METRICS = [
     "hw.temperature",
     "hw.power",
     "hw.scrape.ok",
+    "hw.bmc.up",
 ]
 
 
@@ -61,9 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--realm", default=None,
                         help="Splunk Observability realm; defaults to SPLUNK_O11Y_REALM")
     parser.add_argument("--token-env", default="SPLUNK_ACCESS_TOKEN",
+                        choices=("SPLUNK_ACCESS_TOKEN", "SPLUNK_API_TOKEN"),
                         help="environment variable holding the API token")
     parser.add_argument("--since-minutes", type=float, default=30.0,
-                        help="freshness window: newest time series update must be this recent")
+                        help="deprecated compatibility option; MTS active is authoritative")
     parser.add_argument("--timeout", type=float, default=15.0,
                         help="per-request HTTP timeout in seconds")
     return parser
@@ -97,6 +101,41 @@ def load_metrics(args: argparse.Namespace) -> list[str]:
     return ordered
 
 
+def resolve_credentials(realm: str | None, token_env: str) -> tuple[str, str]:
+    """Resolve the Splunk realm and API-scoped token without logging either.
+
+    :param realm: explicit realm, or None to read ``SPLUNK_O11Y_REALM``.
+    :param token_env: environment variable named by the caller.
+    :return: ``(realm, token)``; either value may be empty for caller validation.
+    """
+    resolved_realm = signalfx_realm(realm)
+    if token_env == "SPLUNK_API_TOKEN":
+        token = signalfx_api_token()
+    elif token_env == "SPLUNK_ACCESS_TOKEN":
+        token = signalfx_api_token() or signalfx_access_token()
+    else:
+        raise ValueError(f"unsupported Splunk token environment name: {token_env}")
+    return resolved_realm, token
+
+
+def classify_liveness(info: dict) -> str:
+    """Classify a parsed MTS response as FLOWING, INACTIVE, MISSING, or ERROR.
+
+    :param info: normalized result returned by :func:`query_metric`.
+    :return: one of ``FLOWING``, ``INACTIVE``, ``MISSING``, or ``ERROR``.
+    """
+    count = info.get("count")
+    if isinstance(count, bool) or not isinstance(count, int):
+        return "ERROR"
+    if count <= 0:
+        return "MISSING"
+    active = info.get("active")
+    if (info.get("active_complete") is not True or isinstance(active, bool)
+            or not isinstance(active, int)):
+        return "ERROR"
+    return "FLOWING" if active > 0 else "INACTIVE"
+
+
 def query_metric(realm: str, token: str, metric: str, timeout: float) -> dict:
     """Query Splunk Observability for time series of one metric.
 
@@ -104,13 +143,12 @@ def query_metric(realm: str, token: str, metric: str, timeout: float) -> dict:
     :param token: API token value (sent as the X-SF-Token header, never logged).
     :param metric: metric name to look up.
     :param timeout: HTTP timeout in seconds.
-    :return: dict with ``count`` (matching time series) and ``newest_ms``
-        (latest lastUpdated/created millisecond timestamp seen, 0 when none).
+    :return: dict with total ``count``, ``active`` series count,
+        ``active_complete`` payload validity, and compatibility ``newest_ms``.
     :raises urllib.error.URLError: on transport failure.
     :raises ValueError: when the API answers with a non-JSON body.
     """
-    query = urllib.parse.urlencode(
-        {"query": f'sf_metric:"{metric}"', "limit": 50, "orderBy": "-sf_updatedOnMs"})
+    query = urllib.parse.urlencode({"query": f'sf_metric:"{metric}"', "limit": 500})
     url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
     request = urllib.request.Request(url, headers={"X-SF-Token": token})
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -120,29 +158,36 @@ def query_metric(realm: str, token: str, metric: str, timeout: float) -> dict:
     except ValueError as exc:
         raise ValueError(f"non-JSON response for {metric}") from exc
     results = data.get("results") or []
+    if not isinstance(results, list) or any(not isinstance(row, dict) for row in results):
+        raise ValueError(f"invalid results payload for {metric}")
+    active_complete = bool(results) and all(
+        "active" in row and isinstance(row["active"], bool) for row in results)
+    active = sum(1 for row in results if row.get("active") is True)
     newest = 0
     for row in results:
         for key in ("lastUpdated", "sf_updatedOnMs", "updatedOnMs", "created"):
             stamp = row.get(key)
             if isinstance(stamp, (int, float)) and stamp > newest:
                 newest = int(stamp)
-    return {"count": int(data.get("count") or len(results)), "newest_ms": newest}
+    raw_count = data.get("count")
+    count = len(results) if raw_count is None else int(raw_count)
+    return {
+        "count": count,
+        "active": active,
+        "active_complete": active_complete,
+        "newest_ms": newest,
+    }
 
 
 def run_gate(argv: list[str] | None = None) -> int:
     """Run the gate and print one PASS/FAIL line per metric.
 
     :param argv: CLI arguments (None uses sys.argv).
-    :return: process exit code — 0 all seen, 1 any miss/stale, 2 config error.
+    :return: process exit code — 0 all flowing, 1 any liveness failure,
+        2 configuration error.
     """
     args = build_parser().parse_args(argv)
-    realm = args.realm or os.environ.get("SPLUNK_O11Y_REALM", "")
-    # Query needs an API-scoped token; ingest-scoped tokens get 401s from
-    # the metrics API, so prefer SPLUNK_API_TOKEN when the caller kept the
-    # default env name and it is set.
-    token = os.environ.get(args.token_env, "")
-    if not token or args.token_env == "SPLUNK_ACCESS_TOKEN":
-        token = os.environ.get("SPLUNK_API_TOKEN", "") or token
+    realm, token = resolve_credentials(args.realm, args.token_env)
     if not realm:
         print("splunk-gate: realm is not set (--realm or SPLUNK_O11Y_REALM)", file=sys.stderr)
         return 2
@@ -155,33 +200,27 @@ def run_gate(argv: list[str] | None = None) -> int:
         print(f"splunk-gate: {exc}", file=sys.stderr)
         return 2
 
-    cutoff_ms = (time.time() - args.since_minutes * 60.0) * 1000.0
-    failures = 0
+    counts = {"FLOWING": 0, "INACTIVE": 0, "MISSING": 0, "ERROR": 0}
     for metric in metrics:
         try:
             info = query_metric(realm, token, metric, args.timeout)
         except Exception as exc:  # transport/auth/parse — fail loud per metric
-            print(f"FAIL {metric}: query error: {type(exc).__name__}: {exc}")
-            failures += 1
+            print(f"FAIL ERROR {metric}: query error: {type(exc).__name__}: {exc}")
+            counts["ERROR"] += 1
             continue
-        if info["count"] <= 0:
-            print(f"FAIL {metric}: no time series found")
-            failures += 1
-        elif info["newest_ms"] <= 0:
-            # A hard gate must never pass on existence alone: no timestamp in
-            # the response means freshness cannot be verified, so fail loud.
-            print(f"FAIL {metric}: {info['count']} time series but no update "
-                  f"timestamp in the response — freshness unverifiable")
-            failures += 1
-        elif info["newest_ms"] < cutoff_ms:
-            age_min = (time.time() * 1000.0 - info["newest_ms"]) / 60000.0
-            print(f"FAIL {metric}: stale — newest update {age_min:.0f} min ago "
-                  f"(window {args.since_minutes:.0f} min)")
-            failures += 1
+        status = classify_liveness(info)
+        counts[status] += 1
+        if status == "FLOWING":
+            print(f"PASS FLOWING {metric}: {info['active']}/{info['count']} active time series")
+        elif status == "MISSING":
+            print(f"FAIL MISSING {metric}: no time series found")
+        elif status == "INACTIVE":
+            print(f"FAIL INACTIVE {metric}: {info['count']} time series, none active")
         else:
-            print(f"PASS {metric}: {info['count']} time series")
-    print(f"splunk-gate: {len(metrics) - failures}/{len(metrics)} metrics visible")
-    return 1 if failures else 0
+            print(f"FAIL ERROR {metric}: active flag missing or malformed")
+    print("splunk-gate: " + " ".join(f"{name}={counts[name]}" for name in counts)
+          + f" TOTAL={len(metrics)}")
+    return 0 if counts["FLOWING"] == len(metrics) else 1
 
 
 if __name__ == "__main__":

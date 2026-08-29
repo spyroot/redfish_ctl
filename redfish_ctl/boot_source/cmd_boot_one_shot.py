@@ -25,15 +25,14 @@ from ..cmd_exceptions import (
     UnexpectedResponse,
     UnsupportedAction,
 )
-from ..redfish_exceptions import RedfishException
-from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import (
+from ..redfish_api_common import (
     ApiRequestType,
     BootSourceOverrideMode,
     RedfishApiRespond,
     Singleton,
 )
+from ..redfish_exceptions import RedfishException
+from ..redfish_manager import CommandResult, RedfishManager
 
 _BOOT_TARGET_ALIASES = {
     "Cd": ("Cd", "CD/DVD", "UsbCd", "UefiCd", "UefiUsbCd"),
@@ -55,7 +54,7 @@ _RESET_ERRORS = (
 )
 
 
-class BootOneShot(RedfishManagerBase,
+class BootOneShot(RedfishManager,
                   scm_type=ApiRequestType.BootOneShot,
                   name='boot_one_shot',
                   metaclass=Singleton):
@@ -260,7 +259,7 @@ class BootOneShot(RedfishManagerBase,
             headers.update(self.json_content_type)
 
         system_result = self.base_query(
-            self.idrac_manage_servers,
+            self.managed_system_uri,
             data_type=data_type,
             do_async=do_async,
             verbose=verbose,
@@ -311,7 +310,7 @@ class BootOneShot(RedfishManagerBase,
             return CommandResult(
                 {
                     "dry_run": True,
-                    "target": self.idrac_manage_servers,
+                    "target": self.managed_system_uri,
                     "payload": payload,
                     "blocked": None if dry_run else "one-time boot requires confirm",
                 },
@@ -329,7 +328,7 @@ class BootOneShot(RedfishManagerBase,
                 )
             except _RESET_ERRORS as exc:
                 return CommandResult(
-                    {"target": self.idrac_manage_servers, "payload": payload},
+                    {"target": self.managed_system_uri, "payload": payload},
                     None,
                     None,
                     f"power-on pre-step failed: {exc}",
@@ -338,7 +337,7 @@ class BootOneShot(RedfishManagerBase,
                 return power_result
 
         cmd_result, api_resp = self.base_patch(
-            self.idrac_manage_servers, payload=payload,
+            self.managed_system_uri, payload=payload,
             do_async=do_async
         )
 

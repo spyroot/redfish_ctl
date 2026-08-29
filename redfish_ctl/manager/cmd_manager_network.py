@@ -5,12 +5,11 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ManagerNetworkProtocol(RedfishManagerBase,
+class ManagerNetworkProtocol(RedfishManager,
                              scm_type=ApiRequestType.ManagerNetworkProtocol,
                              name='manager-network',
                              metaclass=Singleton):

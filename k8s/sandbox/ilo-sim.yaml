@@ -4,6 +4,11 @@ kind: Deployment
 metadata:
   name: ilo-sim
   namespace: redfish-sandbox
+  annotations:
+    # Sandbox Redfish simulator (ephemeral test workload) that writes to its working fs, so a
+    # read-only root fs would break it; the pod already runs as non-root (uid 10001). Exempt this
+    # one check for the sandbox (kubernetes.policy).
+    ignore-check.kube-linter.io/no-read-only-root-fs: "sandbox sim writes to fs; ephemeral test workload"
   labels:
     app.kubernetes.io/name: ilo-sim
     app.kubernetes.io/component: redfish-sandbox
@@ -24,6 +29,29 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+      initContainers:
+        - name: init-runtime-certs
+          image: redfish-ctl-ilo-sim:local
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - touch /certs/server.crt /certs/server.key
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: runtime-certs
+              mountPath: /certs
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
       containers:
         - name: ilo-sim
           image: redfish-ctl-ilo-sim:local
@@ -54,9 +82,17 @@ spec:
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: runtime-certs
+              mountPath: /app/server.crt
+              subPath: server.crt
+            - name: runtime-certs
+              mountPath: /app/server.key
+              subPath: server.key
           resources:
             requests:
               cpu: 50m
@@ -64,6 +100,9 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+      volumes:
+        - name: runtime-certs
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

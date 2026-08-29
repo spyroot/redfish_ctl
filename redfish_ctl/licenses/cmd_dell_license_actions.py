@@ -12,7 +12,6 @@ from environment variables or files and masked in returned preview payloads.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,9 +19,10 @@ from typing import Optional
 
 from ..actions.action_policy import classify
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..redfish_shared import RedfishApi
 
 _LICENSE_MANAGEMENT_FALLBACK = (
@@ -97,7 +97,7 @@ _ACTION_SPECS = {
 }
 
 
-class DellLicenseActions(RedfishManagerBase,
+class DellLicenseActions(IDracManager,
                          scm_type=ApiRequestType.DellLicenseActions,
                          name="dell-license-actions",
                          metaclass=Singleton):
@@ -465,11 +465,12 @@ class DellLicenseActions(RedfishManagerBase,
                 raise InvalidArgument(
                     f"{kind} environment variable name cannot be empty"
                 )
-            if name not in os.environ:
+            value = named_env(name)
+            if value is None:
                 raise InvalidArgument(
                     f"{kind} environment variable '{name}' is not set"
                 )
-            return os.environ[name]
+            return value
         if file_name is not None:
             path = Path(file_name).expanduser()
             try:

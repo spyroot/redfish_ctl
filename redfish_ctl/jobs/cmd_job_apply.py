@@ -13,15 +13,20 @@ import time
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, CliJobTypes, JobState
-from ..redfish_manager_shared import RedfishApiRespond
-from ..redfish_manager_shared import ResetType
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import (
+    REDFISH_API,
+    ApiRequestType,
+    DellCliJobTypes,
+    DellJobState,
+    RedfishApiRespond,
+    ResetType,
+    Singleton,
+)
 from ..redfish_manager import CommandResult
 
 
-class JobApply(RedfishManagerBase,
+class JobApply(IDracManager,
                scm_type=ApiRequestType.JobApply,
                name='job_apply',
                metaclass=Singleton):
@@ -92,7 +97,7 @@ class JobApply(RedfishManagerBase,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         elif setting == "boot-option":
             pd = {
                 "RebootJobType": "ForceReboot",
@@ -100,7 +105,7 @@ class JobApply(RedfishManagerBase,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         else:
             pd = {}
 
@@ -141,7 +146,7 @@ class JobApply(RedfishManagerBase,
             if 'JobState' in jb:
                 job_state = jb['JobState']
                 # we wait for job change to change a state
-                if job_state == JobState.Scheduled or job_state == JobState.Scheduling:
+                if job_state == DellJobState.Scheduled or job_state == DellJobState.Scheduling:
                     time.sleep(sleep_time)
                 else:
                     self.fetch_task(job)

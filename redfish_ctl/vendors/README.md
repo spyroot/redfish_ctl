@@ -22,7 +22,7 @@ Each `vendors/<name>/` contains:
   It declares what the vendor's Redfish service supports (which query parameters,
   recurring-job scheduling, lifecycle events, OEM prefix) so commands can gate
   vendor-specific behavior cleanly.
-- `cmd_*.py` — vendor-specific command modules (self-registering `RedfishManagerBase`
+- `cmd_*.py` — vendor-specific command modules (self-registering `IDracManager`
   subclasses), added incrementally.
 - `README.md` — what's here and any vendor quirks.
 
@@ -37,7 +37,7 @@ if caps.job_scheduling:
 
 ## Migration note
 
-Dell command code currently also lives in `redfish_ctl/redfish_manager_base.py` and
+Dell command code currently also lives in `redfish_ctl/idrac_manager.py` and
 `redfish_ctl/delloem/`. It migrates into `vendors/dell/` incrementally, alongside the
 planned `redfish_ctl` → `redfish_ctl` rename. The core must never import a vendor
 package; vendor packages may depend on the core.

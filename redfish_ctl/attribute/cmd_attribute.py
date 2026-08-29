@@ -15,16 +15,15 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import find_ids
-from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
+from ..cmd_utils import find_ids, save_if_needed
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
 
 class AttributesQuery(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.AttributesQuery,
     name='attribute_inventory',
     metaclass=Singleton):
@@ -111,7 +110,7 @@ class AttributesQuery(
         if do_deep:
             extra_data = [
                 self.api_get_call(
-                    f"{self._default_method}{self.idrac_ip}{a}", headers).json()
+                    f"{self._default_method}{self.redfish_ip}{a}", headers).json()
                 for a in extra_actions
             ]
 

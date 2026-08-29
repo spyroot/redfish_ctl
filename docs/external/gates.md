@@ -13,17 +13,18 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 ```
 ./scripts/check.sh --list                 # enumerate every registered gate
 ./scripts/check.sh --profile merge         # run all merge gates (in-cluster only; refuses off-cluster)
-./scripts/gates/run.sh <profile>           # the runner (invoked inside a homelab-k8s runner pod)
+./scripts/gates/run.sh <profile>           # runner invoked by configured CI
 ```
 
-Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`make k8s-ci REF=<branch>`)
-— a gate never runs on a workstation.
+Off-cluster, `check.sh --profile` refuses and directs the operator to push the
+candidate ref so the configured GitLab pipeline runs it. A gate never runs on a workstation.
 
 ## Profiles
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
 - **integration** — needs the cluster; smoke/namespace checks. No BMC mutation.
+- **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
 
@@ -46,6 +47,7 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
 | `integration.namespace` | integration | no | the home cluster is reachable (fail-closed smoke) | cluster unreachable |
+| `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
 | `gitlab.project-token.api-access` | integration | no | the token carries API scope | `/version` returns 403 (no api scope) |
@@ -58,11 +60,31 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
 | `evidence.sanitized` | merge | no | the evidence artifact contains no secret material | a secret-shaped token in the artifact |
 
+## Telemetry liveness checks
+
+From a source checkout, inspect selected Splunk MTS metrics or validate the
+catalog-driven full-coverage policy without network access:
+
+```bash
+python -m tools.splunk_metric_gate hw.power hw.temperature --token-env SPLUNK_API_TOKEN
+python -m tools.splunk_full_coverage_gate --dry-run
+```
+
+The scheduled full check is read-only and uses the registered realm and
+API-scoped token. Run it only in the configured protected CI environment:
+
+```bash
+python -m tools.splunk_full_coverage_gate --token-env SPLUNK_API_TOKEN
+```
+
+See [Telemetry metrics](telemetry-metrics.md#scheduled-splunk-liveness) for
+`always_on` and `condition_gated` semantics.
+
 ## Permissions
 
 merge/integration gates run under a **read-only** CI ServiceAccount with no production credentials.
 Live apply (deploy profile) runs under a **separate, explicitly selected** apply ServiceAccount, only
-from a protected pipeline. See `docs/secrets.md` for value-free credential creation and `k8s/base/` for
+from a protected pipeline. See [Secrets](secrets.md) for value-free credential creation and `k8s/base/` for
 the ServiceAccount definitions.
 
 ## Failure behavior

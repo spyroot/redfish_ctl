@@ -1,0 +1,44 @@
+apiVersion: homelab.embedings.ai/v1alpha1
+kind: CiSmokeInventory
+metadata:
+  name: redfish-ctl-required-ci-smoke-tests
+spec:
+  smokeTests:
+    - job: gate-merge
+      class: wiring
+      command: './scripts/check.sh --profile "${MERGE_PROFILE:-merge}"'
+      requiredTools: [bash, conda, git, git-lfs, python3]
+      artifactUnderTest:
+        type: repository
+        digestSource: git-commit
+      mutation: none
+      timeoutSeconds: 3600
+      evidencePath: reports/smoke/gate-merge.json
+      cleanupPolicy: reports-only
+      releaseBlocking: true
+
+    - job: gate-integration
+      class: protected-live
+      command: ./scripts/check.sh --profile integration
+      requiredTools: [bash, conda, git, git-lfs, jq, python3, yq]
+      artifactUnderTest:
+        type: repository-and-gitlab-integration
+        digestSource: git-commit-and-pipeline
+      mutation: read-only-api
+      timeoutSeconds: 1800
+      evidencePath: reports/smoke/gate-integration.json
+      cleanupPolicy: reports-only
+      releaseBlocking: true
+
+    - job: gate-scheduled
+      class: protected-live
+      command: ./scripts/check.sh --profile scheduled
+      requiredTools: [bash, conda, git, git-lfs, python3]
+      artifactUnderTest:
+        type: repository-and-splunk-liveness
+        digestSource: git-commit-and-metric-catalogs
+      mutation: read-only-api
+      timeoutSeconds: 1800
+      evidencePath: reports/smoke/gate-scheduled.json
+      cleanupPolicy: reports-only
+      releaseBlocking: true

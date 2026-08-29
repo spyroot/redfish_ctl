@@ -10,13 +10,12 @@ linked EnvironmentMetrics resource.
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class EnvironmentMetrics(RedfishManagerBase,
+class EnvironmentMetrics(RedfishManager,
                          scm_type=ApiRequestType.EnvironmentMetrics,
                          name="environment-metrics",
                          metaclass=Singleton):
@@ -107,16 +106,19 @@ class EnvironmentMetrics(RedfishManagerBase,
             "ControlMode": metric.get("ControlMode"),
         }
 
-    def _query_optional(self, uri, do_async=False):
+    def _query_optional(self, uri, do_async=False, preserve_errors=False):
         """Query a URI and return its payload, swallowing any error.
 
         :param uri: Redfish resource path to fetch.
         :param do_async: when True, issue the query asynchronously.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: the parsed payload dict, or an empty dict on failure.
         """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return {}
 
     def _append_metric(self,
@@ -125,7 +127,8 @@ class EnvironmentMetrics(RedfishManagerBase,
                        parent_type,
                        parent_uri,
                        metrics_uri,
-                       do_async=False):
+                       do_async=False,
+                       preserve_errors=False):
         """Fetch one EnvironmentMetrics resource and append its flattened row.
 
         :param rows: accumulator list receiving the flattened metric row.
@@ -134,10 +137,15 @@ class EnvironmentMetrics(RedfishManagerBase,
         :param parent_uri: URI of the parent resource.
         :param metrics_uri: URI of the EnvironmentMetrics resource to read.
         :param do_async: when True, issue the query asynchronously.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         """
         if not metrics_uri or metrics_uri in seen:
             return
-        metrics = self._query_optional(metrics_uri, do_async=do_async)
+        metrics = self._query_optional(
+            metrics_uri,
+            do_async=do_async,
+            preserve_errors=preserve_errors,
+        )
         if not isinstance(metrics, dict) or not metrics:
             return
         seen.add(metrics_uri)
@@ -155,16 +163,22 @@ class EnvironmentMetrics(RedfishManagerBase,
             "FanSpeedsPercent": metrics.get("FanSpeedsPercent"),
         })
 
-    def _append_chassis_metrics(self, rows, seen, do_async=False):
+    def _append_chassis_metrics(
+            self, rows, seen, do_async=False, preserve_errors=False):
         """Append EnvironmentMetrics rows for every chassis.
 
         :param rows: accumulator list receiving the metric rows.
         :param seen: set of already-processed metrics URIs for de-duplication.
         :param do_async: when True, issue queries asynchronously.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         """
         chassis = self.base_query(REDFISH_API.Chassis, do_async=do_async)
         for chassis_uri in self._members(chassis.data):
-            chassis_data = self._query_optional(chassis_uri, do_async=do_async)
+            chassis_data = self._query_optional(
+                chassis_uri,
+                do_async=do_async,
+                preserve_errors=preserve_errors,
+            )
             metrics_uri = self._link(chassis_data, "EnvironmentMetrics")
             self._append_metric(
                 rows,
@@ -173,6 +187,7 @@ class EnvironmentMetrics(RedfishManagerBase,
                 chassis_uri,
                 metrics_uri,
                 do_async=do_async,
+                preserve_errors=preserve_errors,
             )
 
     def _append_system_collection_metrics(self,
@@ -180,7 +195,8 @@ class EnvironmentMetrics(RedfishManagerBase,
                                           seen,
                                           collection_key,
                                           parent_type,
-                                          do_async=False):
+                                          do_async=False,
+                                          preserve_errors=False):
         """Append EnvironmentMetrics rows for a per-system subresource collection.
 
         :param rows: accumulator list receiving the metric rows.
@@ -188,16 +204,33 @@ class EnvironmentMetrics(RedfishManagerBase,
         :param collection_key: system link key to walk, such as ``Processors`` or ``Memory``.
         :param parent_type: resource type label recorded for each row.
         :param do_async: when True, issue queries asynchronously.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         """
-        systems = self._query_optional(RedfishApi.Systems, do_async=do_async)
+        systems = self._query_optional(
+            RedfishApi.Systems,
+            do_async=do_async,
+            preserve_errors=preserve_errors,
+        )
         for system_uri in self._members(systems):
-            system = self._query_optional(system_uri, do_async=do_async)
+            system = self._query_optional(
+                system_uri,
+                do_async=do_async,
+                preserve_errors=preserve_errors,
+            )
             collection_uri = self._link(system, collection_key)
             if not collection_uri:
                 continue
-            collection = self._query_optional(collection_uri, do_async=do_async)
+            collection = self._query_optional(
+                collection_uri,
+                do_async=do_async,
+                preserve_errors=preserve_errors,
+            )
             for member_uri in self._members(collection):
-                member = self._query_optional(member_uri, do_async=do_async)
+                member = self._query_optional(
+                    member_uri,
+                    do_async=do_async,
+                    preserve_errors=preserve_errors,
+                )
                 metrics_uri = self._link(member, "EnvironmentMetrics")
                 self._append_metric(
                     rows,
@@ -206,6 +239,7 @@ class EnvironmentMetrics(RedfishManagerBase,
                     member_uri,
                     metrics_uri,
                     do_async=do_async,
+                    preserve_errors=preserve_errors,
                 )
 
     @staticmethod
@@ -242,6 +276,7 @@ class EnvironmentMetrics(RedfishManagerBase,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Read EnvironmentMetrics linked from chassis, processors, and memory.
 
@@ -250,18 +285,26 @@ class EnvironmentMetrics(RedfishManagerBase,
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: when True, issue the underlying queries asynchronously.
         :param do_expanded: accepted for CLI compatibility; not used by this command.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: CommandResult whose data holds a summary and the per-resource metric rows.
         """
         rows = []
         seen = set()
 
-        self._append_chassis_metrics(rows, seen, do_async=do_async)
+        self._append_chassis_metrics(
+            rows,
+            seen,
+            do_async=do_async,
+            preserve_errors=bool(preserve_errors),
+        )
         self._append_system_collection_metrics(
             rows,
             seen,
             "Processors",
             "Processor",
             do_async=do_async,
+            preserve_errors=bool(preserve_errors),
         )
         self._append_system_collection_metrics(
             rows,
@@ -269,6 +312,7 @@ class EnvironmentMetrics(RedfishManagerBase,
             "Memory",
             "Memory",
             do_async=do_async,
+            preserve_errors=bool(preserve_errors),
         )
 
         data = {

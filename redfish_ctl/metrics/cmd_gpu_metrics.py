@@ -7,22 +7,24 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from ..telemetry.exporter import (
+    _as_float,
+    _duration_seconds,
+)
+from ..telemetry.supermicro.super_microexporter import (
     GPU_COMPUTE_PROPERTIES,
     GPU_MEMORY_ECC_PROPERTIES,
     GPU_MEMORY_ROW_REMAP_PROPERTIES,
     GPU_THROTTLE_PROPERTIES,
-    _as_float,
-    _duration_seconds,
 )
 from .common import link, members, nvidia_oem, resource_id
 
 
-class GpuMetrics(RedfishManagerBase,
+class GpuMetrics(IDracManager,
                  scm_type=ApiRequestType.GpuMetrics,
                  name="gpu-metrics",
                  metaclass=Singleton):

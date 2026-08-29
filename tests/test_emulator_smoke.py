@@ -30,13 +30,13 @@ _skip = pytest.mark.skipif(
 
 
 def _client():
-    from redfish_ctl.redfish_manager_base import RedfishManagerBase
+    from redfish_ctl.idrac_manager import IDracManager
     # host:port parsed from the emulator URL; api_*_call takes full URLs anyway.
     host = _EMU.split("://", 1)[-1]
-    return RedfishManagerBase(
-        idrac_ip=host,
-        idrac_username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
-        idrac_password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
+    return IDracManager(
+        host=host,
+        username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
+        password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
         insecure=True,
         is_debug=False,
     )

@@ -30,12 +30,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import UnexpectedResponse
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 
-class BootOptionsList(RedfishManagerBase,
+class BootOptionsList(IDracManager,
                       scm_type=ApiRequestType.BootOptions,
                       name='boot_sources_query',
                       metaclass=Singleton):
@@ -97,7 +97,7 @@ class BootOptionsList(RedfishManagerBase,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
+        r = f"{self._default_method}{self.redfish_ip}{self.idrac_manage_servers}" \
             f"/BootOptions?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)

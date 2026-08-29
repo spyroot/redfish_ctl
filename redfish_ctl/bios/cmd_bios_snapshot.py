@@ -23,12 +23,11 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import from_json_spec, save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class BiosSnapshot(RedfishManagerBase,
+class BiosSnapshot(RedfishManager,
                    scm_type=ApiRequestType.BiosSnapshot,
                    name='bios_snapshot',
                    metaclass=Singleton):
@@ -62,7 +61,7 @@ class BiosSnapshot(RedfishManagerBase,
         :return: the current ``Bios.Attributes`` dict, or empty on any query error.
         """
         try:
-            bios = self.base_query(f"{self.idrac_manage_servers}/Bios",
+            bios = self.base_query(f"{self.managed_system_uri}/Bios",
                                    do_async=do_async).data or {}
         except Exception:
             return {}

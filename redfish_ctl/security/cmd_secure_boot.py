@@ -19,15 +19,14 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 _SECURE_BOOT_RESET_ACTION = "#SecureBoot.ResetKeys"
 _SECURE_BOOT_DATABASE_RESET_ACTION = "#SecureBootDatabase.ResetKeys"
 
 
-class SecureBoot(RedfishManagerBase,
+class SecureBoot(RedfishManager,
                  scm_type=ApiRequestType.SecureBoot,
                  name='secure-boot',
                  metaclass=Singleton):
@@ -143,7 +142,7 @@ class SecureBoot(RedfishManagerBase,
         return CommandResult(rows, None, None, None)
 
 
-class SecureBootResetKeys(RedfishManagerBase,
+class SecureBootResetKeys(RedfishManager,
                           scm_type=ApiRequestType.SecureBootResetKeys,
                           name="secure-boot-reset-keys",
                           metaclass=Singleton):

@@ -16,14 +16,12 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import Singleton, ApiRequestType
-from ..redfish_manager import CommandResult
-from ..redfish_shared import RedfishJson
-from ..redfish_shared import RedfishApi
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
+from ..redfish_shared import RedfishApi, RedfishJson
 
 
-class BiosRegistry(RedfishManagerBase,
+class BiosRegistry(RedfishManager,
                    scm_type=ApiRequestType.BiosRegistry,
                    name='bios_registry',
                    metaclass=Singleton):
@@ -47,14 +45,14 @@ class BiosRegistry(RedfishManagerBase,
         :param do_async: note async will subscribe to an event loop.
         :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
         """
-        dell_uri = f"{self.idrac_manage_servers}/Bios/BiosRegistry"
+        dell_uri = f"{self.managed_system_uri}/Bios/BiosRegistry"
         try:
             if (self.base_query(dell_uri, do_async=do_async).data or {}).get("RegistryEntries"):
                 return dell_uri
         except Exception:
             pass
         try:
-            bios = self.base_query(f"{self.idrac_manage_servers}/Bios",
+            bios = self.base_query(f"{self.managed_system_uri}/Bios",
                                    do_async=do_async).data or {}
             name = bios.get("AttributeRegistry")
             if name:

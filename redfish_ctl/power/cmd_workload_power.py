@@ -13,10 +13,10 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
+from ..supermico_manager import SupermicroManager
 
 _PROFILE_MASK = re.compile(r"^0x[0-9a-fA-F]+$")
 _ACTION_TYPES = {
@@ -41,7 +41,7 @@ def _normalize_profile_mask(profile_mask: str) -> str:
     return f"0x{value:x}"
 
 
-class WorkloadPower(RedfishManagerBase,
+class WorkloadPower(SupermicroManager,
                     scm_type=ApiRequestType.WorkloadPower,
                     name="workload-power",
                     metaclass=Singleton):

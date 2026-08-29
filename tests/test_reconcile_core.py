@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.redfish_manager_base import RedfishManagerBase
-from redfish_ctl.redfish_manager_shared import ApiRequestType
+from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.reconcile import DesiredState, reconcile
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -505,11 +505,11 @@ def test_reconcile_dry_run_uses_gb300_corpus_without_writes():
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = RedfishManagerBase(
-            idrac_ip="mock-gb300",
-            idrac_username="root",
-            idrac_password="mock",
-            idrac_port=8080,
+        manager = IDracManager(
+            host="mock-gb300",
+            username="root",
+            password="mock",
+            port=8080,
             insecure=True,
             is_http=True,
             is_debug=False,

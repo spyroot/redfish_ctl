@@ -13,15 +13,15 @@ and only POST when ``--confirm`` is supplied.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 
 _DELL_LC_EXPORTS = {
     "complete-lc-log": "#DellLCService.ExportCompleteLCLog",
@@ -36,7 +36,7 @@ _DELL_LC_EXPORTS = {
 }
 
 
-class DellLcExport(RedfishManagerBase,
+class DellLcExport(IDracManager,
                    scm_type=ApiRequestType.DellLcExport,
                    name="dell-lc-export",
                    metaclass=Singleton):
@@ -360,9 +360,10 @@ class DellLcExport(RedfishManagerBase,
             env_name = password_env.strip()
             if not env_name:
                 raise InvalidArgument("password environment variable name cannot be empty")
-            if env_name not in os.environ:
+            value = named_env(env_name)
+            if value is None:
                 raise InvalidArgument(f"password environment variable '{env_name}' is not set")
-            return os.environ[env_name]
+            return value
         if password_file is not None:
             path = Path(password_file).expanduser()
             try:

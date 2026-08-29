@@ -28,7 +28,7 @@ from .dell_lc.cmd_dell_lc_clear_provisioning import *
 from .compute.cmd_power_state import *
 from .compute.cmd_compute_setting import *
 
-from .redfish_manager_shared import *
+from .redfish_api_common import *
 from .raid.cmd_dell_raid_check_values import *
 from .raid.cmd_raid_service import *
 from .raid.cmd_dell_raid_blink import *
@@ -88,6 +88,7 @@ from .manager.cmd_manager_reset import *
 # virtual medial cmds
 from .virtual_media.cmd_virtual_media_get import *
 from .virtual_media.cmd_virtual_media_insert import *
+from .virtual_media.cmd_mount_cdrom import *
 from .virtual_media.cmd_virtual_media_eject import *
 from .virtual_media.cmd_smc_virtual_media import *
 from .cmd_current_boot import *
@@ -122,12 +123,12 @@ from .environment.cmd_environment_metrics import *
 from .metrics.cmd_processor_metrics import *
 from .metrics.cmd_memory_metrics import *
 from .metrics.cmd_gpu_metrics import *
-from .telemetry.cmd_metric_reports import *
-from .telemetry.cmd_metric_definitions import *
-from .telemetry.cmd_telemetry_clear_reports import *
-from .telemetry.cmd_telemetry_reset_definitions import *
-from .telemetry.cmd_telemetry_submit_test import *
-from .telemetry.cmd_exporter import *
+from redfish_ctl.telemetry.supermicro.cmd_metric_reports import *
+from redfish_ctl.telemetry.supermicro.cmd_metric_definitions import *
+from redfish_ctl.telemetry.supermicro.cmd_telemetry_clear_reports import *
+from redfish_ctl.telemetry.supermicro.cmd_telemetry_reset_definitions import *
+from redfish_ctl.telemetry.supermicro.cmd_telemetry_submit_test import *
+from redfish_ctl.telemetry.supermicro.cmd_exporter import *
 from .component_integrity.cmd_component_integrity import *
 from .component_integrity.cmd_spdm_measurements import *
 from .network.cmd_network_adapters import *
@@ -150,7 +151,7 @@ from .security.cmd_secure_boot import *
 from .security.cmd_certificates import *
 from .security.cmd_certificate_generate_csr import *
 from .firmware.cmd_firmware_update import *
-from .telemetry.cmd_telemetry_triggers import *
+from redfish_ctl.telemetry.supermicro.cmd_telemetry_triggers import *
 from .network.cmd_network_ports import *
 from .network.cmd_dell_switch_port_refresh import *
 from .oem.cmd_oem_info import *

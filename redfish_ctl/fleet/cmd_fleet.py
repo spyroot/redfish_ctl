@@ -8,7 +8,6 @@ Example::
 from __future__ import annotations
 
 import argparse
-import os
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -18,9 +17,10 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
+from ..config import named_env
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import ApiRequestType, Singleton
 from ..telemetry import tracing
 
 
@@ -51,7 +51,7 @@ def _env_value(raw: Mapping[str, Any], field: str, env_field: str, default: str)
         return str(value)
     env_name = raw.get(env_field)
     if env_name:
-        return os.environ.get(str(env_name), default)
+        return named_env(str(env_name), default)
     return default
 
 
@@ -167,17 +167,17 @@ def _temperature_summary(readings: tuple[Any, ...]) -> dict[str, int | float | N
     }
 
 
-def _node_manager(node: FleetNode) -> RedfishManagerBase:
+def _node_manager(node: FleetNode) -> IDracManager:
     """Build a Redfish manager from a node's connection details.
 
     :param node: the fleet node to connect to.
-    :return: a :class:`RedfishManagerBase` bound to the node.
+    :return: a :class:`IDracManager` bound to the node.
     """
-    return RedfishManagerBase(
-        idrac_ip=node.address,
-        idrac_username=node.username,
-        idrac_password=node.password,
-        idrac_port=node.port,
+    return IDracManager(
+        host=node.address,
+        username=node.username,
+        password=node.password,
+        port=node.port,
         insecure=node.insecure,
         is_http=node.use_http,
     )
@@ -306,7 +306,7 @@ def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]
     }
 
 
-class FleetInventory(RedfishManagerBase,
+class FleetInventory(IDracManager,
                      scm_type=ApiRequestType.FleetInventory,
                      name="fleet",
                      metaclass=Singleton):

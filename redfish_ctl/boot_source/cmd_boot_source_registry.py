@@ -10,16 +10,13 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_shared import REDFISH_API
 
 
 class QueryBootSourceRegistry(
-    RedfishManagerBase,
+    IDracManager,
     scm_type=ApiRequestType.BootSourceRegistry,
     name='boot_source_registry',
     metaclass=Singleton):
@@ -49,7 +46,7 @@ class QueryBootSourceRegistry(
                 do_expanded: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Executes boot source registry query command.
-        
+
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded:  will do expand query
         :param filename: if filename indicate call will save the response to this file.

@@ -25,7 +25,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        # Single Python version: the floor (setup.py python_requires>=3.10), which
+        # catches use of newer-than-3.10 syntax. main's branch protection must
+        # require ONLY `test (3.10)`; if it still requires test (3.11)/test (3.12),
+        # a PR hangs on checks that no longer run.
+        python-version: ["3.10"]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -61,7 +65,9 @@ jobs:
           fi
       - name: Offline tests (no BMC, no IDRAC_IP)
         if: steps.changes.outputs.docs_only != 'true'
-        run: pytest -q
+        # dmtf_sim_live is a private-CI integration lane (needs the deployed sim);
+        # exclude it here so GitHub CI stays offline and green.
+        run: pytest -q -m "not dmtf_sim_live"
       - name: Offline tests (docs-only fast path — docs-coupled tests)
         # Docs edits can still break tests that read docs/ or any Markdown
         # file (path links, Makefile/docker doc contracts, simulator-contract
@@ -74,13 +80,13 @@ jobs:
         run: |
           if grep -qlE '\bdocs/|\.md\b' tests/conftest.py tests/test_utils.py tests/vendor_corpus.py 2>/dev/null; then
             echo "shared test helper is docs-coupled; running the full suite"
-            pytest -q
+            pytest -q -m "not dmtf_sim_live"
             exit 0
           fi
           files="$(grep -rlE '\bdocs/|\.md\b' tests/test_*.py || true)"
           if [ -n "$files" ]; then
             # shellcheck disable=SC2086
-            pytest -q $files
+            pytest -q -m "not dmtf_sim_live" $files
           else
             echo "no docs-coupled tests detected"
           fi

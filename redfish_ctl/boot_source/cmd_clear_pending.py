@@ -13,17 +13,12 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-
-from ..cmd_utils import save_if_needed
-from ..cmd_exceptions import InvalidArgument
-from ..redfish_manager_base import RedfishManagerBase
-from ..redfish_manager_shared import RedfishApiRespond, Singleton, ApiRequestType
+from ..idrac_manager import IDracManager
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
-from ..redfish_manager_shared import REDFISH_API
-from ..redfish_manager_shared import RedfishApiRespond
 
 
-class BootOptionsClearPending(RedfishManagerBase,
+class BootOptionsClearPending(IDracManager,
                               scm_type=ApiRequestType.BootOptionsClearPending,
                               name='clear_pending',
                               metaclass=Singleton):
@@ -83,5 +78,3 @@ class BootOptionsClearPending(RedfishManagerBase,
             cmd_result.data['task_id'] = task_id
 
         return cmd_result
-
-

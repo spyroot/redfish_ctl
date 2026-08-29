@@ -26,7 +26,7 @@ class RoundTripError(AssertionError):
 def _read_attr(manager, resource: str, attr: str) -> Any:
     """Read one attribute of a Redfish resource.
 
-    :param manager: RedfishManagerBase-derived instance issuing the GET.
+    :param manager: IDracManager-derived instance issuing the GET.
     :param resource: Redfish resource path, e.g. ``/redfish/v1/Systems/1``.
     :param attr: top-level attribute name in the resource JSON.
     :return: the attribute value, or None when absent.
@@ -53,7 +53,7 @@ def live_roundtrip(manager, resource: str, attr: str, new_value: Any,
     captured value back is idempotent if the write never landed and essential
     if it did, so the safe posture is to always restore once dispatched.
 
-    :param manager: RedfishManagerBase-derived instance issuing GET/PATCH.
+    :param manager: IDracManager-derived instance issuing GET/PATCH.
     :param resource: Redfish resource path holding the attribute.
     :param attr: top-level attribute name to mutate.
     :param new_value: reversible value to write and then roll back.
