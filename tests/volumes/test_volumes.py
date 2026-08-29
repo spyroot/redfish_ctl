@@ -5,11 +5,11 @@ collection (expanded) and returns the payload plus any discovered Redfish action
 on its members. The tests assert it never mutates, surfaces a member's
 ``#Volume.Initialize`` as a discovered action, and resolves the collection on a
 generic (non-Dell) tree. Runs offline by default and against real hardware when
-IDRAC_IP is set.
+REDFISH_IP is set.
 
 Author Mus spyroot@gmail.com
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _CONTROLLER = "RAID.Integrated.1-1"

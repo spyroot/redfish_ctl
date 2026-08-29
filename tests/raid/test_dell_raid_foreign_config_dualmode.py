@@ -8,7 +8,7 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.raid.cmd_dell_raid_foreign_config import DellRaidForeignConfigActions
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -35,9 +35,9 @@ def dell_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-raid-foreign-config",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-raid-foreign-config",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

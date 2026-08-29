@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: harbor.rnd.embedings.ai:30443/spyroot/redfish-dmtf-sim
+  tag: "2026.1"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - harbor-registry-pull
+
+dmtf:
+  bundleRelease: "2026.1"
+  bundleSha256: 481990aa1e77a675b5cc919483b4bc2dd8e832f91ba9b0e3f001ee2b2c8ddef7
+  profile: public-rackmount1
+
+provenance:
+  sourceCommit: ""
+
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+
+serviceAccount:
+  create: true
+  name: ""
+
+networkPolicy:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

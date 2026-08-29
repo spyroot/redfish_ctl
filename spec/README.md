@@ -2,12 +2,14 @@
 
 This directory stores public DMTF Redfish reference bundles used by tests and
 the simulator. The machine-readable release contract is
-`dmtf/redfish/2026.1/manifest.yaml`.
+`dmtf/redfish/2026.1/manifest.yaml`, which also registers the HTTP semantics
+rule graph and its gate.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
+| `redfish-http-semantics-bundle/` | Machine-readable DSP0266 HTTP status and response-semantics rules, generated matrices, and offline contract tests. |
 | `dmtf/redfish/2026.1/manifest.yaml` | Release contract that names DMTF artifacts, local bundle policy, and gates. |
 | `dmtf/redfish/2026.1/protocol/` | Redfish protocol specification PDFs such as DSP0266. |
 | `dmtf/redfish/2026.1/data-model/` | Redfish data model specification PDFs such as DSP0268. |

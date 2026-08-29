@@ -43,7 +43,7 @@ spec:
               containerPort: 8080
           readinessProbe:
             httpGet:
-              path: /redfish/v1/
+              path: /redfish/v1/TaskService
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5

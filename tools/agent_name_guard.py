@@ -39,6 +39,13 @@ _AGENT_FILE_GLOBS = [
 _AGENT_DIR_PREFIXES = (".codex/", ".claude/", ".agent-review/", ".internal/",
                        "docs/internal/", "inventory/")
 
+# These files are the public standards CI bindings allowed under the otherwise
+# private inventory tree.
+_ALLOWED_AGENT_FILE_PATHS = {
+    "inventory/ci/go-no-go.yaml",
+    "inventory/ci/smoke-tests.yaml",
+}
+
 # Agent-tool names (word-bounded) plus specialist-agent role names (either separator).
 _IDENTITIES = [
     r"\bcodex\b",
@@ -141,6 +148,8 @@ def is_agent_file(path: str) -> bool:
     :param path: a repo-relative file path (forward slashes).
     :return: True if it matches an agent-file glob or lives under an agent-only directory.
     """
+    if path in _ALLOWED_AGENT_FILE_PATHS:
+        return False
     if path.startswith(_AGENT_DIR_PREFIXES):
         return True
     base = path.rsplit("/", 1)[-1]

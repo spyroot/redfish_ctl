@@ -1,0 +1,61 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: CoverageLedger
+metadata:
+  name: dmtf-dsp0266-1.24.0-eventing-coverage
+spec:
+  source:
+    document: DSP0266
+    version: 1.24.0
+    sections: ["12.1.2"]
+  statements:
+    - id: subscription-create-uses-event-destination
+      disposition: covered
+      coveredBy: [event.subscription.create.completed]
+    - id: completed-create-status-201
+      disposition: covered
+      coveredBy: [event.subscription.create.completed]
+    - id: completed-create-location-header
+      disposition: covered
+      coveredBy: [event.subscription.create.completed]
+    - id: created-resource-body-recommended
+      disposition: covered
+      coveredBy: [event.subscription.create.body-representation]
+    - id: no-retroactive-events
+      disposition: covered
+      coveredBy: [event.subscription.no-historical-replay]
+    - id: push-eventing-supported
+      disposition: covered
+      coveredBy: [event.push.supported-for-event-capable-resources]
+    - id: conflicting-body-is-error
+      disposition: covered
+      coveredBy: [event.subscription.create.conflicting-body]
+    - id: unsupported-parameter-status-400
+      disposition: covered
+      coveredBy: [event.subscription.create.unsupported-parameter]
+    - id: subscription-persistent-across-restart
+      disposition: covered
+      coveredBy: [event.subscription.persistent-across-restart]
+    - id: no-push-without-subscription
+      disposition: covered
+      coveredBy: [event.push.requires-active-subscription]
+    - id: event-payload-size-and-splitting
+      disposition: covered
+      coveredBy: [event.push.payload-limit]
+    - id: metric-report-size-exemption
+      disposition: covered
+      coveredBy: [event.push.metric-report-payload-exemption]
+    - id: optional-termination-message
+      disposition: covered
+      coveredBy: [event.subscription.termination-last-event]
+    - id: optional-termination-after-delivery-errors
+      disposition: covered
+      coveredBy: [event.subscription.service-termination-after-errors]
+    - id: receiver-returns-success
+      disposition: covered
+      coveredBy: [event.push.delivery-acknowledgement]
+    - id: unsubscribe-via-delete
+      disposition: covered
+      coveredBy: [event.subscription.delete]
+    - id: terminated-resource-subsequent-status-404
+      disposition: covered
+      coveredBy: [event.subscription.request-after-termination]

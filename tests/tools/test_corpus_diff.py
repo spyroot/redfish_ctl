@@ -382,8 +382,7 @@ def test_cli_credentials_half_filled_inventory_falls_back(tmp_path, monkeypatch)
     monkeypatch.setenv("REDFISH_USERNAME", "opuser")
     monkeypatch.setenv("REDFISH_PASSWORD", "opsecret")
     assert corpus._bmc_credentials("10.0.0.9", inventory) == ("opuser", "opsecret")
-    for var in ("REDFISH_USERNAME", "REDFISH_PASSWORD",
-                "IDRAC_USERNAME", "IDRAC_PASSWORD"):
+    for var in ("REDFISH_USERNAME", "REDFISH_PASSWORD"):
         monkeypatch.delenv(var, raising=False)
     with pytest.raises(SystemExit) as excinfo:
         corpus._bmc_credentials("10.0.0.9", inventory)

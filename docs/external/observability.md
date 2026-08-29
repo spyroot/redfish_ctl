@@ -37,7 +37,7 @@ flowchart LR
     cli -->|Redfish HTTPS| bmc[("BMC\n(Dell / HPE / Supermicro /\nNVIDIA / Cisco / Lenovo)")]
     driver -->|OTLP spans + hw.* metrics| col["OpenTelemetry\nCollector"]
     col -->|OTLP| splunk["Splunk Observability APM"]
-    splunk --> map["Service map\nredfish-ctl → bmc"]
+    splunk --> map["Service map\nredfish_ctl → bmc"]
     splunk --> wf["Trace waterfall\n(which step, how long)"]
     splunk --> tag["Tag Spotlight\nby vendor / action / profile"]
 ```
@@ -48,7 +48,7 @@ Two signals, one pipeline:
   (`firmware-update`, `bios-change`, `reboot`). BMC calls routed through the manager HTTP verbs, the
   Redfish action primitive, and the firmware upload helper open `SpanKind.CLIENT` spans
   (`redfish.bmc.request`) carrying `peer.service="bmc"`. Because the BMC is uninstrumented, Splunk
-  infers it as a single downstream service node — so a whole fleet renders as `redfish-ctl → bmc`, not
+  infers it as a single downstream service node — so a whole fleet renders as `redfish_ctl → bmc`, not
   one node per address. Failures set the span to ERROR (from the HTTP status or `CommandResult.error`),
   which drives the red edges, error rate, and Root Cause in APM. The public span contract lives in
   `specs/telemetry/span_contract.yaml`; the merge-gate coverage requirements live in
@@ -70,24 +70,30 @@ with tracing on:
 
 ```bash
 # 1. install with the OpenTelemetry extra
-pip install "redfish-ctl[otlp]"
+pip install "redfish_ctl[otlp]"
 
 # 2. point at your OTLP collector / Splunk (token via env, never on argv)
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<your-collector-or-ingest>:4317"
 export OTEL_EXPORTER_OTLP_HEADERS="X-SF-Token=<your-splunk-access-token>"
 
 # 3. run any operation with tracing enabled
-redfish_ctl --otlp-traces system            # a read; shows redfish-ctl → bmc in the service map
-redfish_ctl --otlp-traces system-reset --dry_run   # guarded reset preview; no POST
+redfish_ctl --vendor dell --otlp-traces system
+redfish_ctl --otlp-traces system-reset --dry_run
 ```
 
-Within seconds the operation appears in APM: a `redfish-ctl → bmc` service map, a trace waterfall of
+Within seconds the operation appears in APM: a `redfish_ctl → bmc` service map, a trace waterfall of
 the BMC calls, and per-operation error/latency in Tag Spotlight. Metrics stream the same way via the
 exporter:
 
 ```bash
-redfish_ctl exporter --output otlp --once     # one scrape of hw.* metrics to the same endpoint
+redfish_ctl --vendor supermicro exporter --output otlp --once
 ```
+
+For Splunk Enterprise/Cloud HEC, serve Prometheus with
+`redfish_ctl --vendor supermicro exporter --output prometheus` and route it through a Splunk
+OpenTelemetry Collector with a Prometheus receiver and `splunk_hec` exporter. Native OTLP uses the
+same endpoint and routing settings shown above. Metric Finder and SignalFlow read-back live in
+[Telemetry Metrics](telemetry-metrics.md#metric-finder-and-read-back).
 
 For a **k8s deployment** (one exporter pod per BMC, the operator reconciling profiles, all streaming
 to an in-cluster Collector), see the [Kubernetes guide](../../k8s/README.md) and the Helm chart under

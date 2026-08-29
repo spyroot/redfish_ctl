@@ -5,5 +5,4 @@
 redfish_ctl/api.py:27
 redfish_ctl/config.py:34
 redfish_ctl/fixtures_catalog.py:14
-redfish_ctl/network/cmd_network_adapter_reset.py:25
 redfish_ctl/proxy/core.py:53

@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -58,7 +58,7 @@ class Manager(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
         target = "/redfish/v1/TaskService"
-        r = f"{self._default_method}{self.idrac_ip}{target}"
+        r = f"{self._default_method}{self.redfish_ip}{target}"
         response = self.api_get_call(r, headers)
         data = response.json()
         redfish_actions = self.discover_redfish_actions(self, data)

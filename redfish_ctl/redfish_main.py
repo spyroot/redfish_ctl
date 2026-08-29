@@ -1,10 +1,7 @@
-"""Main entry for redfish_ctl
+"""CLI entrypoint for redfish_ctl.
 
-The main routine for redfish_ctl; the tool leverages the IDracManager class.
-to interact with a Redfish BMC.
-
-Each command registered dynamically and dispatch to respected execute method
-by invoking requests through the manager.
+Parses root options, builds the DMTF/vendor command tree, instantiates the
+selected manager, and dispatches one command.
 
 Author Mus spyroot@gmail.com
 """
@@ -13,7 +10,6 @@ import argparse
 import collections
 import json
 import logging
-import os
 import ssl
 import sys
 import warnings
@@ -24,7 +20,7 @@ import urllib3
 from pygments import highlight
 
 from redfish_ctl.ilo_manager import IloManager
-from redfish_ctl.sensors import cmd_sensors
+
 from .redfish_exceptions import RedfishException
 from .version import __version__
 
@@ -49,13 +45,13 @@ from .cmd_exceptions import (
     UnsupportedAction,
 )
 from .cmd_utils import save_if_needed
-from .config import ConfigurationConflict, endpoint_conflict_fields, endpoint_defaults
+from .config import ConfigurationConflict, endpoint_defaults, term_type
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .idrac_manager import IDracManager
+from .redfish_api_common import RedfishAction, RedfishActionEncoder
 from .redfish_manager import RedfishManager
-from .supermico_manager import SupermicroManager
-from .idrac_shared import RedfishAction, RedfishActionEncoder
 from .redfish_query import RedfishQuery
+from .supermico_manager import SupermicroManager
 from .telemetry import tracing
 from .telemetry.exporter import apply_exporter_env_file, exporter_argv_uses_secret
 from .vendors import VendorCapabilities, get_vendor
@@ -81,71 +77,7 @@ _ROOT_CONNECTION_ARGS = {
     "redfish_username",
     "redfish_password",
     "redfish_port",
-    "idrac_ip",
-    "idrac_username",
-    "idrac_password",
-    "idrac_port",
-    "_endpoint_cli_overrides",
 }
-
-_LEGACY_ENDPOINT_ATTRS = {
-    "idrac_ip": "redfish_host",
-    "idrac_username": "redfish_username",
-    "idrac_password": "redfish_password",
-    "idrac_port": "redfish_port",
-}
-
-class _EndpointAliasAction(argparse.Action):
-    """Argparse action that mirrors one option into canonical and legacy attrs."""
-
-    def __init__(
-            self, option_strings, dest, legacy_dest=None, endpoint_field=None,
-            **kwargs):
-        """Create a mirrored endpoint action.
-
-        :param option_strings: option spellings handled by this action.
-        :param dest: canonical argparse destination.
-        :param legacy_dest: legacy argparse destination to mirror.
-        :param endpoint_field: endpoint field this option explicitly overrides.
-        :param kwargs: additional argparse action options.
-        :return: None.
-        """
-        self.legacy_dest = legacy_dest
-        self.endpoint_field = endpoint_field
-        super().__init__(option_strings, dest, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        """Store the parsed value under both endpoint destination names.
-
-        :param parser: parser invoking the action.
-        :param namespace: namespace being populated.
-        :param values: parsed value for the option.
-        :param option_string: option spelling used by the caller.
-        :return: None. The namespace is updated in place.
-        """
-        setattr(namespace, self.dest, values)
-        if self.legacy_dest is not None:
-            setattr(namespace, self.legacy_dest, values)
-        if self.endpoint_field is not None:
-            overridden = set(
-                getattr(namespace, "_endpoint_cli_overrides", set()) or set()
-            )
-            overridden.add(self.endpoint_field)
-            setattr(namespace, "_endpoint_cli_overrides", overridden)
-
-
-def _sync_legacy_endpoint_attrs(args: argparse.Namespace) -> None:
-    """Mirror endpoint attrs between canonical and legacy Namespace names.
-
-    :param args: parsed CLI namespace carrying root endpoint attrs.
-    :return: None. The namespace is updated in place.
-    """
-    for legacy_attr, canonical_attr in _LEGACY_ENDPOINT_ATTRS.items():
-        if hasattr(args, canonical_attr):
-            setattr(args, legacy_attr, getattr(args, canonical_attr))
-        elif hasattr(args, legacy_attr):
-            setattr(args, canonical_attr, getattr(args, legacy_attr))
-
 
 class TermColors:
     HEADER = '\033[95m'
@@ -178,7 +110,7 @@ def color_printer(msg: str, tcolor: Optional[str] = TermColors.WARNING):
     :param msg: the message to print.
     :param tcolor: terminal color escape applied when the terminal supports color.
     """
-    current_term = os.getenv("TERM")
+    current_term = term_type()
     if current_term is not None and current_term in TermList:
         err_msg = '{:<30}'.format(f"{tcolor}{msg}{TermColors.ENDC}")
         print(err_msg)
@@ -441,11 +373,12 @@ def is_fleet_command(args) -> bool:
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
-def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
+def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -> None:
     """Main entry point.
 
     :param cmd_args: parsed CLI arguments for the selected command.
     :param command_name_to_cmd: mapping of command name to its (type, name) tuple.
+    :param manager_cls: selected neutral or vendor manager class.
     """
     # BMCs ship self-signed certs, so verification is opt-in via --verify-ssl.
     # We skip verification by default; --insecure stays as an explicit "skip".
@@ -465,41 +398,13 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict) -> None:
         tracing.setup_otlp()
         tracing.install_termination_flush()
 
-    # the manager is the main interface main uses to interact with the BMC.
-    # --vendor selects the manager; absent it, the neutral RedfishManager.
-    vendor = getattr(cmd_args, "vendor", None)
-    if vendor == "dell":
-        redfish_api = IDracManager(host=cmd_args.redfish_host,
-                                   username=cmd_args.redfish_username,
-                                   password=cmd_args.redfish_password,
-                                   port=cmd_args.redfish_port,
-                                   insecure=insecure,
-                                   is_http=cmd_args.use_http,
-                                   is_debug=cmd_args.debug)
-    elif vendor == "hp":
-        redfish_api = IloManager(host=cmd_args.redfish_host,
-                                 username=cmd_args.redfish_username,
-                                 password=cmd_args.redfish_password,
-                                 port=cmd_args.redfish_port,
-                                 insecure=insecure,
-                                 is_http=cmd_args.use_http,
-                                 is_debug=cmd_args.debug)
-    elif vendor == "supermicro":
-        redfish_api = SupermicroManager(host=cmd_args.redfish_host,
-                                        username=cmd_args.redfish_username,
-                                        password=cmd_args.redfish_password,
-                                        port=cmd_args.redfish_port,
-                                        insecure=insecure,
-                                        is_http=cmd_args.use_http,
-                                        is_debug=cmd_args.debug)
-    else:
-        redfish_api = RedfishManager(host=cmd_args.redfish_host,
-                                     username=cmd_args.redfish_username,
-                                     password=cmd_args.redfish_password,
-                                     port=cmd_args.redfish_port,
-                                     insecure=insecure,
-                                     is_http=cmd_args.use_http,
-                                     is_debug=cmd_args.debug)
+    redfish_api = manager_cls(host=cmd_args.redfish_host,
+                              username=cmd_args.redfish_username,
+                              password=cmd_args.redfish_password,
+                              port=cmd_args.redfish_port,
+                              insecure=insecure,
+                              is_http=cmd_args.use_http,
+                              is_debug=cmd_args.debug)
 
     connectionless_mode = (
         is_network_scan(cmd_args)
@@ -642,16 +547,19 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
         console_error_printer(f"Error:{upc}")
 
 
-def create_cmd_tree(arg_parser, debug=False) -> Dict:
+def create_cmd_tree(arg_parser, manager, debug=False) -> Dict:
     """Create command tree structure.
 
+    The selected manager's ``get_registry()`` supplies the command set. The
+    neutral manager returns DMTF commands; a vendor manager returns DMTF plus its
+    vendor commands, with vendor entries overriding same-named DMTF entries.
+
     :param arg_parser: the root argument parser to attach subcommand parsers to.
+    :param manager: selected neutral or vendor manager class/instance.
     :param debug: when True, log each registered command.
     :return: a dict that store mapping for each command.
     """
-    redfish_api = IDracManager()
     command_name_to_cmd = {}
-    commands_registry = redfish_api.get_registry()
     command_name = collections.namedtuple("Command", "type name")
 
     subparsers = arg_parser.add_subparsers(
@@ -665,24 +573,29 @@ def create_cmd_tree(arg_parser, debug=False) -> Dict:
         required=True
     )
 
+    commands_registry = manager.get_registry()
+
+    # Resolve each CLI verb once from the manager-visible DMTF/vendor registry.
+    resolved = {}
     for k in commands_registry:
         for sub_key in commands_registry[k]:
             cls = commands_registry[k][sub_key]
+            if not hasattr(cls, "register_subcommand"):
+                continue
+            cli_arg_parser, cmd_name, cmd_help = cls.register_subcommand(cls)
             if debug:
-                logger.debug(f"Registering command {k} {sub_key}")
-            if hasattr(cls, "register_subcommand"):
-                # register each command
-                cli_arg_parser, cmd_name, cmd_help = cls.register_subcommand(cls)
-                if debug:
-                    logger.debug(f"Registering command name {cmd_name} {cmd_help}")
+                action = "Overriding" if cmd_name in resolved else "Registering"
+                logger.debug(f"{action} command {cmd_name} ({k} {sub_key})")
+            resolved[cmd_name] = (cli_arg_parser, cmd_help, k, sub_key)
 
-                subparsers.add_parser(
-                    cmd_name,
-                    parents=[cli_arg_parser],
-                    help=f"{str(cmd_help)}",
-                    formatter_class=CustomArgumentDefaultsHelpFormatter,
-                )
-                command_name_to_cmd[cmd_name] = command_name(k, sub_key)
+    for cmd_name, (cli_arg_parser, cmd_help, k, sub_key) in resolved.items():
+        subparsers.add_parser(
+            cmd_name,
+            parents=[cli_arg_parser],
+            help=f"{str(cmd_help)}",
+            formatter_class=CustomArgumentDefaultsHelpFormatter,
+        )
+        command_name_to_cmd[cmd_name] = command_name(k, sub_key)
 
     return command_name_to_cmd
 
@@ -691,12 +604,8 @@ def redfish_main_ctl():
     """
     """
     logger.setLevel(logging.ERROR)
-    endpoint_conflicts = set()
     try:
         endpoint = endpoint_defaults()
-    except ConfigurationConflict:
-        endpoint = endpoint_defaults(strict=False)
-        endpoint_conflicts = endpoint_conflict_fields()
     except ValueError as err:
         console_error_printer(f"Error: {err}")
         sys.exit(1)
@@ -706,7 +615,7 @@ def redfish_main_ctl():
         description='''redfish_ctl - a vendor-neutral command-line tool to drive server BMCs |n
                                      over the Redfish REST API: Dell iDRAC, Supermicro, HPE iLO, and |n
                                      generic DMTF Redfish. Supports both synchronous and asynchronous |n
-                                     calls. (idrac_ctl remains a backward-compatible alias.)''',
+                                     calls.''',
         epilog='''Docs and examples: https://github.com/spyroot/redfish_ctl |n
                                              The examples/ folder contains many ready-to-run scripts. |n
                                              Author: Mustafa Bayramov <spyroot@gmail.com>
@@ -715,44 +624,24 @@ def redfish_main_ctl():
 
     credentials = parser.add_argument_group('credentials', '# Redfish BMC credentials.')
 
-    # Root endpoint/credential flags. The deprecated --idrac_* spellings remain
-    # accepted as aliases, but the neutral spellings are shown first and stored
-    # separately from subcommand-local --host/--port options.
+    # Root endpoint/credential flags are vendor-neutral and stored separately
+    # from subcommand-local --host/--port options.
     credentials.add_argument(
-        '--host', '--idrac_ip', required=False, type=str,
-        action=_EndpointAliasAction, legacy_dest="idrac_ip",
-        endpoint_field="host",
+        '--host', required=False, type=str,
         dest="redfish_host", default=endpoint.host,
-        help="BMC host or IP address, by default "
-             "read from environment REDFISH_IP (or legacy IDRAC_IP).")
+        help="BMC host or IP address, read from REDFISH_IP by default.")
     credentials.add_argument(
-        '--username', '--idrac_username', required=False, type=str,
-        action=_EndpointAliasAction, legacy_dest="idrac_username",
-        endpoint_field="username",
+        '--username', required=False, type=str,
         dest="redfish_username", default=endpoint.username,
-        help="BMC username, by default "
-             "read from environment REDFISH_USERNAME (or legacy IDRAC_USERNAME).")
+        help="BMC username, read from REDFISH_USERNAME by default.")
     credentials.add_argument(
-        '--password', '--idrac_password', required=False, type=str,
-        action=_EndpointAliasAction, legacy_dest="idrac_password",
-        endpoint_field="password",
+        '--password', required=False, type=str,
         dest="redfish_password", default=endpoint.password,
-        help="BMC password, by default "
-             "read from environment REDFISH_PASSWORD (or legacy IDRAC_PASSWORD).")
+        help="BMC password, read from REDFISH_PASSWORD by default.")
     credentials.add_argument(
-        '--port', '--idrac_port', required=False, type=int,
-        action=_EndpointAliasAction, legacy_dest="idrac_port",
-        endpoint_field="port",
+        '--port', required=False, type=int,
         dest="redfish_port", default=endpoint.port,
-        help="BMC port, by default "
-             "read from environment REDFISH_PORT (or legacy IDRAC_PORT).")
-    parser.set_defaults(
-        idrac_ip=endpoint.host,
-        idrac_username=endpoint.username,
-        idrac_password=endpoint.password,
-        idrac_port=endpoint.port,
-        _endpoint_cli_overrides=set(),
-    )
+        help="BMC port, read from REDFISH_PORT by default.")
     credentials.add_argument(
         '--insecure', action='store_true', required=False, default=False,
         help="skip TLS certificate verification (explicit form of the "
@@ -763,8 +652,14 @@ def redfish_main_ctl():
         help="verify the BMC TLS certificate. Off by default because "
              "BMCs ship self-signed certs; opt in only with a trusted cert.")
     credentials.add_argument(
-        '--use_http', action='store_true', required=False, default=False,
-        help="use http instead https as transport.")
+        "--use-http",
+        "--use_http",
+        dest="use_http",
+        action="store_true",
+        required=False,
+        default=False,
+        help="use http instead of https as transport.",
+    )
 
     redfish_query = parser.add_argument_group(
         'redfish query', '# server-side Redfish GET query options')
@@ -838,23 +733,27 @@ def redfish_main_ctl():
     output_controllers.add_argument(
         '-f', '--filename', required=False, type=str,
         default="", help="Filename if we need save to a file.")
+    parser.add_argument(
+        '--vendor', required=False, default=None,
+        choices=('dell', 'hp', 'supermicro'),
+        help="omit for shared DMTF commands; pass --vendor dell, --vendor hp, "
+             "or --vendor supermicro for that vendor's command set and manager.")
     parser.add_argument('-v', '--version', action='version',
                         version="%(prog)s " + __version__)
 
-    cmd_dict = create_cmd_tree(parser)
+    # Select one manager class before building the command tree. Its MRO-composed
+    # registry determines which DMTF and vendor subcommands argparse can expose.
+    vendor_scan = argparse.ArgumentParser(add_help=False)
+    vendor_scan.add_argument('--vendor', default=None)
+    vendor_pre, _ = vendor_scan.parse_known_args()
+    manager_classes = {
+        "dell": IDracManager,
+        "hp": IloManager,
+        "supermicro": SupermicroManager,
+    }
+    manager_cls = manager_classes.get(vendor_pre.vendor, RedfishManager)
+    cmd_dict = create_cmd_tree(parser, manager_cls)
     args = parser.parse_args()
-    _sync_legacy_endpoint_attrs(args)
-    unresolved_endpoint_conflicts = (
-        endpoint_conflicts - getattr(args, "_endpoint_cli_overrides", set())
-    )
-    if unresolved_endpoint_conflicts:
-        console_error_printer(
-            "Error: conflicting REDFISH_* and IDRAC_* endpoint environment "
-            "values; supply explicit CLI flags for "
-            f"{', '.join(sorted(unresolved_endpoint_conflicts))} or unset the "
-            "legacy aliases."
-        )
-        sys.exit(1)
     if args.debug:
         logger.setLevel(args.log)
 
@@ -862,12 +761,11 @@ def redfish_main_ctl():
         if exporter_argv_uses_secret(sys.argv):
             print(
                 "Please provide exporter credentials through environment "
-                "variables or --credential-file, not --password/--idrac_password."
+                "variables or --credential-file, not --password."
             )
             sys.exit(2)
         try:
             apply_exporter_env_file(args)
-            _sync_legacy_endpoint_attrs(args)
         except ConfigurationConflict as err:
             console_error_printer(f"Error: {err}")
             sys.exit(1)
@@ -905,7 +803,7 @@ def redfish_main_ctl():
             )
             sys.exit(1)
     try:
-        main(args, cmd_dict)
+        main(args, cmd_dict, manager_cls)
     except AuthenticationFailed as af:
         console_error_printer(f"Error: {af}")
     except requests.exceptions.ConnectionError as http_error:

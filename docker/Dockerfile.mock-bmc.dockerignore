@@ -1,0 +1,8 @@
+# Mock-BMC image context allowlist.
+**
+
+!k8s/
+!k8s/sandbox/
+!k8s/sandbox/mock_bmc_server.py
+!tests/
+!tests/supermicro_gb300_corpus.tar.gz

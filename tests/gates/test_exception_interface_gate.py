@@ -67,8 +67,8 @@ def test_interface_modules_are_not_reported():
 
 
 def test_baseline_skips_comments_and_blank_lines():
-    """The committed baseline parses to the five grandfathered locations only."""
+    """The committed baseline parses to the remaining grandfathered locations."""
     base = gate._baseline()
-    assert "redfish_ctl/network/cmd_network_adapter_reset.py:25" in base
+    assert "redfish_ctl/network/cmd_network_adapter_reset.py:25" not in base
     assert all(not entry.startswith("#") for entry in base)
-    assert len(base) == 5
+    assert len(base) == 4

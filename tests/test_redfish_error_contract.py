@@ -97,8 +97,8 @@ def _repo_path(path):
     return REPO_ROOT / path
 
 
-def _defined_test_names():
-    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+def _defined_test_names(path=Path(__file__)):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     return {
         node.name
         for node in tree.body
@@ -348,6 +348,7 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
     contracts = {contract["id"]: contract for contract in manifest["contracts"]}
     assert {
         "error-envelope-normalization",
+        "http-semantics-rule-graph",
         "schema-pointer-compatibility",
         "simulator-corpus-baseline",
         "redfish-telemetry-resource-contract",
@@ -358,6 +359,7 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
     gates = {gate["id"]: gate for gate in manifest["gates"]}
     assert {
         "dmtf-release-manifest",
+        "dmtf-http-semantics",
         "dmtf-schema-bundle",
         "dmtf-mockup-bundle",
         "dmtf-registry-bundle",
@@ -403,9 +405,8 @@ def test_dmtf_2026_1_release_manifest_names_required_contracts():
 
 
 def test_dmtf_manifest_enforced_by_entries_resolve_to_defined_tests():
-    """Every manifest-enforced test reference must exist in this test module."""
+    """Every manifest-enforced test reference must resolve to a defined test."""
     manifest = yaml.safe_load(DMTF_2026_1_MANIFEST.read_text(encoding="utf-8"))
-    known_tests = _defined_test_names()
     references = []
 
     for contract in manifest["contracts"]:
@@ -417,7 +418,8 @@ def test_dmtf_manifest_enforced_by_entries_resolve_to_defined_tests():
     missing = []
     for reference in references:
         module, _, test_name = reference.partition("::")
-        if module != "tests/test_redfish_error_contract.py" or test_name not in known_tests:
+        test_path = REPO_ROOT / module
+        if not test_path.is_file() or test_name not in _defined_test_names(test_path):
             missing.append(reference)
     assert not missing
 
@@ -676,7 +678,7 @@ def _base_manager():
     :return: an offline IDracManager (no BMC contact).
     """
     return IDracManager(
-        idrac_ip="mock", idrac_username="root", idrac_password="x",
+        host="mock", username="root", password="x",
         insecure=True, is_debug=False)
 
 
@@ -695,13 +697,13 @@ def _base_manager():
     ],
 )
 def test_base_default_error_handler_preserves_dmtf_envelope(status_code, exc_type):
-    """Every command subclasses IDracManager, so ITS default_error_handler -
-    not the parent RedfishManager's - is the real command error path. For every
-    error code it must raise the parsed RedfishError envelope (status, error.code,
-    every @Message.ExtendedInfo), never a generic string, per the Redfish error
-    contract. Regression: the base override previously raised the generic
+    """Dell-selected commands use IDracManager's error classifier.
+
+    For every error code it must raise the parsed RedfishError envelope (status,
+    error.code, every @Message.ExtendedInfo), never a generic string, per the
+    Redfish error contract. Regression: the Dell override previously raised the generic
     "Failed acquire result. Status code N" for 501/5xx, defeating the contract that
-    the parent-only test could not see.
+    a neutral-manager-only test could not see.
     """
     manager = _base_manager()
     with pytest.raises(exc_type) as raised:
