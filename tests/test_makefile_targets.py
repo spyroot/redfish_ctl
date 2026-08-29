@@ -110,3 +110,48 @@ def test_conda_environment_includes_make_build_tools() -> None:
     environment_text = (REPO_ROOT / "environment.yml").read_text(encoding="utf-8")
 
     assert "  - twine" in environment_text
+
+
+def test_gb300_targets_require_an_explicit_workspace_label() -> None:
+    """Remote workspaces must not silently share the local account name."""
+    result = subprocess.run(
+        [
+            "make",
+            "--no-print-directory",
+            "gb300-test",
+            "SLOT=1",
+            "RUN_LABEL=",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert result.returncode == 2
+    assert "RUN_LABEL=<label>" in result.stdout
+    assert "gb300.sh run" not in result.stdout
+
+
+def test_gb300_targets_accept_new_and_legacy_workspace_labels() -> None:
+    """RUN_LABEL is canonical while AGENT remains a compatible input alias."""
+    for variable in ("RUN_LABEL=isolated", "AGENT=isolated"):
+        result = subprocess.run(
+            [
+                "make",
+                "--no-print-directory",
+                "-n",
+                "gb300-test",
+                "SLOT=1",
+                variable,
+            ],
+            cwd=REPO_ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "./scripts/gb300.sh run 1 isolated main pytest -q" in result.stdout

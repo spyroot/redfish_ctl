@@ -106,12 +106,15 @@ clean: ## Remove local build, test, and type-check artifacts.
 # default.
 #   SLOT  = fleet slot number (required for the per-slot targets)
 #   RUN_LABEL = workspace label; isolates your /work volume and container
+#   AGENT = legacy input accepted only when RUN_LABEL is not supplied
 #   REF   = git ref to test (default main); any pushed branch works
 # ---------------------------------------------------------------------------
 -include .internal/inventory/gb300-fleet.env
 GB300_SH    := ./scripts/gb300.sh
 GB300_HOSTC  = $$($(GB300_SH) host $(SLOT))
-RUN_LABEL  ?= $(shell whoami)
+ifeq ($(origin RUN_LABEL), undefined)
+RUN_LABEL   := $(strip $(AGENT))
+endif
 REF        ?= main
 PYTEST_ARGS ?= -q
 # Image choice lives in scripts/gb300.sh: a credentialed private image when a
@@ -140,7 +143,7 @@ gb300-image: ## Build the public base image on a slot from this checkout's HEAD.
 		'docker build -t redfish-ctl-dev -f docker/Dockerfile.gb300-dev -' < "$$ctx"; \
 	rc=$$?; rm -f "$$ctx"; exit $$rc
 
-gb300-test: ## Run the offline pytest suite on a slot. SLOT=<n> [REF=main] [RUN_LABEL=me]
+gb300-test: ## Run pytest on a slot. SLOT=<n> RUN_LABEL=<label> [AGENT=<legacy>]
 	@test -n "$(SLOT)" || { echo "usage: make gb300-test SLOT=<n> [REF=<branch>]"; exit 2; }
 	@test -n "$(RUN_LABEL)" || { echo "usage: make gb300-test SLOT=<n> RUN_LABEL=<label>"; exit 2; }
 	$(GB300_SH) run $(SLOT) $(RUN_LABEL) $(REF) pytest $(PYTEST_ARGS)
@@ -151,18 +154,18 @@ gb300-test: ## Run the offline pytest suite on a slot. SLOT=<n> [REF=main] [RUN_
 GB300_RUFF_CHANGED = git fetch -q origin main && \
 	{ git diff --name-only origin/main...HEAD -- "*.py" | xargs -r ruff check; }
 
-gb300-lint: ## Ruff over files changed vs origin/main, on a slot. SLOT=<n> REF=<branch>
+gb300-lint: ## Ruff changed files on a slot. SLOT=<n> REF=<branch> RUN_LABEL=<label>
 	@test -n "$(SLOT)" || { echo "usage: make gb300-lint SLOT=<n> REF=<branch>"; exit 2; }
 	@test -n "$(RUN_LABEL)" || { echo "usage: make gb300-lint SLOT=<n> RUN_LABEL=<label>"; exit 2; }
 	$(GB300_SH) run $(SLOT) $(RUN_LABEL) $(REF) sh -c '$(GB300_RUFF_CHANGED)'
 
-gb300-gate: ## Full PR gate on a slot: pytest + changed-files ruff + whole-tree docstring gate.
+gb300-gate: ## Full PR gate on a slot. SLOT=<n> RUN_LABEL=<label> [REF=<branch>]
 	@test -n "$(SLOT)" || { echo "usage: make gb300-gate SLOT=<n> [REF=<branch>]"; exit 2; }
 	@test -n "$(RUN_LABEL)" || { echo "usage: make gb300-gate SLOT=<n> RUN_LABEL=<label>"; exit 2; }
 	$(GB300_SH) run $(SLOT) $(RUN_LABEL) $(REF) sh -c \
 		'pytest -q && $(GB300_RUFF_CHANGED) && python tools/docstring_gate.py --all'
 
-gb300-shell: ## Interactive dev shell on a slot (conda env active). SLOT=<n> [RUN_LABEL=me]
+gb300-shell: ## Interactive shell on a slot. SLOT=<n> RUN_LABEL=<label> [AGENT=<legacy>]
 	@test -n "$(SLOT)" || { echo "usage: make gb300-shell SLOT=<n>"; exit 2; }
 	@test -n "$(RUN_LABEL)" || { echo "usage: make gb300-shell SLOT=<n> RUN_LABEL=<label>"; exit 2; }
 	$(GB300_SH) shell $(SLOT) $(RUN_LABEL)
