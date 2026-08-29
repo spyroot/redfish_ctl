@@ -2,16 +2,14 @@
 set -Eeuo pipefail
 
 usage() {
-  cat <<'USAGE'
-usage: check.sh [--dry-run | --apply --confirm-smoke-inventory]
-                [--confirm-overwrite] [--log-format text|json]
-                [--log-level debug|info|warning|error] [--log-file PATH]
-                [--run-id ID] [--timeout SECONDS]
-
-Render inventory/ci/smoke-tests.yaml. The default is a non-mutating dry-run.
-Replacing divergent inventory requires both --confirm-smoke-inventory and
---confirm-overwrite.
-USAGE
+  printf '%s\n' \
+    'usage: check.sh [--dry-run | --apply --confirm-smoke-inventory]' \
+    '                [--log-format text|json]' \
+    '                [--log-level debug|info|warning|error] [--log-file PATH]' \
+    '                [--run-id ID]' \
+    '' \
+    'Render inventory/ci/smoke-tests.yaml. The default is a non-mutating dry-run.' \
+    'Divergent existing inventory is never overwritten.'
 }
 
 # Render the canonical inventory to stdout.
@@ -55,7 +53,7 @@ YAML
 }
 
 # Report the change needed for an inventory path.
-# Arguments: output path. Environment inputs: none. Stdout: create|replace|no-op.
+# Arguments: output path. Environment inputs: none. Stdout: create|conflict|no-op.
 # Stderr: classified path errors. Exit classes: 0 success, 1 invalid target.
 # Side effects: none. Idempotency: repeated calls return the same action.
 # Cleanup: none required.
@@ -74,12 +72,12 @@ inventory_action() {
   if cmp -s <(render_smoke_inventory) "$output_path"; then
     printf 'no-op\n'
   else
-    printf 'replace\n'
+    printf 'conflict\n'
   fi
 }
 
-# Atomically create or replace the inventory after the caller confirms intent.
-# Arguments: output path and precomputed create|replace|no-op action.
+# Atomically create the inventory after the caller confirms intent.
+# Arguments: output path and precomputed create|no-op action.
 # Environment inputs: none. Stdout: none. Stderr: command diagnostics.
 # Exit classes: 0 success, nonzero filesystem failure. Side effects: writes only
 # the requested path. Idempotency: no-op leaves matching output untouched.
@@ -92,6 +90,10 @@ write_smoke_inventory() (
 
   if [[ "$action" == "no-op" ]]; then
     return 0
+  fi
+  if [[ "$action" != "create" ]]; then
+    printf 'check.sh: refusing unsupported write action: %s\n' "$action" >&2
+    return 3
   fi
   output_dir="$(dirname "$output_path")"
   mkdir -p "$output_dir"
@@ -109,8 +111,28 @@ write_smoke_inventory() (
 
   render_smoke_inventory >"$temporary_path"
   chmod 0644 "$temporary_path"
-  mv -f -- "$temporary_path" "$output_path"
+  if [[ -e "$output_path" ]]; then
+    if [[ -f "$output_path" ]] && cmp -s "$temporary_path" "$output_path"; then
+      return 0
+    fi
+    printf 'check.sh: target appeared during create; refusing to overwrite: %s\n' \
+      "$output_path" >&2
+    return 4
+  fi
+  mv -n -- "$temporary_path" "$output_path"
+  if [[ -e "$temporary_path" ]]; then
+    if [[ -f "$output_path" ]] && cmp -s "$temporary_path" "$output_path"; then
+      return 0
+    fi
+    printf 'check.sh: concurrent create won; refusing to overwrite: %s\n' \
+      "$output_path" >&2
+    return 4
+  fi
   temporary_path=""
+  if ! cmp -s <(render_smoke_inventory) "$output_path"; then
+    printf 'check.sh: independent read-back mismatch: %s\n' "$output_path" >&2
+    return 5
+  fi
 )
 
 emit_result() {
@@ -133,12 +155,10 @@ main() {
   local mode="dry-run"
   local mode_was_set=false
   local confirm_inventory=false
-  local confirm_overwrite=false
   local log_format="text"
   local log_level="info"
   local log_file=""
   local run_id="local"
-  local timeout_seconds=30
 
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -159,10 +179,6 @@ main() {
         confirm_inventory=true
         shift
         ;;
-      --confirm-overwrite)
-        confirm_overwrite=true
-        shift
-        ;;
       --log-format)
         log_format="${2:?check.sh: --log-format requires a value}"
         shift 2
@@ -177,10 +193,6 @@ main() {
         ;;
       --run-id)
         run_id="${2:?check.sh: --run-id requires a value}"
-        shift 2
-        ;;
-      --timeout)
-        timeout_seconds="${2:?check.sh: --timeout requires a value}"
         shift 2
         ;;
       *)
@@ -199,10 +211,6 @@ main() {
     printf 'check.sh: invalid --log-level: %s\n' "$log_level" >&2
     return 2
   esac
-  if [[ ! "$timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
-    printf 'check.sh: --timeout must be a positive integer\n' >&2
-    return 2
-  fi
   if [[ ! "$run_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
     printf 'check.sh: --run-id must contain only letters, digits, dot, underscore, or dash\n' >&2
     return 2
@@ -226,8 +234,8 @@ main() {
     printf 'check.sh: --apply requires --confirm-smoke-inventory\n' >&2
     return 2
   fi
-  if [[ "$action" == "replace" ]] && ! $confirm_overwrite; then
-    printf 'check.sh: target differs; add --confirm-overwrite to replace it: %s\n' \
+  if [[ "$action" == "conflict" ]]; then
+    printf 'check.sh: target differs; refusing to overwrite: %s\n' \
       "$output_path" >&2
     return 3
   fi
