@@ -22,7 +22,7 @@ from redfish_ctl.telemetry.prometheus import render_prometheus_text
 from redfish_ctl.telemetry.signalfx import to_signalfx_body
 from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CORPUS_MANAGERS = (
     (

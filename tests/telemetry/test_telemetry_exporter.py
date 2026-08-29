@@ -50,7 +50,8 @@ from redfish_ctl.telemetry.supermicro.super_microexporter import (
 REQUIRED_DIMS = {"host.name", "node", "server.address", "bmc.ip", "vendor"}
 TEST_SERVICE_INSTANCE_ID = "cb0377f1-e3b9-4da9-9275-71825b2c6434"
 GB300_CORPUS = corpus_dir(
-    Path(__file__).parent / "supermicro_gb300_corpus.tar.gz", "172.25.230.37"
+    Path(__file__).parent.parent / "supermicro_gb300_corpus.tar.gz",
+    "172.25.230.37",
 )
 GB300_INDEX = {path.name.lower(): path for path in GB300_CORPUS.glob("*.json")}
 
@@ -697,7 +698,7 @@ def test_scrape_health_signals_contract():
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
@@ -985,7 +986,7 @@ def test_metric_definition_catalog_registers_emitted_metrics():
 def test_metric_catalog_yaml_matches_runtime_static_catalog():
     """Shared and Supermicro specs mirror their runtime definitions."""
     import yaml
-    spec_root = Path(__file__).parent.parent / "specs/telemetry"
+    spec_root = Path(__file__).parents[2] / "specs/telemetry"
     shared_spec = yaml.safe_load(
         (spec_root / "catalog.yaml").read_text(encoding="utf-8"))
     supermicro_spec = yaml.safe_load(
@@ -1723,7 +1724,7 @@ def test_expected_signals_contract():
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     missing = []
@@ -1742,7 +1743,7 @@ def test_state_allowlists_match_contract_spec():
     """Code allowlists equal the spec allowlists (G0 documentation truth)."""
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     allow = spec["allowlists"]
