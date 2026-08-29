@@ -29,10 +29,10 @@ application:
   # both set to different values is a hard conflict). interpreted=true means the
   # app parses/branches on the value.
   canonical:
-    REDFISH_IP:                         {alias: IDRAC_IP,                        interpreted: true}
-    REDFISH_USERNAME:                   {alias: IDRAC_USERNAME,                  interpreted: false, default: root}
-    REDFISH_PASSWORD:                   {alias: IDRAC_PASSWORD,                  interpreted: false, secret: true}
-    REDFISH_PORT:                       {alias: IDRAC_PORT,                      interpreted: true,  default: "443"}
+    REDFISH_IP:                         {alias: null, interpreted: true}
+    REDFISH_USERNAME:                   {alias: null, interpreted: false, default: root}
+    REDFISH_PASSWORD:                   {alias: null, interpreted: false, secret: true}
+    REDFISH_PORT:                       {alias: null, interpreted: true, default: "443"}
     REDFISH_HTTP_TIMEOUT:               {alias: IDRAC_HTTP_TIMEOUT,              interpreted: true,  default: "30"}
     REDFISH_HTTP_POOL:                  {alias: IDRAC_HTTP_POOL,                 interpreted: true,  default: "4"}
     REDFISH_HTTP_RETRIES:               {alias: IDRAC_HTTP_RETRIES,              interpreted: true,  default: "3"}
@@ -79,10 +79,6 @@ application:
   # env_first. read_direct=true records a site that still reads the legacy name
   # with no REDFISH_ precedence (see gate C baseline).
   legacy_aliases:
-    IDRAC_IP:                         {canonical: REDFISH_IP,                         read_direct: true}
-    IDRAC_USERNAME:                   {canonical: REDFISH_USERNAME,                   read_direct: true}
-    IDRAC_PASSWORD:                   {canonical: REDFISH_PASSWORD,                   read_direct: true}
-    IDRAC_PORT:                       {canonical: REDFISH_PORT,                       read_direct: false}
     IDRAC_HTTP_TIMEOUT:               {canonical: REDFISH_HTTP_TIMEOUT,               read_direct: false}
     IDRAC_HTTP_POOL:                  {canonical: REDFISH_HTTP_POOL,                  read_direct: false}
     IDRAC_HTTP_RETRIES:               {canonical: REDFISH_HTTP_RETRIES,               read_direct: false}
@@ -109,16 +105,16 @@ application:
   # App-owned config that LOOKS external but is consumed by the tool's OWN
   # urllib request (parsed/validated), so it is NOT pass-through.
   secrets_and_config:
-    SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "validated for /v2/datapoint (exporter.py:1030,1078)"}
-    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "interpolated into api.<realm>.signalfx.com by tools/splunk_metric_gate.py"}
-    SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token header; read via variable name (exporter.py:1061) so it evades literal scans — listed explicitly"}
-    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token read by tools/splunk_metric_gate.py"}
+    SPLUNK_INGEST_URL:                  {owner: splunk, interpreted: true,  note: "telemetry/signalfx/emit.py resolve_signalfx_ingest_url via config.signalfx_ingest_url(); validated for /v2/datapoint by _require_datapoint_url"}
+    SPLUNK_O11Y_REALM:                  {owner: splunk, interpreted: true,  note: "telemetry/signalfx/writer.py __init__ via config.signalfx_realm(); interpolated into api.<realm>.signalfx.com by signalfx_metric_readback"}
+    SPLUNK_ACCESS_TOKEN:                {owner: splunk, interpreted: false, secret: true, note: "X-SF-Token ingest header; telemetry/signalfx/emit.py resolve_signalfx_token via config.signalfx_access_token(); read via variable name so it evades literal scans — listed explicitly"}
+    SPLUNK_API_TOKEN:                   {owner: splunk, interpreted: false, secret: true, note: "gate-only X-SF-Token for the metric query; telemetry/signalfx/writer.py __init__ via config.signalfx_api_token()"}
 
   # OTEL_* names the app INTERPRETS (branches on) — application config, not
   # pass-through, even though the prefix is standard.
   interpreted_external:
-    OTEL_EXPORTER_OTLP_PROTOCOL:         {owner: opentelemetry, interpreted: true, note: "branched on startswith('http') to pick exporter class (otlp.py:172)"}
-    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: {owner: opentelemetry, interpreted: true, note: "same http/grpc branch (otlp.py:70,172)"}
+    OTEL_EXPORTER_OTLP_PROTOCOL:         {owner: opentelemetry, interpreted: true, note: "generic protocol fallback; resolved via config.otlp_protocol(), branched on startswith('http') in telemetry/otlp/emit.py _build_exporter to pick the exporter class"}
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: {owner: opentelemetry, interpreted: true, note: "metrics-signal protocol, higher precedence; config.otlp_protocol() metrics>generic, same http/grpc branch in telemetry/otlp/emit.py _build_exporter"}
 
   # Other app/tooling-owned knobs (exact names). Not connection config; grouped
   # by subsystem so no real name is undeclared.
@@ -143,15 +139,15 @@ application:
 # OpenTelemetry SDK. The app never inspects the value. New OTEL_* names do NOT
 # belong here unless proven pass-through.
 external:
-  OTEL_EXPORTER_OTLP_ENDPOINT:         {owner: opentelemetry, passthrough: true, note: "generic endpoint fallback -> OTLPMetricExporter (otlp.py:68,167)"}
-  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {owner: opentelemetry, passthrough: true, note: "metrics-signal endpoint, higher precedence (otlp.py:67,167)"}
-  OTEL_EXPORTER_OTLP_HEADERS:          {owner: opentelemetry, passthrough: true, note: "generic headers fallback (otlp.py:75,169)"}
-  OTEL_EXPORTER_OTLP_METRICS_HEADERS:  {owner: opentelemetry, passthrough: true, note: "metrics headers, higher precedence (otlp.py:74,169)"}
+  OTEL_EXPORTER_OTLP_ENDPOINT:         {owner: opentelemetry, passthrough: true, note: "generic endpoint fallback; OTLPMetricExporter reads it, the app no longer does (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {owner: opentelemetry, passthrough: true, note: "metrics-signal endpoint, higher precedence; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_HEADERS:          {owner: opentelemetry, passthrough: true, note: "generic headers fallback; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
+  OTEL_EXPORTER_OTLP_METRICS_HEADERS:  {owner: opentelemetry, passthrough: true, note: "metrics headers, higher precedence; SDK reads it, app read dropped (was telemetry/otlp/emit.py resolve_otlp_config)"}
   OTEL_RESOURCE_ATTRIBUTES:            {owner: opentelemetry, passthrough: true, note: "SDK resource detector reads it directly; app never reads it"}
 
 # OS / toolchain / CI-runtime names. Not application configuration.
 system:
-  TERM:                          {reason: "terminal capability probe (redfish_main.py:122; customer_argdefault.py)"}
+  TERM:                          {reason: "terminal capability probe; read via config.term_type() in redfish_main.py color_printer + custom_argparser/customer_argdefault.py"}
   HOME:                          {reason: "shell HOME for ssh/git in gb300 harness"}
   PATH:                          {reason: "Dockerfile toolchain path"}
   BASH_ENV:                      {reason: "Dockerfile.gb300-dev bash startup file"}
@@ -179,6 +175,6 @@ system:
 # registered as canonical, added as an alias, or used by a wrapper script).
 # Append-only.
 retired:
-  IDRACK_IP:       {reason: "typo (extra K) in first-commit error text only; code always read IDRAC_IP; fixed in 25aa93b9. Reintroducing would tell users to set a variable the tool never reads."}
-  IDRACK_USERNAME: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_USERNAME"}
-  IDRACK_PASSWORD: {reason: "same typo family; fixed in 25aa93b9; current message says IDRAC_PASSWORD"}
+  IDRACK_IP:       {reason: "extra-K typo in first-commit error text only; fixed in 25aa93b9"}
+  IDRACK_USERNAME: {reason: "same extra-K typo family; fixed in 25aa93b9"}
+  IDRACK_PASSWORD: {reason: "same extra-K typo family; fixed in 25aa93b9"}

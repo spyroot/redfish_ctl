@@ -9,6 +9,7 @@ non-root user. Credentials are supplied at container runtime only; do not add th
 | `docker/Dockerfile` | Production CLI/exporter image with the OTLP extra installed. | `make docker-image IMAGE=redfish-ctl` |
 | `docker/Dockerfile.test` | Linux image for the offline pytest suite. | `./docker/run-tests.sh` |
 | `docker/Dockerfile.mock-bmc` | Read-only mock BMC image for the kind sandbox. | `docker build -f docker/Dockerfile.mock-bmc -t redfish-ctl-mock-bmc:local .` |
+| `docker/Dockerfile.dmtf-sim` | Read-only DMTF DSP2043 reference simulator for the kind sandbox. | `docker build -f docker/Dockerfile.dmtf-sim -t redfish-ctl-dmtf-sim:local .` |
 | `docker/Dockerfile.ilo-sim` | HPE iLO Redfish emulator image for the simulator sandbox backend. | `docker build -f docker/Dockerfile.ilo-sim -t redfish-ctl-ilo-sim:local .` |
 | `docker/Dockerfile.controller` | RedfishEndpoint controller image for the kind sandbox. | `docker build -f docker/Dockerfile.controller -t redfish-ctl-controller:local .` |
 
@@ -24,19 +25,19 @@ REDFISH_PASSWORD=replace-me
 REDFISH_PORT=443
 ```
 
-Run a one-shot read command, equivalent to `redfish_ctl system` on the host:
+Run a one-shot shared Redfish read command:
 
 ```bash
-docker run --rm --env-file .env.redfish redfish-ctl system
+docker run --rm --env-file redfish.env redfish-ctl system
 ```
 
 Run the telemetry exporter with native OTLP output:
 
 ```bash
 docker run --rm \
-  --env-file .env.redfish \
+  --env-file redfish.env \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.example.invalid:4317 \
-  redfish-ctl exporter --output otlp --once
+  redfish-ctl --vendor supermicro exporter --output otlp --once
 ```
 
 The image entrypoint is `redfish_ctl`, so container arguments are the normal CLI subcommand and flags.

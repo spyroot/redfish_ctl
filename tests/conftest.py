@@ -90,7 +90,7 @@ def _reset_command_singletons():
     (e.g. ``reboot``) would poison each other depending on collection order. The
     command ``_registry`` (used for dispatch) is a separate dict and is untouched.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_api_common import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -321,9 +321,43 @@ class MockRedfishService:
 def _make_idrac(idrac_ip, username, password):
     from redfish_ctl.idrac_manager import IDracManager
     return IDracManager(
-        idrac_ip=idrac_ip,
-        idrac_username=username,
-        idrac_password=password,
+        host=idrac_ip,
+        username=username,
+        password=password,
+        insecure=True,
+        is_debug=False,
+    )
+
+
+def _make_manager(vendor, host, username, password):
+    """Construct the vendor-appropriate manager so vendor-scoped commands resolve.
+
+    Under ``--vendor`` scoping the exporter, GPU-OOB, and TelemetryService
+    commands register on ``SupermicroManager`` (and HPE commands on
+    ``IloManager``), which shadow their own command registry. A test invoking
+    those commands must therefore use that vendor's manager, not the neutral
+    ``IDracManager`` whose (shared) registry does not carry them.
+
+    :param vendor: fixture-set name (``dell``/``supermicro``/``hpe``/...).
+    :param host: mock BMC host.
+    :param username: mock account username.
+    :param password: mock account password.
+    :return: a manager instance of the class matching the vendor family.
+    """
+    family = _vendor_family(vendor)
+    if family == "supermicro":
+        from redfish_ctl.supermico_manager import SupermicroManager
+        cls = SupermicroManager
+    elif family == "hpe":
+        from redfish_ctl.ilo_manager import IloManager
+        cls = IloManager
+    else:
+        from redfish_ctl.idrac_manager import IDracManager
+        cls = IDracManager
+    return cls(
+        host=host,
+        username=username,
+        password=password,
         insecure=True,
         is_debug=False,
     )
@@ -339,7 +373,7 @@ def _reset_command_singletons():
     cross-vendor tests (e.g. Supermicro then HPE resolve different host ids).
     Clearing the instance registry before each test isolates them.
     """
-    from redfish_ctl.idrac_shared import Singleton
+    from redfish_ctl.redfish_api_common import Singleton
     Singleton._instances.clear()
     yield
     Singleton._instances.clear()
@@ -398,7 +432,7 @@ def redfish_mock_factory():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         _started.append(mocker)
-        return _make_idrac(f"mock-{vendor}", "root", "mock"), service
+        return _make_manager(vendor, f"mock-{vendor}", "root", "mock"), service
 
     yield _factory
     for _m in _started:
@@ -425,3 +459,34 @@ def redfish_api(request):
         service = request.getfixturevalue("redfish_service")
         yield _make_idrac("mock-idrac", "root", "mock")
         _ = service  # keep the mock mounted for the test duration
+
+
+@pytest.fixture
+def dmtf_sim_endpoint(request: pytest.FixtureRequest):
+    """Return the mandatory endpoint for a ``dmtf_sim_live`` test.
+
+    Fails CLOSED: only a ``dmtf_sim_live`` test may use it, and it never skips —
+    a missing or malformed endpoint fails the test loudly (a skip would hide a
+    broken private-CI deploy). The endpoint is resolved by the single config
+    loader; no second environment variable is read here.
+
+    :param request: the pytest request, used to require the ``dmtf_sim_live`` marker.
+    :return: the validated persistent DMTF simulator endpoint.
+    :raises pytest.UsageError: when a test without the marker uses this fixture.
+    """
+    from redfish_ctl.config import (
+        ConfigurationConflict,
+        required_dmtf_sim_endpoint,
+    )
+
+    if request.node.get_closest_marker("dmtf_sim_live") is None:
+        raise pytest.UsageError(
+            "dmtf_sim_endpoint may only be used by tests marked dmtf_sim_live"
+        )
+    try:
+        return required_dmtf_sim_endpoint()
+    except (RuntimeError, ConfigurationConflict) as exc:
+        pytest.fail(
+            f"Persistent DMTF simulator endpoint is invalid: {exc}",
+            pytrace=False,
+        )

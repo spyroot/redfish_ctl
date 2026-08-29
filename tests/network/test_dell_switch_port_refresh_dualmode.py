@@ -7,7 +7,7 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.network.cmd_dell_switch_port_refresh import (
     DellSwitchPortRefresh,
 )
@@ -46,9 +46,9 @@ def dell_switch_manager():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-switch",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-switch",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

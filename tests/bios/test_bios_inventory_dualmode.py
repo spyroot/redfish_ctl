@@ -2,7 +2,7 @@
 
 Runs offline by default against the mock service (using the iDRAC-shaped fixture
 tests/idrac_fixtures/_redfish_v1_Systems_System.Embedded.1_Bios.json), and against
-real hardware when IDRAC_IP is set. Mirrors tests/test_cmd_boot_dualmode.py: invoke
+real hardware when REDFISH_IP is set. Mirrors tests/test_cmd_boot_dualmode.py: invoke
 the command through sync_invoke and assert the CommandResult shape.
 
 This is also the regression guard for the REDFISH_API.BIOS member: BiosQuery.execute
@@ -13,7 +13,7 @@ Author Mus spyroot@gmail.com
 """
 import json
 
-from redfish_ctl.idrac_shared import REDFISH_API, ApiRequestType
+from redfish_ctl.redfish_api_common import REDFISH_API, ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
