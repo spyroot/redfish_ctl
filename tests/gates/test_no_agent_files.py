@@ -56,6 +56,29 @@ def test_flags_agent_only_directories():
     assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
 
 
+def test_allows_the_standards_required_go_no_go_inventory_file():
+    """The public go/no-go profile is the one tracked inventory exception."""
+    assert not agent_name_guard.is_agent_file("inventory/ci/go-no-go.yaml")
+
+
+def test_rejects_sibling_and_other_inventory_files():
+    """Only the exact go/no-go profile is allowed under the denied inventory prefix."""
+    assert agent_name_guard.is_agent_file("inventory/ci/extra.yaml")
+    assert agent_name_guard.is_agent_file("inventory/go-no-go.yaml")
+    assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
+
+
+def test_file_scan_keeps_only_the_allowed_inventory_file(monkeypatch):
+    """A tracked go/no-go profile is ignored while adjacent inventory files still fail."""
+    stdout = "\n".join([
+        "inventory/ci/go-no-go.yaml",
+        "inventory/ci/extra.yaml",
+        "redfish_ctl/redfish_manager.py",
+    ])
+    monkeypatch.setattr(agent_name_guard.subprocess, "run", _fake_git(0, stdout))
+    assert agent_name_guard._agent_file_findings() == ["inventory/ci/extra.yaml"]
+
+
 def test_ordinary_source_is_not_flagged():
     """Real project source and docs are not agent files."""
     assert not agent_name_guard.is_agent_file("redfish_ctl/redfish_manager.py")

@@ -2,16 +2,21 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Before trusting a change, clear any live iDRAC environment and run the offline suite:
+For merge authority, runner placement, and required gate evidence, see
+[CI/CD Pipeline](ci.md). Do not treat laptop commands as merge evidence.
+
+Inside that approved CI environment, clear live connection variables before
+the offline suite:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest -q
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+  pytest -q
 ruff check <changed>
 ```
 
-`REDFISH_IP`, `REDFISH_USERNAME`, and `REDFISH_PASSWORD` are read by the CLI and by the dual-mode test
-fixture. If `REDFISH_IP` is still exported from real hardware work, `redfish_api` switches to live mode,
-so unset those variables for the default suite.
+The CLI reads only the canonical `REDFISH_*` connection variables. The
+dual-mode fixture switches to live mode when `REDFISH_IP` is present, so unset
+the canonical connection variables for the default suite.
 
 ## Which Lane To Use
 
@@ -27,7 +32,7 @@ Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock
 by default and against approved hardware when `REDFISH_IP` is set. Tests that require hardware are
 marked `@pytest.mark.live` and skip without that variable.
 
-For approved live hardware only:
+For approved live hardware from an authorized Kubernetes job only:
 
 ```bash
 REDFISH_IP=<idrac> \
@@ -49,9 +54,9 @@ Worked examples:
 - `tests/test_vendor_portability.py` checks Supermicro system and manager discovery.
 - `tests/test_hpe_vendor.py` and `tests/test_ilo_gap_batch*.py` check HPE iLO read paths.
 - `tests/test_generic_vendor.py` checks the generic DMTF fallback corpus.
-- `tests/test_discover.py` checks `classify_vendor()` for Dell, HPE, Supermicro, and generic roots.
+- `tests/discover/test_discover.py` checks `classify_vendor()` for Dell, HPE, Supermicro, and generic roots.
 - `tests/test_discover_ids.py` checks multi-member system/manager discovery.
-- `tests/test_sensors.py` runs the generic `sensors` command against the Supermicro overlay.
+- `tests/sensors/test_sensors.py` runs the generic `sensors` command against the Supermicro overlay.
 
 **Emulator lane, opt-in.** `tests/test_emulator_smoke.py` targets an external `sushy-emulator --fake`
 process through `REDFISH_EMULATOR_URL`. It is skipped by default and validates generic Redfish
@@ -81,12 +86,14 @@ source files are baked into the image.
 
 ## Coverage
 
-Coverage is not a default gate yet. When you need a local report, install `pytest-cov` in the active
-conda environment and keep the live variables unset:
+Coverage is not a default gate yet. When an approved Kubernetes job needs a
+report, install `pytest-cov` in the project conda environment and keep the live
+variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD pytest --cov=redfish_ctl
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+  pytest --cov=redfish_ctl
 ```
 
 ## Fleet And Concurrency Tests

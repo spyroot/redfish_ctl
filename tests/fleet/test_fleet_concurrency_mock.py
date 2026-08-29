@@ -100,10 +100,10 @@ def _node_config(node_id: str, address: str, *, port: int = 443) -> NodeConfig:
 
 def _manager_for_node(node: NodeConfig, *, use_http: bool = False) -> IDracManager:
     return IDracManager(
-        idrac_ip=node.address,
-        idrac_username=node.username or "root",
-        idrac_password=node.password or "mock",
-        idrac_port=node.port,
+        host=node.address,
+        username=node.username or "root",
+        password=node.password or "mock",
+        port=node.port,
         insecure=node.insecure,
         is_http=use_http,
     )

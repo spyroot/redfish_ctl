@@ -8,7 +8,7 @@ the offline tests, so this page does not require a live BMC or private endpoint.
 
 Regenerate it with `python tools/generate_telemetry_metrics_doc.py`; use
 `python tools/generate_telemetry_metrics_doc.py --check` in gates to verify
-that the checked-in copy matches the exporter mapper.
+that the checked-in copy matches the Supermicro/NV72 reader catalog.
 
 ## How To Read This
 
@@ -27,13 +27,38 @@ operator guidance, not schema-declared units.
 `Context` is the parent Redfish fragment or path segment that disambiguates
 repeated source metric names without copying the full fixture path.
 
-`redfish_ctl exporter`, defined in `redfish_ctl/telemetry/cmd_exporter.py`,
-emits the metrics shown in the `Exporter metric` column. Fabric properties use
+`redfish_ctl --vendor supermicro exporter`, defined in
+`redfish_ctl/telemetry/supermicro/cmd_exporter.py`, emits the metrics shown
+in the `Exporter metric` column. Fabric properties use
 curated `hw.fabric.*` names. GPU temperature, processor, throttle, clock, and
 memory rows use curated `hw.gpu.*` names. Bounded categorical rows use
 `hw.component.*`, `hw.fabric.link_down_reason`, or `hw.power.*` state gauges.
 Remaining numeric rows become generated `hw.gb300.*` metric names derived from
 the source metric name.
+
+## Dimensions
+
+Every series carries the Supermicro reader identity dimensions:
+
+| Dimension | Meaning |
+|---|---|
+| `host.name` | Derived host name for the BMC target. |
+| `node` | Derived node or slot name. |
+| `server.address` | Derived server-side address. |
+| `bmc.ip` | BMC address used for metric identity. |
+| `vendor` | `supermicro`; the concrete reader rejects cross-vendor labels. |
+| `service.name` | Exporter service name, default `redfish_ctl`. |
+| `deployment.environment` | Optional deployment join key. |
+
+Report-derived samples can also carry `report`, `gpu`, `port`, `sensor`,
+`memory`, or a bounded state label. Identity derivation and overrides live in
+[Telemetry Exporter](telemetry-exporter.md#identity-configuration).
+
+For OTLP, identity dimensions and optional producer identity fields map to
+resource attributes; per-metric dimensions map to datapoint attributes.
+Monotonic cumulative counters such as fabric byte/frame/error totals and
+`hw.energy_kwh` are emitted as OTLP Sum values. Instantaneous readings are
+Gauges. Prometheus and SignalFx retain the same metric names and dimension keys.
 
 ## Safe Consumption
 
@@ -45,22 +70,14 @@ redfish_ctl metric-definitions
 redfish_ctl metric-reports --report HGX_ProcessorPortMetrics_0
 ```
 
-Then run a one-shot Prometheus render from `redfish_ctl exporter`, which reads
+Then run a one-shot Prometheus render from the Supermicro exporter, which reads
 the BMC and prints text instead of opening a listener:
 
 ```bash
-redfish_ctl exporter --vendor supermicro --once --output prometheus
+redfish_ctl --vendor supermicro exporter --once --output prometheus
 ```
 
-For SignalFx, `SPLUNK_ACCESS_TOKEN`, the ingest token read by the exporter
-from the process environment, and `SPLUNK_INGEST_URL`, the full
-`/v2/datapoint` URL read by the exporter, are required only when pushing.
-Use `--once --output signalfx` first to inspect the datapoint envelope
-without posting externally. The envelope is typed by the catalog, with
-instantaneous metrics under `gauge` and monotonic totals under
-`cumulative_counter`.
-
-## Checking Live Data In Splunk
+## Metric Finder And Read-Back
 
 SignalFx is Splunk Observability Cloud, so the exporter's `signalfx` output pushes
 these metrics straight into Splunk Observability; no extra bridge is required.
@@ -72,19 +89,12 @@ these metrics straight into Splunk Observability; no extra bridge is required.
 ```bash
 export SPLUNK_ACCESS_TOKEN='<org access token>'
 export SPLUNK_INGEST_URL='https://ingest.<realm>.signalfx.com/v2/datapoint'
-redfish_ctl exporter --vendor supermicro --output signalfx --push-signalfx
+redfish_ctl --vendor supermicro exporter --output signalfx --push-signalfx
 ```
 
-2. Find the data in Splunk Observability. Under **Metrics -> Metric Finder**,
-   search the metric names this exporter emits: `hw.fabric.*` (NVLink/port
-   link state, BER, RX/TX throughput and errors), `hw.gpu.*` (GPU temperature,
-   processor, clock, throttle, and memory gauges), `hw.component.*` and
-   `hw.power.*` state gauges, `hw.gb300.*` (remaining GB300-specific numeric
-   rows), plus `hw.temperature`, `hw.energy_kwh`, and `hw.leak.state` from
-   the non-MetricReport samplers. Every datapoint carries these dimensions
-   for filtering/grouping: `host.name`, `node`, `server.address`, `bmc.ip`,
-   and `vendor`; report-derived datapoints also carry `report` and any
-   applicable `gpu`, `port`, `sensor`, `memory`, or state label.
+2. Find the data under **Metrics -> Metric Finder** by searching for
+   `hw.fabric.*`, `hw.gpu.*`, `hw.component.*`, `hw.power.*`, or `hw.gb300.*`.
+   Filter or group by the [dimensions listed above](#dimensions).
 
 3. Confirm points are arriving with a chart or SignalFlow query, for example
    fabric receive rate per port on one host:
@@ -97,15 +107,9 @@ Datapoints land within a few seconds of the push; when the Metric Finder shows
 the `hw.*` names carrying your `host.name` and `vendor` dimensions, live data
 is flowing.
 
-For **Splunk Enterprise/Cloud (HEC)** rather than Observability: run the Prometheus
-listener (`redfish_ctl exporter --output prometheus`, no `--once`) and point a
-Splunk OpenTelemetry Collector (prometheus receiver -> `splunk_hec` exporter) at
-it, which lands the same metrics in a HEC index.
-
-For a **native OTLP** pipeline, use `redfish_ctl exporter --output otlp` to push
-these same `hw.*` series over OTLP. It honors the standard
-`OTEL_EXPORTER_OTLP_*` environment variables and needs the `redfish_ctl[otlp]`
-extra. See [Telemetry exporter](telemetry-exporter.md#otlp-opentelemetry).
+For an automated ingestion verdict, add `--once --verify-readback` to the
+SignalFx push and provide the realm plus an API read token as documented in
+[Telemetry Exporter](telemetry-exporter.md#signalfx).
 
 > Live verification of the push needs a real `SPLUNK_ACCESS_TOKEN` and your
 > realm's `SPLUNK_INGEST_URL`; without them, use `--once --output signalfx`

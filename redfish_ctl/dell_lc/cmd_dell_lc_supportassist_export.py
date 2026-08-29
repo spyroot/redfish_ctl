@@ -9,14 +9,14 @@ the Dell Lifecycle Controller service. Exporting a collection can send support
 data to a local or network share, so the action previews by default and only
 POSTs when ``--confirm`` is provided.
 """
-import os
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
+from ..config import named_env
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _SUPPORTASSIST_EXPORT_ACTION = "#DellLCService.SupportAssistExportLastCollection"
@@ -315,11 +315,12 @@ class DellLcSupportAssistExport(IDracManager,
                 raise InvalidArgument(
                     "password environment variable name cannot be empty"
                 )
-            if env_name not in os.environ:
+            value = named_env(env_name)
+            if value is None:
                 raise InvalidArgument(
                     f"password environment variable '{env_name}' is not set"
                 )
-            return os.environ[env_name]
+            return value
         if password_file is not None:
             path = Path(password_file).expanduser()
             try:

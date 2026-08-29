@@ -9,7 +9,7 @@ Author Mus spyroot@gmail.com
 import pytest
 
 from redfish_ctl.telemetry import identity, otlp
-from redfish_ctl.telemetry.cmd_exporter import Exporter
+from redfish_ctl.telemetry.supermicro.cmd_exporter import Exporter
 
 
 @pytest.fixture(autouse=True)

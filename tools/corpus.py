@@ -250,8 +250,8 @@ def _bmc_credentials(ip: str, inventory: Path) -> tuple[str, str]:
                 if user and password:  # a half-filled node must not become "None"
                     return str(user), str(password)
                 break  # fall through to the env pair / the loud error
-    user = os.environ.get("REDFISH_USERNAME") or os.environ.get("IDRAC_USERNAME")
-    password = os.environ.get("REDFISH_PASSWORD") or os.environ.get("IDRAC_PASSWORD")
+    user = os.environ.get("REDFISH_USERNAME")
+    password = os.environ.get("REDFISH_PASSWORD")
     if user and password:
         return user, password
     print(f"error: no credentials for BMC {ip}: not in {inventory} and "

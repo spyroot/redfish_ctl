@@ -8,10 +8,9 @@ engine, simulator, and benchmark gate.
 
 ## What Exists Today
 
-The managers already expose async request helpers: `api_async_get`, `api_async_post`,
-`api_async_patch`, and `api_async_delete`. Job polling also honors `Retry-After` on Dell task/job
-flows. Those pieces are the foundation for fan-out work, but they are not a fleet runner by
-themselves.
+`RedfishManager` exposes shared async GET wrappers. Async POST, PATCH, and DELETE helpers remain
+Dell-specific on `IDracManager`. Dell task/job polling also honors `Retry-After`. Those pieces are
+not a fleet runner by themselves.
 
 The discover package has a small fake-async harness in tests around scanner behavior. It is useful
 seed material for a simulator because it exercises Redfish reads without live hardware.
@@ -36,7 +35,7 @@ upload images.
 A future operation such as "apply profile `rt-low-latency` to these 1,000 servers" would run as
 bounded per-server pipelines:
 
-- async Redfish input/output through the existing `api_async_*` helpers,
+- async Redfish input/output through vendor-appropriate request helpers,
 - a cap on simultaneous servers and in-flight requests,
 - ordered per-server steps for changes that create jobs or require reboot,
 - subnet-wide pacing plus capped transient-error backoff,

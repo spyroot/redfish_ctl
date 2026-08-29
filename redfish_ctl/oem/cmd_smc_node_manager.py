@@ -16,15 +16,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from ..supermico_manager import SupermicroManager
 
 _CLEAR_POLICIES_ACTION = "#SmcNodeManager.ClearAllPolicies"
 
 
 class SmcNodeManagerClearPolicies(
-    IDracManager,
+    SupermicroManager,
     scm_type=ApiRequestType.SmcNodeManagerClearPolicies,
     name="smc-clear-policies",
     metaclass=Singleton,

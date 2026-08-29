@@ -4,13 +4,13 @@ Covers ``query_privilege_registry`` (CLI verb ``privilege-registry``), a pure
 DMTF read of the ``#PrivilegeRegistry`` resource. The command resolves the
 manager member and reads ``<manager>/PrivilegeRegistry``; the offline fixture
 tree serves the standard Redfish PrivilegeRegistry document, so the test runs
-with no BMC and no network. Runs live when ``IDRAC_IP`` is set, otherwise mock.
+with no BMC and no network. Runs live when ``REDFISH_IP`` is set, otherwise mock.
 
 Author Mus spyroot@gmail.com
 """
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

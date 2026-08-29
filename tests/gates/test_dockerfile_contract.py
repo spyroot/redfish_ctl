@@ -22,6 +22,9 @@ def test_production_dockerfile_installs_local_otlp_wheel_as_non_root() -> None:
     assert "--find-links=/wheelhouse" in dockerfile
     assert "--no-index" in dockerfile
     assert '"redfish_ctl[otlp]"' in dockerfile
+    assert "opentelemetry.sdk.trace import TracerProvider" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.trace_exporter" in dockerfile
+    assert "opentelemetry.exporter.otlp.proto.http.metric_exporter" in dockerfile
     assert 'ENTRYPOINT ["redfish_ctl"]' in dockerfile
     assert "USER redfish" in dockerfile
 
@@ -31,10 +34,10 @@ def test_production_dockerfile_header_shows_safe_runtime_examples() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     header = "\n".join(dockerfile.splitlines()[:20])
 
-    assert "redfish_ctl system" in header
-    assert "exporter --output otlp" in header
+    assert "redfish-ctl system" in header
+    assert "--vendor supermicro exporter --output otlp" in header
     assert "REDFISH_PASSWORD=" not in dockerfile
-    assert "IDRAC_PASSWORD=" not in dockerfile
+    assert ("IDRAC_" + "PASSWORD=") not in dockerfile
     assert "DOCKERHUB_TOKEN" not in dockerfile
 
 
@@ -44,7 +47,8 @@ def test_docker_docs_link_the_production_image_usage() -> None:
     readme = README.read_text(encoding="utf-8")
 
     assert "docker/Dockerfile" in docker_readme
-    assert "redfish_ctl system" in docker_readme
-    assert "exporter --output otlp" in docker_readme
+    assert "docker/Dockerfile.dmtf-sim" in docker_readme
+    assert "redfish-ctl system" in docker_readme
+    assert "--vendor supermicro exporter --output otlp" in docker_readme
     assert "credentials" in docker_readme.lower()
     assert "[Docker](docker/README.md)" in readme

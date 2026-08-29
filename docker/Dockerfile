@@ -2,10 +2,10 @@
 #
 # Build:
 #   docker build -f docker/Dockerfile -t redfish-ctl .
-# One-shot CLI equivalent to `redfish_ctl system`:
-#   docker run --rm --env-file .env.redfish redfish-ctl system
-# OTLP sidecar equivalent to `redfish_ctl exporter --output otlp`:
-#   docker run --rm --env-file .env.redfish redfish-ctl exporter --output otlp --once
+# One-shot shared Redfish CLI read:
+#   docker run --rm --env-file redfish.env redfish-ctl system
+# OTLP sidecar equivalent to `redfish_ctl --vendor supermicro exporter --output otlp`:
+#   docker run --rm --env-file redfish.env redfish-ctl --vendor supermicro exporter --output otlp --once
 FROM python:3.12-slim AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -45,7 +45,10 @@ RUN python -m pip install \
         --find-links=/wheelhouse \
         "redfish_ctl[otlp]" \
     && rm -rf /wheelhouse \
-    && python -m pip check
+    && python -m pip check \
+    && python -c "from opentelemetry.sdk.trace import TracerProvider; \
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; \
+    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter"
 
 USER redfish
 

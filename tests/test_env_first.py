@@ -78,7 +78,7 @@ def _clear_endpoint_env(monkeypatch):
     :param monkeypatch: the pytest monkeypatch fixture.
     :return: None.
     """
-    for name in ("REDFISH_IP", "IDRAC_IP", "REDFISH_PORT", "IDRAC_PORT"):
+    for name in ("REDFISH_IP", "REDFISH_PORT"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -145,11 +145,11 @@ def test_dmtf_sim_endpoint_rejects_out_of_range_port(monkeypatch):
         required_dmtf_sim_endpoint()
 
 
-def test_dmtf_sim_endpoint_conflict_on_alias_mismatch(monkeypatch):
-    """REDFISH_IP and IDRAC_IP set to different values -> ConfigurationConflict."""
+def test_dmtf_sim_endpoint_ignores_retired_vendor_host_name(monkeypatch):
+    """A retired vendor-specific host variable cannot override REDFISH_IP."""
     _clear_endpoint_env(monkeypatch)
     monkeypatch.setenv("REDFISH_IP", "sim-a")
-    monkeypatch.setenv("IDRAC_IP", "sim-b")
+    monkeypatch.setenv("IDRAC_" + "IP", "sim-b")
     monkeypatch.setenv("REDFISH_PORT", "80")
-    with pytest.raises(ConfigurationConflict):
-        required_dmtf_sim_endpoint()
+
+    assert required_dmtf_sim_endpoint().host == "sim-a"

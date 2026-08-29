@@ -9,7 +9,8 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from redfish_ctl.telemetry import exporter, otlp
+from redfish_ctl.telemetry import exporter, prometheus, signalfx
+from redfish_ctl.telemetry.supermicro.metric_catalog import metric_definition
 
 # Curated metric -> expected type, including the tricky cases the data-type audit surfaced.
 _EXPECTED = {
@@ -46,7 +47,8 @@ def _prometheus_type(name, sample):
     :param sample: the sample to render.
     :return: the type token from the ``# TYPE`` line.
     """
-    for line in exporter.render_prometheus_text([sample]).splitlines():
+    for line in prometheus.render_prometheus_text(
+            [sample], metric_definition).splitlines():
         if line.startswith(f"# TYPE {name} "):
             return line.split()[-1]
     return None
@@ -58,7 +60,7 @@ def _signalfx_envelope(sample):
     :param sample: the sample to wrap.
     :return: ``gauge`` or ``cumulative_counter``.
     """
-    for envelope, points in exporter.to_signalfx_body([sample]).items():
+    for envelope, points in signalfx.to_signalfx_body([sample]).items():
         if points:
             return envelope
     return None
@@ -67,8 +69,16 @@ def _signalfx_envelope(sample):
 @pytest.mark.parametrize("name,expected", sorted(_EXPECTED.items()))
 def test_metric_type_agrees_across_backends(name, expected):
     """GATE: Prometheus TYPE, SignalFx envelope, and OTLP Sum/Gauge all match the expected type."""
-    sample = exporter._sample(name, 1.0, _DIMS, metric_type=_EXPLICIT.get(name))
-    assert sample.metric_type == expected, f"{name} declared {sample.metric_type}, expected {expected}"
+    sample = exporter._sample(
+        name,
+        1.0,
+        _DIMS,
+        metric_type=_EXPLICIT.get(name),
+        definition_lookup=metric_definition,
+    )
+    assert sample.metric_type == expected, (
+        f"{name} declared {sample.metric_type}, expected {expected}"
+    )
 
     assert _prometheus_type(name, sample) == expected
 
@@ -85,12 +95,3 @@ def test_metric_type_agrees_across_backends(name, expected):
         assert isinstance(data, Sum) and data.is_monotonic
     else:
         assert isinstance(data, Gauge)
-
-
-def test_is_monotonic_counter_covers_audit_cases():
-    """The name classifier recognizes the counters the audit flagged (incl _total, _dropped)."""
-    assert otlp.is_monotonic_counter("redfish_exporter_collection_errors_total")
-    assert otlp.is_monotonic_counter("hw.fabric.vl15_dropped")
-    assert otlp.is_monotonic_counter("hw.fabric.rx_bytes")
-    assert not otlp.is_monotonic_counter("hw.scrape.duration_seconds")
-    assert not otlp.is_monotonic_counter("hw.power")

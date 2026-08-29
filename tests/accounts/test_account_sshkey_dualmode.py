@@ -2,7 +2,10 @@
 
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+import pytest
+
+from redfish_ctl.cmd_exceptions import UnsupportedAction
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 RSA_KEY = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ0abcdef user@host"
@@ -130,16 +133,14 @@ def test_account_import_sshkey_refuses_non_hpe_account_without_patch(
     """account-import-sshkey refuses non-HPE accounts before sending a PATCH."""
     manager, service = redfish_mock_factory("supermicro")
 
-    result = manager.sync_invoke(
-        ApiRequestType.AccountImportSSHKey,
-        "account-import-sshkey",
-        acct_user="root",
-        ssh_key=RSA_KEY,
-        acct_confirm=True,
-    )
+    with pytest.raises(UnsupportedAction, match="Unknown account-import-sshkey command"):
+        manager.sync_invoke(
+            ApiRequestType.AccountImportSSHKey,
+            "account-import-sshkey",
+            acct_user="root",
+            ssh_key=RSA_KEY,
+            acct_confirm=True,
+        )
 
-    assert isinstance(result, CommandResult)
-    assert result.data is None
-    assert "HPE-only" in result.error
-    assert [request.method for request in service.requests] == ["GET", "GET"]
+    assert service.requests == []
     assert _mutating_requests(service) == []
