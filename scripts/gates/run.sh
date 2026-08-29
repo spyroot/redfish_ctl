@@ -50,11 +50,20 @@ if [ -z "$profile" ]; then
 fi
 
 exec python3 - "$profile" "$gate" <<'PY'
+import os
 import pathlib
-import subprocess
 import sys
 
 import yaml
+
+from tools.ci_evidence import (
+    EvidenceError,
+    build_evidence,
+    build_smoke_evidence,
+    observe_gate,
+    observe_smoke,
+    write_evidence,
+)
 
 profile = sys.argv[1]
 selected_gate = sys.argv[2] or None
@@ -81,11 +90,124 @@ if selected_gate:
         )
         sys.exit(1)
     gates = [selected]
+
+job_name = os.environ.get("CI_JOB_NAME", "")
+smoke_inventory = yaml.safe_load(
+    pathlib.Path("inventory/ci/smoke-tests.yaml").read_text(encoding="utf-8")
+)
+smoke_records = [
+    record
+    for record in smoke_inventory.get("spec", {}).get("smokeTests", [])
+    if record.get("job") == job_name
+]
+if len(smoke_records) > 1:
+    print(f"EVIDENCE FAILED: duplicate smoke inventory for {job_name}", file=sys.stderr)
+    sys.exit(1)
+run_status = "passed"
+run_return_code = 0
+job_observations = {
+    "return_code": 0,
+    "warnings": 0,
+    "skipped_required_tests": 0,
+    "skipped_optional_tests": 0,
+    "cleanup_status": "passed",
+    "remaining": [],
+    "sources": {
+        "warnings": "captured output from every executed gate",
+        "skips": "pytest -ra reasons from every executed gate",
+        "cleanup": "per-gate git status tracked-state comparisons",
+        "sanitization": "quiet credential-pattern scan before atomic write",
+    },
+}
 for gate in gates:
     print(f"=== gate {gate['id']} ({gate['command']}) ===")
-    if subprocess.run([gate["command"]]).returncode != 0:
+    observations = observe_gate(command=gate["command"])
+    return_code = observations["return_code"]
+    status = "passed" if return_code == 0 else "failed"
+    job_observations["warnings"] += observations["warnings"]
+    job_observations["skipped_required_tests"] += observations[
+        "skipped_required_tests"
+    ]
+    job_observations["skipped_optional_tests"] += observations[
+        "skipped_optional_tests"
+    ]
+    if observations["cleanup_status"] != "passed":
+        job_observations["cleanup_status"] = "failed"
+    job_observations["remaining"].extend(observations["remaining"])
+    try:
+        evidence = build_evidence(
+            kind="gate",
+            name=gate["id"],
+            command=gate["command"],
+            status=status,
+            return_code=return_code,
+            observations=observations,
+        )
+        written = write_evidence(
+            pathlib.Path("reports/gates") / f"{gate['id']}.json",
+            evidence,
+        )
+    except (EvidenceError, OSError, ValueError) as exc:
+        print(f"EVIDENCE FAILED: {gate['id']}: {exc}", file=sys.stderr)
+        run_status = "failed"
+        run_return_code = 1
+        break
+    if written["status"] != "passed":
         print(f"GATE FAILED: {gate['id']}", file=sys.stderr)
-        sys.exit(1)
+        run_status = "failed"
+        run_return_code = written["return_code"] or 1
+        break
+
+job_observations["return_code"] = run_return_code
+
+if smoke_records:
+    try:
+        smoke_observations = observe_smoke(
+            record=smoke_records[0],
+            gate_observations=job_observations,
+        )
+        smoke_evidence = build_smoke_evidence(
+            record=smoke_records[0],
+            gate_observations=job_observations,
+            smoke_observations=smoke_observations,
+        )
+        written_smoke = write_evidence(
+            pathlib.Path("reports/smoke") / f"{job_name}.json",
+            smoke_evidence,
+        )
+        if written_smoke["status"] != "passed":
+            run_status = "failed"
+            run_return_code = written_smoke["return_code"] or 1
+    except (EvidenceError, OSError, ValueError) as exc:
+        print(f"EVIDENCE FAILED: smoke result: {exc}", file=sys.stderr)
+        run_status = "failed"
+        run_return_code = 1
+
+job_command = f"./scripts/check.sh --profile {profile}"
+if selected_gate:
+    job_command += f" --gate {selected_gate}"
+try:
+    job_evidence = build_evidence(
+        kind="job",
+        name=job_name,
+        command=job_command,
+        status=run_status,
+        return_code=run_return_code,
+        observations=job_observations,
+    )
+    written_job = write_evidence(
+        pathlib.Path("reports/ci") / f"{job_name}.json",
+        job_evidence,
+    )
+    if written_job["status"] != "passed":
+        run_status = "failed"
+        run_return_code = written_job["return_code"] or 1
+except (EvidenceError, OSError, ValueError) as exc:
+    print(f"EVIDENCE FAILED: CI job: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+if run_return_code != 0:
+    sys.exit(run_return_code)
 if selected_gate:
     print(f"run.sh: gate {selected_gate} passed")
 else:

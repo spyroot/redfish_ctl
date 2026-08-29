@@ -3,6 +3,7 @@
 !/scripts/gb300.sh
 !/scripts/k8s_ci.sh
 !/scripts/check.sh
+!/scripts/project_ci_entrypoint.sh
 !/scripts/gates/
 !/scripts/hooks/
 !/scripts/publish_github.sh

@@ -6,4 +6,4 @@
 # offline gate stay green without the sim.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
-exec pytest -q -m "not dmtf_sim_live"
+exec pytest -q -ra -W error -m "not dmtf_sim_live"

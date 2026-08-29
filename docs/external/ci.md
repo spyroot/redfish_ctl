@@ -13,32 +13,74 @@ For gate semantics see [Gates](gates.md); for the release procedure, see
 |---|---|---|
 | GitHub | pull request or push to `main` | offline test workflow |
 | GitHub | `v*` tag | release workflow |
-| GitLab | merge request or default branch | `merge` profile |
+| GitLab | merge request | `merge` profile |
+| GitLab | default branch | `merge` plus `integration` profiles |
 | GitLab | schedule on the default branch | `merge`, `integration`, and `scheduled` profiles |
 
 ## Internal validation paths
+
+The tracked `builder-binding.yaml` file pins the Builder provider revision and
+dispatch authority. The `PROJECT_CI_CPU_COMMAND` variable, defined in
+`.gitlab-ci.yml`, selects the tracked `scripts/project_ci_entrypoint.sh` adapter;
+no operator-created command variable is required.
+
+### Wrapper dispatch from the current branch
+
+Install `yq` and `jq`; the wrapper verifies `builder-binding.yaml`, the exact
+Builder revision, and required capabilities before dispatch. The current named
+branch must already exist in Internal GitLab at the same exact HEAD commit. The
+wrapper is dry-run by default, so these commands resolve the exact
+project/ref/commit and print Builder plans without creating a pipeline:
+
+```bash
+./scripts/check.sh --profile merge --gate unit.all --dispatch
+./scripts/check.sh --profile merge --dispatch
+```
+
+The first selects one diagnostic gate; the second maps the project `merge`
+profile to Builder's complete `full` validation profile. After reviewing that
+plan, this explicit apply creates the protected full pipeline, waits, and
+returns its terminal pipeline ID, URL, status, and exact commit as JSON:
+
+```bash
+./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
+```
+
+Builder reads the project-scoped Internal GitLab credential from its registered
+Kubernetes Secret. The consumer wrapper accepts no token value, does not persist
+credentials, and does not place them in arguments, output, logs, or evidence.
+Optional `--no-wait`, logging, run-ID, and timeout controls pass through to the
+bound Builder command. A `--no-wait` receipt is dispatch confirmation only; it
+is not terminal gate or merge evidence.
+
+### Internal validation jobs
 
 The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
 Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
 merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
 `repo.format`; the job runs that one gate through the Kubernetes-guarded
 `scripts/check.sh` entrypoint. This exact-commit result is diagnostic evidence
-only, not merge or release evidence.
+only, not merge or release evidence. Because the exact Builder include also
+selects `project-ci-cpu-validation` when `FOCUSED_GATE` is present, a focused
+pipeline is green only when both diagnostic jobs finish successfully.
 
 The `gate-merge` job remains the merge authority. For an Internal GitLab API or
 web pipeline, the dispatcher sets `MERGE_PROFILE=merge` and omits
 `FOCUSED_GATE`; the pipeline then runs the complete merge profile and no
 integration, deployment, or publication job. Merge-request and default-branch
 pipelines continue to select `gate-merge` through their normal GitLab rules.
+Builder profile dispatch uses the `project-ci-cpu-validation` job from the
+exact-revision shared include declared in `.gitlab-ci.yml`.
 
-### Run internal validation
+### Manual Internal GitLab API or web dispatch
 
-1. Use the project pipeline on Internal GitLab with the immutable
+1. Select the project pipeline on Internal GitLab with the immutable
    `sync/pr-<number>/<40-character-head-sha>` ref produced by the configured
    Sync Now path. The pipeline commit must resolve to that exact head SHA.
 2. For diagnostic feedback, set `FOCUSED_GATE=unit.all` (or another
-   merge-profile gate ID) and leave `MERGE_PROFILE` unset. The pipeline must
-   create only `focused-gate`.
+   merge-profile gate ID) and leave `MERGE_PROFILE` unset. The pipeline creates
+   `focused-gate` and the imported `project-ci-cpu-validation` job; both are
+   diagnostic-only and must pass.
 3. For merge evidence, unset `FOCUSED_GATE` and set `MERGE_PROFILE=merge`. The
    pipeline must create only `gate-merge`.
 4. Verify the terminal job is successful, its commit SHA equals the requested
@@ -46,8 +88,16 @@ pipelines continue to select `gate-merge` through their normal GitLab rules.
    with `run.sh: gate <id> passed`; the authoritative run ends with
    `run.sh: all merge gates passed`.
 
-Pipeline credentials come from the configured Internal GitLab CI binding; do
-not copy tokens into the repository or pass them on the command line.
+### Evidence artifacts
+
+Each required job publishes `reports/ci/<job>.json`, each executed gate
+publishes `reports/gates/<gate-id>.json`, and each required smoke
+publishes `reports/smoke/<job>.json`. These sanitized documents bind the result
+to the exact project commit, Standards revision, pipeline/job IDs, and immutable
+runner digest. Warning/skip counts come from captured gate output; cleanup comes
+from tracked-state comparison; exact identity comes from independent Git
+read-back; and sanitization is recorded only after a quiet content scan and
+atomic file read-back.
 
 ## Protected DMTF simulator deployment
 
@@ -63,9 +113,9 @@ includes](gates.md#trusted-provider-includes). The pipeline supplies
    `project-service-chart-publish`. Their exact-commit receipts supply the
    image repository, image digest, chart version, and source commit; the chart
    has no mutable tag fallback.
-2. Wait for `project-service-deploy-plan`, then play
-   `project-service-deploy`. Both mutation jobs are protected, serialized, and
-   unavailable to merge-request pipelines.
+2. Wait for the non-mutating `project-service-deploy-plan` evidence, then play
+   `project-service-deploy`. The deploy job is a protected, serialized manual
+   mutation unavailable to merge-request pipelines.
 3. Require terminal success from `project-service-verify`,
    `project-service-live-test`, and `project-service-release-evidence`. The
    live test reads `/redfish/v1/` through `RedfishManager`; a pod readiness
@@ -76,16 +126,17 @@ credential prerequisite is documented under [Private DMTF simulator
 image](secrets.md#private-dmtf-simulator-image), and the served resource
 contract is [Redfish Simulator Contract](simulator-contract.md).
 
-## Supplemental `ci.yml` check
+## Supplemental `.github/workflows/ci.yml` check
 
 Triggers on pushes to `main` and on every pull request.
 
-- Runs the **offline** test suite (`pytest -q`) on a matrix of Python **3.10, 3.11, 3.12**.
+- Runs the **offline** test suite (`pytest -q -m "not dmtf_sim_live"`) on
+  Python **3.10**.
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
-- Uses **no secrets**, never contacts a BMC (live `@pytest.mark.live` tests auto-skip with no
-  `REDFISH_IP`), and does **not** fetch Git LFS (the offline suite reads JSON fixtures only, never the
-  LFS-tracked firmware binaries).
+- Uses **no secrets** and never contacts a BMC (live `@pytest.mark.live` tests
+  auto-skip with no `REDFISH_IP`). Checkout enables Git LFS for the committed
+  offline corpus and specification artifacts used by the suite.
 
 Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls
 in `pytest`, `requests-mock`, `ruff`, `mypy`, and `numpy`, the last needed for the discovery
@@ -102,10 +153,16 @@ Triggers **only** on tags matching `v*` (e.g. `v1.1.2`). A normal push to `main`
    records a verified link back to this repo/workflow (this is what makes the project page show
    *verified* details instead of "unverified").
 4. Creates a GitHub Release with the artifacts attached.
+5. Builds and publishes multi-architecture production images to Docker Hub and
+   GitHub Container Registry when `docker/Dockerfile` exists. Controller and
+   mock-BMC images are additionally skipped until their own Dockerfiles exist.
+   Docker Hub requires repository secrets `DOCKERHUB_USERNAME` and
+   `DOCKERHUB_TOKEN`; GitHub Container Registry uses the workflow-provided
+   `GITHUB_TOKEN`. Published tags are the release version and `latest`.
 
-One-time maintainer setup on PyPI (Project → Settings → Publishing → Add a trusted publisher): owner
-`spyroot`, repo `redfish_ctl`, workflow `release.yml`. After that, releasing is just
-`tools/bump_version.py` → commit → push a `vX.Y.Z` tag; see [Releasing](releasing.md).
+Complete the one-time publisher and repository-secret setup in
+[Installing And Releasing](releasing.md#automated-release-recommended) before
+pushing a release tag.
 
 ## The runner and Node.js
 

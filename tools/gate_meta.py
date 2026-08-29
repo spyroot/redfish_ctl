@@ -17,8 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 LIFECYCLE = ("validate", "plan", "apply", "verify", "rollback")
 
 # GitLab's reserved top-level keywords. Everything else at the top level of .gitlab-ci.yml is a job,
-# whether or not it declares an inline ``script`` — so the job checks must exclude these by NAME and
-# never by the presence of a job keyword.
+# whether or not it declares an inline ``script`` — so the job checks must
+# exclude these by NAME and never by the presence of a job keyword.
 GITLAB_GLOBAL_KEYS = frozenset({
     "default", "include", "stages", "variables", "workflow", "spec",
     "image", "services", "before_script", "after_script", "cache", "types",
@@ -27,6 +27,9 @@ SMOKE_CLASSES = frozenset({
     "wiring", "offline-component", "ephemeral-integration",
     "protected-live", "recovery", "status-reflection",
 })
+BUILDER_INCLUDE_PROJECT = "spyroot/builder"
+BUILDER_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
+BUILDER_IMPORTED_JOBS = frozenset({"project-ci-cpu-validation"})
 
 
 def _load_registry() -> dict:
@@ -67,8 +70,9 @@ def _load_registry() -> dict:
 def _check_commands(registry: dict) -> list[str]:
     """Checks 1 & 2: every gate command exists and is executable.
 
-    Optional gates are checked too. ``required: false`` used to skip the check, so a registry row could
-    name a missing or non-executable path that only blew up when the profile actually ran in CI.
+    Optional gates are checked too. ``required: false`` used to skip the check,
+    so a registry row could name a missing or non-executable path that only
+    failed when the profile actually ran in CI.
 
     :param registry: the parsed gate registry.
     :return: list of failure messages.
@@ -292,11 +296,51 @@ def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
             "when": "never",
         },
         {
-            "if": '$CI_COMMIT_REF_PROTECTED == "true"',
+            "if": (
+                '$CI_COMMIT_REF_PROTECTED == "true" && '
+                "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+            ),
             "when": protected_when,
         },
         {"when": "never"},
     ]
+
+
+def _builder_resource_include_failures(ci: dict, registry: dict) -> list[str]:
+    """Validate the imported CI job against the tracked Builder binding."""
+    import yaml
+
+    if "project-ci-cpu-validation" not in (registry.get("required_jobs") or []):
+        return []
+    binding_path = REPO_ROOT / "builder-binding.yaml"
+    if not binding_path.is_file():
+        return ["Builder include requires tracked builder-binding.yaml"]
+    binding = yaml.safe_load(binding_path.read_text(encoding="utf-8")) or {}
+    revision = (((binding.get("spec") or {}).get("source") or {}).get("revision"))
+    raw_includes = ci.get("include") or []
+    includes = raw_includes if isinstance(raw_includes, list) else [raw_includes]
+    identities = {_include_key(include) for include in includes}
+    expected = (BUILDER_INCLUDE_PROJECT, revision, BUILDER_INCLUDE_FILE)
+    if expected not in identities:
+        return [
+            "gitlab: CI resource include must use the exact Builder revision "
+            "declared by builder-binding.yaml"
+        ]
+    command = (ci.get("variables") or {}).get("PROJECT_CI_CPU_COMMAND")
+    entrypoint = REPO_ROOT / "scripts" / "project_ci_entrypoint.sh"
+    if command != "./scripts/project_ci_entrypoint.sh":
+        return ["gitlab: PROJECT_CI_CPU_COMMAND must select the project CI adapter"]
+    if not entrypoint.is_file() or not (entrypoint.stat().st_mode & 0o111):
+        return ["gitlab: project CI adapter is missing or not executable"]
+    return []
+
+
+def _artifact_paths(job: dict) -> set[str]:
+    """Return normalized artifact paths for one local GitLab job or overlay."""
+    paths = ((job.get("artifacts") or {}).get("paths") or [])
+    if isinstance(paths, str):
+        return {paths}
+    return {str(path) for path in paths}
 
 
 def _check_smoke_inventory(registry: dict) -> list[str]:
@@ -364,7 +408,7 @@ def _check_smoke_inventory(registry: dict) -> list[str]:
         command = record.get("command")
         if not isinstance(command, str) or not command:
             failures.append(f"{job} smoke command is missing")
-        elif command not in _script_lines(ci_job):
+        elif command not in _script_lines(ci_job) and job not in BUILDER_IMPORTED_JOBS:
             failures.append(
                 f"{job} smoke command is stale or not wired in .gitlab-ci.yml: {command}"
             )
@@ -409,6 +453,7 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
     failures, trusted_templates = _check_trusted_includes(ci, registry)
+    failures += _builder_resource_include_failures(ci, registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
     for name, job in real_jobs.items():
@@ -459,7 +504,7 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
                 failures.append(
                     f"gitlab job {name}: mutation is not explicitly denied "
                     "in a merge-request pipeline")
-            if "script" not in job:
+            if "script" not in job and name not in BUILDER_IMPORTED_JOBS:
                 failures.append(
                     f"gitlab job {name}: no script — not analyzable, inline the job body")
     required_jobs = registry.get("required_jobs") or []
@@ -470,6 +515,14 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     for required in required_jobs:
         if required not in real_jobs:
             failures.append(f"required GitLab job missing: {required}")
+            continue
+        paths = _artifact_paths(real_jobs[required])
+        expected_ci = f"reports/ci/{required}.json"
+        expected_smoke = f"reports/smoke/{required}.json"
+        if expected_ci not in paths:
+            failures.append(f"required GitLab job {required}: missing artifact {expected_ci}")
+        if expected_smoke not in paths:
+            failures.append(f"required GitLab job {required}: missing artifact {expected_smoke}")
     for diagnostic in registry.get("diagnostic_jobs") or []:
         if diagnostic not in real_jobs:
             failures.append(f"diagnostic GitLab job missing: {diagnostic}")

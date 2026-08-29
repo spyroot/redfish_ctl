@@ -12,6 +12,7 @@ from tools import gate_meta
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
 BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
+BUILDER_RESOURCE_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
 PROJECT_SERVICE_JOBS = {
     "project-service-image-publish": ".builder-project-image-publish",
     "project-service-chart-publish": ".builder-project-chart-publish",
@@ -36,6 +37,7 @@ def _ci_config() -> dict:
 
 
 def _gitlab_jobs() -> dict:
+    """Return local jobs; imported Builder jobs have separate exact-pin tests."""
     ci = _ci_config()
     return {
         name: job
@@ -43,6 +45,7 @@ def _gitlab_jobs() -> dict:
         if name not in gate_meta.GITLAB_GLOBAL_KEYS
         and isinstance(job, dict)
         and not name.startswith(".")
+        and name not in gate_meta.BUILDER_IMPORTED_JOBS
     }
 
 
@@ -98,11 +101,15 @@ def _check_temp_gitlab(
 
 
 def _registry_trusted_include() -> dict:
-    """Return the single trusted include declared by the live gate registry."""
+    """Return the trusted project-service include from the live registry."""
     registry = gate_meta._load_registry()
     records = registry.get("trusted_includes") or []
-    assert len(records) == 1, "the provider include contract must be single-sourced"
-    include = records[0]
+    matches = [
+        record for record in records
+        if record.get("file") == BUILDER_PROJECT_INCLUDE_FILE
+    ]
+    assert len(matches) == 1, "the project-service include must be single-sourced"
+    include = matches[0]
     assert include["project"] == "spyroot/builder"
     assert include["file"] == BUILDER_PROJECT_INCLUDE_FILE
     assert re.fullmatch(r"[0-9a-f]{40}", include["ref"])
@@ -280,8 +287,25 @@ def test_registry_declares_exactly_one_diagnostic_focused_gate_job() -> None:
 
 
 def test_registry_pins_exact_builder_project_service_include() -> None:
-    """The only trusted provider include is a registry-declared exact commit."""
+    """The trusted project-service include is a registry-declared exact commit."""
     _registry_trusted_include()
+
+
+def test_registry_pins_builder_resource_include_to_provider_binding() -> None:
+    """The imported CI job uses the exact tracked Builder provider revision."""
+    registry = gate_meta._load_registry()
+    records = registry.get("trusted_includes") or []
+    matches = [
+        record for record in records
+        if record.get("file") == BUILDER_RESOURCE_INCLUDE_FILE
+    ]
+    assert len(matches) == 1, "the CI resource include must be single-sourced"
+    binding = yaml.safe_load(
+        (REPO_ROOT / "builder-binding.yaml").read_text(encoding="utf-8")
+    )
+    assert matches[0]["project"] == "spyroot/builder"
+    assert matches[0]["ref"] == binding["spec"]["source"]["revision"]
+    assert matches[0]["templates"] == []
 
 
 def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
@@ -315,7 +339,7 @@ def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
           rules:
             - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
               when: never
-            - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+            - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
               when: on_success
             - when: never
           extends: .builder-project-deploy-plan
@@ -537,8 +561,8 @@ def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
     assert "scripts/gates/run.sh" not in script
 
 
-def test_internal_api_web_focused_dispatch_selects_only_the_focused_job() -> None:
-    """Internal API/web dispatch with FOCUSED_GATE creates diagnostic evidence only."""
+def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> None:
+    """Local rules select focused-gate; the exact include adds its imported job."""
     for source in ("api", "web"):
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,

@@ -1,0 +1,27 @@
+apiVersion: standards.spyroot.dev/v1alpha1
+kind: ProjectProviderBinding
+metadata:
+  name: builder
+spec:
+  source:
+    localPath: /Users/spyroot/dev/builder
+    repository: https://gitlab.rnd.embedings.ai/spyroot/builder
+    canonicalId: spyroot/builder
+    revision: f210055901973997a4c6c1fbf1fff189aa871bd9
+  contract:
+    path: docs/agents/contracts/builder-provider.md
+  discovery:
+    command:
+      - ./scripts/shared_inventory_map.sh
+      - --validate
+    resultBinding: .spec.providerCapabilities
+  dispatch:
+    authority: internal-gitlab
+    baseUrl: https://gitlab.rnd.embedings.ai
+    project: spyroot/builder
+    transport: pipeline-api
+    binding: standards.agent-workspace.provider
+    requestSchema: provider-request/v1
+    resultSchema: provider-result/v1
+    protectedRefRequired: true
+    runnerTag: homelab-k8s-protected

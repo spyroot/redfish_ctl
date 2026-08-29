@@ -136,6 +136,7 @@ def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
     )
     assert proc.returncode == 1, f"planted secret was not detected: {proc.stdout}{proc.stderr}"
     assert "sanitize before upload" in proc.stdout + proc.stderr
+    assert "hunter2hunter2" not in proc.stdout + proc.stderr
 
 
 def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:

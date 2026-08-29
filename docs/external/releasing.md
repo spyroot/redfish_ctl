@@ -22,11 +22,12 @@ python -m pip install .
 redfish_ctl --version
 ```
 
-## Automated release (recommended, tokenless)
+## Automated release (recommended)
 
-The going-forward release path is tag-triggered and needs no PyPI token on anyone's machine. It is
-driven by `.github/workflows/release.yml` using PyPI **Trusted Publishing** (OIDC), which also makes
-PyPI show *verified* project details instead of "unverified".
+The going-forward release path is tag-triggered. PyPI publishing needs no PyPI
+token on anyone's machine: `.github/workflows/release.yml` uses **Trusted
+Publishing** (OIDC), which also makes PyPI show *verified* project details
+instead of "unverified".
 
 ```bash
 python tools/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
@@ -36,14 +37,17 @@ git push origin main
 git tag v1.1.2 && git push origin v1.1.2   # <- this is what publishes
 ```
 
-On the tag push, the workflow verifies the tag equals `redfish_ctl/version.py` (a mismatch or a
-duplicate version fails before upload), builds, `twine check`s, publishes to PyPI via OIDC, and cuts
-a GitHub Release with the artifacts attached. `tools/bump_version.py` never runs git itself, so the
-tag step stays a deliberate human action.
+The tag push publishes the package, GitHub release, and available container
+images as described in [CI/CD Pipeline](ci.md#releaseyml--publish-on-a-version-tag).
+`tools/bump_version.py` never runs git, so tagging remains a deliberate human
+action.
 
 **One-time PyPI setup** (maintainer, on the web UI): on the `redfish-ctl` project →
 *Settings → Publishing → Add a trusted publisher* → GitHub, owner `spyroot`, repo `redfish_ctl`,
-workflow `release.yml`. After that, no token is needed to release.
+workflow `release.yml`. After that, no PyPI token is needed for PyPI
+publication.
+Before pushing a release tag, configure the Docker Hub repository secrets when
+`docker/Dockerfile` is present.
 
 The manual steps below remain valid as a fallback before the trusted publisher is configured.
 

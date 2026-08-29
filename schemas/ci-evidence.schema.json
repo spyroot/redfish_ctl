@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spyroot.dev/schemas/redfish_ctl-ci-evidence-v1.json",
+  "title": "redfish_ctl CI evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "kind",
+    "name",
+    "job",
+    "job_id",
+    "pipeline_id",
+    "commit",
+    "standards_revision",
+    "runner_digest",
+    "artifact_digest",
+    "command",
+    "status",
+    "return_code",
+    "warnings",
+    "skipped_required_tests",
+    "skipped_optional_tests",
+    "cleanup",
+    "observation_sources",
+    "evidence_sanitized"
+  ],
+  "properties": {
+    "schema": {"const": "redfish_ctl.ci_evidence/v1"},
+    "kind": {"enum": ["gate", "job"]},
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "job": {"type": "string", "minLength": 1},
+    "job_id": {"type": "string", "minLength": 1},
+    "pipeline_id": {"type": "string", "minLength": 1},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "standards_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "runner_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact_digest": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      ]
+    },
+    "command": {"type": "string", "minLength": 1},
+    "status": {"enum": ["passed", "failed"]},
+    "return_code": {"type": "integer", "minimum": 0},
+    "warnings": {"type": "integer", "minimum": 0},
+    "skipped_required_tests": {"type": "integer", "minimum": 0},
+    "skipped_optional_tests": {"type": "integer", "minimum": 0},
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "remaining"],
+      "properties": {
+        "status": {"enum": ["passed", "failed"]},
+        "remaining": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "observation_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warnings", "skips", "cleanup", "sanitization"],
+      "properties": {
+        "warnings": {"type": "string", "minLength": 1},
+        "skips": {"type": "string", "minLength": 1},
+        "cleanup": {"type": "string", "minLength": 1},
+        "sanitization": {"type": "string", "minLength": 1}
+      }
+    },
+    "evidence_sanitized": {"type": "boolean"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "passed"}}},
+      "then": {
+        "properties": {
+          "return_code": {"const": 0},
+          "warnings": {"const": 0},
+          "skipped_required_tests": {"const": 0},
+          "cleanup": {
+            "properties": {
+              "status": {"const": "passed"},
+              "remaining": {"maxItems": 0}
+            }
+          },
+          "evidence_sanitized": {"const": true}
+        }
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ runner_tag: homelab-k8s
 # GitLab jobs that MUST exist and MUST NOT use allow_failure (meta.required-jobs checks these when
 # .gitlab-ci.yml is present).
 required_jobs:
+  - project-ci-cpu-validation
   - gate-merge
   - gate-integration
   - gate-scheduled
@@ -24,6 +25,10 @@ diagnostic_jobs:
 # pipeline. The meta-gate permits only these hidden templates from this exact
 # immutable include; floating refs and unknown external templates remain fatal.
 trusted_includes:
+  - project: spyroot/builder
+    ref: f210055901973997a4c6c1fbf1fff189aa871bd9
+    file: /ci/templates/project-ci-resource-jobs.yml
+    templates: []
   - project: spyroot/builder
     ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
     file: /ci/templates/project-service.yml

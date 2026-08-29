@@ -7,12 +7,15 @@
 # Job rules below isolate diagnostic, merge, integration, protected deployment,
 # scheduled canary, and publication paths. Operator guidance lives in
 # docs/external/ci.md.
-stages: [validate, integration, deploy, publish]
-
 include:
+  - project: spyroot/builder
+    ref: f210055901973997a4c6c1fbf1fff189aa871bd9
+    file: /ci/templates/project-ci-resource-jobs.yml
   - project: spyroot/builder
     ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
     file: /ci/templates/project-service.yml
+
+stages: [project-ci-validation, validate, integration, deploy, publish]
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
 # git-lfs, gate tools); this project supplies its dependencies via environment.yml.
@@ -43,6 +46,9 @@ variables:
   PROJECT_LIVE_TEST_COMMAND: >-
     pytest -q -m dmtf_sim_live
     tests/k8s/test_dmtf_sim_live.py::test_dmtf_service_root
+  # The exact Builder include invokes this project-owned selector. It chooses
+  # one FOCUSED_GATE or the complete merge profile and nothing else.
+  PROJECT_CI_CPU_COMMAND: ./scripts/project_ci_entrypoint.sh
 
 .private-api-web:
   rules:
@@ -81,6 +87,7 @@ focused-gate:
     when: always
     paths:
       - reports/gate-report.sanitized.json
+      - reports/ci/focused-gate.json
       - reports/gates/
 
 gate-merge:
@@ -99,7 +106,9 @@ gate-merge:
     when: always
     paths:
       - reports/gate-report.sanitized.json
+      - reports/ci/gate-merge.json
       - reports/gates/
+      - reports/smoke/gate-merge.json
 
 gate-integration:
   stage: integration
@@ -115,7 +124,19 @@ gate-integration:
     when: always
     paths:
       - reports/gate-report.sanitized.json
+      - reports/ci/gate-integration.json
       - reports/gates/
+      - reports/smoke/gate-integration.json
+
+# The exact-revision Builder include owns this job's runner, rules, and
+# command. This local overlay owns only redfish_ctl evidence publication.
+project-ci-cpu-validation:
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/project-ci-cpu-validation.json
+      - reports/gates/
+      - reports/smoke/project-ci-cpu-validation.json
 
 gate-scheduled:
   stage: integration
@@ -124,6 +145,12 @@ gate-scheduled:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
     - ./scripts/check.sh --profile scheduled
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/gate-scheduled.json
+      - reports/gates/
+      - reports/smoke/gate-scheduled.json
 
 # Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
 # never from a workstation. The runner pod already carries a ServiceAccount, so
@@ -170,7 +197,9 @@ project-service-image-publish:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
     - when: never
 
@@ -184,7 +213,9 @@ project-service-chart-publish:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
     - when: never
 
@@ -198,7 +229,9 @@ project-service-deploy-plan:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
     - when: never
 
@@ -212,7 +245,9 @@ project-service-deploy:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
     - when: never
 
@@ -226,7 +261,9 @@ project-service-verify:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
     - when: never
 
@@ -239,7 +276,9 @@ project-service-live-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
     - when: never
 
@@ -253,7 +292,9 @@ project-service-rollback:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
     - when: never
 
@@ -267,7 +308,9 @@ project-service-release-evidence:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
     - when: never
 
