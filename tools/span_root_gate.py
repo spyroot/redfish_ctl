@@ -2,8 +2,8 @@
 
 One command opens one root span (``tracing.operation_span``); each outbound BMC
 call opens a CLIENT child (``tracing.client_span``). A direct transport call
-that runs outside any span emits no span at all - the trace loses a hop and the
-call is orphaned from the operation root. This gate resolves imported aliases,
+outside that CLIENT boundary emits no request span - the trace loses a hop and
+the call is orphaned from the operation root. This gate resolves imported aliases,
 directly imported functions, and bound client/session instances before checking
 the call site.
 
@@ -33,7 +33,7 @@ _VERBS = {
     "options",
     "request",
 }
-_SPAN_FNS = {"client_span", "operation_span"}
+_SPAN_FNS = {"client_span"}
 # A function that hands its request to one of these wrappers is traced: the sync
 # path spans the partial in traced_request; the async/executor path spans it in
 # traced_request_callable; the inline path uses a `with client_span` block.
@@ -302,10 +302,10 @@ def _wrapper_bound_names(scope: ast.AST) -> set[str]:
 
 
 def _is_span_with(node: ast.withitem) -> bool:
-    """Return whether a ``with`` item opens a tracing span.
+    """Return whether a ``with`` item opens a CLIENT request span.
 
     :param node: a withitem from a ``with`` statement.
-    :return: True when its context expression calls client_span/operation_span.
+    :return: True when its context expression calls ``client_span``.
     """
     call = node.context_expr
     if not isinstance(call, ast.Call):
@@ -364,10 +364,10 @@ def _walk(
 ) -> None:
     """Recurse, tracking whether the cursor is under tracing.
 
-    A direct HTTP call is traced when it sits inside a ``with client_span`` /
-    ``operation_span`` block (inline path) or inside a function that hands its
-    request to a wrapper in :data:`_WRAPPERS` (deferred path). Otherwise it is
-    an orphan.
+    A direct HTTP call is traced when it sits inside a ``with client_span``
+    block (inline path) or inside a function that hands its request to a wrapper
+    in :data:`_WRAPPERS` (deferred path). An INTERNAL operation span alone is
+    not request coverage.
 
     :param node: current AST node.
     :param traced: True when an enclosing span/wrapper covers this subtree.
