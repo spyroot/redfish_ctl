@@ -4,7 +4,7 @@
 #   check.sh --list                         enumerate every registered gate
 #   check.sh --profile <name>               run all gates in a profile
 #   check.sh --profile <name> --gate <id>   run one gate in that profile
-#                                   (merge|integration|deploy|repository-export)
+#                                   (merge|integration|scheduled|deploy|repository-export)
 #
 # EXECUTION AUTHORITY = Kubernetes. Outside a cluster pod, check.sh REFUSES to run tests locally and
 # prints the exact in-cluster dispatch command instead — it never runs a gate on the operator's laptop.
@@ -51,7 +51,7 @@ PY
 usage() {
   cat <<'USAGE'
 usage: check.sh --list
-       check.sh --profile <merge|integration|deploy|repository-export> [--gate <id>]
+       check.sh --profile <merge|integration|scheduled|deploy|repository-export> [--gate <id>]
 
 A focused --gate result proves only that gate at the exact commit. It is not
 merge or release evidence; use the full required pipeline for those decisions.

@@ -53,6 +53,14 @@ kubectl create secret generic splunk-ingest \
   --from-literal=ingestUrl='https://ingest.<realm>.signalfx.com/v2/datapoint'
 ```
 
+## Splunk metric-query gate
+
+The scheduled read-only MTS gate needs `SPLUNK_O11Y_REALM`, the realm used to
+build the query URL, and `SPLUNK_API_TOKEN`, an API-scoped Observability token.
+Provide both as masked, protected CI variables or through the configured secret
+provider. Do not reuse the exporter ingest token: ingest and API-query scopes
+serve different endpoints. See [Telemetry liveness checks](gates.md#telemetry-liveness-checks).
+
 ## Image pull (only if the images are private)
 
 The published images (`redfish-ctl`, `redfish-ctl-controller`, `redfish-ctl-mock-bmc`) are intended to

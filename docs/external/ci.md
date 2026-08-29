@@ -6,7 +6,15 @@ Internal GitLab is the merge-validation authority. The `gate-merge` job, defined
 in `.gitlab-ci.yml`, runs the merge profile on the `homelab-k8s` Kubernetes
 runner; a passing GitHub workflow is not merge evidence. The GitHub Actions
 workflows described below are supplemental public checks and release automation.
-For the release procedure, see [Releasing](releasing.md).
+For gate semantics see [Gates](gates.md); for the release procedure, see
+[Releasing](releasing.md).
+
+| Source | Trigger | Required path |
+|---|---|---|
+| GitHub | pull request or push to `main` | offline test workflow |
+| GitHub | `v*` tag | release workflow |
+| GitLab | merge request or default branch | `merge` profile |
+| GitLab | schedule on the default branch | `merge`, `integration`, and `scheduled` profiles |
 
 ## Internal validation paths
 
