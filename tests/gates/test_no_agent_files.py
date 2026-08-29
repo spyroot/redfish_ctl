@@ -56,22 +56,24 @@ def test_flags_agent_only_directories():
     assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
 
 
-def test_allows_the_standards_required_go_no_go_inventory_file():
-    """The public go/no-go profile is the one tracked inventory exception."""
+def test_allows_the_standards_required_ci_inventory_files():
+    """The public go/no-go profile and smoke inventory are tracked exceptions."""
     assert not agent_name_guard.is_agent_file("inventory/ci/go-no-go.yaml")
+    assert not agent_name_guard.is_agent_file("inventory/ci/smoke-tests.yaml")
 
 
 def test_rejects_sibling_and_other_inventory_files():
-    """Only the exact go/no-go profile is allowed under the denied inventory prefix."""
+    """Only the exact public CI bindings are allowed under the denied inventory prefix."""
     assert agent_name_guard.is_agent_file("inventory/ci/extra.yaml")
     assert agent_name_guard.is_agent_file("inventory/go-no-go.yaml")
     assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
 
 
-def test_file_scan_keeps_only_the_allowed_inventory_file(monkeypatch):
-    """A tracked go/no-go profile is ignored while adjacent inventory files still fail."""
+def test_file_scan_keeps_only_the_allowed_inventory_files(monkeypatch):
+    """Tracked CI bindings are ignored while adjacent inventory files still fail."""
     stdout = "\n".join([
         "inventory/ci/go-no-go.yaml",
+        "inventory/ci/smoke-tests.yaml",
         "inventory/ci/extra.yaml",
         "redfish_ctl/redfish_manager.py",
     ])
