@@ -69,6 +69,38 @@ def _write_gitlab(tmp_path, body: str):
     (tmp_path / ".gitlab-ci.yml").write_text(textwrap.dedent(body))
 
 
+def _write_smoke_inventory(tmp_path, jobs: list[str]):
+    """Write a minimal valid smoke inventory for the requested GitLab jobs.
+
+    :param tmp_path: pytest temporary directory used as ``REPO_ROOT``.
+    :param jobs: exact job names to register.
+    """
+    records = "\n".join(textwrap.dedent(f"""
+        - job: {job}
+          class: wiring
+          command: ./scripts/check.sh --profile merge
+          requiredTools: [bash]
+          artifactUnderTest:
+            type: repository
+            digestSource: git-commit
+          mutation: none
+          timeoutSeconds: 600
+          evidencePath: reports/smoke/{job}.json
+          cleanupPolicy: reports-only
+          releaseBlocking: true
+    """).strip("\n") for job in jobs)
+    path = tmp_path / "inventory" / "ci" / "smoke-tests.yaml"
+    path.parent.mkdir(parents=True)
+    path.write_text(textwrap.dedent("""
+        apiVersion: homelab.embedings.ai/v1alpha1
+        kind: CiSmokeInventory
+        metadata:
+          name: test-smoke-inventory
+        spec:
+          smokeTests:
+    """) + textwrap.indent(records, "    ") + "\n")
+
+
 def test_detects_allow_failure(tmp_path, monkeypatch):
     """A GitLab job with allow_failure:true is a failure."""
     _write_gitlab(tmp_path, """
@@ -211,3 +243,45 @@ def test_detects_missing_diagnostic_job(tmp_path, monkeypatch):
     reg["diagnostic_jobs"] = ["focused-gate"]
     failures, _ = gate_meta._check_gitlab(reg)
     assert any("diagnostic GitLab job missing" in f for f in failures)
+
+
+def test_detects_missing_smoke_inventory(tmp_path, monkeypatch):
+    """A required smoke inventory missing from the exact tree fails closed."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures = gate_meta._check_smoke_inventory(_valid_registry())
+    assert any("inventory missing" in failure for failure in failures)
+
+
+def test_detects_smoke_inventory_closed_world_drift(tmp_path, monkeypatch):
+    """Missing, extra, and duplicate smoke records are rejected together."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+        ghost-job:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+    """)
+    _write_smoke_inventory(tmp_path, ["ghost-job", "ghost-job"])
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    failures = gate_meta._check_smoke_inventory(_valid_registry())
+    assert any("duplicate" in failure for failure in failures)
+    assert any("missing smoke" in failure for failure in failures)
+    assert any("non-required" in failure for failure in failures)
+
+
+def test_smoke_inventory_accepts_exact_required_job_set(tmp_path, monkeypatch):
+    """One valid record for each required job satisfies the closed-world check."""
+    _write_gitlab(tmp_path, """
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+    """)
+    _write_smoke_inventory(tmp_path, ["gate-merge"])
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    assert gate_meta._check_smoke_inventory(_valid_registry()) == []
