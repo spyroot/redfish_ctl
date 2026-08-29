@@ -698,7 +698,7 @@ def test_scrape_health_signals_contract():
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
@@ -986,7 +986,7 @@ def test_metric_definition_catalog_registers_emitted_metrics():
 def test_metric_catalog_yaml_matches_runtime_static_catalog():
     """Shared and Supermicro specs mirror their runtime definitions."""
     import yaml
-    spec_root = Path(__file__).parent.parent / "specs/telemetry"
+    spec_root = Path(__file__).parents[2] / "specs/telemetry"
     shared_spec = yaml.safe_load(
         (spec_root / "catalog.yaml").read_text(encoding="utf-8"))
     supermicro_spec = yaml.safe_load(
@@ -1724,7 +1724,7 @@ def test_expected_signals_contract():
     """
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     missing = []
@@ -1743,7 +1743,7 @@ def test_state_allowlists_match_contract_spec():
     """Code allowlists equal the spec allowlists (G0 documentation truth)."""
     import yaml
     spec = yaml.safe_load(
-        (Path(__file__).parent.parent
+        (Path(__file__).parents[2]
          / "specs/telemetry/supermicro/expected_signals.yaml")
         .read_text(encoding="utf-8"))
     allow = spec["allowlists"]
