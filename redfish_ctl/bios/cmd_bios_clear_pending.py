@@ -13,7 +13,7 @@ from typing import Optional
 from .. import ApiRequestType, CommandResult, IDracManager, Singleton
 from ..cmd_exceptions import FailedDiscoverAction
 from ..custom_argparser.customer_argdefault import BiosSubcommand
-from ..idrac_shared import RedfishApiRespond
+from ..redfish_api_common import RedfishApiRespond
 
 
 class BiosClearPending(IDracManager,
@@ -24,6 +24,10 @@ class BiosClearPending(IDracManager,
     This cmd action is used to clear all BIOS pending
     values currently staged on the Redfish endpoint.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Construct the clear-pending command, forwarding credentials to the base manager."""
+        super(BiosClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

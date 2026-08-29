@@ -11,7 +11,7 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from .report import capability_report
 
@@ -21,6 +21,10 @@ class CapabilityReport(IDracManager,
                        name="capability-report",
                        metaclass=Singleton):
     """Emit local vendor capability profiles as machine-readable data."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the capability-report command."""
+        super(CapabilityReport, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

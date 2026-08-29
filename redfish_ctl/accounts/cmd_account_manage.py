@@ -16,9 +16,8 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional, Tuple
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 # RoleId is the standard Redfish privilege model (present on Dell/HPE/Supermicro).
 DEFAULT_ROLE = "ReadOnly"
@@ -65,7 +64,7 @@ def _mask(payload: dict) -> dict:
     return {k: ("***" if k == "Password" else v) for k, v in payload.items()}
 
 
-class _AccountBase(IDracManager):
+class _AccountBase(RedfishManager):
     """Shared account resolution for the write commands."""
 
     def _resolve_account(self, username: Optional[str],
@@ -99,6 +98,10 @@ class AccountCreate(_AccountBase,
                     name='account-create',
                     metaclass=Singleton):
     """Create a new Redfish account (dry-run unless --confirm)."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the account-create command."""
+        super(AccountCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -147,6 +150,10 @@ class AccountUpdate(_AccountBase,
                     name='account-update',
                     metaclass=Singleton):
     """Update a Redfish account's password/role/enabled (dry-run unless --confirm)."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the account-update command."""
+        super(AccountUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -208,6 +215,10 @@ class AccountDelete(_AccountBase,
                     name='account-delete',
                     metaclass=Singleton):
     """Delete a Redfish account (refuses without --confirm; never self-deletes)."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the account-delete command."""
+        super(AccountDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

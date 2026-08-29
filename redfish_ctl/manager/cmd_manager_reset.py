@@ -10,18 +10,21 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ManagerReset(IDracManager,
+class ManagerReset(RedfishManager,
                    scm_type=ApiRequestType.ManagerReset,
                    name='manager_reset',
                    metaclass=Singleton):
     """Reset the manager command, targets the manager service,
     caller can save to a file or output to a file or pass downstream.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the manager-reboot command."""
+        super(ManagerReset, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -84,7 +87,7 @@ class ManagerReset(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        t = f"{self.idrac_members}/Actions/Manager.Reset"
+        t = f"{self.manager_uri}/Actions/Manager.Reset"
         if do_graceful:
             pd = {
                 "ResetType": "GracefulRestart"

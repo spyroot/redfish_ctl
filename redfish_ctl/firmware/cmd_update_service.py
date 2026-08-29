@@ -9,17 +9,20 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class UpdateServiceQuery(IDracManager,
+class UpdateServiceQuery(RedfishManager,
                          scm_type=ApiRequestType.UpdateServiceQuery,
                          name='update_service',
                          metaclass=Singleton):
     """Read the service, inventory links, push URIs, and action targets."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the update_service command."""
+        super(UpdateServiceQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

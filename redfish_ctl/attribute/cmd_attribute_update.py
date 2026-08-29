@@ -18,7 +18,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -30,6 +30,10 @@ class AttributesUpdate(
     """Attribute update command, fetch attribute data, caller can save to a file
     or output to a file or pass downstream.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the attr-update command."""
+        super(AttributesUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

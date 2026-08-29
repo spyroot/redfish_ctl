@@ -11,17 +11,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class TasksList(IDracManager,
+class TasksList(RedfishManager,
                 scm_type=ApiRequestType.TasksList,
                 name='chassis_service_query',
                 metaclass=Singleton):
     """A command query job_service_query.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the tasks command."""
+        super(TasksList, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

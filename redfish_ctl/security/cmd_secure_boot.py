@@ -19,19 +19,22 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 _SECURE_BOOT_RESET_ACTION = "#SecureBoot.ResetKeys"
 _SECURE_BOOT_DATABASE_RESET_ACTION = "#SecureBootDatabase.ResetKeys"
 
 
-class SecureBoot(IDracManager,
+class SecureBoot(RedfishManager,
                  scm_type=ApiRequestType.SecureBoot,
                  name='secure-boot',
                  metaclass=Singleton):
     """Read SecureBoot state and key databases for every system."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the secure-boot command."""
+        super(SecureBoot, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -139,11 +142,15 @@ class SecureBoot(IDracManager,
         return CommandResult(rows, None, None, None)
 
 
-class SecureBootResetKeys(IDracManager,
+class SecureBootResetKeys(RedfishManager,
                           scm_type=ApiRequestType.SecureBootResetKeys,
                           name="secure-boot-reset-keys",
                           metaclass=Singleton):
     """Preview or run guarded SecureBoot ResetKeys actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the secure-boot-reset-keys command."""
+        super(SecureBootResetKeys, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

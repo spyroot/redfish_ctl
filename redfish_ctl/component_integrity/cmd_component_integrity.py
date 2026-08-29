@@ -17,17 +17,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class QueryComponentIntegrity(IDracManager,
+class QueryComponentIntegrity(RedfishManager,
                               scm_type=ApiRequestType.ComponentIntegrity,
                               name='component-integrity',
                               metaclass=Singleton):
     """Read every ComponentIntegrity (SPDM/attestation) relationship."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the component-integrity command."""
+        super(QueryComponentIntegrity, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -75,6 +78,7 @@ class QueryComponentIntegrity(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Walk the ComponentIntegrity collection and summarize each leaf.
 
@@ -86,6 +90,8 @@ class QueryComponentIntegrity(IDracManager,
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded: issue an expanded ($expand) Redfish query.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: CommandResult whose data is a list of per-leaf integrity rows
             (empty when the host exposes no ComponentIntegrity collection).
         """
@@ -95,12 +101,16 @@ class QueryComponentIntegrity(IDracManager,
             coll = self.base_query(coll_uri, do_async=do_async,
                                    do_expanded=do_expanded).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return CommandResult(rows, None, None, None)
 
         for leaf_uri in self._members(coll):
             try:
                 ci = self.base_query(leaf_uri, do_async=do_async).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
             rows.append({
                 "Id": ci.get("Id") or leaf_uri.rsplit("/", 1)[-1],

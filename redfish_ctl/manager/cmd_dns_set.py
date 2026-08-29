@@ -10,9 +10,8 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 _MAX_DNS_SERVERS = 4
 
@@ -52,11 +51,15 @@ def _normalize_dns_servers(servers, clear: bool = False) -> list[str]:
     return normalized
 
 
-class DnsSet(IDracManager,
+class DnsSet(RedfishManager,
              scm_type=ApiRequestType.DnsSet,
              name='dns-set',
              metaclass=Singleton):
     """Set Manager EthernetInterface StaticNameServers after a dry-run preview."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dns-set command."""
+        super(DnsSet, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

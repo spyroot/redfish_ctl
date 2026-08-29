@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _DELL_JOB_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"
@@ -22,6 +22,10 @@ class DellJobQueueSetup(
     metaclass=Singleton,
 ):
     """Run DellJobService.SetupJobQueue behind the action safety gate."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-job-queue-setup command."""
+        super(DellJobQueueSetup, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

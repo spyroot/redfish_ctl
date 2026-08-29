@@ -15,7 +15,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _ACTION_TYPE = "#DelliDRACCardService.TestSEKMServerConnection"
@@ -32,6 +32,10 @@ class DellCardSekmTest(IDracManager,
                        name="dell-card-sekm-test",
                        metaclass=Singleton):
     """Discover and invoke the Dell SEKM server connectivity test."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-sekm-test command."""
+        super(DellCardSekmTest, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -15,7 +15,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -27,6 +27,10 @@ class UpdateStart(IDracManager,
                   name="update-start",
                   metaclass=Singleton):
     """Start UpdateService updates staged for OnStartUpdateRequest."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the update-start command."""
+        super(UpdateStart, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

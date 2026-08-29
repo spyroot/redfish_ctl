@@ -15,7 +15,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -34,6 +34,10 @@ class DellRaidSpareActions(IDracManager,
                            name="dell-raid-spare",
                            metaclass=Singleton):
     """Assign or unassign DellRaidService hot spare disks."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-spare command."""
+        super(DellRaidSpareActions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

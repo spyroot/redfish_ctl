@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -19,6 +19,10 @@ class BootOptionsQuery(IDracManager,
     """
     Command enable boot option
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-options command."""
+        super(BootOptionsQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

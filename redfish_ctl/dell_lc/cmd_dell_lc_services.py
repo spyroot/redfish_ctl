@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -22,6 +22,10 @@ class DellLcQuery(IDracManager,
                   metaclass=Singleton):
     """A command query Dell LC services.
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-svc command."""
+        super(DellLcQuery, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

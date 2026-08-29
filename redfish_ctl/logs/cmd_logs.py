@@ -16,17 +16,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class Logs(IDracManager,
+class Logs(RedfishManager,
           scm_type=ApiRequestType.Logs,
           name='logs',
           metaclass=Singleton):
     """Read log-service entries from every system and manager."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the logs command."""
+        super(Logs, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -14,7 +14,7 @@ from typing import Optional
 
 from ..cmd_utils import find_ids
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -24,6 +24,10 @@ class ConvertNoneRaid(IDracManager,
                       metaclass=Singleton):
     """Convert RAID physical disks to non-RAID via the Dell RAID service.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the convert_none_raid command."""
+        super(ConvertNoneRaid, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

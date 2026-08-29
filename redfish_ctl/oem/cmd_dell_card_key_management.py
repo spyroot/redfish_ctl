@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -84,6 +84,10 @@ class DellCardKeyManagement(IDracManager,
                             name="dell-card-key-management",
                             metaclass=Singleton):
     """Discover and invoke Dell card-service key-management actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-key-management command."""
+        super(DellCardKeyManagement, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

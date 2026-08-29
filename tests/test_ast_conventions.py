@@ -31,7 +31,7 @@ from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "redfish_ctl"
 
-RESPOND_MEMBERS = {"Success", "Ok", "AcceptedTaskGenerated", "Error"}
+RESPOND_MEMBERS = {"Success", "Ok", "Created", "AcceptedTaskGenerated", "Error"}
 MUTATING_HELPERS = {"base_post", "base_patch", "base_delete"}
 MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confirm"}
 
@@ -39,39 +39,39 @@ MUTATION_GUARD_ARGS = {"dry_run", "confirm", "confirm_irreversible", "acct_confi
 # New command code should expose one of MUTATION_GUARD_ARGS or route through
 # invoke_action instead of extending this list.
 LEGACY_UNGUARDED_MUTATION_CALLS = {
-    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:89 execute base_post",
-    "redfish_ctl/attribute/cmd_attribute_update.py:90 execute base_patch",
-    "redfish_ctl/bios/cmd_bios_clear_pending.py:77 execute base_post",
-    "redfish_ctl/bios/cmd_change_bios.py:365 execute base_patch",
-    "redfish_ctl/bios/cmd_change_boot_order.py:173 execute base_patch",
-    "redfish_ctl/boot_source/cmd_clear_pending.py:67 execute base_post",
-    "redfish_ctl/boot_source/cmd_enable.py:113 execute base_patch",
-    "redfish_ctl/boot_source/cmd_update.py:171 execute base_patch",
-    "redfish_ctl/chassis/cmd_chasis_reset.py:111 execute base_post",
-    "redfish_ctl/chassis/cmd_update_chassis.py:115 execute base_patch",
-    "redfish_ctl/dell_lc/cmd_dell_lc_api.py:53 execute base_post",
-    "redfish_ctl/dell_lc/cmd_dell_lc_rs.py:52 execute base_post",
-    "redfish_ctl/delloem/delloem_attach.py:86 execute base_post",
-    "redfish_ctl/delloem/delloem_attach_status.py:63 execute base_post",
-    "redfish_ctl/delloem/delloem_boot_netios.py:88 execute base_post",
-    "redfish_ctl/delloem/delloem_detach.py:52 execute base_post",
-    "redfish_ctl/delloem/delloem_disconnect.py:51 execute base_post",
-    "redfish_ctl/delloem/delloem_get_networkios.py:61 execute base_post",
-    "redfish_ctl/jobs/cmd_job_apply.py:150 execute base_post",
-    "redfish_ctl/jobs/cmd_job_del.py:61 execute base_delete",
-    "redfish_ctl/jobs/cmd_job_delete_all.py:69 execute base_post",
-    "redfish_ctl/manager/cmd_manager_reset.py:95 execute base_post",
-    "redfish_ctl/manager/cmd_manager_time.py:120 execute base_patch",
-    "redfish_ctl/storage/cmd_convert_none_raid.py:111 execute base_post",
-    "redfish_ctl/storage/cmd_convert_to_raid.py:113 execute base_post",
-    "redfish_ctl/system/cmd_system_config.py:115 execute base_post",
-    "redfish_ctl/system/cmd_system_import.py:148 execute base_post",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:242 execute base_post",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:256 execute base_patch",
-    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:263 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:95 execute base_post",
-    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:204 execute base_post",
-    "redfish_ctl/volumes/cmd_initilize.py:77 execute base_post",
+    "redfish_ctl/attribute/cmd_attribute_clear_pending.py:93 execute base_post",
+    "redfish_ctl/attribute/cmd_attribute_update.py:94 execute base_patch",
+    "redfish_ctl/bios/cmd_bios_clear_pending.py:81 execute base_post",
+    "redfish_ctl/bios/cmd_change_bios.py:374 execute base_patch",
+    "redfish_ctl/bios/cmd_change_boot_order.py:177 execute base_patch",
+    "redfish_ctl/boot_source/cmd_clear_pending.py:69 execute base_post",
+    "redfish_ctl/boot_source/cmd_enable.py:121 execute base_patch",
+    "redfish_ctl/boot_source/cmd_update.py:175 execute base_patch",
+    "redfish_ctl/chassis/cmd_chasis_reset.py:114 execute base_post",
+    "redfish_ctl/chassis/cmd_update_chassis.py:118 execute base_patch",
+    "redfish_ctl/dell_lc/cmd_dell_lc_api.py:57 execute base_post",
+    "redfish_ctl/dell_lc/cmd_dell_lc_rs.py:56 execute base_post",
+    "redfish_ctl/delloem/delloem_attach.py:90 execute base_post",
+    "redfish_ctl/delloem/delloem_attach_status.py:67 execute base_post",
+    "redfish_ctl/delloem/delloem_boot_netios.py:89 execute base_post",
+    "redfish_ctl/delloem/delloem_detach.py:56 execute base_post",
+    "redfish_ctl/delloem/delloem_disconnect.py:55 execute base_post",
+    "redfish_ctl/delloem/delloem_get_networkios.py:65 execute base_post",
+    "redfish_ctl/jobs/cmd_job_apply.py:154 execute base_post",
+    "redfish_ctl/jobs/cmd_job_del.py:65 execute base_delete",
+    "redfish_ctl/jobs/cmd_job_delete_all.py:70 execute base_post",
+    "redfish_ctl/manager/cmd_manager_reset.py:98 execute base_post",
+    "redfish_ctl/manager/cmd_manager_time.py:123 execute base_patch",
+    "redfish_ctl/storage/cmd_convert_none_raid.py:115 execute base_post",
+    "redfish_ctl/storage/cmd_convert_to_raid.py:117 execute base_post",
+    "redfish_ctl/system/cmd_system_config.py:119 execute base_post",
+    "redfish_ctl/system/cmd_system_import.py:152 execute base_post",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:247 execute base_post",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:261 execute base_patch",
+    "redfish_ctl/virtual_media/cmd_smc_virtual_media.py:268 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_eject.py:98 execute base_post",
+    "redfish_ctl/virtual_media/cmd_virtual_media_insert.py:207 execute base_post",
+    "redfish_ctl/volumes/cmd_initilize.py:80 execute base_post",
 }
 
 

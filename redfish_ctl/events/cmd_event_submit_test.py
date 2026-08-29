@@ -16,17 +16,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class EventSubmitTest(IDracManager,
+class EventSubmitTest(RedfishManager,
                       scm_type=ApiRequestType.EventSubmitTest,
                       name='event_submit_test',
                       metaclass=Singleton):
     """Submit a test event via EventService.SubmitTestEvent."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the event-submit-test command."""
+        super(EventSubmitTest, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

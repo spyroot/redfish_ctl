@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -33,6 +33,10 @@ class DellVFlashStateChange(IDracManager,
                             name="dell-vflash-state",
                             metaclass=Singleton):
     """Discover and change Dell vFlash state."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-vflash-state command."""
+        super(DellVFlashStateChange, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -10,17 +10,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
 class VolumeQuery(
-    IDracManager, scm_type=ApiRequestType.VolumeQuery,
+    RedfishManager, scm_type=ApiRequestType.VolumeQuery,
     name='vol_query',
     metaclass=Singleton):
     """A command query job_service_query.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the volume-get command."""
+        super(VolumeQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -54,7 +57,7 @@ class VolumeQuery(
         :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
-        target_api = f"{self.idrac_manage_servers}/Storage/{dev_id}/Volumes"
+        target_api = f"{self.managed_system_uri}/Storage/{dev_id}/Volumes"
         cmd_result = self.base_query(target_api,
                                      filename=filename,
                                      do_async=do_async,

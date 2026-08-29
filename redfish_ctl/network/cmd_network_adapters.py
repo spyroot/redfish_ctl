@@ -17,16 +17,19 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class NetworkAdapters(IDracManager,
+class NetworkAdapters(RedfishManager,
                       scm_type=ApiRequestType.NetworkAdapters,
                       name='network-adapters',
                       metaclass=Singleton):
     """Read every NetworkAdapter (NIC/DPU) across all chassis."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the network-adapters command."""
+        super(NetworkAdapters, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -74,6 +77,7 @@ class NetworkAdapters(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Walk every chassis NetworkAdapters collection and collect adapters.
 
@@ -85,6 +89,8 @@ class NetworkAdapters(IDracManager,
         :param verbose: accepted for CLI compatibility; not used by this command.
         :param do_async: note async will subscribe to an event loop.
         :param do_expanded: issue an expanded ($expand) query on the adapters collection.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: CommandResult holding a list of per-adapter rows.
         """
         rows = []
@@ -93,6 +99,8 @@ class NetworkAdapters(IDracManager,
             try:
                 cdata = self.base_query(chassis_uri, do_async=do_async).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
             link = cdata.get("NetworkAdapters")
             adapters_uri = link.get("@odata.id") if isinstance(link, dict) else None
@@ -102,11 +110,15 @@ class NetworkAdapters(IDracManager,
                 coll = self.base_query(adapters_uri, do_async=do_async,
                                        do_expanded=do_expanded).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
             for adapter_uri in self._members(coll):
                 try:
                     ad = self.base_query(adapter_uri, do_async=do_async).data or {}
                 except Exception:
+                    if preserve_errors:
+                        raise
                     continue
                 status = ad.get("Status") or {}
                 rows.append({

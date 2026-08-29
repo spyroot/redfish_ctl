@@ -12,7 +12,7 @@ from typing import Optional
 
 from ..cmd_exceptions import FailedDiscoverAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -26,6 +26,10 @@ class AttributeClearPending(
     This cmd action is used to clear all the pending
     values currently staged on the Redfish endpoint.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the attr-clear-pending command."""
+        super(AttributeClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -12,7 +12,7 @@ import pytest
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.component_integrity.cmd_spdm_measurements import SpdmMeasurements
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _BMC_RESOURCE = "/redfish/v1/ComponentIntegrity/HGX_ERoT_BMC_0"

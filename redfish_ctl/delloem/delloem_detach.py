@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -19,6 +19,10 @@ class DellOemDetach(
     metaclass=Singleton):
     """A command uses dell oem to attach ISO
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-detach command."""
+        super(DellOemDetach, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

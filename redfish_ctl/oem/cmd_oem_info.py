@@ -15,16 +15,19 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class OemInfo(IDracManager,
+class OemInfo(RedfishManager,
              scm_type=ApiRequestType.OemInfo,
              name='oem-info',
              metaclass=Singleton):
     """Inventory the vendor OEM extensions exposed on systems/managers/chassis."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-info command."""
+        super(OemInfo, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

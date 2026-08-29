@@ -77,12 +77,11 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class VirtualMediaInsert(IDracManager,
+class VirtualMediaInsert(RedfishManager,
                          scm_type=ApiRequestType.VirtualMediaInsert,
                          name='virtual_disk_insert',
                          metaclass=Singleton):
@@ -90,6 +89,10 @@ class VirtualMediaInsert(IDracManager,
     Virtual medial must be empty, otherwise command will throw exception.
     Called must first eject existing virtual media.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the insert_vm command."""
+        super(VirtualMediaInsert, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

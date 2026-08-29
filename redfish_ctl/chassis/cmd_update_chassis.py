@@ -17,18 +17,21 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, InvalidArgumentFormat
 from ..cmd_utils import from_json_spec
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ChassisUpdate(IDracManager,
+class ChassisUpdate(RedfishManager,
                     scm_type=ApiRequestType.ChassisUpdate,
                     name='update_chassis',
                     metaclass=Singleton):
     """
     This  action update chassis .
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the chassis-update command."""
+        super(ChassisUpdate, self).__init__(*args, **kwargs)
+
     @property
     def accepted(self):
         """Accepted; a Task has been generated.

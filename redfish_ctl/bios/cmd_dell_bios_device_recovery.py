@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _DEVICE_RECOVERY_ACTION = "#DellBIOSService.DeviceRecovery"
@@ -24,6 +24,10 @@ class DellBiosDeviceRecovery(IDracManager,
                              name="dell-bios-device-recovery",
                              metaclass=Singleton):
     """Preview or invoke DellBIOSService.DeviceRecovery."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-bios-device-recovery command."""
+        super(DellBiosDeviceRecovery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

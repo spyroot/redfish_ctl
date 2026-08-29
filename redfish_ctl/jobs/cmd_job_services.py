@@ -14,7 +14,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -24,6 +24,10 @@ class JobServices(IDracManager,
                   metaclass=Singleton):
     """A command query job_service_query.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the jobs-service command."""
+        super(JobServices, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

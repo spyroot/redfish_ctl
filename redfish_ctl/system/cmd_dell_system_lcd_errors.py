@@ -13,7 +13,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _SHOW_ERRORS_ON_LCD_ACTION = "#DellSystemManagementService.ShowErrorsOnLCD"
@@ -25,6 +25,10 @@ class DellSystemLcdErrors(IDracManager,
                           name="dell-system-lcd-errors",
                           metaclass=Singleton):
     """Preview or invoke DellSystemManagementService.ShowErrorsOnLCD."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-system-lcd-errors command."""
+        super(DellSystemLcdErrors, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

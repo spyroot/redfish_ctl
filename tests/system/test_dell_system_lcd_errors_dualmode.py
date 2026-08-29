@@ -9,7 +9,7 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_dell_system_lcd_errors import DellSystemLcdErrors
 
@@ -67,9 +67,9 @@ def _dell_system_lcd_manager(remove_action=False):
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-system-lcd",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-system-lcd",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )

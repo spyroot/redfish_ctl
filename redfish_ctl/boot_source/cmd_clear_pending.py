@@ -13,10 +13,8 @@ import argparse
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -28,6 +26,10 @@ class BootOptionsClearPending(IDracManager,
     This cmd action is used to clear all BIOS pending
     values currently staged on the Redfish endpoint.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-options-clear command."""
+        super(BootOptionsClearPending, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -76,5 +78,3 @@ class BootOptionsClearPending(IDracManager,
             cmd_result.data['task_id'] = task_id
 
         return cmd_result
-
-

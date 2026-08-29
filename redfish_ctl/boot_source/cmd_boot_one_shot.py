@@ -25,15 +25,14 @@ from ..cmd_exceptions import (
     UnexpectedResponse,
     UnsupportedAction,
 )
-from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     ApiRequestType,
     BootSourceOverrideMode,
     RedfishApiRespond,
     Singleton,
 )
 from ..redfish_exceptions import RedfishException
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 _BOOT_TARGET_ALIASES = {
     "Cd": ("Cd", "CD/DVD", "UsbCd", "UefiCd", "UefiUsbCd"),
@@ -55,13 +54,17 @@ _RESET_ERRORS = (
 )
 
 
-class BootOneShot(IDracManager,
+class BootOneShot(RedfishManager,
                   scm_type=ApiRequestType.BootOneShot,
                   name='boot_one_shot',
                   metaclass=Singleton):
     """
     Command enable boot option
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-one-shot command."""
+        super(BootOneShot, self).__init__(*args, **kwargs)
 
     @staticmethod
     def _resolve_boot_device(device: str, boot_devices: list[str]) -> str:
@@ -256,7 +259,7 @@ class BootOneShot(IDracManager,
             headers.update(self.json_content_type)
 
         system_result = self.base_query(
-            self.idrac_manage_servers,
+            self.managed_system_uri,
             data_type=data_type,
             do_async=do_async,
             verbose=verbose,
@@ -307,7 +310,7 @@ class BootOneShot(IDracManager,
             return CommandResult(
                 {
                     "dry_run": True,
-                    "target": self.idrac_manage_servers,
+                    "target": self.managed_system_uri,
                     "payload": payload,
                     "blocked": None if dry_run else "one-time boot requires confirm",
                 },
@@ -325,7 +328,7 @@ class BootOneShot(IDracManager,
                 )
             except _RESET_ERRORS as exc:
                 return CommandResult(
-                    {"target": self.idrac_manage_servers, "payload": payload},
+                    {"target": self.managed_system_uri, "payload": payload},
                     None,
                     None,
                     f"power-on pre-step failed: {exc}",
@@ -334,7 +337,7 @@ class BootOneShot(IDracManager,
                 return power_result
 
         cmd_result, api_resp = self.base_patch(
-            self.idrac_manage_servers, payload=payload,
+            self.managed_system_uri, payload=payload,
             do_async=do_async
         )
 

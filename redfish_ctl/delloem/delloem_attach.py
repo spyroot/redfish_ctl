@@ -17,7 +17,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -26,6 +26,10 @@ class DellOemAttach(IDracManager, scm_type=ApiRequestType.OemAttach,
                     metaclass=Singleton):
     """A command uses dell oem to attach ISO
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-attach command."""
+        super(DellOemAttach, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

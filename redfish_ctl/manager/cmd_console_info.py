@@ -15,16 +15,19 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ConsoleInfo(IDracManager,
+class ConsoleInfo(RedfishManager,
                   scm_type=ApiRequestType.ConsoleInfo,
                   name='console-info',
                   metaclass=Singleton):
     """Report serial / graphical / shell console access for every manager."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the console-info command."""
+        super(ConsoleInfo, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

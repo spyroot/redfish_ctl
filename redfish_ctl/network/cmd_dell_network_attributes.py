@@ -14,7 +14,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -23,6 +23,10 @@ class DellNetworkAttributes(IDracManager,
                             name="dell-network-attributes",
                             metaclass=Singleton):
     """Read or stage Dell NetworkDeviceFunction network attributes."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-network-attributes command."""
+        super(DellNetworkAttributes, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

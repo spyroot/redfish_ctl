@@ -8,16 +8,18 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from ..telemetry.exporter import (
+    _as_float,
+    _duration_seconds,
+)
+from ..telemetry.supermicro.super_microexporter import (
     GPU_COMPUTE_PROPERTIES,
     GPU_MEMORY_ECC_PROPERTIES,
     GPU_MEMORY_ROW_REMAP_PROPERTIES,
     GPU_THROTTLE_PROPERTIES,
-    _as_float,
-    _duration_seconds,
 )
 from .common import link, members, nvidia_oem, resource_id
 
@@ -27,6 +29,10 @@ class GpuMetrics(IDracManager,
                  name="gpu-metrics",
                  metaclass=Singleton):
     """Read per-GPU ProcessorMetrics, Sensor, and MemoryMetrics links."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the gpu-metrics command."""
+        super(GpuMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

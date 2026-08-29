@@ -27,7 +27,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 # Host serial-console BIOS attribute -> the value that ENABLES redirection.
@@ -43,6 +43,10 @@ class SerialConsoleConfig(IDracManager,
                           name='serial-console',
                           metaclass=Singleton):
     """Report or enable host BIOS serial redirection together with BMC SOL."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the serial-console command."""
+        super(SerialConsoleConfig, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

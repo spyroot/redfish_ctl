@@ -37,17 +37,18 @@ warn_redundant_casts = true
 check_untyped_defs = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "spec/redfish-http-semantics-bundle/tests"]
 # Collect only the test_*.py convention (skips stray *_test.py scratch files).
 python_files = ["test_*.py"]
 # Make the repo root importable so `import redfish_ctl` resolves to the source
 # tree regardless of how pytest is launched.
 pythonpath = ["."]
-# Tests that need a reachable iDRAC must be marked @pytest.mark.live; they are
-# skipped automatically by tests/conftest.py unless IDRAC_IP is set.
+# Tests that need a reachable Redfish BMC must be marked @pytest.mark.live; they
+# are skipped automatically by tests/conftest.py unless REDFISH_IP is set.
 markers = [
-    "live: integration test that requires a reachable iDRAC (set IDRAC_IP to run)",
+    "live: integration test that requires a reachable Redfish BMC (set REDFISH_IP to run)",
     "schema: validates fixtures against DMTF Redfish schemas (run tools/fetch_schemas.sh first)",
+    "dmtf_sim_live: integration test against the deployed DMTF sim; fails closed (raises, never skips) when REDFISH_IP/REDFISH_PORT are unset. Runs only in private CI with -m dmtf_sim_live; the offline suite excludes it with -m 'not dmtf_sim_live'.",
 ]
 filterwarnings = [
     "ignore:Unverified HTTPS request",

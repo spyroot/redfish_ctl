@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -57,6 +57,10 @@ class DellCardCsr(IDracManager,
                   name="dell-card-csr",
                   metaclass=Singleton):
     """Discover and generate Dell card-service CSRs."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-csr command."""
+        super(DellCardCsr, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

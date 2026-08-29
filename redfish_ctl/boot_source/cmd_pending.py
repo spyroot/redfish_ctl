@@ -11,10 +11,8 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..cmd_utils import save_if_needed, str2bool
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, ResetType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -25,6 +23,10 @@ class BootSourcePending(IDracManager,
                         metaclass=Singleton):
     """A command query dell OEM for boot source pending changes.
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-pending command."""
+        super(BootSourcePending, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

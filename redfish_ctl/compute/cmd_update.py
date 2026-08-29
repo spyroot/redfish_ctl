@@ -14,7 +14,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -25,6 +25,10 @@ class UpdateCompute(IDracManager,
     """
     Update compute system settings
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the compute-update command."""
+        super(UpdateCompute, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

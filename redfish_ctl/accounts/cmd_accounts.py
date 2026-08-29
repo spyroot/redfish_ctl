@@ -10,7 +10,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, REDFISH_JSON, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -21,6 +21,10 @@ class QueryAccounts(IDracManager,
                     metaclass=Singleton):
     """Query a Redfish endpoint resource by resource path.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the query_accounts command."""
+        super(QueryAccounts, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -9,7 +9,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -20,6 +20,10 @@ class Manager(IDracManager,
     """Manager view command, fetch the manager service,
     caller can save to a file or output to a file or pass downstream.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the manager command."""
+        super(Manager, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

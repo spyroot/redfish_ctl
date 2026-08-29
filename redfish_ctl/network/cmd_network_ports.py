@@ -16,16 +16,19 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class NetworkPorts(IDracManager,
+class NetworkPorts(RedfishManager,
                    scm_type=ApiRequestType.NetworkPorts,
                    name='network-ports',
                    metaclass=Singleton):
     """Read every NetworkAdapter Port's link state across all chassis."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the network-ports command."""
+        super(NetworkPorts, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

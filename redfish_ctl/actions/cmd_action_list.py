@@ -17,18 +17,21 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 from .action_policy import classify
 
 
-class ActionList(IDracManager,
+class ActionList(RedfishManager,
                  scm_type=ApiRequestType.ActionList,
                  name='action_list',
                  metaclass=Singleton):
     """Inventory every Redfish action target on the box and its risk level."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the actions command."""
+        super(ActionList, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

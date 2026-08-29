@@ -15,7 +15,7 @@ from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -25,6 +25,10 @@ class JobGet(IDracManager,
              metaclass=Singleton):
     """Command gets a job from iDRAC
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the job command."""
+        super(JobGet, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

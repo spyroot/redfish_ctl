@@ -12,9 +12,9 @@ import json
 from abc import abstractmethod
 from typing import Iterable, Optional
 
-from ..cmd_exceptions import InvalidArgument
+from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_exceptions import RedfishException
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
@@ -41,6 +41,10 @@ class DellRaidCheckValues(IDracManager,
                           name="dell-raid-check-values",
                           metaclass=Singleton):
     """Run DellRaidService.CheckVDValues as a read-only validation query."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-check-values command."""
+        super(DellRaidCheckValues, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -218,7 +222,7 @@ class DellRaidCheckValues(IDracManager,
         }
         try:
             api_resp = self.default_post_success(response, expected=200)
-        except RedfishException as exc:
+        except (RedfishException, ResourceNotFound) as exc:
             try:
                 data["response"] = response.json()
             except ValueError:
@@ -246,7 +250,7 @@ class DellRaidCheckValues(IDracManager,
 
         data["executed"] = True
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
-            data["task_id"] = self.job_id_from_header(response)
+            data["task_id"] = self.job_id_from_response(response)
         else:
             try:
                 data["response"] = response.json()

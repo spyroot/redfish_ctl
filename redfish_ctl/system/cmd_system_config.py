@@ -14,7 +14,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -25,6 +25,10 @@ class ExportSystemConfig(IDracManager,
     """
     Command exports system configuration..
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the system-export command."""
+        super(ExportSystemConfig, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -107,7 +111,7 @@ class ExportSystemConfig(IDracManager,
         if "Clone" in export_use or "Replace" in export_use:
             payload["ExportUse"] = export_use
 
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ExportSystemConfiguration"
 
         # json_pd = json.dumps(payload)

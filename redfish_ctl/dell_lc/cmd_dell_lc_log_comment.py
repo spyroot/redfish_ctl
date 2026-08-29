@@ -15,7 +15,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -31,6 +31,10 @@ class DellLcLogComment(IDracManager,
                        name="dell-lc-log-comment",
                        metaclass=Singleton):
     """Preview or insert a Dell Lifecycle Controller log comment."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-log-comment command."""
+        super(DellLcLogComment, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

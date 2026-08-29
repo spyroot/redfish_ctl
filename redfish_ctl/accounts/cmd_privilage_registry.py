@@ -10,7 +10,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -20,6 +20,9 @@ class QueryPrivilegeRegistry(IDracManager,
                              metaclass=Singleton):
     """Query a Redfish endpoint resource by resource path.
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the query_privilege_registry command."""
+        super(QueryPrivilegeRegistry, self).__init__(*args, **kwargs)
         # maps from cli choice to a key in respond
 
     @staticmethod

@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _CLEAR_PROVISIONING_ACTION = "#DellLCService.ClearProvisioningServer"
@@ -31,6 +31,10 @@ class DellLcClearProvisioningServer(
         name="dell-lc-clear-provisioning",
         metaclass=Singleton):
     """Discover and invoke DellLCService.ClearProvisioningServer."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-clear-provisioning command."""
+        super(DellLcClearProvisioningServer, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

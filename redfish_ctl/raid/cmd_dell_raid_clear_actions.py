@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -56,6 +56,10 @@ class DellRaidClearActions(
     metaclass=Singleton,
 ):
     """Preview or run DellRaidService clear actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-clear-actions command."""
+        super(DellRaidClearActions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

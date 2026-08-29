@@ -20,8 +20,8 @@ from redfish_ctl.redfish_manager import CommandResult
 def bios_cmd():
     """A BiosChangeSettings command instance (offline; no iDRAC contacted)."""
     return BiosChangeSettings(
-        idrac_ip="mock-idrac", idrac_username="root",
-        idrac_password="mock", insecure=True, is_debug=False,
+        host="mock-idrac", username="root",
+        password="mock", insecure=True, is_debug=False,
     )
 
 

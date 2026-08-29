@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..cmd_utils import find_ids
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -19,6 +19,10 @@ class DrivesQuery(IDracManager,
                   metaclass=Singleton):
     """Fetch storage drive information over the Redfish API.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the drives_query command."""
+        super(DrivesQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

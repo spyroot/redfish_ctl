@@ -4,21 +4,19 @@
     redfish_ctl subscription-delete --subscription <id-or-uri> --confirm
 """
 
-import asyncio
 import inspect
 import json
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     REDFISH_API,
     ApiRequestType,
     HTTPMethod,
     RedfishApiRespond,
     Singleton,
 )
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
 def _as_list(values) -> list[str]:
@@ -39,7 +37,7 @@ def _as_list(values) -> list[str]:
     return normalized
 
 
-class _SubscriptionBase(IDracManager):
+class _SubscriptionBase(RedfishManager):
     """Shared EventService subscription helpers."""
 
     @staticmethod
@@ -139,11 +137,15 @@ class _SubscriptionBase(IDracManager):
         :param expected_status: the status a success is expected to return.
         :return: Success on the expected status, Ok on any other 2xx, else Error.
         """
-        mapped_status = self._http_code_mapping.get(response.status_code)
         if response.status_code == expected_status:
-            return mapped_status or RedfishApiRespond.Success
+            return {
+                200: RedfishApiRespond.Ok,
+                201: RedfishApiRespond.Created,
+                202: RedfishApiRespond.AcceptedTaskGenerated,
+                204: RedfishApiRespond.Success,
+            }.get(response.status_code, RedfishApiRespond.Success)
         if 200 <= response.status_code < 300:
-            return mapped_status or RedfishApiRespond.Ok
+            return RedfishApiRespond.Ok
         return RedfishApiRespond.Error
 
     def _error_text(self, response):
@@ -269,6 +271,10 @@ class SubscriptionCreate(_SubscriptionBase,
                          name='subscription-create',
                          metaclass=Singleton):
     """Create an EventDestination subscription after dry-run preview."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the subscription-create command."""
+        super(SubscriptionCreate, self).__init__(*args, **kwargs)
 
     @staticmethod
     def register_subcommand(cls):
@@ -412,6 +418,10 @@ class SubscriptionDelete(_SubscriptionBase,
                          name='subscription-delete',
                          metaclass=Singleton):
     """Delete an EventDestination subscription after dry-run preview."""
+
+    def __init__(self, *args, **kwargs):
+        """Construct the subscription-delete command (delegates to the base)."""
+        super(SubscriptionDelete, self).__init__(*args, **kwargs)
 
     @staticmethod
     def register_subcommand(cls):

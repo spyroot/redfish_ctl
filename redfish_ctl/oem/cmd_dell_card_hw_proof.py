@@ -16,7 +16,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -33,6 +33,10 @@ class DellCardHwProof(IDracManager,
                       name="dell-card-hw-proof",
                       metaclass=Singleton):
     """Discover and invoke Dell hardware proof-of-possession verification."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-hw-proof command."""
+        super(DellCardHwProof, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

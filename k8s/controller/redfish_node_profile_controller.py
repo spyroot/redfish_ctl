@@ -16,8 +16,8 @@ try:  # pragma: no cover - exercised only in a deployed controller image.
 except ImportError:  # pragma: no cover - unit tests call the handler directly.
     kopf = None
 
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.kube_client import get_core_v1_api
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.telemetry import tracing
 
 REDFISH_GROUP = "redfish.ctl.dev"
@@ -321,6 +321,12 @@ def build_status(
                 applied_reason,
                 changed_at=observed_at,
             ),
+            _condition(
+                "Ready",
+                True,
+                "ReconciliationSucceeded",
+                changed_at=observed_at,
+            ),
         ],
         "lastReconciled": _rfc3339(observed_at),
     }
@@ -356,7 +362,14 @@ def build_error_status(
                 "BackendUnavailable",
                 message=message,
                 changed_at=observed_at,
-            )
+            ),
+            _condition(
+                "Ready",
+                False,
+                "BackendUnavailable",
+                message=message,
+                changed_at=observed_at,
+            ),
         ],
         "lastReconciled": _rfc3339(observed_at),
     }
@@ -413,10 +426,10 @@ def _make_manager(
     """
     address, port, is_http = _manager_address(endpoint)
     return manager_factory(
-        idrac_ip=address,
-        idrac_username=credentials.get("username", DEFAULT_USERNAME),
-        idrac_password=credentials.get("password", ""),
-        idrac_port=port,
+        host=address,
+        username=credentials.get("username", DEFAULT_USERNAME),
+        password=credentials.get("password", ""),
+        port=port,
         insecure=bool(endpoint.get("insecure", True)),
         is_http=is_http,
         is_debug=False,
@@ -441,7 +454,7 @@ def reconcile_profile(
     *,
     credentials: Mapping[str, str] | None = None,
     current_status: Mapping[str, Any] | None = None,
-    manager_factory: ManagerFactory = IDracManager,
+    manager_factory: ManagerFactory = RedfishManager,
     reconcile_func: ReconcileFunc | None = None,
     reconciled_at: datetime | None = None,
 ) -> dict[str, Any]:

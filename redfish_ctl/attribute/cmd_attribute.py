@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cmd_utils import find_ids, save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -30,6 +30,10 @@ class AttributesQuery(
     """Attribute query command, fetch attribute data, caller can save to a file
     or output to a file or pass downstream.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the attr command."""
+        super(AttributesQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -106,7 +110,7 @@ class AttributesQuery(
         if do_deep:
             extra_data = [
                 self.api_get_call(
-                    f"{self._default_method}{self.idrac_ip}{a}", headers).json()
+                    f"{self._default_method}{self.redfish_ip}{a}", headers).json()
                 for a in extra_actions
             ]
 

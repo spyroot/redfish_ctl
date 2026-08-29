@@ -26,12 +26,11 @@ import argparse
 from abc import abstractmethod
 from typing import List, Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class MountCdrom(IDracManager,
+class MountCdrom(RedfishManager,
                  scm_type=ApiRequestType.VirtualMediaInsert,
                  name='mount_cdrom',
                  metaclass=Singleton):
@@ -44,6 +43,10 @@ class MountCdrom(IDracManager,
     CD-capable device, media already inserted) is returned as
     ``CommandResult.error``; it is never raised.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the ``mount_cdrom`` command."""
+        super(MountCdrom, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

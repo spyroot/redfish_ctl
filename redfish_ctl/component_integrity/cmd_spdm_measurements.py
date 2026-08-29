@@ -15,19 +15,22 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _SPDM_ACTION = "#ComponentIntegrity.SPDMGetSignedMeasurements"
 
 
-class SpdmMeasurements(IDracManager,
+class SpdmMeasurements(RedfishManager,
                        scm_type=ApiRequestType.SpdmMeasurements,
                        name="spdm-measurements",
                        metaclass=Singleton):
     """Fetch signed measurements from SPDM ComponentIntegrity resources."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the spdm-measurements command."""
+        super(SpdmMeasurements, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

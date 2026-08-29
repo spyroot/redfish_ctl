@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _SECURE_ERASE_ACTION = "#Drive.SecureErase"
@@ -31,6 +31,10 @@ class DriveSecureErase(
     metaclass=Singleton,
 ):
     """Preview or run a guarded Redfish Drive.SecureErase action."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the drive-secure-erase command."""
+        super(DriveSecureErase, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

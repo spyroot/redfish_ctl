@@ -11,7 +11,7 @@ from typing import Iterable, Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _CHECK_CONSISTENCY_ACTION = "#Volume.CheckConsistency"
@@ -202,6 +202,10 @@ class VolumeCreate(
 ):
     """Create a Redfish Volume through a Storage resource's Volumes collection."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the volume-create command."""
+        super(VolumeCreate, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
@@ -301,6 +305,10 @@ class VolumeDelete(
 ):
     """Delete a Redfish Volume member after explicit confirmation."""
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the volume-delete command."""
+        super(VolumeDelete, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
@@ -393,6 +401,10 @@ class VolumeCheckConsistency(
     metaclass=Singleton,
 ):
     """Run a guarded Redfish Volume.CheckConsistency action."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the volume-check-consistency command."""
+        super(VolumeCheckConsistency, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

@@ -17,9 +17,8 @@ from typing import Optional
 
 import requests
 
-from .idrac_manager import IDracManager
-from .idrac_shared import ApiRequestType, Singleton
-from .redfish_manager import CommandResult
+from .redfish_api_common import ApiRequestType, Singleton
+from .redfish_manager import CommandResult, RedfishManager
 
 
 def probe_reachable(url: str, auth, verify: bool, timeout: float) -> bool:
@@ -133,11 +132,15 @@ def wait_reachable(url: str, auth, verify: bool,
     return out
 
 
-class WaitReady(IDracManager,
+class WaitReady(RedfishManager,
                 scm_type=ApiRequestType.WaitReady,
                 name='wait',
                 metaclass=Singleton):
     """Poll the Redfish ServiceRoot until the BMC is reachable (bounded by a timeout)."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the wait command."""
+        super(WaitReady, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

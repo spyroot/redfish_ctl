@@ -11,17 +11,17 @@ read from an environment variable or file and masked in returned previews.
 
 Author Mus spyroot@gmail.com
 """
-import os
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..config import named_env
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
+from ..supermico_manager import SupermicroManager
 
 
 @dataclass(frozen=True)
@@ -56,11 +56,15 @@ _ACTION_SPECS = {
 }
 
 
-class NvidiaDebugToken(IDracManager,
+class NvidiaDebugToken(SupermicroManager,
                        scm_type=ApiRequestType.NvidiaDebugToken,
                        name="nvidia-debug-token",
                        metaclass=Singleton):
     """Discover and invoke NVIDIA debug-token Redfish actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the nvidia-debug-token command."""
+        super(NvidiaDebugToken, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -310,9 +314,10 @@ class NvidiaDebugToken(IDracManager,
             env_name = token_env.strip()
             if not env_name:
                 raise InvalidArgument("token environment variable name cannot be empty")
-            if env_name not in os.environ:
+            v = named_env(env_name)
+            if v is None:
                 raise InvalidArgument(f"token environment variable '{env_name}' is not set")
-            return os.environ[env_name]
+            return v
         if token_file is not None:
             path = Path(token_file).expanduser()
             try:

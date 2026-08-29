@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..actions.action_policy import classify
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -34,6 +34,10 @@ class DellPersistentInitializeMedia(
     metaclass=Singleton,
 ):
     """Discover and invoke DellPersistentStorageService.InitializeMedia."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-persistent-initialize-media command."""
+        super(DellPersistentInitializeMedia, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

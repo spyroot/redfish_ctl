@@ -14,7 +14,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -24,6 +24,10 @@ class QueryCompute(IDracManager,
                    metaclass=Singleton):
     """Query compute
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the compute-query command."""
+        super(QueryCompute, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):

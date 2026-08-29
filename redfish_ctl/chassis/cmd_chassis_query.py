@@ -10,18 +10,24 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument, UnsupportedAction
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, REDFISH_JSON, ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import (
+    REDFISH_API,
+    ApiRequestType,
+    Singleton,
+)
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ChassisQuery(IDracManager,
+class ChassisQuery(RedfishManager,
                    scm_type=ApiRequestType.ChassisQuery,
                    name='chassis_service_query',
                    metaclass=Singleton):
     """A command query chassis.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the chassis command."""
+        super(ChassisQuery, self).__init__(*args, **kwargs)
 
     @property
     def help(self):

@@ -15,19 +15,22 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _COLLECT_DIAG_ACTION = "#LogService.CollectDiagnosticData"
 
 
-class LogCollectDiagnosticData(IDracManager,
+class LogCollectDiagnosticData(RedfishManager,
                                scm_type=ApiRequestType.LogCollectDiagnosticData,
                                name="log-collect-diag",
                                metaclass=Singleton):
     """Collect diagnostic data from a discovered LogService."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the log-collect-diag command."""
+        super(LogCollectDiagnosticData, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

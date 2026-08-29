@@ -384,7 +384,7 @@ def test_metric_definitions_command_reads_the_dmtf_mockup(profile: Path) -> None
     row's metric count matching the on-disk ``MetricProperties``.
     """
     from redfish_ctl.idrac_manager import IDracManager
-    from redfish_ctl.idrac_shared import ApiRequestType
+    from redfish_ctl.redfish_api_common import ApiRequestType
 
     module = _load_server_module()
     tree = profile / "TelemetryService" / "MetricReportDefinitions"
@@ -409,7 +409,7 @@ def test_metric_definitions_command_reads_the_dmtf_mockup(profile: Path) -> None
             is_http=True,
         )
         result = manager.sync_invoke(
-            ApiRequestType.MetricReportDefinitions, "metric-definitions"
+            ApiRequestType.SupermicroMetricReportDefinitions, "metric-definitions"
         )
 
     rows = {row["Definition"]: row for row in result.data}

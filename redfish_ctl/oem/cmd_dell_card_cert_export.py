@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -63,6 +63,10 @@ class DellCardCertExport(IDracManager,
                          name="dell-card-cert-export",
                          metaclass=Singleton):
     """Discover and query Dell iDRAC card certificate export actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-card-cert-export command."""
+        super(DellCardCertExport, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

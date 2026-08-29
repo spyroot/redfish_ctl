@@ -18,9 +18,8 @@ import datetime
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
 def build_time_payload(set_now: bool,
@@ -47,11 +46,15 @@ def build_time_payload(set_now: bool,
     return payload
 
 
-class ManagerTime(IDracManager,
+class ManagerTime(RedfishManager,
                   scm_type=ApiRequestType.ManagerTime,
                   name='manager-time',
                   metaclass=Singleton):
     """Read or set each Manager's Redfish DateTime clock."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the manager-time command."""
+        super(ManagerTime, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

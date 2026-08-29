@@ -9,7 +9,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -19,6 +19,10 @@ class GetRemoteServicesAPIStatus(IDracManager,
                                  metaclass=Singleton):
     """iDRACs fetch Dell LC status
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the service-api-status command."""
+        super(GetRemoteServicesAPIStatus, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

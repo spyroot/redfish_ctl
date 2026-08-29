@@ -8,7 +8,7 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.raid.cmd_dell_raid_check_values import DellRaidCheckValues
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -67,9 +67,9 @@ def dell_raid_manager_factory():
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-raid",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-raid",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )
@@ -181,12 +181,18 @@ def test_dell_raid_check_values_posts_read_only_action_by_default(
     }
 
 
+@pytest.mark.parametrize(
+    "post_status",
+    [400, 405],
+    ids=["raised-error", "returned-error"],
+)
 def test_dell_raid_check_values_non_2xx_is_not_reported_as_executed(
     dell_raid_manager_factory,
+    post_status,
 ):
-    """A rejected validation POST fails closed instead of reporting execution."""
+    """Raised and returned POST failures cannot report successful execution."""
     manager, requests = dell_raid_manager_factory(
-        post_status=405,
+        post_status=post_status,
         post_body={
             "error": {
                 "code": "Base.1.12.ActionNotSupported",

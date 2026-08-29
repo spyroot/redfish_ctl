@@ -18,17 +18,20 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from .net_scan import scan_segment
 
 
-class BmcScan(IDracManager,
+class BmcScan(RedfishManager,
              scm_type=ApiRequestType.BmcScan,
              name='bmc-scan',
              metaclass=Singleton):
     """Scan a CIDR for hosts exposing a Redfish ServiceRoot."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the bmc-scan command."""
+        super(BmcScan, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

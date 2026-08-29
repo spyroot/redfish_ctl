@@ -1,8 +1,8 @@
 """Preview or fire HPE iLO diagnostic/test Redfish actions.
 
-    redfish_ctl hpe-test-actions
-    redfish_ctl hpe-test-actions --action snmp-alert
-    redfish_ctl hpe-test-actions --action syslog-alert --confirm
+    redfish_ctl --vendor hp hpe-test-actions
+    redfish_ctl --vendor hp hpe-test-actions --action snmp-alert
+    redfish_ctl --vendor hp hpe-test-actions --action syslog-alert --confirm
 
 The command discovers HPE OEM test-action targets from the live Redfish tree and
 dry-runs by default, because these actions can send test SNMP, mail, syslog, or
@@ -15,8 +15,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..ilo_manager import IloManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -71,11 +71,15 @@ _ACTION_SPECS = {
 }
 
 
-class HpeTestActions(IDracManager,
+class HpeTestActions(IloManager,
                      scm_type=ApiRequestType.HpeTestActions,
                      name="hpe-test-actions",
                      metaclass=Singleton):
     """Discover and invoke HPE iLO diagnostic/test actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the hpe-test-actions command."""
+        super(HpeTestActions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

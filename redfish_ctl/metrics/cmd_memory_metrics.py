@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 from .common import link, members, nvidia_oem, resource_id
@@ -19,6 +19,10 @@ class MemoryMetrics(IDracManager,
                     name="memory-metrics",
                     metaclass=Singleton):
     """Read Memory Metrics linked from Memory and Processor MemorySummary."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the memory-metrics command."""
+        super(MemoryMetrics, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

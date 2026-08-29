@@ -10,7 +10,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 

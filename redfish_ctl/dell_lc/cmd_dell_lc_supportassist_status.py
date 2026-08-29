@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -53,6 +53,10 @@ class DellLcSupportAssistStatus(
     metaclass=Singleton,
 ):
     """Discover and invoke Dell LC SupportAssist status actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-supportassist-status command."""
+        super(DellLcSupportAssistStatus, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -240,5 +244,4 @@ class DellLcSupportAssistStatus(
             full_action_type=spec.full_type,
             do_async=do_async,
             dry_run=bool(dry_run),
-            confirm=True,
         )

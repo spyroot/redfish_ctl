@@ -15,7 +15,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _SERVICE_NAME = "DellLCService"
@@ -40,6 +40,10 @@ class DellLcSupportAssistSchedule(
         name="dell-lc-supportassist-schedule",
         metaclass=Singleton):
     """Discover and invoke DellLCService SupportAssist schedule actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-lc-supportassist-schedule command."""
+        super(DellLcSupportAssistSchedule, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

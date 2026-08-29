@@ -11,7 +11,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishJson
 
@@ -23,6 +23,10 @@ class ChangeBootOrder(
     metaclass=Singleton):
     """Command change boot order.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Construct the change-boot-order command, forwarding credentials to the base manager."""
+        super(ChangeBootOrder, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

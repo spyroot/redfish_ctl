@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -53,6 +53,10 @@ class DellRaidConfigActions(IDracManager,
                             name="dell-raid-config-actions",
                             metaclass=Singleton):
     """Preview or run selected DellRaidService configuration actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-config-actions command."""
+        super(DellRaidConfigActions, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

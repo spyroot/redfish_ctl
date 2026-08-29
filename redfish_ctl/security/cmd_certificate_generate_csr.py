@@ -15,19 +15,22 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _GENERATE_CSR_ACTION = "#CertificateService.GenerateCSR"
 
 
-class CertificateGenerateCSR(IDracManager,
+class CertificateGenerateCSR(RedfishManager,
                              scm_type=ApiRequestType.CertificateGenerateCSR,
                              name="cert_gen_csr",
                              metaclass=Singleton):
     """Generate a CSR through the Redfish CertificateService."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the cert-gen-csr command."""
+        super(CertificateGenerateCSR, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

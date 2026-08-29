@@ -15,16 +15,19 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class EthernetInterfaces(IDracManager,
+class EthernetInterfaces(RedfishManager,
                          scm_type=ApiRequestType.EthernetInterfaces,
                          name='ethernet-interfaces',
                          metaclass=Singleton):
     """Read EthernetInterface config from every system and manager."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the ethernet-interfaces command."""
+        super(EthernetInterfaces, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

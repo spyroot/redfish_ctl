@@ -53,19 +53,20 @@ target.
 | `example_custom_profile.sh` | CPU/platform | Write | Build a custom BIOS spec, preview it, and apply it. |
 | `example_dell_network_cif_ios.sh` | Dell/iDRAC | Write | Boot a Dell host from a CIFS-backed network ISO. |
 | `example_dell_system_profile.sh` | Dell/iDRAC, CPU/platform | Write | Apply a Dell `SysProfile` or newer `WorkloadProfile`. |
-| `example_discover_host.sh` | generic/vendor-neutral | Read | Run inventory and discovery reads on an unknown host. |
+| `example_discover_host.sh` | generic discovery + Dell/iDRAC reads | Read | Discover an unknown host, then run Dell inventory reads. |
 | `example_enable_secure_boot.sh` | generic/vendor-neutral, CPU/platform | Write | Stage Secure Boot and verify databases. |
 | `example_export_import.sh` | Dell/iDRAC | Write | Export system config, import an edited config, and verify a BIOS field. |
 | `example_fast_boot.sh` | CPU/platform | Write | Enable faster boot-related BIOS settings where supported. |
-| `example_inventory_walk.sh` | generic/vendor-neutral | Read | Read system, chassis, PCI, storage, drives, and boot state. |
+| `example_inventory_walk.sh` | Dell/iDRAC | Read | Read system, chassis, PCI, storage, drives, and boot state. |
 | `example_jobs.sh` | Dell/iDRAC | Write | Read jobs, watch one job, then delete one approved job. |
 | `example_low_latency_profile.sh` | CPU/platform | Write | Apply the low-latency BIOS profile from `specs/realtime.opt.spec.json`. |
 | `example_manager_time.sh` | generic/vendor-neutral | Write | Read or set the BMC manager clock before trusting log timestamps. |
 | `example_provision_boot_iso.sh` | generic/vendor-neutral | Write | Mount an installer ISO and boot from it once. |
-| `example_sensors_read.sh` | generic/vendor-neutral | Read | Read and filter temperatures, fans, power supplies, and voltages. |
+| `example_sensors_read.sh` | shared sensors + Dell/iDRAC reads | Read | Read sensors, then confirm the Dell chassis and system. |
 | `example_supermicro_provision_from_iso.sh` | Supermicro/GB300 | Write | Mount Supermicro virtual media and boot once. |
 | `example_wait.sh` | generic/vendor-neutral | Read | Wait for Redfish service recovery after an approved BMC restart. |
 | `hpe_ilo_canary.sh` | HPE iLO | Guarded | Run read-only commands and a dry-run reset against the iLO emulator. |
 
-For BIOS profile flow, see [BIOS profiles](../docs/bios-profiles.md). For every command name, see
-[Command reference](../docs/commands.md). JSON specs are indexed in [Specs](../specs/README.md).
+For BIOS profile flow, see [BIOS profiles](../docs/external/bios-profiles.md). For every command name,
+see [Command reference](../docs/external/commands.md). JSON specs are indexed in
+[Specs](../specs/README.md).

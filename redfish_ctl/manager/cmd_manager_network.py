@@ -5,16 +5,19 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class ManagerNetworkProtocol(IDracManager,
+class ManagerNetworkProtocol(RedfishManager,
                              scm_type=ApiRequestType.ManagerNetworkProtocol,
                              name='manager-network',
                              metaclass=Singleton):
     """Read BMC network protocol enablement and NTP settings."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the manager-network command."""
+        super(ManagerNetworkProtocol, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

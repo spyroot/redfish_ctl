@@ -7,7 +7,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -17,6 +17,10 @@ class GetNetworkIsoAttachStatus(IDracManager,
                                 metaclass=Singleton):
     """A command query job_service_query.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-net-ios-status command."""
+        super(GetNetworkIsoAttachStatus, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

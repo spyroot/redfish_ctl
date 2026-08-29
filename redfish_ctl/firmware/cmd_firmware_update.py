@@ -20,18 +20,21 @@ from typing import Optional
 
 import requests
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 from ..telemetry import tracing
 
 
-class FirmwareUpdate(IDracManager,
+class FirmwareUpdate(RedfishManager,
                      scm_type=ApiRequestType.FirmwareUpdate,
                      name='firmware-update',
                      metaclass=Singleton):
     """Flash firmware via a discovered UpdateService update endpoint."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the firmware-update command."""
+        super(FirmwareUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -241,7 +244,7 @@ class FirmwareUpdate(IDracManager,
             return CommandResult(data, None, None, exc)
 
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
-            data["task_id"] = self.job_id_from_header(response)
+            data["task_id"] = self.task_id_from_header(response)
         else:
             data.update(self.api_success_msg(api_resp))
         data["executed"] = True

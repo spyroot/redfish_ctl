@@ -5,16 +5,19 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class EventServiceQuery(IDracManager,
+class EventServiceQuery(RedfishManager,
                         scm_type=ApiRequestType.EventServiceQuery,
                         name='event-service',
                         metaclass=Singleton):
     """Read Redfish EventService, SSE, and subscription metadata."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the event-service command."""
+        super(EventServiceQuery, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

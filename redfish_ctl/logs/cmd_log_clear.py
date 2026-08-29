@@ -17,19 +17,22 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _CLEAR_LOG_ACTION = "#LogService.ClearLog"
 
 
-class LogClear(IDracManager,
+class LogClear(RedfishManager,
                scm_type=ApiRequestType.LogClear,
                name="log-clear",
                metaclass=Singleton):
     """Clear a discovered LogService via LogService.ClearLog."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the log-clear command."""
+        super(LogClear, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

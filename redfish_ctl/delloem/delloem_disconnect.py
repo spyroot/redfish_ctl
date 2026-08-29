@@ -10,7 +10,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -20,6 +20,10 @@ class DellOemDisconnect(IDracManager,
                         metaclass=Singleton):
     """A command uses dell oem to disconnect ISO
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the oem-disconnect command."""
+        super(DellOemDisconnect, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

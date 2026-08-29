@@ -26,19 +26,22 @@ from typing import Optional
 
 from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishJson
 
 
-class VirtualMediaGet(IDracManager,
+class VirtualMediaGet(RedfishManager,
                       scm_type=ApiRequestType.VirtualMediaGet,
                       name='virtual_disk_query',
                       metaclass=Singleton):
     """Virtual media query command, fetch virtual media, caller can save
     result to a file or output stdout or pass downstream to jq etc. tools.
     """
+    def __init__(self, *args, **kwargs):
+        """Initialize the get_vm command."""
+        super(VirtualMediaGet, self).__init__(*args, **kwargs)
+
     @staticmethod
     @abstractmethod
     def register_subcommand(cls):
@@ -93,7 +96,7 @@ class VirtualMediaGet(IDracManager,
         except ResourceNotFound as exc:
             status = str(exc)
             return CommandResult({"Status": status}, None, None, status)
-        r = f"{self._default_method}{self.idrac_ip}{vm_uri}?$expand=*($levels=1)"
+        r = f"{self._default_method}{self.redfish_ip}{vm_uri}?$expand=*($levels=1)"
 
         response = self.api_get_call(r, headers)
         if response.status_code == 501:

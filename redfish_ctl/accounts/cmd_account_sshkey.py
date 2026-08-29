@@ -24,7 +24,8 @@ import os
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_shared import ApiRequestType, Singleton
+from ..ilo_manager import IloManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from .cmd_account_manage import _AccountBase
 
@@ -54,11 +55,15 @@ def validate_ssh_key(key: str) -> Optional[str]:
     return None
 
 
-class AccountImportSSHKey(_AccountBase,
+class AccountImportSSHKey(IloManager, _AccountBase,
                          scm_type=ApiRequestType.AccountImportSSHKey,
                          name='account-import-sshkey',
                          metaclass=Singleton):
     """PATCH an account's Oem.Hpe.SSHKeys to authorize (or clear) an SSH key."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the account-import-sshkey command."""
+        super(AccountImportSSHKey, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

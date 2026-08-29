@@ -15,7 +15,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidJsonSpec
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -25,6 +25,10 @@ class BootSourceUpdate(IDracManager,
                        metaclass=Singleton):
     """A command query dell OEM for boot source pending changes.
     """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the boot-source-update command."""
+        super(BootSourceUpdate, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod

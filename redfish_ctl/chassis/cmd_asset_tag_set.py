@@ -7,9 +7,8 @@ import argparse
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _COLLECTIONS = {
@@ -31,11 +30,15 @@ def _target_id_arg(value: str) -> str:
     return target_id
 
 
-class AssetTagSet(IDracManager,
+class AssetTagSet(RedfishManager,
                   scm_type=ApiRequestType.AssetTagSet,
                   name="asset-tag-set",
                   metaclass=Singleton):
     """Read or set AssetTag on a chassis or system resource."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the asset-tag-set command."""
+        super(AssetTagSet, self).__init__(*args, **kwargs)
 
     @staticmethod
     def register_subcommand(cls):

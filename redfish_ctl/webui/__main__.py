@@ -1,8 +1,8 @@
 """Run the redfish_ctl web explorer:  python -m redfish_ctl.webui
 
-Reads the target BMC from REDFISH_IP/REDFISH_USERNAME/REDFISH_PASSWORD (falling
-back to IDRAC_*), the same environment the CLI uses. Every command selected in the
-UI is invoked through the tool's own registry — no scripts, no ad-hoc HTTP.
+Reads the target BMC from REDFISH_IP/REDFISH_USERNAME/REDFISH_PASSWORD, the
+same canonical environment the CLI uses. Every command selected in the UI is
+invoked through the tool's own registry — no scripts, no ad-hoc HTTP.
 """
 
 from __future__ import annotations

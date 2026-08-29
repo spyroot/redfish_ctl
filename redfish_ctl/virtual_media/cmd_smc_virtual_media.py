@@ -30,16 +30,20 @@ import argparse
 from abc import abstractmethod
 from typing import Any, Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from ..supermico_manager import SupermicroManager
 
 
-class SmcVirtualMediaMount(IDracManager,
+class SmcVirtualMediaMount(SupermicroManager,
                            scm_type=ApiRequestType.SmcVirtualMediaMount,
                            name='vm-mount',
                            metaclass=Singleton):
     """Supermicro OEM virtual media: mount / unmount / status an ISO via CfgCD."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the vm-mount command."""
+        super(SmcVirtualMediaMount, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
@@ -56,7 +60,7 @@ class SmcVirtualMediaMount(IDracManager,
                              help="path to the ISO on the share, e.g. /dl/ubuntu.iso")
         cmd_arg.add_argument('--share_user', required=False, type=str, default="",
                              help="CIFS share username (optional; renamed to avoid the "
-                                  "global --idrac_password/user collision)")
+                                  "global credential-option collision)")
         cmd_arg.add_argument('--share_pass', required=False, type=str, default="",
                              help="CIFS share password (optional)")
         cmd_arg.add_argument('--unmount', action='store_true', dest="do_unmount",
@@ -85,7 +89,8 @@ class SmcVirtualMediaMount(IDracManager,
         """
         result: dict[str, Any] = {"path": path, "status": None, "ok": False}
         try:
-            resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}{path}", {})
+            resp = self.api_get_call(
+                f"{self._default_method}{self.redfish_ip}{path}", {})
             if resp is None:
                 result["error"] = "no response"
                 return result

@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _PATROL_ACTIONS = {
@@ -26,6 +26,10 @@ class DellRaidPatrolRead(IDracManager,
                          name="dell-raid-patrol-read",
                          metaclass=Singleton):
     """Preview or run Dell RAID patrol-read start/stop actions."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dell-raid-patrol-read command."""
+        super(DellRaidPatrolRead, self).__init__(*args, **kwargs)
 
     @staticmethod
     @abstractmethod
