@@ -166,6 +166,46 @@ def test_comments_and_docstrings_are_ignored():
     assert _orphans(src) == []
 
 
+def test_function_local_aliases_do_not_overwrite_other_scopes():
+    """A non-HTTP alias in one function cannot hide another scope's call."""
+    src = (
+        "def request_data():\n"
+        "    import requests as client\n"
+        "    client.get('u')\n"
+        "def decode_data():\n"
+        "    import json as client\n"
+        "    return client.loads('{}')\n"
+    )
+    assert len(_orphans(src)) == 1
+
+
+def test_reused_client_names_remain_local_and_converge_once():
+    """Independent client bindings remain visible without global rescans."""
+    src = (
+        "def sync_request():\n"
+        "    import requests\n"
+        "    client = requests.Session()\n"
+        "    client.get('u')\n"
+        "def async_request():\n"
+        "    import httpx\n"
+        "    client = httpx.AsyncClient()\n"
+        "    client.get('u')\n"
+    )
+    assert len(_orphans(src)) == 2
+
+
+def test_wrapper_covers_only_the_callable_it_receives():
+    """An unrelated raw call remains orphaned in a wrapper-using function."""
+    src = (
+        "import functools, requests\n"
+        "def f():\n"
+        "    call = functools.partial(requests.get, 'u')\n"
+        "    tracing.traced_request('u', 'GET', call)\n"
+        "    requests.post('u')\n"
+    )
+    assert len(_orphans(src)) == 1
+
+
 def test_real_repo_gate_is_clean():
     """The shipped baseline covers the real repo — main() returns 0."""
     assert gate.main() == 0

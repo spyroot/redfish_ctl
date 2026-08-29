@@ -77,118 +77,195 @@ def _target_name(node: ast.AST) -> str | None:
     return None
 
 
+def _scope_nodes(root: ast.AST) -> list[ast.AST]:
+    """Return nodes owned by one lexical scope in source order.
+
+    Nested functions, classes, and lambdas are returned as declarations but
+    their bodies are left for a child resolver. This prevents a local alias in
+    one function from overwriting the same local name in another function.
+
+    :param root: module, class, function, or lambda that owns the scope.
+    :return: scope-owned nodes ordered by source location.
+    """
+    nodes: list[ast.AST] = []
+    stack = list(reversed(list(ast.iter_child_nodes(root))))
+    while stack:
+        node = stack.pop()
+        nodes.append(node)
+        if isinstance(
+            node,
+            (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda),
+        ):
+            continue
+        stack.extend(reversed(list(ast.iter_child_nodes(node))))
+    return sorted(
+        nodes,
+        key=lambda item: (
+            getattr(item, "lineno", -1),
+            getattr(item, "col_offset", -1),
+        ),
+    )
+
+
 class _Bindings:
     """Resolve import aliases and statically visible HTTP client bindings."""
 
-    def __init__(self, tree: ast.AST):
+    def __init__(self, tree: ast.AST, parent: _Bindings | None = None):
         """Build bindings for one parsed module.
 
         :param tree: parsed module or test snippet.
+        :param parent: enclosing lexical-scope bindings, if any.
         """
-        self.aliases: dict[str, str] = {}
-        self.values: dict[str, str] = {}
-        self.returns: dict[str, str] = {}
-        self._read_imports(tree)
+        self.parent = parent
+        self.nodes = _scope_nodes(tree)
+        self.aliases: dict[str, set[str]] = {}
+        self.values: dict[str, set[str]] = {}
+        self.returns: dict[str, set[str]] = {}
+        self.local_names: set[str] = set()
+        self._read_imports()
         self._read_return_annotations(tree)
-        self._read_value_bindings(tree)
+        self._read_value_bindings()
 
-    def _read_imports(self, tree: ast.AST) -> None:
+    @staticmethod
+    def _bind(mapping: dict[str, set[str]], name: str, values: set[str]) -> None:
+        """Union resolved identities into one local binding.
+
+        :param mapping: alias, value, or return binding map.
+        :param name: local identifier being bound.
+        :param values: resolved identities to add.
+        """
+        if values:
+            mapping.setdefault(name, set()).update(values)
+
+    def _read_imports(self) -> None:
         """Record import aliases without importing the target packages."""
-        for node in ast.walk(tree):
+        for node in self.nodes:
             if isinstance(node, ast.Import):
                 for item in node.names:
+                    local_name = item.asname or item.name.split(".", 1)[0]
+                    self.local_names.add(local_name)
                     if item.asname:
-                        self.aliases[item.asname] = item.name
+                        self._bind(self.aliases, item.asname, {item.name})
                     else:
                         root = item.name.split(".", 1)[0]
-                        self.aliases[root] = root
+                        self._bind(self.aliases, root, {root})
             elif isinstance(node, ast.ImportFrom) and node.module:
                 for item in node.names:
                     if item.name == "*":
                         continue
                     local_name = item.asname or item.name
-                    self.aliases[local_name] = f"{node.module}.{item.name}"
+                    self.local_names.add(local_name)
+                    self._bind(
+                        self.aliases,
+                        local_name,
+                        {f"{node.module}.{item.name}"},
+                    )
 
     def _read_return_annotations(self, tree: ast.AST) -> None:
         """Record local function return types used by client factories."""
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            resolved = self.resolve(node.returns) if node.returns else None
-            if resolved in _CLIENT_METHODS:
-                self.returns[node.name] = resolved
-            for arg in (*node.args.posonlyargs, *node.args.args,
-                        *node.args.kwonlyargs):
-                annotation = self.resolve(arg.annotation) if arg.annotation else None
-                if annotation in _CLIENT_METHODS:
-                    self.values[arg.arg] = annotation
+        for node in self.nodes:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.local_names.add(node.name)
+                resolved = self.resolve(node.returns) if node.returns else set()
+                self._bind(
+                    self.returns,
+                    node.name,
+                    resolved.intersection(_CLIENT_METHODS),
+                )
+        if isinstance(tree, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            for arg in (
+                *tree.args.posonlyargs,
+                *tree.args.args,
+                *tree.args.kwonlyargs,
+            ):
+                self.local_names.add(arg.arg)
+                annotation = self.resolve(arg.annotation) if arg.annotation else set()
+                self._bind(
+                    self.values,
+                    arg.arg,
+                    annotation.intersection(_CLIENT_METHODS),
+                )
 
-    def _read_value_bindings(self, tree: ast.AST) -> None:
+    def _read_value_bindings(self) -> None:
         """Propagate constructor, factory, annotation, and simple alias values."""
-        nodes = list(ast.walk(tree))
-        for _ in range(len(nodes) + 1):
-            changed = False
-            for node in nodes:
-                pairs: list[tuple[ast.AST, ast.AST | None]] = []
-                if isinstance(node, ast.Assign):
-                    pairs.extend((target, node.value) for target in node.targets)
-                elif isinstance(node, ast.AnnAssign):
-                    pairs.append((node.target, node.value or node.annotation))
-                elif isinstance(node, ast.NamedExpr):
-                    pairs.append((node.target, node.value))
-                elif isinstance(node, (ast.With, ast.AsyncWith)):
-                    pairs.extend(
-                        (item.optional_vars, item.context_expr)
-                        for item in node.items
-                        if item.optional_vars is not None
-                    )
-                for target, value in pairs:
-                    name = _target_name(target)
-                    resolved = self._value_result(value)
-                    if name and resolved and self.values.get(name) != resolved:
-                        self.values[name] = resolved
-                        changed = True
-            if not changed:
-                break
+        for node in self.nodes:
+            pairs: list[tuple[ast.AST, ast.AST | None]] = []
+            if isinstance(node, ast.Assign):
+                pairs.extend((target, node.value) for target in node.targets)
+            elif isinstance(node, ast.AnnAssign):
+                pairs.append((node.target, node.value or node.annotation))
+            elif isinstance(node, ast.NamedExpr):
+                pairs.append((node.target, node.value))
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                pairs.extend(
+                    (item.optional_vars, item.context_expr)
+                    for item in node.items
+                    if item.optional_vars is not None
+                )
+            elif isinstance(node, (ast.For, ast.AsyncFor)):
+                pairs.append((node.target, None))
+            for target, value in pairs:
+                name = _target_name(target)
+                if not name:
+                    continue
+                self.local_names.add(name)
+                self._bind(self.values, name, self._value_result(value))
 
-    def _value_result(self, node: ast.AST | None) -> str | None:
+    def _value_result(self, node: ast.AST | None) -> set[str]:
         """Return the transport identity produced by an expression."""
         if node is None:
-            return None
+            return set()
         resolved = self.resolve(node)
-        if isinstance(node, ast.Call):
-            called = self.resolve(node.func)
-            if called in _CLIENT_METHODS:
-                return called
-            if called in _FACTORY_RESULTS:
-                return _FACTORY_RESULTS[called]
-            if called:
-                return self.returns.get(called.rsplit(".", 1)[-1])
-        if (resolved in _CLIENT_METHODS
-                or resolved in _DIRECT_HTTP_FUNCTIONS
-                or resolved in _HTTP_MODULES):
-            return resolved
-        return None
+        return {
+            item
+            for item in resolved
+            if item in _CLIENT_METHODS
+            or item in _DIRECT_HTTP_FUNCTIONS
+            or item in _HTTP_MODULES
+        }
 
-    def resolve(self, node: ast.AST | None) -> str | None:
+    def _resolve_name(self, name: str) -> set[str]:
+        """Resolve one name without crossing a local shadowing boundary."""
+        resolved = self.values.get(name, set()) | self.aliases.get(name, set())
+        if resolved:
+            return resolved
+        if name in self.local_names:
+            return {name}
+        if self.parent is not None:
+            return self.parent._resolve_name(name)
+        return {name}
+
+    def _resolve_return(self, name: str) -> set[str]:
+        """Resolve a local or enclosing function's annotated client result."""
+        if name in self.returns:
+            return self.returns[name]
+        if name in self.local_names:
+            return set()
+        if self.parent is not None:
+            return self.parent._resolve_return(name)
+        return set()
+
+    def resolve(self, node: ast.AST | None) -> set[str]:
         """Resolve a Name/Attribute/Call to its imported transport identity."""
         if isinstance(node, ast.Name):
-            return self.values.get(node.id, self.aliases.get(node.id, node.id))
+            return self._resolve_name(node.id)
         if isinstance(node, ast.Attribute):
-            base = self.resolve(node.value)
-            if not base:
-                return None
-            dotted = f"{base}.{node.attr}"
-            return self.values.get(dotted, dotted)
+            resolved: set[str] = set()
+            for base in self.resolve(node.value):
+                dotted = f"{base}.{node.attr}"
+                resolved.update(self.values.get(dotted, {dotted}))
+            return resolved
         if isinstance(node, ast.Call):
-            called = self.resolve(node.func)
-            if called in _CLIENT_METHODS:
-                return called
-            if called in _FACTORY_RESULTS:
-                return _FACTORY_RESULTS[called]
-            if called:
-                return self.returns.get(called.rsplit(".", 1)[-1])
-        return None
+            resolved: set[str] = set()
+            for called in self.resolve(node.func):
+                if called in _CLIENT_METHODS:
+                    resolved.add(called)
+                elif called in _FACTORY_RESULTS:
+                    resolved.add(_FACTORY_RESULTS[called])
+                else:
+                    resolved.update(self._resolve_return(called.rsplit(".", 1)[-1]))
+            return resolved
+        return set()
 
 
 def _fn_name(call: ast.Call) -> str | None:
@@ -201,14 +278,20 @@ def _fn_name(call: ast.Call) -> str | None:
     return fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
 
 
-def _calls_wrapper(fn_node: ast.AST) -> bool:
-    """Return whether a function body hands a request to the tracing wrapper.
+def _wrapper_bound_names(scope: ast.AST) -> set[str]:
+    """Return local values handed directly to a tracing wrapper.
 
-    :param fn_node: a FunctionDef/AsyncFunctionDef node.
-    :return: True when its body calls a tracing wrapper.
+    :param scope: function, class, lambda, or module scope.
+    :return: names whose assigned callables are consumed by a wrapper.
     """
-    return any(isinstance(n, ast.Call) and _fn_name(n) in _WRAPPERS
-               for n in ast.walk(fn_node))
+    names: set[str] = set()
+    for node in _scope_nodes(scope):
+        if not isinstance(node, ast.Call) or _fn_name(node) not in _WRAPPERS:
+            continue
+        for argument in (*node.args, *(item.value for item in node.keywords)):
+            if isinstance(argument, ast.Name):
+                names.add(argument.id)
+    return names
 
 
 def _is_span_with(node: ast.withitem) -> bool:
@@ -240,13 +323,27 @@ def _http_symbol(node: ast.AST, bindings: _Bindings) -> str | None:
     if not isinstance(getattr(node, "ctx", ast.Load()), ast.Load):
         return None
     resolved = bindings.resolve(node)
-    if resolved in _DIRECT_HTTP_FUNCTIONS:
-        return resolved
+    direct = resolved.intersection(_DIRECT_HTTP_FUNCTIONS)
+    if direct:
+        return sorted(direct)[0]
     if isinstance(node, ast.Attribute):
-        client = bindings.resolve(node.value)
-        methods = _CLIENT_METHODS.get(client or "", set())
-        if node.attr in methods:
-            return f"{client}.{node.attr}"
+        for client in bindings.resolve(node.value):
+            methods = _CLIENT_METHODS.get(client, set())
+            if node.attr in methods:
+                return f"{client}.{node.attr}"
+    return None
+
+
+def _assignment_parts(
+    node: ast.AST,
+) -> tuple[tuple[ast.AST, ...], ast.AST | None] | None:
+    """Return assignment targets and value for wrapper-flow handling."""
+    if isinstance(node, ast.Assign):
+        return tuple(node.targets), node.value
+    if isinstance(node, ast.AnnAssign):
+        return (node.target,), node.value
+    if isinstance(node, ast.NamedExpr):
+        return (node.target,), node.value
     return None
 
 
@@ -256,6 +353,7 @@ def _walk(
         path: str,
         out: list[str],
         bindings: _Bindings | None = None,
+        wrapped_names: set[str] | None = None,
 ) -> None:
     """Recurse, tracking whether the cursor is under tracing.
 
@@ -268,27 +366,76 @@ def _walk(
     :param traced: True when an enclosing span/wrapper covers this subtree.
     :param path: source path, for reporting.
     :param out: accumulator of ``"path:line"`` violations.
-    :param bindings: module-level import and client binding resolver.
+    :param bindings: lexical import and client binding resolver.
+    :param wrapped_names: local callables handed to a tracing wrapper.
     :return: None; ``out`` is mutated in place.
     """
     if bindings is None:
         bindings = _Bindings(node)
+    if wrapped_names is None:
+        wrapped_names = _wrapper_bound_names(node)
     if _http_symbol(node, bindings) and not traced:
         out.append(f"{path}:{node.lineno}")
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        fn_traced = traced or _calls_wrapper(node)
+        function_bindings = _Bindings(node, bindings)
+        function_wrapped_names = _wrapper_bound_names(node)
         for child in ast.iter_child_nodes(node):
-            _walk(child, fn_traced, path, out, bindings)
+            _walk(
+                child,
+                traced,
+                path,
+                out,
+                function_bindings,
+                function_wrapped_names,
+            )
+        return
+    if isinstance(node, (ast.ClassDef, ast.Lambda)):
+        child_bindings = _Bindings(node, bindings)
+        child_wrapped_names = _wrapper_bound_names(node)
+        for child in ast.iter_child_nodes(node):
+            _walk(
+                child,
+                traced,
+                path,
+                out,
+                child_bindings,
+                child_wrapped_names,
+            )
+        return
+    if isinstance(node, ast.Call) and _fn_name(node) in _WRAPPERS:
+        _walk(node.func, traced, path, out, bindings, wrapped_names)
+        for argument in node.args:
+            _walk(argument, True, path, out, bindings, wrapped_names)
+        for keyword in node.keywords:
+            _walk(keyword.value, True, path, out, bindings, wrapped_names)
+        return
+    assignment = _assignment_parts(node)
+    if assignment is not None:
+        targets, value = assignment
+        assignment_is_wrapped = any(
+            _target_name(target) in wrapped_names for target in targets
+        )
+        for target in targets:
+            _walk(target, traced, path, out, bindings, wrapped_names)
+        if value is not None:
+            _walk(
+                value,
+                traced or assignment_is_wrapped,
+                path,
+                out,
+                bindings,
+                wrapped_names,
+            )
         return
     if isinstance(node, (ast.With, ast.AsyncWith)):
         body_traced = traced or any(_is_span_with(it) for it in node.items)
         for it in node.items:
-            _walk(it.context_expr, traced, path, out, bindings)
+            _walk(it.context_expr, traced, path, out, bindings, wrapped_names)
         for child in node.body:
-            _walk(child, body_traced, path, out, bindings)
+            _walk(child, body_traced, path, out, bindings, wrapped_names)
         return
     for child in ast.iter_child_nodes(node):
-        _walk(child, traced, path, out, bindings)
+        _walk(child, traced, path, out, bindings, wrapped_names)
 
 
 def _violations() -> list[str]:
