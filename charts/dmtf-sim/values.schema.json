@@ -25,16 +25,11 @@
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "required": ["repository", "digest", "pullPolicy"],
       "properties": {
         "repository": {
           "type": "string",
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-        },
-        "tag": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+          "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
         },
         "digest": {
           "type": "string",
@@ -151,10 +146,27 @@
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled"],
+      "required": ["enabled", "allowedNamespaceLabels"],
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "allowedNamespaceLabels": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["homelab.embedings.ai/ci-class"],
+            "properties": {
+              "homelab.embedings.ai/ci-class": {
+                "type": "string",
+                "enum": ["validation", "protected"]
+              }
+            }
+          }
         }
       }
     },

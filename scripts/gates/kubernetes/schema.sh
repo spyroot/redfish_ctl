@@ -3,6 +3,7 @@
 # kubeconform in the toolchain (a missing validator FAILS the gate).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+source scripts/gates/kubernetes/dmtf_sim_values.bash
 if ! command -v kubeconform >/dev/null 2>&1; then
   echo "kubernetes.schema: kubeconform not installed in this gate environment" >&2
   exit 1
@@ -19,6 +20,7 @@ if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
   echo "kubernetes.schema: exact source commit is unavailable" >&2
   exit 1
 fi
+dmtf_sim_set_helm_values "$source_commit"
 # Validate concrete manifests first. Skip Helm templates and placeholder
 # manifests here; rendered chart output is validated separately below.
 files="$(git ls-files 'k8s/**/*.yaml' 'charts/**/*.yaml' | while read -r f; do
@@ -36,12 +38,12 @@ helm template redfish-controller charts/redfish-controller \
 helm template dmtf-sim charts/dmtf-sim \
   --namespace dmtf-bmc \
   --skip-tests \
-  --set-string provenance.sourceCommit="$source_commit" |
+  "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary
 helm template dmtf-sim charts/dmtf-sim \
   --namespace dmtf-bmc \
   --show-only templates/tests/test-connection.yaml \
-  --set-string provenance.sourceCommit="$source_commit" |
+  "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary
 static_count="$(echo "$files" | wc -l | tr -d ' ')"
 echo "kubernetes.schema: OK (${static_count} static manifests + rendered charts)"

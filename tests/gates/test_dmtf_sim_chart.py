@@ -24,6 +24,8 @@ BUNDLE = (
 )
 BUNDLE_SHA256 = "481990aa1e77a675b5cc919483b4bc2dd8e832f91ba9b0e3f001ee2b2c8ddef7"
 TEST_COMMIT = "c" * 40
+TEST_IMAGE_REPOSITORY = "registry.invalid/redfish/dmtf-sim"
+TEST_IMAGE_DIGEST = "sha256:" + "0" * 64
 ANNOTATIONS = {
     "dmtf.redfish.ctl.dev/bundle-release": "2026.1",
     "dmtf.redfish.ctl.dev/bundle-sha256": BUNDLE_SHA256,
@@ -52,6 +54,10 @@ def _helm_command(*extra_args: str, include_tests: bool = False) -> list[str]:
         "dmtf-bmc",
         "--set-string",
         f"provenance.sourceCommit={TEST_COMMIT}",
+        "--set-string",
+        f"image.repository={TEST_IMAGE_REPOSITORY}",
+        "--set-string",
+        f"image.digest={TEST_IMAGE_DIGEST}",
     ]
     if not include_tests:
         command.append("--skip-tests")
@@ -104,17 +110,24 @@ def test_chart_metadata_schema_defaults_and_strict_lint() -> None:
     assert chart["name"] == "dmtf-sim"
     assert chart["type"] == "application"
     assert chart["appVersion"] == "2026.1"
-    assert values["image"]["repository"] == (
-        "harbor.rnd.embedings.ai:30443/spyroot/redfish-dmtf-sim"
-    )
-    assert values["image"]["tag"] == "2026.1"
+    assert values["image"]["repository"] == ""
+    assert "tag" not in values["image"]
+    assert values["image"]["digest"] == ""
     assert values["service"] == {"type": "ClusterIP", "port": 80}
     assert values["imagePullSecrets"] == ["harbor-registry-pull"]
     assert values["dmtf"]["bundleRelease"] == "2026.1"
     assert values["dmtf"]["bundleSha256"] == BUNDLE_SHA256
     assert values["dmtf"]["profile"] == "public-rackmount1"
     assert values["provenance"]["sourceCommit"] == ""
+    assert values["networkPolicy"]["allowedNamespaceLabels"] == [
+        {"homelab.embedings.ai/ci-class": "validation"},
+        {"homelab.embedings.ai/ci-class": "protected"},
+    ]
     assert schema["additionalProperties"] is False
+    image_schema = schema["properties"]["image"]
+    assert set(image_schema["required"]) == {"repository", "digest", "pullPolicy"}
+    assert "tag" not in image_schema["properties"]
+    assert image_schema["properties"]["digest"]["pattern"] == "^$|^sha256:[0-9a-f]{64}$"
 
     result = subprocess.run(
         [
@@ -124,6 +137,10 @@ def test_chart_metadata_schema_defaults_and_strict_lint() -> None:
             str(CHART_DIR),
             "--set-string",
             f"provenance.sourceCommit={TEST_COMMIT}",
+            "--set-string",
+            f"image.repository={TEST_IMAGE_REPOSITORY}",
+            "--set-string",
+            f"image.digest={TEST_IMAGE_DIGEST}",
         ],
         capture_output=True,
         text=True,
@@ -139,9 +156,13 @@ def test_render_requires_exact_source_commit_provenance() -> None:
             "template",
             "dmtf-sim",
             str(CHART_DIR),
-            "--namespace",
-            "dmtf-bmc",
-            "--skip-tests",
+                "--namespace",
+                "dmtf-bmc",
+                "--skip-tests",
+                "--set-string",
+                f"image.repository={TEST_IMAGE_REPOSITORY}",
+                "--set-string",
+                f"image.digest={TEST_IMAGE_DIGEST}",
         ],
         capture_output=True,
         text=True,
@@ -235,8 +256,8 @@ def test_default_render_is_namespace_scoped_and_has_no_external_surface() -> Non
     assert forbidden_fields.isdisjoint(_walk_keys(docs))
 
 
-def test_image_tag_digest_and_pull_secret_are_templated() -> None:
-    """Repository overrides, digest pinning, tags, and pull Secret names render."""
+def test_image_digest_and_pull_secret_are_templated() -> None:
+    """Repository overrides, digest pinning, and pull Secret names render."""
     digest = "sha256:" + "a" * 64
     digest_docs = _template(
         "--set-string",
@@ -245,21 +266,52 @@ def test_image_tag_digest_and_pull_secret_are_templated() -> None:
         f"image.digest={digest}",
         "--set-string",
         "imagePullSecrets[0]=custom-pull",
+        include_tests=True,
     )
     deployment = _by_kind(digest_docs, "Deployment")
+    hook = _by_kind(digest_docs, "Pod")
     pod_spec = deployment["spec"]["template"]["spec"]
     assert pod_spec["containers"][0]["image"] == f"registry.invalid/team/sim@{digest}"
     assert pod_spec["imagePullSecrets"] == [{"name": "custom-pull"}]
+    assert hook["spec"]["containers"][0]["image"] == f"registry.invalid/team/sim@{digest}"
+    assert hook["spec"]["imagePullSecrets"] == [{"name": "custom-pull"}]
 
-    tag_docs = _template(
-        "--set-string",
-        "image.repository=registry.invalid/team/sim",
-        "--set-string",
-        "image.tag=verified-tag",
+
+def test_image_tag_fallback_and_missing_identity_are_rejected() -> None:
+    """The simulator image identity is repository plus sha256 digest only."""
+    digest = "sha256:" + "b" * 64
+    invalid_cases = (
+        ("--set-string", "image.digest="),
+        ("--set-string", "image.repository=", "--set-string", f"image.digest={digest}"),
+        (
+            "--set-string",
+            "image.tag=verified-tag",
+            "--set-string",
+            "image.digest=",
+        ),
     )
-    tag_deployment = _by_kind(tag_docs, "Deployment")
-    tag_container = tag_deployment["spec"]["template"]["spec"]["containers"][0]
-    assert tag_container["image"] == "registry.invalid/team/sim:verified-tag"
+
+    for invalid_args in invalid_cases:
+        result = subprocess.run(
+            _helm_command(*invalid_args),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0, result.stdout + result.stderr
+
+
+def test_chart_templates_do_not_contain_tag_fallback() -> None:
+    """Chart templates must not carry a dead tag path beside the digest contract."""
+    rendered_sources = "\n".join(
+        (CHART_DIR / path).read_text(encoding="utf-8")
+        for path in (
+            "templates/deployment.yaml",
+            "templates/tests/test-connection.yaml",
+        )
+    )
+
+    assert ".Values.image.tag" not in rendered_sources
+    assert "if .Values.image.digest" not in rendered_sources
 
 
 def test_pull_secret_is_name_only_and_no_secret_resource_is_rendered() -> None:
@@ -339,15 +391,31 @@ def test_profile_argument_provenance_and_workload_security() -> None:
     assert container["securityContext"]["capabilities"] == {"drop": ["ALL"]}
 
 
-def test_network_policy_allows_only_same_namespace_clients() -> None:
-    """Default ingress is restricted to simulator traffic from its namespace."""
+def test_network_policy_allows_only_registered_client_namespaces() -> None:
+    """Ingress admits same-namespace pods and the two provider-bound CI classes."""
     policy = _by_kind(_template(), "NetworkPolicy")
 
     assert policy["spec"]["policyTypes"] == ["Ingress"]
     assert "egress" not in policy["spec"]
     assert policy["spec"]["ingress"] == [
         {
-            "from": [{"podSelector": {}}],
+            "from": [
+                {"podSelector": {}},
+                {
+                    "namespaceSelector": {
+                        "matchLabels": {
+                            "homelab.embedings.ai/ci-class": "validation"
+                        }
+                    }
+                },
+                {
+                    "namespaceSelector": {
+                        "matchLabels": {
+                            "homelab.embedings.ai/ci-class": "protected"
+                        }
+                    }
+                },
+            ],
             "ports": [{"protocol": "TCP", "port": 8080}],
         }
     ]

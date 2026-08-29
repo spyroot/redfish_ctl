@@ -9,11 +9,17 @@
 # docs/external/ci.md.
 stages: [validate, integration, deploy, publish]
 
+include:
+  - project: spyroot/builder
+    ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
+    file: /ci/templates/project-service.yml
+
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
 # git-lfs, gate tools); this project supplies its dependencies via environment.yml.
-# Registry and tag come from builder inventory/images/shared-images.yaml.
+# Registry and digest come from builder inventory/images/shared-images.yaml.
 default:
-  image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
+  image: &builder-toolbox >-
+    harbor.rnd.embedings.ai/spyroot/builder/toolbox@sha256:bba5761e8248eec533b270a4d16966f8440ba2a81287e7ff63907c8b3a483fc9
   tags: [homelab-k8s]
   before_script:
     # Corpora and the DMTF spec bundles are Git LFS; without this the suite runs
@@ -32,6 +38,11 @@ variables:
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
+  BUILDER_PROJECT_CONSUMER: redfish_ctl
+  DMTF_RELEASE: "2026.1"
+  PROJECT_LIVE_TEST_COMMAND: >-
+    pytest -q -m dmtf_sim_live
+    tests/k8s/test_dmtf_sim_live.py::test_dmtf_service_root
 
 .private-api-web:
   rules:
@@ -142,22 +153,123 @@ k8s-live-check:
       kubectl get nodes -o wide
       kubectl get crd 2>/dev/null | grep -i redfish || echo "(no redfish CRDs registered)"
 
-# Live apply: protected branch ONLY, manual, serialized (resource_group), never from a merge request.
-deploy-apply:
+# Builder owns publication, the immutable deploy plan, protected mutation, and
+# exact-commit read-back. The consumer names each job so the provider template's
+# artifact DAG remains closed and auditable.
+project-service-image-publish:
+  extends: .builder-project-image-publish
   stage: deploy
-  tags: [homelab-k8s]
-  environment:
-    name: production
-  resource_group: homelab-apply
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script:
+    - git lfs install --local
+    - >-
+      git lfs pull
+      --include='spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip'
   rules:
-    - <<: *private-api-web
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
-  variables:
-    MUTATION_LOCK: "$CI_JOB_ID"
-  script:
-    - ./scripts/check.sh --profile deploy
+    - when: never
+
+project-service-chart-publish:
+  extends: .builder-project-chart-publish
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+    - when: never
+
+project-service-deploy-plan:
+  extends: .builder-project-deploy-plan
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: on_success
+    - when: never
+
+project-service-deploy:
+  extends: .builder-project-deploy
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+    - when: never
+
+project-service-verify:
+  extends: .builder-project-verify
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: on_success
+    - when: never
+
+project-service-live-test:
+  extends: .builder-project-live-test
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-validation]
+  allow_failure: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: on_success
+    - when: never
+
+project-service-rollback:
+  extends: .builder-project-rollback
+  stage: deploy
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-protected]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
+    - when: never
+
+project-service-release-evidence:
+  extends: .builder-project-release-evidence
+  stage: publish
+  image: *builder-toolbox
+  tags: [homelab-k8s, homelab-k8s-validation]
+  allow_failure: false
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+      when: on_success
+    - when: never
 
 # Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
 # Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
@@ -166,6 +278,8 @@ publish-github:
   stage: publish
   tags: [homelab-k8s]
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
     - <<: *private-api-web
       when: never
     - if: >-

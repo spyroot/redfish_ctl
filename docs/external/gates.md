@@ -28,6 +28,16 @@ candidate ref so the configured GitLab pipeline runs it. A gate never runs on a 
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
 
+## Trusted provider includes
+
+`trusted_includes` in `gates/manifest.yaml` is the only allow-list for
+provider-owned GitLab templates. Each entry pins the provider project, exact
+40-character commit, template file, permitted hidden templates, and their
+mutation classification. A local wrapper must still declare its stage, runner tags, rules, and
+`allow_failure: false`, so `tools/gate_meta.py` can reject a floating include,
+unknown template, or merge-request-reachable mutation. The protected simulator
+job sequence is documented in [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
+
 ## The gates
 
 | id | profile | mutates | what it checks | fails when |

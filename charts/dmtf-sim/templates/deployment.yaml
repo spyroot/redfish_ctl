@@ -1,6 +1,8 @@
 {{- $bundleRoot := printf "/mockups/DSP2043_%s" .Values.dmtf.bundleRelease -}}
 {{- $mockupDir := printf "%s/%s" $bundleRoot .Values.dmtf.profile -}}
 {{- $sourceCommit := required "provenance.sourceCommit must be an exact 40-character commit SHA" .Values.provenance.sourceCommit -}}
+{{- $imageRepository := required "image.repository must be the published simulator repository" .Values.image.repository -}}
+{{- $imageDigest := required "image.digest must be the published sha256 digest" .Values.image.digest -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,11 +55,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: dmtf-sim
-          {{- if .Values.image.digest }}
-          image: {{ printf "%s@%s" .Values.image.repository .Values.image.digest | quote }}
-          {{- else }}
-          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
-          {{- end }}
+          image: {{ printf "%s@%s" $imageRepository $imageDigest | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --host
