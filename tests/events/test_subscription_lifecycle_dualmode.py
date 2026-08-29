@@ -16,7 +16,7 @@ from redfish_ctl.events.cmd_subscription_lifecycle import (
     SubscriptionDelete,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"

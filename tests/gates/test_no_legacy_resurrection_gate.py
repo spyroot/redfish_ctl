@@ -11,7 +11,10 @@ import ast
 
 from tools import no_legacy_resurrection_gate as gate
 
-_LEGACY = {"IDRAC_HTTP_TIMEOUT": "REDFISH_HTTP_TIMEOUT", "IDRAC_IP": "REDFISH_IP"}
+_LEGACY = {
+    "IDRAC_HTTP_TIMEOUT": "REDFISH_HTTP_TIMEOUT",
+    "IDRAC_HTTP_POOL": "REDFISH_HTTP_POOL",
+}
 
 
 def _flagged(src: str) -> list[str]:
@@ -48,7 +51,8 @@ def test_paired_env_first_is_clean():
 
 def test_or_chain_fallback_is_clean():
     """getenv(REDFISH) or getenv(IDRAC) pairs in one statement — not flagged."""
-    assert _flagged('x = os.getenv("REDFISH_IP") or os.getenv("IDRAC_IP")') == []
+    src = 'x = os.getenv("REDFISH_HTTP_POOL") or os.getenv("IDRAC_HTTP_POOL")'
+    assert _flagged(src) == []
 
 
 def test_unpaired_call_read_is_flagged():
@@ -57,19 +61,19 @@ def test_unpaired_call_read_is_flagged():
 
 
 def test_subscript_read_is_flagged():
-    """The idiomatic os.environ["IDRAC_IP"] subscript is caught (regression:
+    """The idiomatic os.environ subscript is caught (regression:
     the Call-only check missed this, the most common direct-read form)."""
-    assert _flagged('x = os.environ["IDRAC_IP"]') == ["IDRAC_IP"]
+    assert _flagged('x = os.environ["IDRAC_HTTP_POOL"]') == ["IDRAC_HTTP_POOL"]
 
 
 def test_legacy_only_in_container_is_flagged():
     """A legacy name alone in a tuple/list (variable indirection) is caught."""
-    assert _flagged('ENVS = ("IDRAC_IP",)') == ["IDRAC_IP"]
+    assert _flagged('ENVS = ("IDRAC_HTTP_POOL",)') == ["IDRAC_HTTP_POOL"]
 
 
 def test_paired_container_is_clean():
     """A tuple naming both canonical and legacy is a legitimate pair."""
-    assert _flagged('ENVS = ("REDFISH_IP", "IDRAC_IP")') == []
+    assert _flagged('ENVS = ("REDFISH_HTTP_POOL", "IDRAC_HTTP_POOL")') == []
 
 
 def test_tombstone_hit_fails(monkeypatch, capsys):
@@ -81,6 +85,7 @@ def test_tombstone_hit_fails(monkeypatch, capsys):
     monkeypatch.setattr(gate, "_registry", lambda: {"retired": {"RETIRED_EXAMPLE": {}}})
     monkeypatch.setattr(gate, "_tombstone_hits", lambda reg: ["RETIRED_EXAMPLE @ redfish_ctl/x.py:9"])
     monkeypatch.setattr(gate, "_direct_legacy_uses", lambda m: [])
+    monkeypatch.setattr(gate, "_runtime_connection_aliases", lambda: [])
     monkeypatch.setattr(gate, "_legacy_map", lambda reg: {})
     assert gate.main() == 1
     assert "TOMBSTONE" in capsys.readouterr().out
@@ -92,9 +97,27 @@ def test_new_direct_use_fails(monkeypatch, capsys):
     monkeypatch.setattr(gate, "_tombstone_hits", lambda reg: [])
     monkeypatch.setattr(gate, "_legacy_map", lambda reg: {})
     monkeypatch.setattr(gate, "_direct_legacy_uses", lambda m: ["redfish_ctl/new.py:5"])
+    monkeypatch.setattr(gate, "_runtime_connection_aliases", lambda: [])
     monkeypatch.setattr(gate, "_baseline", lambda: set())
     assert gate.main() == 1
     assert "LEGACY_ENV_DIRECT_USE" in capsys.readouterr().out
+
+
+def test_runtime_connection_alias_fails(monkeypatch, capsys):
+    """A lowercase Dell-specific connection name fails the runtime gate."""
+    monkeypatch.setattr(gate, "_registry", lambda: {})
+    monkeypatch.setattr(gate, "_tombstone_hits", lambda reg: [])
+    monkeypatch.setattr(gate, "_legacy_map", lambda reg: {})
+    monkeypatch.setattr(gate, "_direct_legacy_uses", lambda m: [])
+    monkeypatch.setattr(
+        gate,
+        "_runtime_connection_aliases",
+        lambda: ["redfish_ctl/example.py:5"],
+    )
+    monkeypatch.setattr(gate, "_baseline", lambda: set())
+
+    assert gate.main() == 1
+    assert "RUNTIME_CONNECTION_ALIAS" in capsys.readouterr().out
 
 
 def test_real_repo_gate_is_clean():

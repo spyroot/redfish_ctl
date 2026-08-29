@@ -14,11 +14,11 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     REDFISH_API,
     ApiRequestType,
-    CliJobTypes,
-    JobState,
+    DellCliJobTypes,
+    DellJobState,
     RedfishApiRespond,
     ResetType,
     Singleton,
@@ -97,7 +97,7 @@ class JobApply(IDracManager,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         elif setting == "boot-option":
             pd = {
                 "RebootJobType": "ForceReboot",
@@ -105,7 +105,7 @@ class JobApply(IDracManager,
                 "StartTime": "TIME_NOW",
                 "EndTime": "TIME_NA"
             }
-            job_type = CliJobTypes.Bios_Config.value
+            job_type = DellCliJobTypes.Bios_Config.value
         else:
             pd = {}
 
@@ -146,7 +146,7 @@ class JobApply(IDracManager,
             if 'JobState' in jb:
                 job_state = jb['JobState']
                 # we wait for job change to change a state
-                if job_state == JobState.Scheduled or job_state == JobState.Scheduling:
+                if job_state == DellJobState.Scheduled or job_state == DellJobState.Scheduling:
                     time.sleep(sleep_time)
                 else:
                     self.fetch_task(job)

@@ -8,7 +8,7 @@ from test_roundtrip_budget import projected_walltime
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.controls.cmd_control_reset_defaults import ControlResetDefaults
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _CONTROL_URI = "/redfish/v1/Chassis/HGX_GPU_0/Controls/ClockLimit_0"

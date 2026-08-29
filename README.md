@@ -30,8 +30,8 @@ What it does across the whole server lifecycle:
 - **Serial console & SOL** — report and enable host BIOS serial redirection together with the BMC
   Serial-over-LAN service, in one step, vendor-neutrally.
 - **Sensors & telemetry** — read every chassis sensor and TelemetryService report/definition, plus
-  an out-of-band exporter that streams BMC metrics — including GB300 GPU, NVLink, thermal, and power
-  — to Prometheus, SignalFx, and Splunk Observability. The
+  a Supermicro/NV72 exporter that streams GB300 GPU, NVLink, thermal, and power metrics to
+  Prometheus, SignalFx, and Splunk Observability. The
   [telemetry exporter guide](docs/external/telemetry-exporter.md) covers the one-exporter-per-BMC deployment
   model and the supported consumer modes.
 - **Firmware** — inventory and guarded `UpdateService` SimpleUpdate.
@@ -42,12 +42,6 @@ What it does across the whole server lifecycle:
 - **Config, logs & events** — system config export/import, system and manager logs (SEL), test
   events, the BMC clock, and a `wait` that blocks until the BMC answers after a reboot.
 - **Discovery** — scan a subnet for BMCs, classify their vendor, and crawl a Redfish tree.
-
-> The tool was renamed from `idrac_ctl` to `redfish_ctl`. `idrac_ctl` still works as a
-> backward-compatible alias — the `idrac_ctl` command, `import idrac_ctl`, and the legacy
-> `IDRAC_IP`/`IDRAC_USERNAME`/`IDRAC_PASSWORD`/`IDRAC_PORT` env vars all keep working.
-> When both `REDFISH_*` and legacy `IDRAC_*` names are set for the same value, they must match;
-> different values fail closed so automation does not silently target the wrong BMC.
 
 Author: Mus <spyroot@gmail.com>
 
@@ -63,11 +57,12 @@ export REDFISH_USERNAME=root
 export REDFISH_PASSWORD='your-password'
 
 # 3. Read something safe
-redfish_ctl --version          # prints the installed version
-redfish_ctl system             # host ComputerSystem (Id, Name, PowerState)
-redfish_ctl sensors            # temperatures, power, fans, voltages
-redfish_ctl system --yaml      # same data as YAML instead of JSON
-redfish_ctl --help             # every subcommand
+redfish_ctl --version                   # prints the installed version
+redfish_ctl sensors                     # shared DMTF sensor read
+redfish_ctl system                      # shared DMTF ComputerSystem read
+redfish_ctl system --yaml               # same ComputerSystem data as YAML
+redfish_ctl --help                      # shared DMTF commands
+redfish_ctl --vendor supermicro --help  # DMTF + Supermicro commands
 ```
 
 Reads are safe. Commands that change hardware are labeled **Guarded** or **Write** in the
@@ -75,10 +70,6 @@ Reads are safe. Commands that change hardware are labeled **Guarded** or **Write
 intent flag such as `--confirm`; Write commands can mutate immediately and require explicit target
 approval before live use. Preview with `--show` or `--dry_run` when the command supports it, then
 see [Mutating Commands](#mutating-commands) below before applying anything.
-
-> **Upgrading from `idrac_ctl`?** Install `redfish_ctl` — the `idrac_ctl` command, `import idrac_ctl`,
-> and the legacy `IDRAC_*` env vars all keep working as a backward-compatible alias. The old
-> `idrac_ctl` PyPI package (≤ 1.0.13) is the pre-rename tool; new work should `pip install redfish_ctl`.
 
 ## Install
 
@@ -108,12 +99,11 @@ locally from the repository root:
 make docker-image IMAGE=redfish-ctl:local
 ```
 
-Put BMC connection settings in `.internal/redfish.env`, a gitignored runtime file you create before
+Put BMC connection settings in `redfish.env`, a gitignored runtime file you create before
 running the container:
 
 ```bash
-mkdir -p .internal
-cat > .internal/redfish.env <<'EOF'
+cat > redfish.env <<'EOF'
 REDFISH_IP=192.0.2.10
 REDFISH_USERNAME=root
 REDFISH_PASSWORD=change-this-password
@@ -124,19 +114,19 @@ EOF
 Run a safe one-shot read:
 
 ```bash
-docker run --rm --env-file .internal/redfish.env redfish-ctl:local system
+docker run --rm --env-file redfish.env redfish-ctl:local --vendor dell system
 ```
 
 Run the exporter as an OTLP sidecar:
 
 ```bash
 docker run --rm \
-  --env-file .internal/redfish.env \
+  --env-file redfish.env \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 \
-  redfish-ctl:local exporter --output otlp --interval 30
+  redfish-ctl:local --vendor supermicro exporter --output otlp --interval 30
 ```
 
-With Docker Compose, keep credentials in `.internal/redfish.env` and pass only collector routing in
+With Docker Compose, keep credentials in `redfish.env` and pass only collector routing in
 the service definition:
 
 ```yaml
@@ -144,10 +134,17 @@ services:
   redfish-exporter:
     image: redfish-ctl:local
     env_file:
-      - .internal/redfish.env
+      - redfish.env
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-    command: ["exporter", "--output", "otlp", "--interval", "30"]
+    command:
+      - --vendor
+      - supermicro
+      - exporter
+      - --output
+      - otlp
+      - --interval
+      - "30"
 ```
 
 In Kubernetes, store BMC credentials in a Secret that you create in the target namespace, then point
@@ -163,7 +160,14 @@ spec:
     - name: exporter
       image: redfish-ctl:local
       imagePullPolicy: Never
-      args: ["exporter", "--output", "otlp", "--interval", "30"]
+      args:
+        - --vendor
+        - supermicro
+        - exporter
+        - --output
+        - otlp
+        - --interval
+        - "30"
       envFrom:
         - secretRef:
             name: redfish-bmc-credentials
@@ -187,23 +191,21 @@ export REDFISH_PORT=443
 ```
 
 Any of these can be overridden per-invocation by a CLI flag. The canonical flags are
-`--host`, `--username`, `--password`, and `--port`; the legacy aliases
-`--idrac_ip`, `--idrac_username`, `--idrac_password`, and `--idrac_port` still work for
-existing scripts.
+`--host`, `--username`, `--password`, and `--port`.
 
 BMCs usually ship self-signed certificates. TLS verification is off by default; use `--verify-ssl`
 only when the BMC has a certificate chain you trust.
 
 ## First Safe Read
 
-Start with the host ComputerSystem:
+Start with a shared DMTF sensor read:
 
 ```bash
-redfish_ctl system
+redfish_ctl sensors
 ```
 
-A healthy response includes `data.Id`, `data.Name`, and usually `data.PowerState`. If you have `jq`
-installed, this is a compact smoke check:
+For the host ComputerSystem, this is a compact smoke check when `jq` is
+installed:
 
 ```bash
 redfish_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
@@ -212,14 +214,17 @@ redfish_ctl --nocolor system | jq '.data | {Id, Name, PowerState}'
 ## Common Reads
 
 ```bash
-redfish_ctl manager
-redfish_ctl chassis
 redfish_ctl sensors
-redfish_ctl firmware_inventory
-redfish_ctl bios --filter ProcCStates,SysMemSize
-redfish_ctl storage-list
-redfish_ctl get_vm
-redfish_ctl logs
+redfish_ctl environment-metrics
+redfish_ctl thermal
+redfish_ctl component-integrity
+redfish_ctl --vendor dell manager
+redfish_ctl --vendor dell chassis
+redfish_ctl --vendor dell firmware_inventory
+redfish_ctl --vendor dell bios --filter ProcCStates,SysMemSize
+redfish_ctl --vendor dell storage-list
+redfish_ctl --vendor dell get_vm
+redfish_ctl --vendor dell logs
 ```
 
 `sensors`, defined in `redfish_ctl/sensors/cmd_sensors.py`, follows Chassis sensor links and returns
@@ -241,8 +246,10 @@ the command has `--show` or `--dry_run`, then verify after the job or task compl
 
 ```bash
 redfish_ctl system-reset --reset_type GracefulRestart --dry_run
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
-redfish_ctl firmware-update --image_uri https://example.invalid/firmware.exe --dry_run
+redfish_ctl --vendor dell bios-change \
+  --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl --vendor dell firmware-update \
+  --image_uri https://example.invalid/firmware.exe --dry_run
 ```
 
 Use `--confirm` only when you mean to perform a guarded action such as `system-reset` or
@@ -256,29 +263,29 @@ firmware. Full guide: [Observability](docs/external/observability.md).
 
 ### Telemetry (metrics)
 
-The exporter turns out-of-band hardware state (power, thermal, fans, GPU, leak detection, fabric)
-into the stable `hw.*` metric family and pushes it over native OTLP. One exporter streams one BMC;
-scale by running more. See [Telemetry Exporter](docs/external/telemetry-exporter.md).
+The Supermicro exporter turns out-of-band hardware state (power, thermal, fans, GPU, leak detection,
+fabric) into the stable `hw.*` metric family and pushes it over native OTLP. One exporter streams one
+BMC; scale by running more. See [Telemetry Exporter](docs/external/telemetry-exporter.md).
 
 ```bash
-redfish_ctl exporter --output otlp --once
+redfish_ctl --vendor supermicro exporter --output otlp --once
 ```
 
 ### Traces and spans
 
 Every command opens an operation span (`bios-change`, `firmware-update`, `reboot`), and every BMC
 call becomes a `CLIENT` span tagged `peer.service=bmc` — so the fleet renders in APM as a
-`redfish-ctl → bmc` service map with a trace waterfall, and per-operation error rate and latency in
+`redfish_ctl → bmc` service map with a trace waterfall, and per-operation error rate and latency in
 Tag Spotlight (sliceable by vendor, action, and profile). Failed writes show up red, so a failed BIOS
 apply or a slow firmware flash is one glance away.
 
 ### Quick start — up and streaming in three commands
 
 ```bash
-pip install "redfish-ctl[otlp]"
+pip install "redfish_ctl[otlp]"
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<collector-or-ingest>:4317"
 export OTEL_EXPORTER_OTLP_HEADERS="X-SF-Token=<splunk-access-token>"   # token via env, never argv
-redfish_ctl --otlp-traces system      # appears in APM as redfish-ctl → bmc
+redfish_ctl --vendor dell --otlp-traces system  # appears in APM as redfish_ctl → bmc
 ```
 
 For Kubernetes (one exporter pod per BMC, the operator reconciling profiles, all streaming to an
@@ -309,13 +316,13 @@ First-run problems are almost always the connection, not the command:
   profile examples.
 - [Vendors](docs/external/vendors.md) - Dell, Supermicro, HPE, and generic Redfish support.
 - [Observability](docs/external/observability.md) - stream BMC operations to Splunk APM as traces and metrics.
-- [Telemetry Exporter](docs/external/telemetry-exporter.md) - the `hw.*` metric exporter and deployment model.
+- [Telemetry Exporter](docs/external/telemetry-exporter.md) - Supermicro/NV72 exporter deployment and configuration.
 - [Simulation and replay](docs/external/simulation-and-replay.md) - the hardware-free mock and mutation replay.
 - [Testing](docs/external/testing.md) - offline mock tests, vendor corpora, emulator tests, and live-test safety.
 - [Corpus library](docs/external/corpus-library.md) - manifest-indexed Redfish corpus tarballs and pull-all extraction.
 - [Docker](docker/README.md) - production image and Linux offline-test image usage.
 - [Fixture capture](docs/external/fixture-capture.md) - crawl a BMC with `discovery`, sanitize it, and contribute it as a vendor corpus.
-- [CI/CD](docs/external/ci.md) - the GitHub Actions test + release pipeline, the runner, and the Node.js runtime.
+- [CI/CD](docs/external/ci.md) - authoritative GitLab merge gates plus supplemental GitHub checks and releases.
 - [Architecture](docs/external/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
 - [Telemetry metrics](docs/external/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.

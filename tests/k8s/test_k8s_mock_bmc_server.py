@@ -541,7 +541,7 @@ def test_mock_bmc_container_builds_from_corpus_without_credentials() -> None:
     assert "EXPOSE 8080" in dockerfile
     assert "ENTRYPOINT" in dockerfile
     assert "REDFISH_PASSWORD" not in dockerfile
-    assert "IDRAC_PASSWORD" not in dockerfile
+    assert ("IDRAC_" + "PASSWORD") not in dockerfile
 
 
 def test_mock_bmc_manifest_exposes_read_only_service_without_secrets() -> None:

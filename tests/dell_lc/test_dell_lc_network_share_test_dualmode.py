@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import pytest
-from conftest import MockRedfishService, _build_fixture_index
+from conftest import MockRedfishService
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
@@ -10,13 +10,14 @@ from redfish_ctl.dell_lc.cmd_dell_lc_network_share_test import (
     DellLcNetworkShareTest,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
     Path(__file__).parent.parent / "dell_xr8620t_corpus.tar.gz",
     "10.252.252.209",
 )
+DELL_INDEX = {path.name.lower(): path for path in DELL_CORPUS.glob("*.json")}
 SERVICE_URI = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellLCService"
 TARGET_URI = f"{SERVICE_URI}/Actions/DellLCService.TestNetworkShare"
 
@@ -34,7 +35,7 @@ def dell_lc_mock():
     requests_mock = pytest.importorskip("requests_mock")
     service = MockRedfishService(
         DELL_CORPUS,
-        index=_build_fixture_index(DELL_CORPUS),
+        index=DELL_INDEX,
         vendor="dell",
     )
     with requests_mock.Mocker() as mocker:
@@ -45,9 +46,9 @@ def dell_lc_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

@@ -4,7 +4,7 @@
 
 Covers ``boot_one_shot`` (ApiRequestType.BootOneShot), a DMTF ComputerSystem
 Boot-override PATCH. The preview (dry-run / confirm=False) paths mutate nothing,
-so they run fully offline against the mock service and, when IDRAC_IP is set,
+so they run fully offline against the mock service and, when REDFISH_IP is set,
 against real hardware without touching boot config.
 
 Author Mus spyroot@gmail.com
@@ -12,7 +12,7 @@ Author Mus spyroot@gmail.com
 import pytest
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

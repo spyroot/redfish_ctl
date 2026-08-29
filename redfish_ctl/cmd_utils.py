@@ -5,11 +5,11 @@ should be here.
 Author Mus spyroot@gmail.com
 """
 import argparse
+import json
 import os
 import warnings
 from pathlib import Path
 from typing import Optional
-import json
 
 
 def from_json_spec(from_spec: str):

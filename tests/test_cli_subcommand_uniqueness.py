@@ -19,6 +19,8 @@ import redfish_ctl  # noqa: F401  — populates the registry with the wired comm
 import redfish_ctl.compute.cmd_update  # noqa: F401  — force-load the un-wired update cmd
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_main import create_cmd_tree
+from redfish_ctl.redfish_manager import RedfishManager
+from redfish_ctl.supermico_manager import SupermicroManager
 
 
 def _registered_subcommand_names():
@@ -50,9 +52,28 @@ def test_compute_query_and_compute_update_are_distinct():
 
 
 def test_full_parser_builds_without_conflict():
-    """create_cmd_tree assembles every subparser (raises on 3.11+ if duplicated)."""
+    """The Dell command tree assembles without duplicate subparsers."""
     parser = argparse.ArgumentParser(prog="redfish_ctl")
-    mapping = create_cmd_tree(parser)
+    mapping = create_cmd_tree(parser, IDracManager)
     # A well-formed tree maps each unique subcommand name to exactly one command.
     assert "compute-update" in mapping
     assert len(mapping) == len(set(mapping))
+
+
+def test_neutral_parser_contains_only_dmtf_command_roots():
+    """The bare command tree exposes the generic action and discovery verbs."""
+    parser = argparse.ArgumentParser(prog="redfish_ctl")
+    mapping = create_cmd_tree(parser, RedfishManager)
+
+    assert {"actions", "bmc-scan", "discovery"} <= mapping.keys()
+    assert "compute-update" not in mapping
+    assert "exporter" not in mapping
+
+
+def test_supermicro_parser_composes_dmtf_and_exporter_commands():
+    """Supermicro help combines the DMTF base with its exporter command."""
+    parser = argparse.ArgumentParser(prog="redfish_ctl")
+    mapping = create_cmd_tree(parser, SupermicroManager)
+
+    assert {"actions", "bmc-scan", "discovery", "exporter"} <= mapping.keys()
+    assert "compute-update" not in mapping

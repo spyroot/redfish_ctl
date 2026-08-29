@@ -13,7 +13,7 @@ reaches real hardware.
 """
 
 from redfish_ctl.chassis.cmd_chasis_reset import ChassisReset
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 _TASK_STATE = {"TaskState": "Completed", "TaskStatus": "OK"}

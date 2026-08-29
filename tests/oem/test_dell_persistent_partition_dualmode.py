@@ -9,7 +9,7 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.oem.cmd_dell_persistent_partition import (
     DellPersistentPartitionActions,
 )
@@ -44,7 +44,6 @@ def dell_persistent_mock():
     service = MockRedfishService(
         DELL_CORPUS,
         index=_build_fixture_index(DELL_CORPUS),
-        vendor="dell",
     )
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
@@ -54,9 +53,9 @@ def dell_persistent_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-persistent",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-persistent",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

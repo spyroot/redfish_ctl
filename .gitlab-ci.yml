@@ -1,16 +1,11 @@
 # GitLab pipeline for the homelab platform. Every job runs on the self-managed `homelab-k8s` runner
 # (Kubernetes executor: one disposable pod per job — the execution authority). Gates are driven from
-# gates/manifest.yaml via scripts/gates/run.sh <profile>. The meta-gate (tools/gate_meta.py) enforces
+# gates/manifest.yaml through scripts/check.sh. The meta-gate (tools/gate_meta.py) enforces
 # that the required jobs exist, none uses allow_failure, every job carries the homelab-k8s tag, and no
 # live-apply job is reachable from a merge-request pipeline.
 #
-# Four pipeline shapes:
-#   merge-request  -> gate-merge (static + unit + render; NO cluster mutation, NO production creds)
-#   default-branch -> gate-merge + gate-integration
-#   scheduled      -> gate-integration (cluster smoke)
-#   manual protected deploy -> deploy-apply (protected branch only, manual, serialized)
-#   protected default branch -> publish-github (GATED outbound mirror: agent files/names/secrets
-#                               must pass the boundary gates before anything reaches public GitHub)
+# Job rules below isolate diagnostic, merge, integration, protected deployment,
+# and publication paths. Operator guidance lives in docs/external/ci.md.
 stages: [validate, integration, deploy, publish]
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
@@ -30,28 +25,85 @@ default:
     - eval "$(conda shell.bash hook)" && conda activate redfish_ctl
 
 variables:
+  # Direct exact-ref API pipelines need a full clone so changed-file gates can
+  # compute their merge base against origin/main deterministically.
+  GIT_DEPTH: "0"
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
+
+.private-api-web:
+  rules:
+    - &private-api-web
+      if: >-
+        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api")
+
+.focused-dispatch:
+  rules:
+    - &focused-dispatch
+      if: >-
+        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        $FOCUSED_GATE != null && $FOCUSED_GATE != ""
+
+.merge-profile-dispatch:
+  rules:
+    - &merge-profile-dispatch
+      if: >-
+        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        $MERGE_PROFILE == "merge"
+
+focused-gate:
+  stage: validate
+  tags: [homelab-k8s]
+  rules:
+    - *focused-dispatch
+    - when: never
+  script:
+    # A focused result proves only this gate at this commit. It is not merge or release evidence.
+    - ./scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"
+  artifacts:
+    when: always
+    paths:
+      - reports/gate-report.sanitized.json
+      - reports/gates/
 
 gate-merge:
   stage: validate
   tags: [homelab-k8s]
   rules:
+    - <<: *focused-dispatch
+      when: never
+    - *merge-profile-dispatch
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - ./scripts/check.sh --list
-    - ./scripts/gates/run.sh merge
+    - ./scripts/check.sh --profile "${MERGE_PROFILE:-merge}"
+  artifacts:
+    when: always
+    paths:
+      - reports/gate-report.sanitized.json
+      - reports/gates/
 
 gate-integration:
   stage: integration
   tags: [homelab-k8s]
   rules:
+    - <<: *private-api-web
+      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
-    - ./scripts/gates/run.sh integration
+    - ./scripts/check.sh --profile integration
+  artifacts:
+    when: always
+    paths:
+      - reports/gate-report.sanitized.json
+      - reports/gates/
 
 # Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
 # never from a workstation. The runner pod already carries a ServiceAccount, so
@@ -65,6 +117,8 @@ k8s-live-check:
   stage: integration
   tags: [homelab-k8s]
   rules:
+    - <<: *private-api-web
+      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   before_script: []          # no project env needed; this probes the cluster only
@@ -87,12 +141,14 @@ deploy-apply:
     name: production
   resource_group: homelab-apply
   rules:
+    - <<: *private-api-web
+      when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
   variables:
     MUTATION_LOCK: "$CI_JOB_ID"
   script:
-    - ./scripts/gates/run.sh deploy
+    - ./scripts/check.sh --profile deploy
 
 # Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
 # Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
@@ -101,13 +157,15 @@ publish-github:
   stage: publish
   tags: [homelab-k8s]
   rules:
+    - <<: *private-api-web
+      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
   before_script: []          # boundary gates need no project environment
   script:
     # Run the PROFILE, not a hand-listed set of scripts. A hand-listed set silently stops covering
     # the boundary the moment a gate is added to the registry — which is exactly how the exact-commit,
     # agent-artifact and large-artifact checks came to be missing here.
-    - ./scripts/gates/run.sh repository-export
+    - ./scripts/check.sh --profile repository-export
     # The shared contract's export chain also requires a secret scan and sanitized evidence. Both are
     # registered under `merge` because they run there too, and the schema allows a gate exactly one
     # profile, so they are named explicitly rather than duplicated under a second id.
