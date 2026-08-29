@@ -21,7 +21,7 @@ from redfish_ctl.api import (
     TemperatureReading,
     ThermalStatus,
 )
-from redfish_ctl.idrac_manager import IDracManager
+from redfish_ctl.redfish_manager import RedfishManager
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_MODULE = REPO_ROOT / "k8s" / "controller" / "redfish_endpoint_controller.py"
@@ -62,6 +62,11 @@ class FakeSpan:
         :param value: span attribute value.
         """
         self.attributes[key] = value
+
+
+def _conditions_by_type(status: dict) -> dict[str, dict]:
+    """Index Kubernetes status conditions by type."""
+    return {item["type"]: item for item in status["conditions"]}
 
 
 def test_crd_schema_pins_read_only_endpoint_spec_and_status_shape() -> None:
@@ -193,7 +198,7 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
 
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
-        manager = IDracManager(
+        manager = RedfishManager(
             host="mock-gb300",
             username="root",
             password="mock",
@@ -233,6 +238,80 @@ def test_poll_endpoint_reads_gb300_corpus_without_mutating_requests() -> None:
     assert set(seen_methods) == {"GET"}
 
 
+def test_poll_endpoint_default_dmtf_path_uses_redfish_manager_not_idrac(
+    monkeypatch,
+) -> None:
+    """Default endpoint polls instantiate the neutral manager, never IDracManager."""
+    from redfish_ctl.idrac_manager import IDracManager
+
+    module = _load_controller_module()
+    built: list[type] = []
+
+    def forbidden_idrac_init(self, *args, **kwargs):
+        raise AssertionError(
+            "DMTF endpoint controller path instantiated IDracManager"
+        )
+
+    def fake_get_system(manager):
+        built.append(type(manager))
+        return SystemStatus("System_0", "System_0", "On", "OK", "Enabled", {})
+
+    monkeypatch.setattr(IDracManager, "__init__", forbidden_idrac_init)
+    monkeypatch.setattr(module, "get_system", fake_get_system)
+    monkeypatch.setattr(module, "get_sensors", lambda manager: ())
+    monkeypatch.setattr(
+        module,
+        "get_thermal",
+        lambda manager: ThermalStatus(summary={}, temperatures=(), fans=(), raw={}),
+    )
+    monkeypatch.setattr(module, "_safe_network_firmware", lambda manager: None)
+
+    status = module.poll_endpoint(
+        {"address": "mock-bmc", "port": 8443, "insecure": False},
+        credentials={"username": "root", "password": "mock"},
+        polled_at=datetime(2026, 7, 10, 15, 0, tzinfo=timezone.utc),
+    )
+
+    assert module.MANAGER_FACTORY is RedfishManager
+    default_factory = module.poll_endpoint.__kwdefaults__["manager_factory"]
+    assert default_factory is RedfishManager
+    assert built == [RedfishManager]
+    assert status["powerState"] == "On"
+    assert status["health"] == "OK"
+
+
+def test_make_manager_uses_canonical_constructor_kwargs() -> None:
+    """Endpoint controller builds managers with host/username/password/port kwargs."""
+    module = _load_controller_module()
+    built: list[dict] = []
+
+    def factory(**kwargs):
+        built.append(kwargs)
+        return object()
+
+    module._make_manager(
+        {"address": "mock-bmc", "port": 8443, "insecure": False},
+        {"username": "bmc-admin", "password": "secret"},
+        factory,
+    )
+
+    assert built == [
+        {
+            "host": "mock-bmc",
+            "username": "bmc-admin",
+            "password": "secret",
+            "port": 8443,
+            "insecure": False,
+            "is_http": False,
+            "is_debug": False,
+        }
+    ]
+    retired_connection_keys = {
+        "idrac_" + suffix for suffix in ("ip", "username", "password", "port")
+    }
+    assert not retired_connection_keys & set(built[0])
+
+
 def test_kopf_handler_patches_status_only(monkeypatch) -> None:
     """The handler writes status through the kopf patch, returns None, never mutates."""
     module = _load_controller_module()
@@ -265,25 +344,34 @@ def test_kopf_handler_patches_status_only(monkeypatch) -> None:
     # does not persist a result under a status field the structural CRD rejects
     # (the source of the "merge-patching inconsistencies" warning every poll).
     assert result is None
-    assert patch == {
-        "status": {
-            "powerState": "On",
-            "health": "OK",
-            "temperature": {"count": 1, "maxCelsius": 24.4},
-            "lastPolled": "2026-07-10T14:50:00Z",
-            "conditions": [
-                {
-                    "type": "EndpointReachable",
-                    "status": "True",
-                    "reason": "PollSucceeded",
-                    "lastTransitionTime": "2026-07-10T14:50:00Z",
-                }
-            ],
-            "consecutiveFailures": 0,
-            "lastError": None,
-            "nextPollAfter": None,
-        }
+    status = patch["status"]
+    assert status["powerState"] == "On"
+    assert status["health"] == "OK"
+    assert status["temperature"] == {"count": 1, "maxCelsius": 24.4}
+    assert status["lastPolled"] == "2026-07-10T14:50:00Z"
+    assert status["consecutiveFailures"] == 0
+    assert status["lastError"] is None
+    assert status["nextPollAfter"] is None
+
+    conditions = _conditions_by_type(status)
+    assert set(conditions) == {
+        "Reachable",
+        "Authenticated",
+        "ProfileResolved",
+        "Ready",
     }
+    assert conditions["Reachable"]["status"] == "True"
+    assert conditions["Reachable"]["reason"] == "RedfishServiceResponding"
+    assert conditions["Authenticated"]["status"] == "True"
+    assert conditions["Authenticated"]["reason"] == "CredentialsAccepted"
+    assert conditions["ProfileResolved"]["status"] == "True"
+    assert conditions["ProfileResolved"]["reason"] == "DmtfProfileSelected"
+    assert conditions["Ready"]["status"] == "True"
+    assert conditions["Ready"]["reason"] == "PollSucceeded"
+    assert all(
+        condition["lastTransitionTime"] == "2026-07-10T14:50:00Z"
+        for condition in conditions.values()
+    )
     assert calls == [
         (
             {"address": "mock-bmc", "secretRef": {"name": "bmc-login"}},
@@ -676,7 +764,73 @@ def test_handler_force_polls_even_when_not_due(monkeypatch) -> None:
     # Would be skipped without force (1s elapsed vs 1h interval); force overrides.
     assert called == [1]
     assert patch["status"]["powerState"] == "On"
-    assert patch["status"]["conditions"][0]["status"] == "True"
+    conditions = _conditions_by_type(patch["status"])
+    assert conditions["Ready"]["status"] == "True"
+    assert conditions["Ready"]["reason"] == "PollSucceeded"
+
+
+def test_handler_preserves_condition_transition_time_when_status_is_unchanged(
+    monkeypatch,
+) -> None:
+    """Unchanged condition status keeps its transition time; changed status advances."""
+    module = _load_controller_module()
+    now = datetime(2026, 7, 10, 16, 0, 0, tzinfo=timezone.utc)
+    previous_time = "2026-07-10T15:00:00Z"
+    monkeypatch.setattr(module, "_utc_now", lambda: now)
+
+    def fake_poll(spec, credentials=None, manager_factory=None, polled_at=None):
+        return {
+            "powerState": "On",
+            "health": "OK",
+            "temperature": {"count": 0, "maxCelsius": None},
+            "lastPolled": module._rfc3339(now),
+        }
+
+    monkeypatch.setattr(module, "poll_endpoint", fake_poll)
+
+    previous_conditions = [
+        {
+            "type": "Reachable",
+            "status": "True",
+            "reason": "RedfishServiceResponding",
+            "lastTransitionTime": previous_time,
+        },
+        {
+            "type": "Authenticated",
+            "status": "True",
+            "reason": "CredentialsAccepted",
+            "lastTransitionTime": previous_time,
+        },
+        {
+            "type": "ProfileResolved",
+            "status": "True",
+            "reason": "DmtfProfileSelected",
+            "lastTransitionTime": previous_time,
+        },
+        {
+            "type": "Ready",
+            "status": "False",
+            "reason": "BMCUnreachable",
+            "lastTransitionTime": previous_time,
+        },
+    ]
+
+    patch: dict = {}
+    module.poll_redfish_endpoint(
+        spec={"address": "bmc", "pollInterval": "30s"},
+        body={"status": {"conditions": previous_conditions}},
+        namespace="default",
+        name="node-a",
+        patch=patch,
+        force=True,
+    )
+
+    conditions = _conditions_by_type(patch["status"])
+    assert conditions["Reachable"]["lastTransitionTime"] == previous_time
+    assert conditions["Authenticated"]["lastTransitionTime"] == previous_time
+    assert conditions["ProfileResolved"]["lastTransitionTime"] == previous_time
+    assert conditions["Ready"]["status"] == "True"
+    assert conditions["Ready"]["lastTransitionTime"] == module._rfc3339(now)
 
 
 # ---------------------------------------------------------------------------
@@ -711,10 +865,54 @@ def test_handler_records_error_condition_and_backoff_on_bmc_failure(monkeypatch)
     # keys (so a merge-patch preserves the last good ones).
     assert status["consecutiveFailures"] == 1
     assert status["lastError"] == "connection refused"
-    assert status["conditions"][0]["type"] == "EndpointReachable"
-    assert status["conditions"][0]["status"] == "False"
-    assert status["conditions"][0]["reason"] == "BMCUnreachable"
     assert status["nextPollAfter"] == module._rfc3339(now + timedelta(seconds=30))
+    conditions = _conditions_by_type(status)
+    assert conditions["Reachable"]["status"] == "False"
+    assert conditions["Reachable"]["reason"] == "BMCUnreachable"
+    assert conditions["Authenticated"]["status"] == "Unknown"
+    assert conditions["Authenticated"]["reason"] == "AuthenticationNotAttempted"
+    assert conditions["ProfileResolved"]["status"] == "Unknown"
+    assert conditions["ProfileResolved"]["reason"] == "ProfileNotResolved"
+    assert conditions["Ready"]["status"] == "False"
+    assert conditions["Ready"]["reason"] == "BMCUnreachable"
+    assert "powerState" not in status
+    assert "lastPolled" not in status
+
+
+def test_handler_records_authentication_failure_as_reachable_not_authenticated(
+    monkeypatch,
+) -> None:
+    """401/403-style failures mean the service responded but credentials failed."""
+    module = _load_controller_module()
+    now = datetime(2026, 7, 10, 15, 1, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(module, "_utc_now", lambda: now)
+
+    def raise_auth(*_a, **_k):
+        raise module.AuthenticationFailed("bad credentials")
+
+    monkeypatch.setattr(module, "poll_endpoint", raise_auth)
+
+    patch: dict = {}
+    result = module.poll_redfish_endpoint(
+        spec={"address": "bmc", "pollInterval": "30s"},
+        body={"status": {}},
+        namespace="default",
+        name="node-a",
+        patch=patch,
+    )
+
+    assert result is None
+    status = patch["status"]
+    assert status["lastError"] == "bad credentials"
+    conditions = _conditions_by_type(status)
+    assert conditions["Reachable"]["status"] == "True"
+    assert conditions["Reachable"]["reason"] == "RedfishServiceResponding"
+    assert conditions["Authenticated"]["status"] == "False"
+    assert conditions["Authenticated"]["reason"] == "AuthenticationFailed"
+    assert conditions["ProfileResolved"]["status"] == "Unknown"
+    assert conditions["ProfileResolved"]["reason"] == "ProfileNotResolved"
+    assert conditions["Ready"]["status"] == "False"
+    assert conditions["Ready"]["reason"] == "AuthenticationFailed"
     assert "powerState" not in status
     assert "lastPolled" not in status
 
@@ -750,7 +948,15 @@ def test_handler_error_increments_prior_failure_count(monkeypatch) -> None:
 
     status = patch["status"]
     assert status["consecutiveFailures"] == 3
-    assert status["conditions"][0]["reason"] == "Timeout"
+    conditions = _conditions_by_type(status)
+    assert conditions["Reachable"]["status"] == "False"
+    assert conditions["Reachable"]["reason"] == "Timeout"
+    assert conditions["Authenticated"]["status"] == "Unknown"
+    assert conditions["Authenticated"]["reason"] == "AuthenticationNotAttempted"
+    assert conditions["ProfileResolved"]["status"] == "Unknown"
+    assert conditions["ProfileResolved"]["reason"] == "ProfileNotResolved"
+    assert conditions["Ready"]["status"] == "False"
+    assert conditions["Ready"]["reason"] == "Timeout"
     # base 30s * 2**(3-1) = 120s backoff.
     assert status["nextPollAfter"] == module._rfc3339(now + timedelta(seconds=120))
     # lastPolled from the prior success is untouched by the error patch.

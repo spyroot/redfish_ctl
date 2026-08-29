@@ -13,20 +13,15 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
+from ..cmd_exceptions import FailedDiscoverAction, InvalidArgument
 from ..redfish_api_common import REDFISH_API, ApiRequestType, ResetType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 _NETWORK_ADAPTER_RESET_ACTION = "#NetworkAdapter.Reset"
 _RESET_TYPE_VALUES = frozenset(item.value for item in ResetType)
 
 
-class _DiscoveryError(RuntimeError):
-    """Raised when required reset discovery reads fail."""
-
-
-class NetworkAdapterReset(IDracManager,
+class NetworkAdapterReset(RedfishManager,
                           scm_type=ApiRequestType.NetworkAdapterReset,
                           name="network-adapter-reset",
                           metaclass=Singleton):
@@ -140,21 +135,23 @@ class NetworkAdapterReset(IDracManager,
         :param do_async: run the query through the async path when True.
         :param required: raise when the read fails instead of returning ``{}``.
         :return: parsed resource body dict, or ``{}`` for optional failures.
-        :raises _DiscoveryError: when a required resource cannot be read.
+        :raises FailedDiscoverAction: when a required resource cannot be read.
         """
         try:
             result = self.base_query(uri, do_async=do_async)
         except Exception as exc:
             if required:
-                raise _DiscoveryError(f"failed to read {uri}: {exc}") from exc
+                raise FailedDiscoverAction(f"failed to read {uri}: {exc}") from exc
             return {}
         if result.error:
             if required:
-                raise _DiscoveryError(f"failed to read {uri}: {result.error}")
+                raise FailedDiscoverAction(f"failed to read {uri}: {result.error}")
             return {}
         data = result.data or {}
         if required and not isinstance(data, dict):
-            raise _DiscoveryError(f"failed to read {uri}: expected a Redfish object")
+            raise FailedDiscoverAction(
+                f"failed to read {uri}: expected a Redfish object"
+            )
         return data if isinstance(data, dict) else {}
 
     def _row_from_adapter(self, adapter_uri, adapter):
@@ -309,13 +306,13 @@ class NetworkAdapterReset(IDracManager,
         if not adapter:
             try:
                 rows = self._resettable_adapters(bool(do_async))
-            except _DiscoveryError as exc:
+            except FailedDiscoverAction as exc:
                 return CommandResult(None, None, None, str(exc))
             return CommandResult({"resettable_adapters": rows}, None, None, None)
 
         try:
             row = self._resolve_adapter(adapter, bool(do_async))
-        except _DiscoveryError as exc:
+        except FailedDiscoverAction as exc:
             return CommandResult(None, None, None, str(exc))
         result = self.invoke_action(
             row["Resource"],

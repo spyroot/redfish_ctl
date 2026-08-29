@@ -15,12 +15,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class EthernetInterfaces(IDracManager,
+class EthernetInterfaces(RedfishManager,
                          scm_type=ApiRequestType.EthernetInterfaces,
                          name='ethernet-interfaces',
                          metaclass=Singleton):

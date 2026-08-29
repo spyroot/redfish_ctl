@@ -30,7 +30,7 @@ def test_secure_boot_returns_fixture_database_rows_without_mutation(
     redfish_mock_factory,
 ):
     """secure-boot returns fixture database rows with GET-only traffic."""
-    monkeypatch.delenv("IDRAC_IP", raising=False)
+    monkeypatch.delenv("REDFISH_IP", raising=False)
     redfish_api, redfish_service = redfish_mock_factory("hpe")
 
     result = redfish_api.sync_invoke(ApiRequestType.SecureBoot, "secure-boot")

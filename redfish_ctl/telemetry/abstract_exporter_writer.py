@@ -6,10 +6,9 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import Callable, Iterable
 
-if TYPE_CHECKING:
-    from redfish_ctl.telemetry.exporter import MetricSample
+from redfish_ctl.telemetry.metric_model import MetricSample
 
 
 class AbstractExporterWriter(ABC):
@@ -18,7 +17,8 @@ class AbstractExporterWriter(ABC):
     A writer is decoupled from the reader: it consumes the shared ``MetricSample``
     model and owns *where* and *how* samples are emitted (Prometheus text, SignalFx
     push, OTLP), including its own backend config (endpoint, token, settings). The
-    reader never knows the destination, so one writer serves every vendor's reader.
+    reader never knows the destination, so writers stay independent of the
+    concrete reader selected by a vendor command.
     """
 
     @abstractmethod

@@ -110,7 +110,7 @@ class AttributesQuery(
         if do_deep:
             extra_data = [
                 self.api_get_call(
-                    f"{self._default_method}{self.idrac_ip}{a}", headers).json()
+                    f"{self._default_method}{self.redfish_ip}{a}", headers).json()
                 for a in extra_actions
             ]
 

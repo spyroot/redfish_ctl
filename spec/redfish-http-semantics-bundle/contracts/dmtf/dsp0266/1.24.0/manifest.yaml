@@ -1,0 +1,48 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolManifest
+metadata:
+  name: dmtf-dsp0266-1.24.0
+spec:
+  authority:
+    protocol:
+      document: DSP0266
+      version: 1.24.0
+      documentDate: 2026-04-02
+      publicationDate: 2026-05-17
+      status: published
+      class: normative
+      html: https://www.dmtf.org/sites/default/files/standards/documents/DSP0266_1.24.0.html
+      versions: https://www.dmtf.org/dsp/DSP0266
+    release:
+      name: Redfish 2026.1
+      publicationDate: 2026-05-17
+      index: https://www.dmtf.org/standards/redfish
+    schemas:
+      document: DSP8010
+      version: 2026.1
+    registries:
+      document: DSP8011
+      version: 2026.1
+  imports:
+    - global/normative-language.yaml
+    - global/status-codes.yaml
+    - global/error-response.yaml
+    - methods/post-create.yaml
+    - methods/update-delete.yaml
+    - services/task-monitor.yaml
+    - services/eventing.yaml
+  resolution:
+    precedence:
+      - exact_condition
+      - exact_service_operation
+      - generic_operation
+      - generic_method
+      - global_status
+    strictDmtf:
+      oemOverlayMayReplaceRequiredRule: false
+      implementationSpecificStatusIsAutomaticFailure: false
+  generated:
+    - generated/dmtf-effective-matrix.json
+    - generated/dmtf-effective-matrix.csv
+    - generated/dmtf-effective-matrix.md
+    - generated/eventing-matrix.csv

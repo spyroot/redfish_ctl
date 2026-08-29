@@ -1,9 +1,11 @@
 # Telemetry and tracing merge gates
 
 Operator-defined gate contract (2026-07-17). Every telemetry or tracing change merges only
-through the gates below. Machine-readable companions: `span_contract.yaml` (span attribute
-schema) and `expected_signals.yaml` (fixture-to-signal mapping). Contract tests assert these
-documents against the code; drift in either direction blocks merge.
+through the gates below. Machine-readable companions are `span_contract.yaml`
+(span attributes), `catalog.yaml` (shared exporter self-metrics), and the
+concrete reader contracts `supermicro/catalog.yaml` and
+`supermicro/expected_signals.yaml`. Contract tests assert these documents
+against the code; drift in either direction blocks merge.
 
 ## Merge gates
 
@@ -185,7 +187,7 @@ Gate:
 Covered source properties: `Status.Health`, `Status.HealthRollup`, `Status.State`,
 `LinkDownReasonCode`, `EDPViolationState`, `PowerBreakPerformanceState`, `LastResetType`.
 
-Every property has fixture rows in `expected_signals.yaml`, e.g.:
+Every property has fixture rows in `supermicro/expected_signals.yaml`, e.g.:
 
 ```yaml
 source_property: Status.Health

@@ -22,6 +22,7 @@ class RedfishApiRespond(Enum):
     """
     Ok = auto()
     Error = auto()
+    Created = auto()
     Success = auto()
     AcceptedTaskGenerated = auto()
 

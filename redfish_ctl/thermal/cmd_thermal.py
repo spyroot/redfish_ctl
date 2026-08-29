@@ -9,12 +9,11 @@ metrics (temperature readings), and fan inventory.
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class Thermal(IDracManager,
+class Thermal(RedfishManager,
               scm_type=ApiRequestType.Thermal,
               name="thermal",
               metaclass=Singleton):
@@ -82,30 +81,39 @@ class Thermal(IDracManager,
         status = data.get("Status") if isinstance(data, dict) else None
         return status if isinstance(status, dict) else {}
 
-    def _query_optional(self, uri, do_async=False):
+    def _query_optional(self, uri, do_async=False, preserve_errors=False):
         """Query a URI and return its payload, swallowing any error.
 
         :param uri: the Redfish resource URI to fetch.
         :param do_async: when True, run the query on an asyncio event loop.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: the decoded payload dict, or an empty dict on any failure.
         """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return {}
 
-    def _read_fans(self, chassis_id, fans_uri, do_async=False):
+    def _read_fans(
+            self, chassis_id, fans_uri, do_async=False, preserve_errors=False):
         """Read a Fans collection and expand each fan into a summary row.
 
         :param chassis_id: the owning chassis identifier.
         :param fans_uri: the Fans collection URI.
         :param do_async: when True, run the queries on an asyncio event loop.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: a (collection, rows) tuple — ``collection`` is a summary dict
             of the Fans resource (chassis id and members) and ``rows`` the
             per-fan summary list; ``collection`` is None only in the defensive
             case where the fetch does not yield a dict.
         """
-        data = self._query_optional(fans_uri, do_async=do_async)
+        data = self._query_optional(
+            fans_uri,
+            do_async=do_async,
+            preserve_errors=preserve_errors,
+        )
         if not isinstance(data, dict):
             return None, []
         members = data.get("Members") or []
@@ -124,7 +132,11 @@ class Thermal(IDracManager,
             fan_uri = member.get("@odata.id")
             fan = member
             if fan_uri and "Status" not in fan:
-                fan = self._query_optional(fan_uri, do_async=do_async)
+                fan = self._query_optional(
+                    fan_uri,
+                    do_async=do_async,
+                    preserve_errors=preserve_errors,
+                )
             if not isinstance(fan, dict):
                 continue
             status = self._status(fan)
@@ -168,6 +180,7 @@ class Thermal(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Aggregate every chassis ThermalSubsystem, its metrics, and fans.
 
@@ -178,6 +191,8 @@ class Thermal(IDracManager,
             loop.
         :param do_expanded: accepted for CLI compatibility; not used by this
             command.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: a CommandResult wrapping the collected thermal summary,
             subsystems, thermal metrics, temperature readings, and fans.
         """
@@ -194,11 +209,19 @@ class Thermal(IDracManager,
 
         for chassis_uri in chassis_uris:
             chassis_id = self._chassis_id(chassis_uri)
-            chassis_data = self._query_optional(chassis_uri, do_async=do_async)
+            chassis_data = self._query_optional(
+                chassis_uri,
+                do_async=do_async,
+                preserve_errors=bool(preserve_errors),
+            )
             thermal_uri = self._link(chassis_data, "ThermalSubsystem")
             if not thermal_uri:
                 continue
-            thermal = self._query_optional(thermal_uri, do_async=do_async)
+            thermal = self._query_optional(
+                thermal_uri,
+                do_async=do_async,
+                preserve_errors=bool(preserve_errors),
+            )
             if not isinstance(thermal, dict) or not thermal:
                 continue
             status = self._status(thermal)
@@ -216,7 +239,11 @@ class Thermal(IDracManager,
             })
 
             if metrics_uri:
-                metrics = self._query_optional(metrics_uri, do_async=do_async)
+                metrics = self._query_optional(
+                    metrics_uri,
+                    do_async=do_async,
+                    preserve_errors=bool(preserve_errors),
+                )
                 if isinstance(metrics, dict) and metrics:
                     temps = self._temperature_rows(chassis_id, metrics)
                     data["thermal_metrics"].append({
@@ -229,7 +256,11 @@ class Thermal(IDracManager,
 
             if fans_uri:
                 fan_collection, fans = self._read_fans(
-                    chassis_id, fans_uri, do_async=do_async)
+                    chassis_id,
+                    fans_uri,
+                    do_async=do_async,
+                    preserve_errors=bool(preserve_errors),
+                )
                 if fan_collection is not None:
                     data["fan_collections"].append(fan_collection)
                     data["fans"].extend(fans)

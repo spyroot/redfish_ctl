@@ -5,12 +5,11 @@
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class EventServiceQuery(IDracManager,
+class EventServiceQuery(RedfishManager,
                         scm_type=ApiRequestType.EventServiceQuery,
                         name='event-service',
                         metaclass=Singleton):

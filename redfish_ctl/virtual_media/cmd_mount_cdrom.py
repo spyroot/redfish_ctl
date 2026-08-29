@@ -26,12 +26,11 @@ import argparse
 from abc import abstractmethod
 from typing import List, Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class MountCdrom(IDracManager,
+class MountCdrom(RedfishManager,
                  scm_type=ApiRequestType.VirtualMediaInsert,
                  name='mount_cdrom',
                  metaclass=Singleton):

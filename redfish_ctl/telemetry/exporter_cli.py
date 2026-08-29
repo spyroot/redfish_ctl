@@ -1,10 +1,7 @@
-"""Shared CLI registration for the telemetry ``exporter`` subcommand.
+"""Shared flags for vendor-scoped exporters, currently used by Supermicro.
 
-Every vendor's exporter command exposes the same flags — Prometheus/SignalFx/OTLP
-output selection, identity derivation, and OTel service attributes; none of them
-are vendor-specific. They are registered here once so each vendor command's
-``register_subcommand`` is a single call with zero duplication across
-``supermicro/``, ``dmtf/``, and ``dell/`` exporters.
+The output, identity, and OpenTelemetry options are independent of the concrete
+reader even though only the Supermicro exporter is currently registered.
 
 Author Mus spyroot@gmail.com
 """
@@ -41,7 +38,7 @@ def register_exporter_subcommand(cls):
     cmd_parser.add_argument(
         "--credential-file", dest="exporter_credential_file", default=None, type=str,
         help="gitignored KEY=VALUE runtime file for "
-             "REDFISH_IP/USERNAME/PASSWORD/PORT (legacy IDRAC_* also accepted)")
+             "the canonical REDFISH_IP/USERNAME/PASSWORD/PORT keys")
     cmd_parser.add_argument(
         "--exporter-config", dest="exporter_config_file", default=None, type=str,
         help="JSON exporter config spec for SignalFx ingest/token source and "

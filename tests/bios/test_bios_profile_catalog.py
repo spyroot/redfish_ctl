@@ -205,9 +205,6 @@ def test_bios_profile_cli_runs_without_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
     ):
         env.pop(name, None)
 
@@ -245,10 +242,6 @@ def test_bios_profile_cli_accepts_canonical_connection_flags():
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
             "REDFISH_PORT",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
-            "IDRAC_PORT",
     ):
         env.pop(name, None)
 
@@ -291,9 +284,6 @@ def test_bios_profile_diff_cli_requires_bmc_connection():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
     ):
         env.pop(name, None)
 
@@ -327,9 +317,6 @@ def test_bios_profile_apply_cli_requires_bmc_credentials():
             "REDFISH_IP",
             "REDFISH_USERNAME",
             "REDFISH_PASSWORD",
-            "IDRAC_IP",
-            "IDRAC_USERNAME",
-            "IDRAC_PASSWORD",
     ):
         env.pop(name, None)
 

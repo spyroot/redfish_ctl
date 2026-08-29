@@ -15,11 +15,11 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import CommandResult, IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class SystemQuery(IDracManager,
+class SystemQuery(RedfishManager,
                   scm_type=ApiRequestType.SystemQuery,
                   name='system_query',
                   metaclass=Singleton):
@@ -75,44 +75,32 @@ class SystemQuery(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 save_dir: Optional[str] = None, **kwargs) -> CommandResult:
-        """Execute main system query. From here we see what system support.
-        Power state / and overall view.
+        """Read the managed ComputerSystem and its linked resources on request.
 
-        Method return actual json and dict where each key is action
-        and respected reset end point.
+        The base manager resolves ``/redfish/v1/Systems/<managed-system-id>``.
+        With ``do_deep``, each top-level ``@odata.id`` link is fetched and
+        returned with the ComputerSystem payload.
 
-        Bios: /redfish/v1/Systems/System.Embedded.1/Bios
-        Memory /redfish/v1/Systems/System.Embedded.1/Memory
-        Processors /redfish/v1/Systems/System.Embedded.1/Processors
-        SecureBoot /redfish/v1/Systems/System.Embedded.1/SecureBoot
-        SimpleStorage /redfish/v1/Systems/System.Embedded.1/SimpleStorage
-        Storage /redfish/v1/Systems/System.Embedded.1/Storage
-        VirtualMedia /redfish/v1/Systems/System.Embedded.1/VirtualMedia
-        EthernetInterfaces: /redfish/v1/Systems/System.Embedded.1/EthernetInterfaces
-        NetworkInterfaces /redfish/v1/Systems/System.Embedded.1/NetworkInterfaces
-
-        :param save_dir:
-        :param do_async:
-        :param verbose:
-        :param do_deep: if caller indicate deep, method will perform deep call
-                     for each end point.
-        :param filename: if filename indicate call will save the response to this file.
-        :param data_type:  what data type we use to serialize data.
-        :return: json or xml and dict that host type of action and rest api end point.
+        :param filename: optional output filename.
+        :param data_type: response serialization type.
+        :param do_deep: fetch top-level linked resources when true.
+        :param verbose: print request details when true.
+        :param do_async: accepted for command compatibility.
+        :param save_dir: optional directory for saved output.
+        :param kwargs: additional command arguments.
+        :return: command result containing the system data and linked resources.
         """
         if verbose:
             print(f"filename {filename} data type: {data_type} "
                   f"do_deep: {do_deep}, do_async: {do_async}, "
                   f"save_dir: {save_dir}")
 
-        headers = {}
-        if data_type == "json":
-            headers.update(self.json_content_type)
-
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}"
-        response = self.api_get_call(r, headers)
-        self.default_error_handler(response)
-        data = response.json()
+        data = self.base_query(
+            self.managed_system_uri,
+            data_type=data_type,
+            do_async=do_async,
+            verbose=verbose,
+        ).data
         save_if_needed(filename, data, save_dir=save_dir)
 
         rest_endpoints = {}
@@ -124,11 +112,11 @@ class SystemQuery(IDracManager,
                 rest_endpoints[k] = sub_rest
                 # deep walk
                 if do_deep:
-                    r = f"{self._default_method}{self.idrac_ip}{sub_rest}"
-                    response = self.api_get_call(r, headers)
-                    self.default_error_handler(response)
-                    if verbose:
-                        print(f"sending request {r} status code {response.status_code}")
-                    extra_data_dict[k] = response.json()
+                    extra_data_dict[k] = self.base_query(
+                        sub_rest,
+                        data_type=data_type,
+                        do_async=do_async,
+                        verbose=verbose,
+                    ).data
 
         return CommandResult(data, rest_endpoints, extra_data_dict, None)

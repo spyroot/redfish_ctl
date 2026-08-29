@@ -6,31 +6,43 @@ Author Mus spyroot@gmail.com
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Iterable, Mapping
+from typing import Iterable, Mapping
 
-if TYPE_CHECKING:
-    from redfish_ctl.telemetry.exporter import MetricSample
+from redfish_ctl.telemetry.metric_model import MetricDefinition, MetricSample
 
 
 class AbstractExporterReader(ABC):
     """Interface a class must satisfy to claim to be a telemetry export reader.
 
-    A reader performs pure data adaptation: it maps a vendor's already-collected
-    Redfish rows into the shared, vendor-neutral ``MetricSample`` model. A reader
-    never uses the Redfish transport — collecting the raw rows from the BMC is the
-    command/Manager's job. Every vendor (Supermicro, DMTF, Dell) provides its own
-    reader implementing this contract, so the same metric contract is emitted no
-    matter how a given BMC exposes the source data.
+    A concrete reader owns one vendor's complete read side: which Redfish
+    resources are collected, how unsupported and failed collectors are reported,
+    and how the resulting rows map into the vendor-neutral ``MetricSample`` model.
+    The exporter command supplies the selected manager/transport to the reader and
+    does not duplicate those vendor decisions.
     """
+
+    @abstractmethod
+    def read(self, **kwargs) -> list[MetricSample]:
+        """Collect one scrape and return samples ready for a writer."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def metric_definition(self, metric_name: str) -> MetricDefinition:
+        """Resolve a metric definition from this reader's concrete catalog.
+
+        :param metric_name: canonical metric name.
+        :return: concrete catalog definition.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def build_metric_samples(self, identity: Mapping[str, str],
                              **rows: Iterable[Mapping]) -> list[MetricSample]:
-        """Adapt collected rows into shared samples.
+        """Adapt already-collected rows into shared samples.
 
         :param identity: fixed join dimensions applied to every sample.
         :param rows: named row sources collected from the BMC; the accepted keys
             are vendor-specific and defined by the concrete reader.
         :return: vendor-neutral samples; the base contract yields none.
         """
-        return []
+        raise NotImplementedError

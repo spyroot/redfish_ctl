@@ -1,21 +1,17 @@
 """Native OTLP (OpenTelemetry) output for the telemetry exporter.
 
-This emits the SAME ``hw.*`` metric contract as the Prometheus/SignalFx paths,
-mapped onto the OTLP data model so ``redfish_ctl`` drops into an existing
-OpenTelemetry pipeline as just another producer:
+This maps reader-produced ``MetricSample`` objects onto the OTLP data model:
 
 * identity dimensions (``host.name``/``server.address``/``bmc.ip``/``node``/
   ``vendor``/``deployment.environment``/``deployment.environment.name``)
   become OTel **resource** attributes when present; the remaining per-metric
   dimensions (``gpu``/``port``/``chassis``/``system``/``index``) become
   **datapoint** attributes;
-* monotonic cumulative counters (fabric byte/frame/error/packet/discard/count
-  totals and ``hw.energy_kwh``) become OTLP **Sum**; everything instantaneous
-  (power, temperature, rates, ratios, booleans) stays a **Gauge**.
+* samples declared as counters become monotonic OTLP **Sum** values; other
+  samples become **Gauge** values.
 
-Metric names and dimension keys are unchanged, so this does not alter the
-contract the Prometheus/SignalFx outputs already emit. The OpenTelemetry SDK is
-imported lazily and is only required when ``--output otlp`` is used
+Metric names and dimension keys are unchanged. The OpenTelemetry SDK is imported
+lazily and is only required when ``--output otlp`` is used
 (``pip install "redfish_ctl[otlp]"``).
 """
 from __future__ import annotations
@@ -29,29 +25,10 @@ from ..identity import RESOURCE_DIMENSIONS
 # Identity dims that describe the emitting host -> OTel resource attributes.
 RESOURCE_DIM_KEYS = RESOURCE_DIMENSIONS
 
-# A metric is a monotonic cumulative counter (OTLP Sum) when its name ends with
-# one of these suffixes, or is total energy. Everything else is a Gauge.
-_COUNTER_SUFFIXES = (
-    "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
-    "_total", "_dropped",
-)
-_COUNTER_EXACT = frozenset({"hw.energy_kwh"})
-
 _MISSING_SDK_MSG = (
     "native OTLP output needs the OpenTelemetry SDK. Install it with:\n"
     '    pip install "redfish_ctl[otlp]"'
 )
-
-
-def is_monotonic_counter(metric_name: str) -> bool:
-    """True when ``metric_name`` is a cumulative counter that should be an OTLP Sum.
-
-    :param metric_name: the metric name to classify.
-    :return: True for a monotonic cumulative counter, False for a gauge.
-    """
-    if metric_name in _COUNTER_EXACT:
-        return True
-    return any(metric_name.endswith(sfx) for sfx in _COUNTER_SUFFIXES)
 
 
 def resolve_otlp_config(endpoint: Optional[str] = None,

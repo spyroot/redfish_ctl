@@ -5,7 +5,7 @@ initialize request. The POST realizes as a task, so the vendor-faithful tests
 assert the returned task id matches what each vendor's mock returns: a Dell OEM
 ``JID_`` job vs a plain DMTF TaskService id for every other vendor (the mock's
 ``service.JOB_ID`` moves with the vendor). Runs offline by default and against
-real hardware when IDRAC_IP is set.
+real hardware when REDFISH_IP is set.
 
 Author Mus spyroot@gmail.com
 """

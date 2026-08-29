@@ -8,7 +8,7 @@ second spelling of a flag that already exists.
 
     python3 tools/arg_consistency_gate.py
 
-It does NOT force a global dash-or-underscore convention (``--idrac_ip`` is
+It does NOT force a global dash-or-underscore convention (``--data_only`` is
 deliberately underscore per the config contract) — it forbids a concept from
 having BOTH. Ratchet: existing split pairs are grandfathered in
 tools/arg_consistency_baseline.txt; a NEW split fails, and a fixed one must

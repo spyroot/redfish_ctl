@@ -222,7 +222,7 @@ class DellRaidCheckValues(IDracManager,
         }
         data.update(self.api_success_msg(api_resp))
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
-            data["task_id"] = self.job_id_from_header(response)
+            data["task_id"] = self.job_id_from_response(response)
         else:
             try:
                 data["response"] = response.json()

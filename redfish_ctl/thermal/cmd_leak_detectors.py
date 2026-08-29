@@ -9,12 +9,11 @@ its detector state plus any linked leak policies.
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
 from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class LeakDetectors(IDracManager,
+class LeakDetectors(RedfishManager,
                     scm_type=ApiRequestType.LeakDetectors,
                     name="leak-detectors",
                     metaclass=Singleton):
@@ -100,30 +99,43 @@ class LeakDetectors(IDracManager,
         """
         return chassis_uri.rstrip("/").rsplit("/", 1)[-1]
 
-    def _query_optional(self, uri, do_async=False):
+    def _query_optional(self, uri, do_async=False, preserve_errors=False):
         """Query a URI and return its payload, swallowing any error.
 
         :param uri: the Redfish resource URI to fetch.
         :param do_async: when True, run the query on an asyncio event loop.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: the decoded payload dict, or an empty dict on any failure.
         """
         try:
             return self.base_query(uri, do_async=do_async).data or {}
         except Exception:
+            if preserve_errors:
+                raise
             return {}
 
-    def _read_detectors(self, chassis_id, detectors_uri, do_async=False):
+    def _read_detectors(
+            self,
+            chassis_id,
+            detectors_uri,
+            do_async=False,
+            preserve_errors=False):
         """Read a LeakDetectors collection into per-detector summary rows.
 
         :param chassis_id: the owning chassis identifier.
         :param detectors_uri: the LeakDetectors collection URI.
         :param do_async: when True, run the queries on an asyncio event loop.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: a (collection, rows) tuple — ``collection`` is a summary dict
             of the LeakDetectors resource (chassis id and members) and ``rows``
             the per-detector summary list; ``collection`` is None only in the
             defensive case where the fetch does not yield a dict.
         """
-        data = self._query_optional(detectors_uri, do_async=do_async)
+        data = self._query_optional(
+            detectors_uri,
+            do_async=do_async,
+            preserve_errors=preserve_errors,
+        )
         if not isinstance(data, dict):
             return None, []
         members = data.get("Members") or []
@@ -145,6 +157,7 @@ class LeakDetectors(IDracManager,
                 detector = self._query_optional(
                     detector_uri,
                     do_async=do_async,
+                    preserve_errors=preserve_errors,
                 )
             if not isinstance(detector, dict):
                 continue
@@ -192,20 +205,34 @@ class LeakDetectors(IDracManager,
                 return True
         return False
 
-    def _read_policies(self, chassis_id, policies_uri, do_async=False):
+    def _read_policies(
+            self,
+            chassis_id,
+            policies_uri,
+            do_async=False,
+            preserve_errors=False):
         """Read a policy collection and keep the leak-related policies.
 
         :param chassis_id: the owning chassis identifier.
         :param policies_uri: the policy collection URI.
         :param do_async: when True, run the queries on an asyncio event loop.
+        :param preserve_errors: re-raise failures for exporter health accounting.
         :return: a list of leak-policy summary rows (empty when none match).
         """
-        data = self._query_optional(policies_uri, do_async=do_async)
+        data = self._query_optional(
+            policies_uri,
+            do_async=do_async,
+            preserve_errors=preserve_errors,
+        )
         if not isinstance(data, dict):
             return []
         policies = []
         for policy_uri in self._members(data):
-            policy = self._query_optional(policy_uri, do_async=do_async)
+            policy = self._query_optional(
+                policy_uri,
+                do_async=do_async,
+                preserve_errors=preserve_errors,
+            )
             if not self._is_leak_policy(policy):
                 continue
             status = self._status(policy)
@@ -270,6 +297,7 @@ class LeakDetectors(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Aggregate every chassis LeakDetection subsystem and leak policies.
 
@@ -280,6 +308,8 @@ class LeakDetectors(IDracManager,
             loop.
         :param do_expanded: accepted for CLI compatibility; not used by this
             command.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: a CommandResult wrapping the leak-detection summary,
             subsystems, detector collections, detectors, and policies.
         """
@@ -295,14 +325,26 @@ class LeakDetectors(IDracManager,
 
         for chassis_uri in chassis_uris:
             chassis_id = self._chassis_id(chassis_uri)
-            chassis_data = self._query_optional(chassis_uri, do_async=do_async)
+            chassis_data = self._query_optional(
+                chassis_uri,
+                do_async=do_async,
+                preserve_errors=bool(preserve_errors),
+            )
             thermal_uri = self._link(chassis_data, "ThermalSubsystem")
             thermal = {}
             if thermal_uri:
-                thermal = self._query_optional(thermal_uri, do_async=do_async)
+                thermal = self._query_optional(
+                    thermal_uri,
+                    do_async=do_async,
+                    preserve_errors=bool(preserve_errors),
+                )
             leak_uri = self._link(thermal, "LeakDetection")
             if leak_uri:
-                leak = self._query_optional(leak_uri, do_async=do_async)
+                leak = self._query_optional(
+                    leak_uri,
+                    do_async=do_async,
+                    preserve_errors=bool(preserve_errors),
+                )
                 if isinstance(leak, dict) and leak:
                     status = self._status(leak)
                     detectors_uri = self._link(leak, "LeakDetectors")
@@ -320,6 +362,7 @@ class LeakDetectors(IDracManager,
                             chassis_id,
                             detectors_uri,
                             do_async=do_async,
+                            preserve_errors=bool(preserve_errors),
                         )
                         if collection is not None:
                             data["detector_collections"].append(collection)
@@ -337,6 +380,7 @@ class LeakDetectors(IDracManager,
                         chassis_id,
                         policies_uri,
                         do_async=do_async,
+                        preserve_errors=bool(preserve_errors),
                     )
                 )
 

@@ -23,7 +23,7 @@ def test_gpu_oob_commands_return_list_payloads(redfish_api, request_type, comman
     assert isinstance(result.data, list)
     assert result.error is None
 
-    if redfish_api.idrac_ip == "mock-idrac":
+    if redfish_api.host == "mock-idrac":
         if request_type is ApiRequestType.NetworkAdapters:
             adapter_ids = {row["Id"] for row in result.data}
             adapter_classes = {row["DeviceClass"] for row in result.data}

@@ -1,7 +1,7 @@
 """Dual-mode test for the boot-source query command.
 
 Runs offline by default against the mock service (using the iDRAC-shaped fixture
-in tests/idrac_fixtures/), and against real hardware when IDRAC_IP is set. This is
+in tests/idrac_fixtures/), and against real hardware when REDFISH_IP is set. This is
 the template for porting the remaining live-only command tests: invoke the command
 through sync_invoke and assert the CommandResult shape.
 
@@ -429,13 +429,21 @@ def test_boot_one_shot_x10_power_on_failure_returns_error_before_patch(
     assert all(request.method != "PATCH" for request in service.requests)
 
 
-def test_boot_one_shot_x10_reboot_501_returns_error_after_patch(
+def test_boot_one_shot_x10_reboot_uses_computer_system_reset(
     redfish_mock_factory,
+    monkeypatch,
 ):
-    """boot_one_shot -r reports a chassis read failure instead of tracebacks."""
+    """boot_one_shot -r uses DMTF ComputerSystem.Reset, not Chassis discovery."""
     requests_mock = pytest.importorskip("requests_mock")
     manager, service = redfish_mock_factory("supermicro_x10")
     original_get = service.get_cb
+
+    monkeypatch.setattr(
+        RebootHost,
+        "wait_for_reboot",
+        lambda _self, *_args: CommandResult(
+            {"ready": True}, None, None, None),
+    )
 
     def get_cb(request, context):
         if request.path.lower() == "/redfish/v1/chassis":
@@ -456,18 +464,25 @@ def test_boot_one_shot_x10_reboot_501_returns_error_after_patch(
     patches = [request for request in service.requests if request.method == "PATCH"]
     posts = [request for request in service.requests if request.method == "POST"]
     assert isinstance(result, CommandResult)
-    # The 501 is normalized to a Redfish error envelope (contract), not a generic
-    # "Failed acquire result" string; the reboot step still reports cleanly.
-    assert result.error == "reboot post-step failed: Redfish error (HTTP 501)"
+    assert result.error is None
     assert result.data["Status"] == "ok"
-    assert result.data["reboot_error"] == "Redfish error (HTTP 501)"
+    assert result.data["reboot"]["action"] == "#ComputerSystem.Reset"
+    assert result.data["reboot"]["wait"] == {"ready": True}
     assert len(patches) == 1
     assert patches[0].path.lower() == "/redfish/v1/systems/1"
     assert patches[0].json() == {
         "BootSourceOverrideEnabled": "Once",
         "BootSourceOverrideTarget": "UefiCd",
     }
-    assert posts == []
+    assert len(posts) == 1
+    assert posts[0].path.lower() == (
+        "/redfish/v1/systems/1/actions/computersystem.reset"
+    )
+    assert posts[0].json() == {"ResetType": "GracefulRestart"}
+    assert all(
+        request.path.lower() != "/redfish/v1/chassis"
+        for request in service.requests
+    )
 
 
 def test_boot_one_shot_none_disarms_override_in_mock_mode(

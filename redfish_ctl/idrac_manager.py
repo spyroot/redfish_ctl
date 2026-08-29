@@ -1,31 +1,20 @@
-"""IDracManager
+"""Dell iDRAC manager and Dell-specific Redfish semantics.
 
-redfish_ctl interacts with any Redfish-capable BMC (Dell iDRAC, Supermicro,
-HPE iLO, and generic DMTF Redfish) via the REST API interface.
-
-Main class command line tools utilizes. Each command must inherit
-from this class. The class itself provides a register pattern where
-each sub-command is registered automatically.
-During the module phase, each sub-command is discovered and loaded,
-allowing anyone to extend and add their own set of subcommands easily.
-
-- The interaction with the BMC is done via the REST API.
-- Each command must provide option invoke command synchronously
-  or asynchronously
-
-Each command return CommandResult named tuple where data
-is actually data returned from rest API response.
-
-CommandResult.discovered hold all rest endpoint.
+Shared DMTF commands and transport live on :class:`RedfishManager`. Dell
+commands inherit this class when they need iDRAC status mapping, Lifecycle
+Controller ``JID_`` extraction, or Dell task/job completion behavior. The two
+manager layers intentionally keep separate HTTP implementations because Dell
+can return a job id in either the ``Location`` header or its JSON response body.
 
 https://www.dell.com/support/manuals/en-us/idrac9-lifecycle-controller-v4.x-series/idrac9_4.00.00.00_redfishapiguide_pub/redfish-resources?guid=guid-d3e85da8-5d22-4eb1-82ff-d2fdd4cd7730&lang=en-us
 
 Author Mus spyroot@gmail.com
 """
-import argparse
+import collections
 import functools
 import json
 import logging
+import re
 import time
 from abc import abstractmethod
 from datetime import datetime
@@ -43,37 +32,36 @@ from .cmd_exceptions import (
     PatchRequestFailed,
     PostRequestFailed,
     ResourceNotFound,
+    TaskIdUnavailable,
     UnexpectedResponse,
 )
-from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
+from .config import http_timeout
 from .decorators.fault_injection import (
     simulate_http_faults,
     simulate_http_faults_async,
 )
+from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_api_common import (
     REDFISH_API,
     REDFISH_JSON,
     ApiRequestType,
     ApiRespondString,
-    DellCliJobTypes,
-    HTTPMethod,
-    DellJobType,
     DellApplyTypes,
+    DellCliJobTypes,
     DellJobState,
+    DellJobType,
+    HTTPMethod,
     PowerState,
-    RedfishAction,
     RedfishApiRespond,
     ScheduleJobType,
 )
 from .redfish_api_common import ResetType as ResetType
-from .idrac_task_state import IdracTaskState, IdracTaskStatus
 from .redfish_exceptions import RedfishException, RedfishForbidden, RedfishUnauthorized
 from .redfish_manager import (
     CommandResult,
     RedfishManager,
 )
-from .config import http_timeout
-from .redfish_shared import RedfishApi, RedfishJson, RedfishJsonSpec
+from .redfish_shared import RedfishJson, RedfishJsonSpec
 from .telemetry import tracing
 
 module_logger = logging.getLogger('redfish_ctl.idrac_manager')
@@ -106,52 +94,29 @@ class IDracManager(RedfishManager):
     IDracManager Class, interact with a Redfish endpoint via REST API interface
     """
 
-    def __init__(self,
-                 host: Optional[str] = None,
-                 username: Optional[str] = None,
-                 password: Optional[str] = None,
-                 port: Optional[int] = 443,
-                 insecure: Optional[bool] = True,
-                 x_auth: Optional[str] = None,
-                 is_http: Optional[bool] = False,
-                 is_debug: Optional[bool] = False,
-                 log_level=logging.NOTSET):
-        """Default constructor requires credentials.
-           By default, the manager uses json to serialize a data to callee
-           and uses json content type.
+    # Dell owns its own command registry, exactly like SupermicroManager and
+    # IloManager. Without this shadow, Dell commands would register into the
+    # shared RedfishManager._registry (the DMTF base) and leak into every
+    # vendor's tree; with it, get_registry's MRO-merge gives Dell SET(DMTF) +
+    # SET(Dell) while a non-Dell vendor never sees a Dell verb.
+    _registry = collections.defaultdict(dict)
+    uses_dell_job_semantics = True
 
-        :param host: BMC host or IP address.
-        :param username: BMC account username; defaults to root.
-        :param password: BMC account password.
-        :param port: BMC TCP port (default 443); accepts an int or str.
-        :param insecure: when True (the default) TLS certificate verification is
-            skipped. BMC controllers present self-signed certificates, so
-            verification is opt-in: pass ``insecure=False`` to verify the cert.
-        :param x_auth: X-Authentication header.
-        :param is_http: use plain HTTP instead of HTTPS for requests when True.
-        :param is_debug: when True, include exception tracebacks in error logs.
+    def __init__(self, *args, log_level=logging.NOTSET, **kwargs):
+        """Initialize Dell-specific state on top of the shared connection.
+
+        Host, username, password, port, and transport options are owned by
+        :class:`RedfishManager` and are forwarded unchanged.
+
+        :param args: positional arguments forwarded to ``RedfishManager``.
         :param log_level: logging level applied to this manager's logger.
+        :param kwargs: keyword arguments forwarded to ``RedfishManager``.
         """
-        super().__init__(host=host,
-                         username=username,
-                         password=password,
-                         port=port,
-                         insecure=insecure,
-                         is_http=is_http,
-                         x_auth=x_auth,
-                         is_debug=is_debug)
+        super().__init__(*args, **kwargs)
 
         self.logger = logging.getLogger(__name__)
         self._logger_level = log_level
         self.logger.setLevel(self._logger_level)
-
-        self.content_type = {'Content-Type': 'application/json; charset=utf-8'}
-        self.json_content_type = {'Content-Type': 'application/json; charset=utf-8'}
-
-        self._manage_servers_obs = []
-        self._manage_chassis_obs = []
-        # mainly to track query sent , for unit test
-        self.query_counter = 0
 
         # mapping between rest API respond to respected
         # string that we report to apper layer.
@@ -232,35 +197,17 @@ class IDracManager(RedfishManager):
 
         self._redfish_error = None
 
-        # run time
-        self.action_targets = None
-        self.api_endpoints = None
-
-    @property
-    def idrac_ip(self) -> str:
-        """BMC host address (delegates to :attr:`redfish_ip`).
-
-        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
-        """
-        return self.redfish_ip
-
-    @property
-    def host(self) -> str:
-        """BMC host address (canonical alias for :attr:`redfish_ip`).
-
-        :return: the IP or hostname, suffixed with ``:port`` for non-443 ports.
-        """
-        return self.redfish_ip
-
     @simulate_http_faults_async(_simulated_connection_error, _simulated_read_timeout)
     async def api_async_get_call(self, loop, req, hdr: Dict):
-        """Make api asynced requests either with x-auth authentication
-         header or base authentication.
-        If event loop is none it will create one.
+        """Await one Dell GET without polling its Task or Lifecycle job.
+
+        This is the vendor transport override used by concurrently scheduled
+        callers. Dell JID submission and later job polling remain separate.
+
         :param loop: asyncio event loop
         :param req: request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
-        :return: request.
+        :return: completed HTTP response.
         """
         headers = {}
         headers.update(self.content_type)
@@ -268,21 +215,25 @@ class IDracManager(RedfishManager):
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    headers=headers
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
+                timeout=http_timeout(),
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
+                timeout=http_timeout(),
             )
+        return await loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "GET", request_call),
+        )
 
     @simulate_http_faults(_simulated_connection_error, _simulated_read_timeout)
     def api_get_call(
@@ -321,6 +272,94 @@ class IDracManager(RedfishManager):
                 raise
             tracing.record_response(span, response.status_code)
             return response
+
+    @staticmethod
+    def job_id_from_respond(
+            response: requests.models.Response) -> str:
+        """Parse a Dell Lifecycle Controller job id (``JID_...``) from the body.
+
+        Some Dell responses carry the job id as ``id``, ``Id``, ``JobID``, or
+        ``JID`` instead of returning a ``Location`` header. A body without a JID
+        is a normal outcome for the caller's two-surface fallback.
+
+        :param response: Dell write response.
+        :return: the ``JID_...`` job id, or ``""`` when the body carries none.
+        """
+        if response is None:
+            return ""
+        try:
+            body = response.json()
+        except (ValueError, TypeError, AttributeError):
+            body = None
+        if isinstance(body, dict):
+            for key in ("id", "Id", "JobID", "JID"):
+                value = body.get(key)
+                if isinstance(value, str) and value.startswith("JID_"):
+                    return value
+        try:
+            text = response.text if hasattr(response, "text") else json.dumps(body)
+        except (TypeError, ValueError):
+            text = ""
+        match = re.search(r"JID_[0-9A-Za-z]+", text or "")
+        return match.group(0) if match else ""
+
+    def job_id_from_response(
+            self,
+            response: requests.models.Response,
+            strict: bool = True,
+            ) -> str:
+        """Return a Dell Lifecycle Controller JID from header or JSON body.
+
+        Dell firmware versions are not consistent about which response surface
+        carries the job id. The header helper returns ``""`` when called in
+        non-strict mode, so fallback must use truthiness rather than ``is None``.
+
+        :param response: accepted Dell write response.
+        :param strict: raise when neither response surface carries a JID.
+        :return: Dell ``JID_...`` value, or ``""`` in non-strict mode.
+        :raises TaskIdUnavailable: when strict and no job id is available.
+        """
+        job_id = self.task_id_from_header(response, strict=False)
+        if not job_id:
+            job_id = self.job_id_from_respond(response)
+        if not job_id and strict:
+            raise TaskIdUnavailable(
+                "Dell accepted the request but returned no task id in "
+                "the Location header or response body"
+            )
+        return job_id
+
+    @staticmethod
+    def job_id_from_header(
+            response: requests.models.Response,
+            strict: bool = True) -> str:
+        """Compatibility name for Dell callers reading a JID from Location.
+
+        :param response: accepted Dell write response.
+        :param strict: raise when the Location header carries no task id.
+        :return: Dell JID from the Location header, or ``""`` in non-strict mode.
+        """
+        return RedfishManager.task_id_from_header(response, strict=strict)
+
+    def parse_task_id(self, data) -> str:
+        """Return a Dell job id from a response or ``CommandResult`` wrapper.
+
+        :param data: Dell HTTP response or command result carrying one in
+            ``extra``.
+        :return: Dell JID from ``Location`` or the response body, else ``""``.
+        :raises ValueError: when ``data`` is neither supported input shape.
+        """
+        if data is None:
+            return ""
+        if hasattr(data, "extra"):
+            response = data.extra
+        elif isinstance(data, requests.models.Response):
+            response = data
+        else:
+            raise ValueError("Unknown data type.")
+        if response is None:
+            return ""
+        return self.job_id_from_response(response, strict=False)
 
     def get_job(self,
                 job_id: str,
@@ -457,7 +496,7 @@ class IDracManager(RedfishManager):
         with tqdm(total=100) as pbar:
             while True:
                 # /redfish/v1/TaskService/Tasks/{TaskId}
-                resp = self.api_get_call(f"{self._default_method}{self.idrac_ip}"
+                resp = self.api_get_call(f"{self._default_method}{self.redfish_ip}"
                                          f"{REDFISH_API.Tasks}{task_id}", hdr={})
 
                 if 'Retry-After' in resp.headers:
@@ -628,93 +667,6 @@ class IDracManager(RedfishManager):
                 json_data, sort_keys=sort, indent=indents
             )
         print(json_raw)
-
-    @staticmethod
-    def _get_actions(cls, json_data):
-        """Parse json from the manager for all supported action
-        and action method arg.
-        :param cls:
-        :param json_data:
-        :return:
-        """
-        unfiltered_actions = {}
-        full_redfish_names = {}
-
-        if REDFISH_JSON.Actions not in json_data:
-            return unfiltered_actions, full_redfish_names
-
-        redfish_actions = json_data[REDFISH_JSON.Actions]
-        for a in redfish_actions:
-            _ca = redfish_actions[a]
-            if a == "Oem" and isinstance(_ca, dict):
-                for k in _ca.keys():
-                    rest_api_action = k.split(".")
-                    if len(rest_api_action) < 2:
-                        continue
-                    rest_api_action = rest_api_action[-1]
-                    unfiltered_actions[rest_api_action] = _ca[k]
-                    full_redfish_names[rest_api_action] = k
-            else:
-                rest_api_action = a.split(".")
-                if len(rest_api_action) < 2:
-                    continue
-                rest_api_action = rest_api_action[-1]
-                unfiltered_actions[rest_api_action] = _ca
-                full_redfish_names[rest_api_action] = a
-
-        return unfiltered_actions, full_redfish_names
-
-    @staticmethod
-    def discover_member_redfish_actions(cls, json_data):
-        """
-        :param cls:
-        :param json_data:
-        :return:
-        """
-        action_dict = {}
-        if REDFISH_JSON.Members not in json_data:
-            if REDFISH_JSON.Actions in json_data:
-                return cls.discover_redfish_actions(cls, json_data)
-            else:
-                return action_dict
-
-        member_data = json_data[REDFISH_JSON.Members]
-        for m in member_data:
-            if isinstance(m, dict):
-                if REDFISH_JSON.Actions in m.keys():
-                    action = cls.discover_redfish_actions(cls, m)
-                    action_dict.update(action)
-
-        return action_dict
-
-    @staticmethod
-    def discover_redfish_actions(cls, json_data):
-        """Discovers all redfish action, args and args choices.
-        :param cls:
-        :param json_data:
-        :return:
-        """
-        if isinstance(json_data, requests.models.Response):
-            json_data = json_data.json()
-
-        action_dict = {}
-        unfiltered_actions, full_redfish_names = cls._get_actions(cls, json_data)
-        for ra in unfiltered_actions.keys():
-            if 'target' not in unfiltered_actions[ra]:
-                continue
-            action_tuple = unfiltered_actions[ra]
-            if isinstance(action_tuple, Dict):
-                arg_keys = action_tuple.keys()
-                redfish_action = RedfishAction(action_name=ra,
-                                               target=action_tuple['target'],
-                                               full_redfish_name=full_redfish_names[ra])
-                action_dict[ra] = redfish_action
-                for k in arg_keys:
-                    if '@Redfish.AllowableValues' in k:
-                        arg_name = k.split('@')[0]
-                        action_dict[ra].add_action_arg(arg_name, action_tuple[k])
-
-        return action_dict
 
     @cached_property
     def version_api(self, data_type: Optional[str] = "json") -> bool:
@@ -1399,7 +1351,7 @@ class IDracManager(RedfishManager):
         # if task id available, we fetch task/job id from header
         # and include in return api
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
-            task_id = self.job_id_from_header(response)
+            task_id = self.job_id_from_response(response)
             return CommandResult(
                 {"task_id": task_id}, None, None, None), api_resp
 
@@ -1670,59 +1622,6 @@ class IDracManager(RedfishManager):
                 return cmd_result.data
         else:
             raise ResourceNotFound("no iDRAC manager member found")
-
-    @cached_property
-    def idrac_members(self) -> str:
-        """Shared method return the BMC managed member servers list as json
-        /redfish/v1/Managers/iDRAC.Embedded.1
-
-        Upon first call , result cached all follow-up call will return cached result.
-        :return:
-        """
-        cmd_result = self.base_query(f"{REDFISH_API.IDRAC_MANAGER}", key=REDFISH_JSON.Members)
-        return self.value_from_json_list(cmd_result.data, REDFISH_JSON.Data_id)
-
-
-    def computer_system_id(self):
-        """alias name for idrac_manage_servers to match v6.0 docs
-        :return: str: computer_system_id "/redfish/v1/Systems/System.Embedded.1"
-        """
-        return self.idrac_manage_servers
-
-    @cached_property
-    def idrac_manage_servers(self) -> str:
-        """Return the managed (host) ComputerSystem path, e.g.
-        /redfish/v1/Systems/System.Embedded.1. Cached after the first call.
-
-        Resolves via the manager's ManagerForServers link. On a multi-system host
-        (e.g. a GB300 exposing System_0 + the NVIDIA HGX baseboard) that link,
-        taken from the last Managers member, can land on a non-host baseboard, so
-        when /redfish/v1/Systems has more than one member we prefer the host
-        system -- the one exposing a Bios/Boot link. Single-system hosts (Dell)
-        and hosts without a reachable Systems collection keep the original result.
-
-        :return: the managed host ComputerSystem path (empty string if unresolved).
-        """
-        resolved = ""
-        api_resp = self.base_query(self.idrac_members, key=REDFISH_JSON.Links)
-        if api_resp.data is not None and REDFISH_JSON.ManagerServers in api_resp.data:
-            if isinstance(api_resp.data, dict):
-                manage_servers = api_resp.data[REDFISH_JSON.ManagerServers]
-                self._manage_servers_obs = manage_servers
-                resolved = self.value_from_json_list(
-                    manage_servers, REDFISH_JSON.Data_id
-                )
-        else:
-            self.logger.error("")
-        try:
-            system_ids = self.discover_computer_system_ids()
-        except Exception:
-            system_ids = []
-        if len(system_ids) > 1:
-            host = self._host_system(system_ids)
-            if host:
-                return host
-        return resolved
 
     @cached_property
     def idrac_id(self):

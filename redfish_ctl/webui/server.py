@@ -272,9 +272,8 @@ def make_manager_factory():
 
     :return: tuple of (manager factory callable, ``"address:port"`` target label).
     """
-    # Canonical endpoint resolution lives in the config loader (REDFISH_* first,
-    # deprecated IDRAC_* aliases next); strict=False so an alias pair that both
-    # resolve does not fail server startup. Scheme has no alias.
+    # Canonical endpoint resolution lives in the config loader. Scheme is
+    # resolved separately because it is not part of EndpointConfig.
     endpoint = endpoint_defaults(strict=False)
     address = endpoint.host
     username = endpoint.username
@@ -313,7 +312,7 @@ class ExplorerServer(ThreadingHTTPServer):
 
 
 def run_server(bind_host: str = "0.0.0.0", bind_port: int = 8299) -> None:  # pragma: no cover
-    """Serve the explorer, reading the target BMC from REDFISH_*/IDRAC_* env.
+    """Serve the explorer, reading the target BMC from REDFISH_* env.
 
     :param bind_host: interface address to bind the HTTP server to.
     :param bind_port: TCP port to listen on.

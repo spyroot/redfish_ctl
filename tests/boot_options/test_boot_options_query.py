@@ -4,7 +4,7 @@
 
 Covers ``boot_options_query`` (ApiRequestType.BootOptionQuery), a read-only DMTF
 BootOptionCollection GET via the shared ``base_query`` helper. Runs offline
-against the mock service by default and against real hardware when IDRAC_IP is set.
+against the mock service by default and against real hardware when REDFISH_IP is set.
 
 Author Mus spyroot@gmail.com
 """

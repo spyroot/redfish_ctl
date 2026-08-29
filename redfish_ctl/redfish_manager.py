@@ -12,14 +12,16 @@ import collections
 import contextvars
 import copy
 import functools
+import json
 import logging
-import re
 import threading
 import time
 import uuid
+import warnings
 from abc import abstractmethod
 from collections.abc import Mapping
 from contextlib import contextmanager
+from datetime import datetime
 from functools import cached_property
 from typing import Any, Callable, Dict, Hashable, Optional, Tuple
 
@@ -29,6 +31,8 @@ from urllib3.util.retry import Retry
 
 from .cmd_exceptions import (
     AuthenticationFailed,
+    InvalidArgumentFormat,
+    MissingMandatoryArguments,
     ResourceNotFound,
     TaskIdUnavailable,
     UnsupportedAction,
@@ -36,6 +40,12 @@ from .cmd_exceptions import (
 from .cmd_utils import save_if_needed
 from .config import http_backoff, http_pool, http_retries, http_timeout
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
+from .redfish_api_common import (
+    ApiRequestType,
+    ApiRespondString,
+    HTTPMethod,
+    RedfishAction,
+)
 from .redfish_exceptions import (
     RedfishForbidden,
     RedfishMethodNotAllowed,
@@ -45,11 +55,6 @@ from .redfish_exceptions import (
 from .redfish_query import RedfishQuery
 from .redfish_respond import RedfishRespondMessage
 from .redfish_respond_error import RedfishError
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .redfish_api_common import RedfishAction
-
 from .redfish_shared import (
     RedfishApi,
     RedfishApiRespond,
@@ -153,20 +158,28 @@ def redfish_response_cache_scope(cache):
 
 class RedfishManager:
 
+    uses_dell_job_semantics = False
+
     @staticmethod
     def _event_loop() -> asyncio.AbstractEventLoop:
         """Return a usable event loop for a synchronous caller.
 
-        ``asyncio.get_event_loop()`` used to create a loop implicitly when none existed. Python 3.12
-        deprecated that and 3.14 removed it, so on 3.14 it raises RuntimeError and every async path in
-        this client dies before sending anything. Creating the loop explicitly when there is none keeps
-        one behaviour across 3.10 through 3.14.
+        Reuse an installed thread loop when available; otherwise create and install
+        one. Keep all callers off deprecated event-loop policy APIs while shielding
+        older supported runtimes from their historical direct-lookup warning.
 
-        :return: the running loop when one exists, otherwise a new loop installed for this thread.
+        :return: the current loop when configured, otherwise a new loop installed
+            for this thread.
         :raises RuntimeError: never — the no-loop case is handled by creating one.
         """
         try:
-            return asyncio.get_event_loop_policy().get_event_loop()
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="There is no current event loop",
+                    category=DeprecationWarning,
+                )
+                return asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -235,6 +248,7 @@ class RedfishManager:
         # run time
         self.action_targets = None
         self.api_endpoints = None
+        self._redfish_error = None
 
     _registry = collections.defaultdict(dict)
 
@@ -246,6 +260,8 @@ class RedfishManager:
         :return:
         """
         super().__init_subclass__(**kwargs)
+        if scm_type is None and "_registry" in cls.__dict__:
+            cls._dispatch_manager_class = cls
         if scm_type is not None:
             cls._registry[scm_type][name] = cls
 
@@ -266,10 +282,26 @@ class RedfishManager:
 
     @classmethod
     def get_registry(cls):
-        """Return current command registry.
-        :return:
+        """Return the command registry visible to ``cls``: ``SET(DMTF) + SET(vendor)``.
+
+        Walks the MRO base-first and merges each class's own ``_registry``, so a
+        vendor manager's own commands override same-named DMTF commands and any
+        verb the vendor never implemented falls back to the base -- the same
+        inheritance the dispatcher (:meth:`_resolve_command`) applies at call
+        time. A vendor manager that shadows ``_registry`` (declares its own dict)
+        keeps its commands isolated from the base; this merge is the single place
+        that recombines them, so no vendor needs its own override. For the neutral
+        base it returns just ``SET(DMTF)``.
+
+        :return: a dict mapping the ApiRequestType key to ``{name: command class}``.
         """
-        return dict(cls._registry)
+        merged = collections.defaultdict(dict)
+        for klass in reversed(cls.__mro__):
+            registry = klass.__dict__.get("_registry")
+            if registry:
+                for scm_type, bucket in registry.items():
+                    merged[scm_type].update(bucket)
+        return dict(merged)
 
     @classmethod
     def _resolve_command(cls, api_call, name):
@@ -296,6 +328,47 @@ class RedfishManager:
             if bucket and name in bucket:
                 return bucket[name]
         raise UnsupportedAction(f"Unknown {name} command.")
+
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def _compose_runtime_command(manager_cls, command_cls):
+        """Return the cached composition for a manager and command class.
+
+        :param manager_cls: selected neutral or vendor manager class.
+        :param command_cls: registered command implementation class.
+        :return: command class whose MRO includes the selected manager.
+        """
+        if issubclass(command_cls, manager_cls):
+            return command_cls
+        return type(command_cls)(
+            f"{manager_cls.__name__}{command_cls.__name__}",
+            (command_cls, manager_cls),
+            {
+                "__module__": command_cls.__module__,
+                "__doc__": command_cls.__doc__,
+                "_dispatch_manager_class": manager_cls,
+            },
+        )
+
+    @classmethod
+    def _runtime_command_class(cls, command_cls):
+        """Compose a shared command with the selected vendor manager.
+
+        A DMTF command class owns its command behavior and registers on
+        ``RedfishManager``.  When Dell invokes it, however, the runtime instance
+        must still inherit ``IDracManager`` so Dell's HTTP/job overrides handle
+        the response.  The same composition preserves future HPE or Supermicro
+        overrides without copying a command into each vendor registry.
+
+        Vendor-owned commands already inherit their selected manager and need
+        no wrapper.  The cached dynamic class keeps Singleton identity stable
+        across repeated invocations.
+
+        :param command_cls: registered concrete command implementation.
+        :return: command class with ``SET(command) + SET(selected vendor)`` MRO.
+        """
+        manager_cls = getattr(cls, "_dispatch_manager_class", cls)
+        return RedfishManager._compose_runtime_command(manager_cls, command_cls)
 
     @staticmethod
     def base_parser(is_async: Optional[bool] = True,
@@ -394,12 +467,11 @@ class RedfishManager:
 
     @staticmethod
     def _pop_connection_value(
-            kwargs: dict, primary: str, legacy: str, internal: str):
-        """Pop a dispatch connection argument, accepting deprecated aliases.
+            kwargs: dict, primary: str, internal: str):
+        """Pop one canonical or private dispatch connection argument.
 
         :param kwargs: dispatch keyword arguments.
         :param primary: canonical keyword name.
-        :param legacy: deprecated alias keyword name.
         :param internal: private keyword used by sync dispatch to avoid
             colliding with subcommand-local ``host`` or ``port`` arguments.
         :return: the popped value.
@@ -407,21 +479,10 @@ class RedfishManager:
         """
         if internal in kwargs:
             value = kwargs.pop(internal)
-            kwargs.pop(legacy, None)
             if kwargs.get(primary) in (value, None):
                 kwargs.pop(primary, None)
             return value
-
-        if primary in kwargs:
-            value = kwargs.pop(primary)
-            legacy_value = kwargs.pop(legacy, None)
-            if value is not None:
-                return value
-            if legacy_value is not None:
-                return legacy_value
-            return value
-
-        return kwargs.pop(legacy)
+        return kwargs.pop(primary)
 
     @classmethod
     def invoke(cls,
@@ -434,19 +495,16 @@ class RedfishManager:
                       So we can register under same type sub-commands.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: command result returned by the registered command.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -455,7 +513,8 @@ class RedfishManager:
         )
         _redfish_cache = kwargs.pop("redfish_cache", None)
 
-        inst = disp(
+        runtime_cls = cls._runtime_command_class(disp)
+        inst = runtime_cls(
             host=_host,
             username=_username,
             password=_password,
@@ -479,19 +538,16 @@ class RedfishManager:
         :param name: a name.
         :param kwargs: command arguments plus connection arguments. Connection
             arguments accept canonical ``host``/``username``/``password``/``port``
-            names, legacy ``idrac_*`` aliases, or private ``_redfish_*`` keys
-            used by internal dispatch.
+            names or private ``_redfish_*`` keys used by internal dispatch.
         :return: CommandResult.
         """
         disp = cls._resolve_command(api_call, name)
-        _host = cls._pop_connection_value(
-            kwargs, "host", "idrac_ip", "_redfish_host")
+        _host = cls._pop_connection_value(kwargs, "host", "_redfish_host")
         _username = cls._pop_connection_value(
-            kwargs, "username", "idrac_username", "_redfish_username")
+            kwargs, "username", "_redfish_username")
         _password = cls._pop_connection_value(
-            kwargs, "password", "idrac_password", "_redfish_password")
-        _port = cls._pop_connection_value(
-            kwargs, "port", "idrac_port", "_redfish_port")
+            kwargs, "password", "_redfish_password")
+        _port = cls._pop_connection_value(kwargs, "port", "_redfish_port")
         _insecure = kwargs.pop("insecure")
         _is_http = kwargs.pop("is_http")
         _redfish_query = kwargs.pop("redfish_query", None)
@@ -501,7 +557,8 @@ class RedfishManager:
         _redfish_cache = kwargs.pop("redfish_cache", None)
         module_logger.debug(f"dispatching {name} to Redfish port {_port}")
 
-        inst = disp(
+        runtime_cls = cls._runtime_command_class(disp)
+        inst = runtime_cls(
             host=_host,
             username=_username,
             password=_password,
@@ -586,6 +643,14 @@ class RedfishManager:
                 return self._redfish_ip
 
     @property
+    def host(self) -> str:
+        """Return the canonical BMC host, including a non-default port.
+
+        :return: the normalized host used to build Redfish request URLs.
+        """
+        return self.redfish_ip
+
+    @property
     def username(self) -> str:
         """Redfish account username.
 
@@ -651,25 +716,29 @@ class RedfishManager:
                 "in the current state of the resources."
             )
 
-    @staticmethod
     async def async_default_error_handler(
-            response: requests.models.Response) -> bool:
-        """Default error handler for base query and redfish error code based on spec.
-        :param response:
-        :return:
+            self, response: requests.models.Response) -> RedfishApiRespond:
+        """Apply the synchronous Redfish status contract to an async GET.
+
+        :param response: completed async GET response.
+        :return: the shared Redfish response classification for a 2xx status.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on any other non-2xx status.
         """
-        if response.status_code >= 200 or response.status_code < 300:
-            return True
-        RedfishManager.redfish_error_handlers(response.status_code)
+        return self.default_error_handler(response)
 
     async def api_async_get_call(self, loop, req, hdr: Dict):
-        """Make api request either with x-auth authentication header or base authentication
-        to redfish endpoint.
+        """Await one GET without polling any server-side Task or Job.
+
+        Callers may schedule this coroutine concurrently across BMCs. Completion
+        means the HTTP response arrived; it never means a TaskService task or
+        vendor job reached a terminal state.
 
         :param loop: asyncio event loop
         :param req: request
         :param hdr: http header dict that will append to HTTP/HTTPS request.
-        :return: request.
+        :return: completed HTTP response.
         """
         headers = {}
         headers.update(self.content_type)
@@ -677,21 +746,25 @@ class RedfishManager:
             headers.update(hdr)
 
         if self.x_auth is not None:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    headers=headers
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                headers=headers,
+                timeout=http_timeout(),
             )
         else:
-            return loop.run_in_executor(
-                None, functools.partial(
-                    requests.get, req,
-                    verify=self._is_verify_cert,
-                    auth=(self._username, self._password)
-                )
+            request_call = functools.partial(
+                requests.get,
+                req,
+                verify=self._is_verify_cert,
+                auth=(self._username, self._password),
+                timeout=http_timeout(),
             )
+        return await loop.run_in_executor(
+            None,
+            tracing.traced_request_callable(req, "GET", request_call),
+        )
 
     def _http_session(self) -> requests.Session:
         """Return a cached keep-alive Session so many GETs reuse ONE connection.
@@ -805,7 +878,13 @@ class RedfishManager:
         return f"?$expand=*($levels={level})"
 
     async def api_async_get_until_complete(self, req: str, hdr: Dict, loop=None):
-        """Execute async get request
+        """Await and validate one GET transport response.
+
+        This helper waits only for the local HTTP request. Server-side Redfish
+        Task and vendor Job lifecycles remain separate and are polled by their
+        dedicated commands using the identifier returned by the write operation
+        that created the server-side work.
+
         :param req: api method caller request.
         :param hdr: dict: http/https header
         :param loop:  asyncio loop
@@ -814,8 +893,9 @@ class RedfishManager:
         if loop is None:
             loop = self._event_loop()
         response = await self.api_async_get_call(loop, req, hdr)
-        await self.async_default_error_handler(await response)
-        return await response
+        self.query_counter += 1
+        await self.async_default_error_handler(response)
+        return response
 
     @cached_property
     def _service_root(self):
@@ -868,6 +948,393 @@ class RedfishManager:
         :return: a query fragment of the form ``?$select=<property>``.
         """
         return f"?$select={select_property}"
+
+    # ------------------------------------------------------------------ #
+    # Generic (DMTF) synchronous write path.
+    #
+    # Vendor-neutral counterpart to the Dell write flow in IDracManager. A
+    # A DMTF/Supermicro/HPE write can complete synchronously (200/204) or return
+    # the specification's 202 + TaskService Location form. This layer returns
+    # that DMTF task id but never applies Dell Lifecycle Controller JID parsing
+    # or polling. Errors route through the shared parse_error so the
+    # @Message.ExtendedInfo envelope surfaces identically to Dell.
+    #
+    # IDracManager OVERRIDES every method below because its writes are built on
+    # the Dell job/task system (status via _http_code_mapping, id in header OR
+    # body, fetch_task over the Dell job model). MRO resolves a Dell instance to
+    # those overrides and a non-Dell instance to these generic versions -- the
+    # two must never cross-wire.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _redact_sensitive_payload(payload):
+        """Return a copy of a request payload with sensitive fields masked.
+
+        Masks password-like top-level keys before a payload is written to a
+        debug log so credentials never reach logs. IDracManager provides its own
+        override; this generic version serves non-Dell instances.
+
+        :param payload: the request payload mapping, or any value.
+        :return: a redacted shallow copy when a mapping, else the value unchanged.
+        """
+        if not isinstance(payload, dict):
+            return payload
+        redacted = {}
+        for key, value in payload.items():
+            if isinstance(key, str) and "password" in key.lower():
+                redacted[key] = "***"
+            else:
+                redacted[key] = value
+        return redacted
+
+    def _api_write_call(
+            self, method: str, req: str, hdr: Dict,
+            data: Optional[str] = None) -> requests.models.Response:
+        """Shared transport for the synchronous write verbs (POST/PATCH/DELETE).
+
+        Mirrors :meth:`api_get_call`: reuses the pooled keep-alive session,
+        applies the bounded timeout, and authenticates with the X-Auth token
+        when present, otherwise HTTP basic auth. Vendor-neutral; Dell provides
+        its own api_*_call transport and never reaches this.
+
+        :param method: the HTTP method name (POST/PATCH/DELETE).
+        :param req: the fully qualified request URL.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :param data: the serialized JSON body, or None for DELETE.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        headers = {}
+        headers.update(self.content_type)
+        if hdr is not None:
+            headers.update(hdr)
+        session = self._http_session()
+        kwargs = {"verify": self._is_verify_cert, "timeout": http_timeout()}
+        if data is not None:
+            kwargs["data"] = data
+        if self._x_auth is not None:
+            headers.update({"X-Auth-Token": self._x_auth})
+        else:
+            kwargs["auth"] = (self._username, self._password)
+        with tracing.client_span(req, method) as span:
+            try:
+                response = session.request(method, req, headers=headers, **kwargs)
+            except Exception as exc:
+                tracing.record_exception(span, exc)
+                raise
+            tracing.record_response(span, response.status_code)
+            return response
+
+    def api_post_call(self, req: str, payload: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP POST to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param payload: the serialized JSON body.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("POST", req, hdr, data=payload)
+
+    def api_patch_call(self, req: str, payload: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP PATCH to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param payload: the serialized JSON body.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("PATCH", req, hdr, data=payload)
+
+    def api_delete_call(self, req: str, hdr: Dict) -> requests.models.Response:
+        """Issue a synchronous HTTP DELETE to a Redfish resource.
+
+        :param req: the fully qualified request URL.
+        :param hdr: extra headers to merge onto the content-type headers.
+        :return: the raw :class:`requests.models.Response`.
+        """
+        return self._api_write_call("DELETE", req, hdr)
+
+    async def api_async_post_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue POST through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: serialized JSON body.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_post_call, req, payload, hdr))
+
+    async def api_async_patch_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue PATCH through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: serialized JSON body.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_patch_call, req, payload, hdr))
+
+    async def api_async_delete_call(self, loop, req, payload: str, hdr: Dict):
+        """Issue DELETE through the selected event loop's executor.
+
+        :param loop: event loop that owns the executor future.
+        :param req: fully qualified request URL.
+        :param payload: accepted for write-call signature compatibility.
+        :param hdr: request headers.
+        :return: future resolving to the HTTP response.
+        """
+        return loop.run_in_executor(
+            None, functools.partial(self.api_delete_call, req, hdr))
+
+    def default_post_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """Map a write response to a RedfishApiRespond, raising on failure.
+
+        Vendor-neutral status handling: an explicitly ignored status is treated
+        as success, otherwise the shared :meth:`default_error_handler` classifies
+        the code (2xx -> Ok/Success, 202 -> AcceptedTaskGenerated) and raises for
+        4xx/5xx. Unlike the Dell override it consults no instance status table.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        :raises RedfishUnauthorized: on HTTP 401.
+        :raises RedfishForbidden: on HTTP 403.
+        :raises ResourceNotFound: on HTTP 404 and other error statuses.
+        """
+        if ignore_error_code and response.status_code == ignore_error_code:
+            return RedfishApiRespond.Success
+        if response.status_code in (405, 409):
+            self._redfish_error = self.parse_error(response)
+            return RedfishApiRespond.Error
+        return self.default_error_handler(response)
+
+    def default_patch_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """PATCH counterpart of :meth:`default_post_success`.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        """
+        return self.default_post_success(
+            response, expected=expected, ignore_error_code=ignore_error_code)
+
+    def default_delete_success(
+            self, response: requests.models.Response,
+            expected: Optional[int] = 202,
+            ignore_error_code: Optional[int] = 0) -> RedfishApiRespond:
+        """DELETE counterpart of :meth:`default_post_success`.
+
+        :param response: the write HTTP response.
+        :param expected: the status the caller treats as success (advisory here).
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: the mapped RedfishApiRespond.
+        """
+        return self.default_post_success(
+            response, expected=expected, ignore_error_code=ignore_error_code)
+
+    def base_request_respond(
+            self, resource: str, method: HTTPMethod,
+            payload: Optional[dict] = None,
+            do_async: Optional[bool] = False,
+            data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 200,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral synchronous write orchestrator (POST/PATCH/DELETE).
+
+        DMTF counterpart to ``IDracManager.base_request_respond``. A non-Dell
+        write is synchronous: on success it returns a CommandResult with the
+        success message and no task id. It still honours the specification's
+        202 + Location async form (task id from the Location header via the
+        shared task_id_from_header), when the implementation returns one. Errors
+        propagate from the default_*_success handlers carrying the parsed
+        RedfishError, so the operator sees the @Message.ExtendedInfo text.
+
+        :param resource: the Redfish resource path (leading slash included).
+        :param method: the :class:`HTTPMethod` to issue (POST/PATCH/DELETE).
+        :param payload: the request body mapping, or None for an empty body.
+        :param do_async: accepted for signature parity; this path is synchronous.
+        :param data_type: the body content type; only ``"json"`` adds JSON headers.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        :raises UnsupportedAction: when ``method`` is not a write verb.
+        """
+        headers = {}
+        if data_type == "json":
+            headers.update(self.json_content_type)
+        pd = payload if payload is not None else {}
+        self.logger.debug(
+            f"Issuing {method} request to resource: {resource}, "
+            f"payload: {json.dumps(self._redact_sensitive_payload(pd))}"
+        )
+        r = f"{self._default_method}{self.redfish_ip}{resource}"
+        if method == HTTPMethod.POST:
+            response = self.api_post_call(r, json.dumps(pd), headers)
+            api_resp = self.default_post_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        elif method == HTTPMethod.PATCH:
+            response = self.api_patch_call(r, json.dumps(pd), headers)
+            api_resp = self.default_patch_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        elif method == HTTPMethod.DELETE:
+            response = self.api_delete_call(r, headers)
+            api_resp = self.default_delete_success(
+                response, expected=expected_status, ignore_error_code=ignore_error_code)
+        else:
+            raise UnsupportedAction(f"unsupported write method: {method}")
+
+        if api_resp == RedfishApiRespond.Error:
+            return CommandResult(
+                {}, None, None, self._redfish_error), api_resp
+        if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
+            task_id = self.task_id_from_header(response, strict=False)
+            return CommandResult({"task_id": task_id}, None, None, None), api_resp
+        return CommandResult(self.api_success_msg(api_resp), None, None, None), api_resp
+
+    @staticmethod
+    def make_future_task_timestamp(start_date: str, start_time: str) -> str:
+        """Validate and combine a future maintenance-window timestamp.
+
+        :param start_date: local date in ISO format.
+        :param start_time: local time in ISO format.
+        :return: combined future timestamp in ISO format.
+        """
+        if not start_date:
+            raise MissingMandatoryArguments(
+                "A maintenance task requires a start date.")
+        if not start_time:
+            raise MissingMandatoryArguments(
+                "A maintenance task requires a start time.")
+        try:
+            start_timestamp = datetime.fromisoformat(
+                f"{start_date}T{start_time}.000001")
+        except (TypeError, ValueError) as exc:
+            raise InvalidArgumentFormat(str(exc)) from exc
+        if start_timestamp < datetime.now():
+            raise InvalidArgumentFormat(
+                f"Start time is in the past local time {start_timestamp}")
+        return start_timestamp.isoformat()
+
+    def create_apply_time_req(
+            self, apply: str, start_date: str, start_time: str,
+            default_duration: int) -> dict:
+        """Build the DMTF ``@Redfish.SettingsApplyTime`` annotation.
+
+        :param apply: requested apply-time mode.
+        :param start_date: maintenance-window local date.
+        :param start_time: maintenance-window local time.
+        :param default_duration: maintenance-window duration in seconds.
+        :return: Redfish settings-apply-time annotation.
+        """
+        selector = apply.strip().lower()
+        settings = {}
+        if selector in {"auto-boot", "maintenance"}:
+            settings.update({
+                "ApplyTime": (
+                    "AtMaintenanceWindowStart"
+                    if selector == "auto-boot"
+                    else "InMaintenanceWindowOnReset"
+                ),
+                "MaintenanceWindowStartTime": self.make_future_task_timestamp(
+                    start_date, start_time),
+                "MaintenanceWindowDurationInSeconds": default_duration,
+            })
+        elif selector == "on-reset":
+            settings["ApplyTime"] = "OnReset"
+        elif selector == "immediate":
+            settings["ApplyTime"] = "Immediate"
+        else:
+            raise ValueError("Unknown apply time")
+        return {"@Redfish.SettingsApplyTime": settings}
+
+    def reboot(
+            self,
+            do_watch: bool = False,
+            do_wait: Optional[bool] = None) -> CommandResult:
+        """Reset the managed ComputerSystem through the shared DMTF command.
+
+        :param do_watch: compatibility flag requesting reset-cycle waiting.
+        :param do_wait: explicit wait override; when omitted, use ``do_watch``.
+        :return: result of the shared ``ComputerSystem.Reset`` command.
+        """
+        wait = do_watch if do_wait is None else do_wait
+        return self.sync_invoke(
+            ApiRequestType.ComputerSystemReset,
+            "reboot",
+            reset_type="GracefulRestart",
+            do_wait=wait,
+        )
+
+    def base_post(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP POST wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.POST, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
+
+    def base_patch(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP PATCH wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.PATCH, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
+
+    def base_delete(
+            self, resource: str, payload: Optional[dict] = None,
+            do_async: Optional[bool] = False, data_type: Optional[str] = "json",
+            expected_status: Optional[int] = 204,
+            ignore_error_code: Optional[int] = 0) -> tuple:
+        """Vendor-neutral HTTP DELETE wrapper over :meth:`base_request_respond`.
+
+        :param resource: the Redfish resource path.
+        :param payload: the request body mapping, or None.
+        :param do_async: accepted for parity; the base path is synchronous.
+        :param data_type: the body content type.
+        :param expected_status: the status the caller treats as success.
+        :param ignore_error_code: an HTTP status to treat as success.
+        :return: a tuple of (CommandResult, RedfishApiRespond).
+        """
+        return self.base_request_respond(
+            resource, HTTPMethod.DELETE, payload=payload, do_async=do_async,
+            data_type=data_type, expected_status=expected_status,
+            ignore_error_code=ignore_error_code)
 
     def base_query(self,
                    resource: str,
@@ -1101,9 +1568,9 @@ class RedfishManager:
         if 200 <= response.status_code < 300:
             return RedfishApiRespond.Success
         if response.status_code == 401:
-            raise RedfishUnauthorized("Unauthorized access")
+            raise RedfishUnauthorized(RedfishManager.parse_error(response))
         elif response.status_code == 403:
-            raise RedfishForbidden("access forbidden")
+            raise RedfishForbidden(RedfishManager.parse_error(response))
         elif response.status_code == 404:
             error_msg = RedfishManager.parse_error(response)
             raise ResourceNotFound(error_msg)
@@ -1258,6 +1725,93 @@ class RedfishManager:
                     })
         return errors
 
+    @staticmethod
+    def _get_actions(cls, json_data):
+        """Parse json from the manager for all supported action
+        and action method arg.
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        unfiltered_actions = {}
+        full_redfish_names = {}
+
+        if RedfishJson.Actions not in json_data:
+            return unfiltered_actions, full_redfish_names
+
+        redfish_actions = json_data[RedfishJson.Actions]
+        for a in redfish_actions:
+            _ca = redfish_actions[a]
+            if a == "Oem" and isinstance(_ca, dict):
+                for k in _ca.keys():
+                    rest_api_action = k.split(".")
+                    if len(rest_api_action) < 2:
+                        continue
+                    rest_api_action = rest_api_action[-1]
+                    unfiltered_actions[rest_api_action] = _ca[k]
+                    full_redfish_names[rest_api_action] = k
+            else:
+                rest_api_action = a.split(".")
+                if len(rest_api_action) < 2:
+                    continue
+                rest_api_action = rest_api_action[-1]
+                unfiltered_actions[rest_api_action] = _ca
+                full_redfish_names[rest_api_action] = a
+
+        return unfiltered_actions, full_redfish_names
+
+    @staticmethod
+    def discover_member_redfish_actions(cls, json_data):
+        """
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        action_dict = {}
+        if RedfishJson.Members not in json_data:
+            if RedfishJson.Actions in json_data:
+                return cls.discover_redfish_actions(cls, json_data)
+            else:
+                return action_dict
+
+        member_data = json_data[RedfishJson.Members]
+        for m in member_data:
+            if isinstance(m, dict):
+                if RedfishJson.Actions in m.keys():
+                    action = cls.discover_redfish_actions(cls, m)
+                    action_dict.update(action)
+
+        return action_dict
+
+    @staticmethod
+    def discover_redfish_actions(cls, json_data):
+        """Discovers all redfish action, args and args choices.
+        :param cls:
+        :param json_data:
+        :return:
+        """
+        if isinstance(json_data, requests.models.Response):
+            json_data = json_data.json()
+
+        action_dict = {}
+        unfiltered_actions, full_redfish_names = cls._get_actions(cls, json_data)
+        for ra in unfiltered_actions.keys():
+            if 'target' not in unfiltered_actions[ra]:
+                continue
+            action_tuple = unfiltered_actions[ra]
+            if isinstance(action_tuple, Dict):
+                arg_keys = action_tuple.keys()
+                redfish_action = RedfishAction(action_name=ra,
+                                               target=action_tuple['target'],
+                                               full_redfish_name=full_redfish_names[ra])
+                action_dict[ra] = redfish_action
+                for k in arg_keys:
+                    if '@Redfish.AllowableValues' in k:
+                        arg_name = k.split('@')[0]
+                        action_dict[ra].add_action_arg(arg_name, action_tuple[k])
+
+        return action_dict
+
     def invoke_action(self,
                       resource_uri: str,
                       action_name: str,
@@ -1392,7 +1946,8 @@ class RedfishManager:
         data.setdefault("level", level.value)
 
         error = result.error
-        if api_resp == RedfishApiRespond.Error or error is not None:
+        if getattr(api_resp, "name", None) == RedfishApiRespond.Error.name \
+                or error is not None:
             data["executed"] = False
             if error is None:
                 status_name = getattr(api_resp, "name", str(api_resp))
@@ -1420,10 +1975,9 @@ class RedfishManager:
     def discover_computer_system_ids(self) -> list:
         """Return ALL ComputerSystem ids from ``/redfish/v1/Systems``.
 
-        ``idrac_manage_servers`` resolves a single system via the manager's
-        ``ManagerForServers`` link and (through ``value_from_json_list``) returns
-        only the last member — wrong on multi-system hosts. This enumerates the
-        Systems collection so callers can pick the right one: e.g. a Supermicro
+        :attr:`managed_system_uri` resolves one system via the manager's
+        ``ManagerForServers`` link. This method enumerates the Systems collection
+        so callers can inspect every member: e.g. a Supermicro
         GB300 exposes ``/redfish/v1/Systems/System_0`` (host) and
         ``/redfish/v1/Systems/HGX_Baseboard_0`` (NVIDIA GPU baseboard).
 
@@ -1436,12 +1990,33 @@ class RedfishManager:
         """Return ALL Manager ids from ``/redfish/v1/Managers`` (e.g. BMC_0, HGX_BMC_0).
 
         Companion to :meth:`discover_computer_system_ids` for boxes with more
-        than one BMC; ``idrac_members`` only yields a single (last) manager.
+        than one BMC; :attr:`manager_uri` yields one primary manager.
 
         :return: the list of Manager ``@odata.id`` paths.
         """
         cmd_result = self.base_query(RedfishApi.Managers, key=RedfishJson.Members)
         return self._member_ids(cmd_result.data)
+
+    @cached_property
+    def manager_uri(self) -> str:
+        """Return one primary Redfish Manager URI.
+
+        This is the shared discovery primitive used by every vendor manager.
+        Multi-manager collectors should use :meth:`discover_manager_ids`
+        instead of assuming this primary member is the only BMC.
+
+        :return: one Manager member ``@odata.id``, or ``""`` when unavailable.
+        """
+        result = self.base_query(RedfishApi.Managers, key=RedfishJson.Members)
+        return self.value_from_json_list(result.data, RedfishJson.Data_id)
+
+    @cached_property
+    def idrac_members(self) -> str:
+        """Compatibility alias for the vendor-neutral :attr:`manager_uri`.
+
+        :return: primary Redfish Manager URI.
+        """
+        return self.manager_uri
 
     def _host_system(self, system_ids) -> str:
         """Return the host ComputerSystem id from a multi-system collection.
@@ -1462,6 +2037,58 @@ class RedfishManager:
                 return sid
         return ""
 
+    @cached_property
+    def managed_system_uri(self) -> str:
+        """Return the host ComputerSystem managed by the primary BMC.
+
+        The standard ``ManagerForServers`` link is preferred for a single-system
+        service. On a multi-system service, such as a host plus an accelerator
+        baseboard, the resource exposing ``Bios`` or ``Boot`` is selected.
+
+        :return: host ComputerSystem ``@odata.id``, or ``""`` if unresolved.
+        """
+        resolved = ""
+        try:
+            links = self.base_query(self.manager_uri, key=RedfishJson.Links).data
+        except Exception:
+            links = None
+        if isinstance(links, dict):
+            managed = links.get(RedfishJson.ManagerServers)
+            if isinstance(managed, list):
+                self._manage_servers_obs = managed
+                resolved = self.value_from_json_list(
+                    managed,
+                    RedfishJson.Data_id,
+                )
+
+        try:
+            system_ids = self.discover_computer_system_ids()
+        except Exception:
+            system_ids = []
+        if len(system_ids) > 1:
+            host = self._host_system(system_ids)
+            if host:
+                return host
+        if len(system_ids) == 1:
+            return system_ids[0]
+        return resolved
+
+    @cached_property
+    def idrac_manage_servers(self) -> str:
+        """Compatibility alias for :attr:`managed_system_uri`.
+
+        :return: host ComputerSystem URI.
+        """
+        return self.managed_system_uri
+
+    def computer_system_id(self) -> str:
+        """Return the vendor-neutral managed ComputerSystem URI.
+
+        :return: host ComputerSystem URI.
+        """
+        return self.managed_system_uri
+
+
     @abstractmethod
     def redfish_manage_servers(self) -> str:
         """Shared method return who remote endpoint managed servers
@@ -1481,16 +2108,16 @@ class RedfishManager:
         return ""
 
     @staticmethod
-    def job_id_from_header(
+    def task_id_from_header(
             response: requests.models.Response,
             strict: Optional[bool] = True) -> str:
-        """Returns job id from the response header.
+        """Return a DMTF TaskService task id from the Location header.
         :param strict: if true will raise exception.
         :param response: a response that should have job id information in the header.
-        :return: job id from the Location header
+        :return: task id from the Location header
         :raise TaskIdUnavailable if header not present.
         """
-        job_id = ""
+        task_id = ""
         resp_hdr = response.headers
         if RedfishJsonSpec.Location not in resp_hdr:
             if strict:
@@ -1500,70 +2127,9 @@ class RedfishManager:
                 )
         else:
             location = response.headers[RedfishJsonSpec.Location]
-            job_id = location.split("/")[-1]
+            task_id = location.split("/")[-1]
 
-        return job_id
-
-    @staticmethod
-    def job_id_from_respond(
-            response: requests.models.Response) -> str:
-        """Try to parse job id from HTTP respond, otherwise empty string
-        :param response: requests.models.Response
-        :return: str: a job id or empty string
-        """
-        try:
-            if response is not None and hasattr(response, "__dict__"):
-                response_dict = str(response.__dict__)
-                if response_dict is not None and len(response_dict) > 0:
-                    job_id = re.search("JID_.+?,", response_dict)
-                    if job_id is not None:
-                        job_id = job_id.group(0)
-                    return job_id
-        except AttributeError as attr_err:
-            logging.debug(f"could not read job id from respond object: {attr_err}")
-
-        return ""
-
-    def parse_task_id(self, data) -> str:
-        """Parses input data and try to get a
-        job id from the http header or http response.
-
-        :param data:  http response or CommandResult
-        :return: job_id or empty string.
-        """
-        # get response from extra
-        if data is None:
-            return ""
-
-        # TODO this case I need remove
-        if hasattr(data, "extra"):
-            resp = data.extra
-        elif isinstance(data, requests.models.Response):
-            resp = data
-        else:
-            raise ValueError("Unknown data type.")
-
-        if resp is None:
-            return ""
-
-        # this based on spec
-        try:
-            job_id = self.job_id_from_header(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-            return job_id
-        # optional lookup, fall through to the response body below.
-        except TaskIdUnavailable as header_err:
-            logging.debug(f"no job id in the response header: {header_err}")
-
-        # this from response
-        try:
-            # try to get from the response, it an optional check.
-            job_id = self.job_id_from_respond(resp)
-            logging.debug(f"idrac api returned job_id: {job_id} in the response header.")
-        except TaskIdUnavailable as respond_err:
-            logging.debug(f"no job id in the response body: {respond_err}")
-
-        return ""
+        return task_id
 
     def get_task_state(
             self, resp: requests.models.Response
@@ -1732,7 +2298,7 @@ class RedfishManager:
         except Exception:
             pass
         try:
-            host_system = self.idrac_manage_servers
+            host_system = self.managed_system_uri
         except Exception:
             host_system = ""
         system_roots = []
@@ -1762,24 +2328,32 @@ class RedfishManager:
             return f"{fallback_system}/VirtualMedia"
         raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
 
-    @abstractmethod
     def api_success_msg(self,
                         api_respond: RedfishApiRespond,
                         message_key: Optional[str] = "message",
                         message=None) -> Dict:
-        """A default api success respond,
-        Return dict contains Status, and it describes whether rest return
-        ok, accepted or success.
+        """Return the vendor-neutral status envelope for a Redfish write.
 
-        if message and msg key provide msg key added to a dict.
-        for example if we want to add extra information about success.
+        Vendor managers may override this presentation hook, but DMTF commands
+        cannot require a Dell manager merely to describe an HTTP outcome.
 
-        :param api_respond: respond enum. we report to upper ok, accepted, success.
-        :param message_key: key we need add extra
-        :param message: message information data
-        :return: a dict
+        :param api_respond: normalized Redfish response classification.
+        :param message_key: key used when an optional message is supplied.
+        :param message: optional response detail.
+        :return: mapping with ``Status`` and, when supplied, the message.
         """
-        pass
+        status_by_response = {
+            RedfishApiRespond.Ok: ApiRespondString.Ok,
+            RedfishApiRespond.Error: ApiRespondString.Error,
+            RedfishApiRespond.Created: ApiRespondString.Created,
+            RedfishApiRespond.Success: ApiRespondString.Success,
+            RedfishApiRespond.AcceptedTaskGenerated:
+                ApiRespondString.AcceptedTaskGenerated,
+        }
+        result = {"Status": status_by_response[api_respond]}
+        if message is not None:
+            result[message_key] = message
+        return result
 
     @staticmethod
     def _members(data):
@@ -1859,7 +2433,7 @@ class RedfishManager:
         """
         managers_collection = self._identity_resource(
             RedfishApi.Managers, redfish_cache, do_async)
-        
+
         manager_resources = []
         for uri in sorted(self._members(managers_collection)):
             manager_resources.append((

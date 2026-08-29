@@ -4,7 +4,7 @@
 
 Covers ``boot_sources_query`` (ApiRequestType.BootOptions), a read-only DMTF
 BootOptionCollection walk. Runs offline against the mock service by default and
-against real hardware when IDRAC_IP is set.
+against real hardware when REDFISH_IP is set.
 
 Author Mus spyroot@gmail.com
 """
