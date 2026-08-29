@@ -17,6 +17,7 @@ from typing import Optional
 
 from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_exceptions import RedfishNotFound
 from ..redfish_manager import CommandResult
 
 
@@ -162,11 +163,11 @@ class DellCardCertExport(IDracManager,
 
         :param uri: Redfish resource URI.
         :param do_async: run the query asynchronously when True.
-        :return: parsed resource body, or an empty dict when the read fails.
+        :return: parsed resource body, or an empty dict when the resource is absent.
         """
         try:
             data = self.base_query(uri, do_async=do_async).data or {}
-        except Exception:
+        except RedfishNotFound:
             return {}
         return data if isinstance(data, dict) else {}
 
@@ -275,7 +276,16 @@ class DellCardCertExport(IDracManager,
         :param do_async: issue the underlying queries/POST on the async path when True.
         :return: CommandResult with a listing, preview, execution result, or error.
         """
-        rows = self._discover_rows(bool(do_async))
+        try:
+            rows = self._discover_rows(bool(do_async))
+        except Exception as exc:
+            return CommandResult(
+                None,
+                None,
+                None,
+                "failed to read Dell iDRAC card certificate export resources: "
+                f"{exc}",
+            )
         if action is None:
             return CommandResult(rows, None, None, None)
 
