@@ -2,11 +2,46 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Two GitHub Actions workflows run this project's automation. Both live in `.github/workflows/`. This
-doc describes what they do and the runner they use; for the step-by-step *release* procedure see
-[Releasing](releasing.md).
+Internal GitLab is the merge-validation authority. The `gate-merge` job, defined
+in `.gitlab-ci.yml`, runs the merge profile on the `homelab-k8s` Kubernetes
+runner; a passing GitHub workflow is not merge evidence. The GitHub Actions
+workflows described below are supplemental public checks and release automation.
+For the release procedure, see [Releasing](releasing.md).
 
-## `ci.yml` — test + lint on every change
+## Internal validation paths
+
+The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
+Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
+merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
+`repo.format`; the job runs that one gate through the Kubernetes-guarded
+`scripts/check.sh` entrypoint. This exact-commit result is diagnostic evidence
+only, not merge or release evidence.
+
+The `gate-merge` job remains the merge authority. For an Internal GitLab API or
+web pipeline, the dispatcher sets `MERGE_PROFILE=merge` and omits
+`FOCUSED_GATE`; the pipeline then runs the complete merge profile and no
+integration, deployment, or publication job. Merge-request and default-branch
+pipelines continue to select `gate-merge` through their normal GitLab rules.
+
+### Run internal validation
+
+1. Use the project pipeline on Internal GitLab with the immutable
+   `sync/pr-<number>/<40-character-head-sha>` ref produced by the configured
+   Sync Now path. The pipeline commit must resolve to that exact head SHA.
+2. For diagnostic feedback, set `FOCUSED_GATE=unit.all` (or another
+   merge-profile gate ID) and leave `MERGE_PROFILE` unset. The pipeline must
+   create only `focused-gate`.
+3. For merge evidence, unset `FOCUSED_GATE` and set `MERGE_PROFILE=merge`. The
+   pipeline must create only `gate-merge`.
+4. Verify the terminal job is successful, its commit SHA equals the requested
+   head SHA, and its sanitized gate artifacts are available. A focused run ends
+   with `run.sh: gate <id> passed`; the authoritative run ends with
+   `run.sh: all merge gates passed`.
+
+Pipeline credentials come from the configured Internal GitLab CI binding; do
+not copy tokens into the repository or pass them on the command line.
+
+## Supplemental `ci.yml` check
 
 Triggers on pushes to `main` and on every pull request.
 
@@ -14,7 +49,7 @@ Triggers on pushes to `main` and on every pull request.
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
 - Uses **no secrets**, never contacts a BMC (live `@pytest.mark.live` tests auto-skip with no
-  `IDRAC_IP`), and does **not** fetch Git LFS (the offline suite reads JSON fixtures only, never the
+  `REDFISH_IP`), and does **not** fetch Git LFS (the offline suite reads JSON fixtures only, never the
   LFS-tracked firmware binaries).
 
 Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls
@@ -36,9 +71,6 @@ Triggers **only** on tags matching `v*` (e.g. `v1.1.2`). A normal push to `main`
 One-time maintainer setup on PyPI (Project → Settings → Publishing → Add a trusted publisher): owner
 `spyroot`, repo `redfish_ctl`, workflow `release.yml`. After that, releasing is just
 `tools/bump_version.py` → commit → push a `vX.Y.Z` tag; see [Releasing](releasing.md).
-
-The one-off `idrac_ctl` deprecation shim (`packaging/idrac_ctl_deprecation/`) is **not** automated —
-it is published manually and rarely.
 
 ## The runner and Node.js
 

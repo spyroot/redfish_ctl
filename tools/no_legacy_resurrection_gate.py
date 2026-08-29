@@ -1,6 +1,6 @@
-"""Gate: no legacy resurrection — retired names stay dead, aliases stay paired.
+"""Gate: retired names stay dead and connection aliases stay contained.
 
-Two checks against the registry specs/config/environment.yaml:
+Three checks enforce the canonical configuration boundary:
 
 1. TOMBSTONE — a name in ``retired`` must never reappear anywhere in the tree
    (read, exported, registered, aliased, or used by a wrapper script).
@@ -8,12 +8,17 @@ Two checks against the registry specs/config/environment.yaml:
    deprecated ``IDRAC_*`` name directly. A legacy name may appear only in a call
    that also names its canonical ``REDFISH_*`` (the ``env_first(REDFISH_X,
    IDRAC_X)`` pair), so the canonical always takes precedence.
+3. RUNTIME_CONNECTION_ALIAS — application code must use the canonical
+   ``REDFISH_*`` environment variables and
+   ``host``/``username``/``password``/``port`` runtime names.
 
     python3 tools/no_legacy_resurrection_gate.py
 
-Tests read the legacy name directly to set up live hardware, so they are out of
-scope. Ratchet: existing direct uses are grandfathered in
-tools/no_legacy_resurrection_baseline.txt; a new one fails.
+The generic legacy-environment scan remains application-scoped because tests
+exercise those compatibility aliases. The connection-name scan also covers
+tests and docs. ``tests/conftest.py`` and ``.github/**`` remain outside that
+scan until their endpoint contracts are migrated. Existing direct uses are
+grandfathered in tools/no_legacy_resurrection_baseline.txt; a new one fails.
 
 Author Mus spyroot@gmail.com
 """
@@ -100,7 +105,7 @@ def _direct_legacy_uses(legacy: dict[str, str]) -> list[str]:
     Every string literal is grouped by its innermost enclosing statement. A
     legacy ``IDRAC_*`` literal is flagged unless its canonical ``REDFISH_*``
     appears in the SAME statement — so it is caught however it is read
-    (``os.environ["IDRAC_IP"]`` subscript, ``os.getenv("IDRAC_IP")`` call, a name
+    (an ``os.environ`` subscript, ``os.getenv`` call, a name
     in a tuple/dict/list, or an f-string) while a legitimate pair
     (``env_first(REDFISH, IDRAC)`` or ``getenv(REDFISH) or getenv(IDRAC)``) is not.
 
@@ -133,6 +138,34 @@ def _direct_legacy_uses(legacy: dict[str, str]) -> list[str]:
     return sorted(set(out))
 
 
+def _runtime_connection_aliases() -> list[str]:
+    """Return audited project locations using retired connection names.
+
+    :return: sorted ``"path:line"`` violations in runtime, tests, and docs.
+    """
+    pattern = (
+        r"(^|[^A-Za-z0-9_])"
+        r"[iI][dD][rR][aA][cC]_"
+        r"(ip|IP|username|USERNAME|password|PASSWORD|port|PORT)"
+        r"([^A-Za-z0-9_]|$)"
+    )
+    proc = subprocess.run(
+        [
+            "git", "grep", "-nIE", pattern, "--",
+            "redfish_ctl", "tests", "tools", "specs", "docs",
+            "README.md", "docker", "k8s", "pyproject.toml",
+            ":(exclude)tests/conftest.py",
+        ],
+        cwd=_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    return sorted(
+        ":".join(line.split(":", 2)[:2])
+        for line in proc.stdout.splitlines()
+    )
+
+
 def _baseline() -> set[str]:
     """Return grandfathered direct-use locations.
 
@@ -145,7 +178,7 @@ def _baseline() -> set[str]:
 
 
 def main() -> int:
-    """Report tombstone hits and new direct legacy uses.
+    """Run all no-legacy-resurrection checks.
 
     :return: 0 when clean, 1 on any tombstone hit, new direct use, or stale entry.
     """
@@ -153,6 +186,7 @@ def main() -> int:
     tombs = _tombstone_hits(reg)
     base = _baseline()
     direct = set(_direct_legacy_uses(_legacy_map(reg)))
+    runtime_aliases = _runtime_connection_aliases()
     new = sorted(direct - base)
     stale = sorted(base - direct)
     for t in tombs:
@@ -162,8 +196,16 @@ def main() -> int:
               "use env_first(REDFISH_*, IDRAC_*) so the canonical wins")
     for v in stale:
         print(f"legacy: {v} baselined but no longer a direct use — remove it from the baseline")
-    if tombs or new or stale:
-        print(f"no-legacy-resurrection: {len(tombs)} tombstone, {len(new)} new, {len(stale)} stale")
+    for v in runtime_aliases:
+        print(
+            f"RUNTIME_CONNECTION_ALIAS: {v} — use canonical connection names"
+        )
+    if tombs or new or stale or runtime_aliases:
+        print(
+            "no-legacy-resurrection: "
+            f"{len(tombs)} tombstone, {len(new)} new, {len(stale)} stale, "
+            f"{len(runtime_aliases)} runtime alias"
+        )
         return 1
     print(f"no-legacy-resurrection: clean ({len(base)} direct use(s) baselined)")
     return 0

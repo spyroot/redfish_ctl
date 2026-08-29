@@ -1,6 +1,6 @@
 """Dual-mode tests for Dell persistent-storage media initialization."""
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 PERSISTENT_STORAGE = (

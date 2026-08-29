@@ -194,6 +194,19 @@ supplementalArtifacts:
     localRequired: true
 
 contracts:
+  - id: http-semantics-rule-graph
+    authority:
+      - DSP0266
+    rule: >
+      HTTP response classification uses the operation, target, resource state,
+      status, required headers, and body-presence constraints. OEM observations
+      remain compatibility overlays and never replace the DMTF rules.
+    enforcedBy:
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_contracts_validate"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_generated_artifacts_are_current"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_classifier_requires_location_for_completed_create"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_classifier_requires_active_subscription_for_delivery"
+
   - id: error-envelope-normalization
     authority:
       - DSP0266
@@ -262,6 +275,12 @@ contracts:
       - "tests/test_redfish_error_contract.py::test_output_adapter_plan_is_documented"
 
 gates:
+  - id: dmtf-http-semantics
+    command: "scripts/check.sh via GitLab homelab-k8s unit.all gate"
+    checks:
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_contracts_validate"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_generated_artifacts_are_current"
+
   - id: dmtf-release-manifest
     command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
     checks:

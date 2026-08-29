@@ -72,7 +72,7 @@ kubectl -n redfish-sandbox get rfe -w        # watch it flip from Pending to a s
 ```
 
 A kind pod on Docker Desktop inherits the host's routes, so validate BMC reachability
-with a safe `redfish_ctl system` read before adding the endpoint. A full poll of a
+with a safe `redfish_ctl sensors` read before adding the endpoint. A full poll of a
 large chassis (dozens of chassis, hundreds of sensors) takes a minute or more; the
 endpoint shows `Pending` until the first walk finishes.
 
@@ -106,7 +106,8 @@ open http://127.0.0.1:8299/
 ```
 
 Select **Network → NIC / DPU firmware**; the explorer invokes
-`redfish_ctl nic-firmware` via `sync_invoke(ApiRequestType.NicFirmware, …)` and
+`redfish_ctl --vendor dell nic-firmware` via
+`sync_invoke(ApiRequestType.NicFirmware, …)` and
 shows the ConnectX/BlueField firmware versions. Only read-only commands are
 allow-listed, so a mutating action is refused (HTTP 400).
 
@@ -117,9 +118,9 @@ Set the endpoint once and read directly:
 
 ```bash
 export REDFISH_IP=203.0.113.10 REDFISH_USERNAME=root REDFISH_PASSWORD='<pw>'
-redfish_ctl nic-firmware --json_only      # NIC/DPU firmware for the 100GbE cards
+redfish_ctl --vendor dell nic-firmware --json_only # NIC/DPU firmware for the 100GbE cards
 redfish_ctl network-adapters              # the physical NIC/DPU cards
-redfish_ctl firmware_inventory            # the full UpdateService firmware set
+redfish_ctl --vendor dell firmware_inventory      # full UpdateService firmware set
 ```
 
 The web explorer is the same surface served over HTTP:

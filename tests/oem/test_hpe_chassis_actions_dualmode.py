@@ -5,9 +5,9 @@ import pytest
 from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.ilo_manager import IloManager
 from redfish_ctl.oem.cmd_hpe_chassis_actions import HpeChassisActions
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,8 +21,7 @@ def hpe_corpus_mock():
     :return: tuple of Redfish manager and mock service.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    service = MockRedfishService(
-        HPE_CORPUS, index=_build_fixture_index(HPE_CORPUS), vendor="hpe")
+    service = MockRedfishService(HPE_CORPUS, index=_build_fixture_index(HPE_CORPUS))
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)
@@ -30,10 +29,10 @@ def hpe_corpus_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            IDracManager(
-                idrac_ip="mock-hpe-dl360",
-                idrac_username="root",
-                idrac_password="mock",
+            IloManager(
+                host="mock-hpe-dl360",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),
@@ -121,7 +120,14 @@ def test_hpe_chassis_action_confirm_posts_selected_target(hpe_corpus_mock):
 
 def test_hpe_chassis_action_missing_target_reports_without_post(redfish_mock_factory):
     """A fixture without HPE chassis OEM actions reports an error and no POST."""
-    manager, service = redfish_mock_factory("generic")
+    _, service = redfish_mock_factory("generic")
+    manager = IloManager(
+        host="mock-generic",
+        username="root",
+        password="mock",
+        insecure=True,
+        is_debug=False,
+    )
 
     result = manager.sync_invoke(
         ApiRequestType.HpeChassisActions,
@@ -138,7 +144,7 @@ def test_hpe_chassis_action_missing_target_reports_without_post(redfish_mock_fac
 
 def test_hpe_chassis_actions_exposes_cli_entrypoint():
     """The hpe-chassis-actions command is wired into the package registry."""
-    registry = IDracManager().get_registry()
+    registry = IloManager().get_registry()
     assert registry[ApiRequestType.HpeChassisActions]["hpe-chassis-actions"] is (
         HpeChassisActions
     )

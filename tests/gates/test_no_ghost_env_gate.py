@@ -43,7 +43,7 @@ def test_registry_loads_exact_names_from_yaml():
     """
     import yaml
     names = gate._registry()
-    assert {"REDFISH_IP", "IDRAC_IP", "OTEL_EXPORTER_OTLP_ENDPOINT",
+    assert {"REDFISH_IP", "OTEL_EXPORTER_OTLP_ENDPOINT",
             "SPLUNK_ACCESS_TOKEN", "TERM"} <= names
     reg = yaml.safe_load(gate._REGISTRY.read_text(encoding="utf-8"))
     retired = set((reg.get("retired") or {}).keys())

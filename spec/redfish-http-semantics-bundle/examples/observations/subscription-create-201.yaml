@@ -1,0 +1,17 @@
+operation:
+  initiator: redfish_client
+  responder: redfish_service
+  method: POST
+  operationKind: create_subscription
+  target:
+    kind: collection
+    relation: ServiceRoot.EventService.Subscriptions
+condition:
+  processingState: completed
+  outcome: success
+response:
+  status: 201
+  headers:
+    Location: /redfish/v1/EventService/Subscriptions/42
+  body:
+    schema: EventDestination

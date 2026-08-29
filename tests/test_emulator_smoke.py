@@ -34,9 +34,9 @@ def _client():
     # host:port parsed from the emulator URL; api_*_call takes full URLs anyway.
     host = _EMU.split("://", 1)[-1]
     return IDracManager(
-        idrac_ip=host,
-        idrac_username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
-        idrac_password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
+        host=host,
+        username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
+        password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
         insecure=True,
         is_debug=False,
     )

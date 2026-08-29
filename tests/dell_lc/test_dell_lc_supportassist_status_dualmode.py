@@ -10,7 +10,7 @@ from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_status import (
     DellLcSupportAssistStatus,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -37,8 +37,7 @@ def dell_lc_corpus_mock():
     :return: tuple of Redfish manager and mock service.
     """
     requests_mock = pytest.importorskip("requests_mock")
-    service = MockRedfishService(
-        DELL_CORPUS, index=_build_fixture_index(DELL_CORPUS), vendor="dell")
+    service = MockRedfishService(DELL_CORPUS, index=_build_fixture_index(DELL_CORPUS))
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=service.get_cb)
         mocker.patch(requests_mock.ANY, text=service.patch_cb)
@@ -47,9 +46,9 @@ def dell_lc_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc-supportassist",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc-supportassist",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

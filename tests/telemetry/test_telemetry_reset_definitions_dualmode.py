@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 TELEMETRY_SERVICE = "/redfish/v1/TelemetryService"
@@ -44,7 +44,7 @@ def test_telemetry_reset_definitions_without_confirm_is_preview_only(
     manager, service = telemetry_reset_manager
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryResetMetricDefinitions,
+        ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         "telemetry-reset-definitions",
     )
 
@@ -65,7 +65,7 @@ def test_telemetry_reset_definitions_confirm_posts_empty_payload(
     manager, service = telemetry_reset_manager
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryResetMetricDefinitions,
+        ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         "telemetry-reset-definitions",
         confirm=True,
     )
@@ -88,7 +88,7 @@ def test_telemetry_reset_definitions_confirm_dry_run_still_does_not_post(
     manager, service = telemetry_reset_manager
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryResetMetricDefinitions,
+        ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         "telemetry-reset-definitions",
         confirm=True,
         dry_run=True,
@@ -107,7 +107,7 @@ def test_telemetry_reset_definitions_missing_action_reports_error(
     manager, service = redfish_mock_factory("supermicro")
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryResetMetricDefinitions,
+        ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         "telemetry-reset-definitions",
     )
 
@@ -127,7 +127,7 @@ def test_telemetry_reset_definitions_result_is_json_serializable(
     manager, _service = telemetry_reset_manager
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetryResetMetricDefinitions,
+        ApiRequestType.SupermicroTelemetryResetMetricDefinitions,
         "telemetry-reset-definitions",
         dry_run=True,
     )
