@@ -331,11 +331,19 @@ def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
           stage: validate
           tags: [homelab-k8s]
           script: [./scripts/check.sh --profile merge]
+          artifacts:
+            paths:
+              - reports/ci/gate-merge.json
+              - reports/smoke/gate-merge.json
 
         project-service-deploy-plan:
           stage: validate
           tags: [homelab-k8s]
           allow_failure: false
+          artifacts:
+            paths:
+              - reports/ci/project-service-deploy-plan.json
+              - reports/smoke/project-service-deploy-plan.json
           rules:
             - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
               when: never

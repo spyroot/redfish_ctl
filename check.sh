@@ -24,6 +24,19 @@ metadata:
   name: redfish-ctl-required-ci-smoke-tests
 spec:
   smokeTests:
+    - job: project-ci-cpu-validation
+      class: wiring
+      command: bash -lc "$PROJECT_CI_CPU_COMMAND"
+      requiredTools: [bash, conda, git, git-lfs, python3]
+      artifactUnderTest:
+        type: repository
+        digestSource: git-commit
+      mutation: none
+      timeoutSeconds: 3600
+      evidencePath: reports/smoke/project-ci-cpu-validation.json
+      cleanupPolicy: reports-only
+      releaseBlocking: true
+
     - job: gate-merge
       class: wiring
       command: './scripts/check.sh --profile "${MERGE_PROFILE:-merge}"'

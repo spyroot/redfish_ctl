@@ -23,7 +23,7 @@ _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _WARNING_SUMMARY_RE = re.compile(r"\b(\d+) warnings?\b", re.IGNORECASE)
 _SKIP_REASON_RE = re.compile(r"^SKIPPED \[(\d+)\].*?: (.+)$", re.MULTILINE)
 _OPTIONAL_SKIP_RE = re.compile(
-    r"no IDRAC_IP|REDFISH_EMULATOR|HPE_EMULATOR|LFS pointer|"
+    r"skipping live iDRAC test|REDFISH_EMULATOR|HPE_EMULATOR|LFS pointer|"
     r"no @odata\.type|OEM type / no standard schema",
     re.IGNORECASE,
 )
