@@ -72,18 +72,6 @@ The CLI root encloses manager construction, version/vendor preflight, command
 dispatch, vendor post-processing, and rendering. A surrounding ambient span is
 never its parent.
 
-Fleet operation:
-
-```
-fleet ROOT
-├── link -> fleet.node ROOT -> redfish.bmc.request CLIENT
-└── link -> fleet.node ROOT -> redfish.bmc.request CLIENT
-```
-
-Each controller reconcile is also a `ROOT`, independent of any framework span.
-Known root attributes and fleet links are supplied when the span is created so
-samplers can use them.
-
 Action followed by a task:
 
 ```
@@ -122,10 +110,14 @@ Fleet:
 
 ```
 Fleet coordinator ROOT
-├── link → Node A operation ROOT
-├── link → Node B operation ROOT
-└── link → Node C operation ROOT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+└── link → fleet.node ROOT → redfish.bmc.request CLIENT
 ```
+
+Each node span is an independent root linked to the coordinator. Its bounded
+BMC identity and coordinator link are supplied at span creation so samplers can
+use them.
 
 For `N` nodes:
 
@@ -152,7 +144,8 @@ k8s.redfish_node_profile.reconcile ROOT
 Controller root spans carry the bounded Kubernetes identity fields
 `k8s.namespace.name`, `k8s.resource.name`, and `k8s.resource.kind`, plus
 `server.address`. They do not record Secret data, request bodies, response
-bodies, raw URLs, or query strings.
+bodies, raw URLs, or query strings. Each reconcile is a root independent of any
+framework span, with its sampler-visible identity supplied at span creation.
 
 ## Lifecycle gate (G6 details)
 
