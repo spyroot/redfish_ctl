@@ -30,13 +30,13 @@ from redfish_ctl.api import (
     get_thermal,
 )
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, ResourceNotFound
-from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.kube_client import get_core_v1_api
 from redfish_ctl.redfish_exceptions import (
     RedfishException,
     RedfishForbidden,
     RedfishUnauthorized,
 )
+from redfish_ctl.redfish_manager import RedfishManager
 from redfish_ctl.telemetry import tracing
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,8 +63,11 @@ POLL_DUE_TOLERANCE_SECONDS = 1.0
 #: Ceiling for the exponential backoff applied after repeated BMC failures.
 MAX_BACKOFF_SECONDS = 600.0
 
-#: Condition type surfaced on ``.status`` describing BMC reachability.
-REACHABLE_CONDITION = "EndpointReachable"
+#: Ordered condition types surfaced on ``.status`` for the endpoint lifecycle.
+REACHABLE_CONDITION = "Reachable"
+AUTHENTICATED_CONDITION = "Authenticated"
+PROFILE_RESOLVED_CONDITION = "ProfileResolved"
+READY_CONDITION = "Ready"
 
 #: Errors that mean "the BMC could not be read this cycle" rather than a bug in
 #: the controller. These are caught, recorded on ``.status`` with a backoff, and
@@ -84,7 +87,7 @@ ManagerFactory = Callable[..., Any]
 
 #: Manager class the handler builds per poll. Indirected through a module global
 #: so tests can substitute a fake BMC facade without a real network.
-MANAGER_FACTORY: ManagerFactory = IDracManager
+MANAGER_FACTORY: ManagerFactory = RedfishManager
 
 
 def _utc_now() -> datetime:
@@ -418,7 +421,7 @@ def backoff_seconds(failures: int, base: float, cap: float = MAX_BACKOFF_SECONDS
 
 def _condition(
     condition_type: str,
-    status: bool,
+    status: bool | str,
     reason: str,
     *,
     message: str,
@@ -427,21 +430,69 @@ def _condition(
     """Build a Kubernetes-style status condition entry.
 
     :param condition_type: the condition ``type`` value.
-    :param status: whether the condition holds, rendered as ``"True"``/``"False"``.
+    :param status: whether the condition holds, or the Kubernetes ``"Unknown"``
+        state.
     :param reason: machine-readable reason code.
     :param message: human-readable detail; omitted when empty.
     :param changed_at: transition time recorded as ``lastTransitionTime``.
     :return: the condition dict.
     """
+    if isinstance(status, bool):
+        rendered_status = "True" if status else "False"
+    else:
+        rendered_status = status
+    if rendered_status not in {"True", "False", "Unknown"}:
+        raise ValueError(f"invalid Kubernetes condition status: {rendered_status}")
     condition = {
         "type": condition_type,
-        "status": "True" if status else "False",
+        "status": rendered_status,
         "reason": reason,
         "lastTransitionTime": _rfc3339(changed_at),
     }
     if message:
         condition["message"] = message
     return condition
+
+
+def _merge_conditions(
+    previous_status: Mapping[str, Any],
+    desired: list[tuple[str, bool | str, str, str]],
+    *,
+    changed_at: datetime,
+) -> list[dict[str, str]]:
+    """Build ordered conditions while preserving real transition timestamps.
+
+    Kubernetes ``lastTransitionTime`` changes only when a condition's status
+    changes. Reason or message refreshes do not represent a state transition.
+
+    :param previous_status: prior resource status containing conditions.
+    :param desired: ordered ``(type, status, reason, message)`` entries.
+    :param changed_at: timestamp used for new or transitioned conditions.
+    :return: ordered Kubernetes condition dictionaries.
+    """
+    previous = {
+        str(item.get("type")): item
+        for item in previous_status.get("conditions", ())
+        if isinstance(item, Mapping) and item.get("type")
+    }
+    conditions: list[dict[str, str]] = []
+    for condition_type, status, reason, message in desired:
+        condition = _condition(
+            condition_type,
+            status,
+            reason,
+            message=message,
+            changed_at=changed_at,
+        )
+        prior = previous.get(condition_type)
+        if (
+            prior is not None
+            and prior.get("status") == condition["status"]
+            and isinstance(prior.get("lastTransitionTime"), str)
+        ):
+            condition["lastTransitionTime"] = prior["lastTransitionTime"]
+        conditions.append(condition)
+    return conditions
 
 
 def _classify_poll_error(exc: BaseException) -> tuple[str, str]:
@@ -490,16 +541,44 @@ def build_error_status(
     failures = _int(prev_status.get("consecutiveFailures")) + 1
     reason, message = _classify_poll_error(exc)
     delay = backoff_seconds(failures, base_interval)
+    if reason == "AuthenticationFailed":
+        reachable: bool | str = True
+        authenticated: bool | str = False
+        authentication_reason = "AuthenticationFailed"
+    elif reason in {"BMCUnreachable", "Timeout"}:
+        reachable = False
+        authenticated = "Unknown"
+        authentication_reason = "AuthenticationNotAttempted"
+    else:
+        reachable = True
+        authenticated = True
+        authentication_reason = "CredentialsAccepted"
     return {
-        "conditions": [
-            _condition(
-                REACHABLE_CONDITION,
-                False,
-                reason,
-                message=message,
-                changed_at=now,
-            )
-        ],
+        "conditions": _merge_conditions(
+            prev_status,
+            [
+                (
+                    REACHABLE_CONDITION,
+                    reachable,
+                    "RedfishServiceResponding" if reachable is True else reason,
+                    "" if reachable is True else message,
+                ),
+                (
+                    AUTHENTICATED_CONDITION,
+                    authenticated,
+                    authentication_reason,
+                    message if authenticated is False else "",
+                ),
+                (
+                    PROFILE_RESOLVED_CONDITION,
+                    "Unknown",
+                    "ProfileNotResolved",
+                    message,
+                ),
+                (READY_CONDITION, False, reason, message),
+            ],
+            changed_at=now,
+        ),
         "consecutiveFailures": failures,
         "lastError": message,
         "nextPollAfter": _rfc3339(now + timedelta(seconds=delay)),
@@ -510,23 +589,27 @@ def build_success_status(
     readings: Mapping[str, Any],
     *,
     now: datetime,
+    prev_status: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Merge the core readings with a healthy condition and cleared failure fields.
 
     :param readings: the status readings from a successful poll.
     :param now: current time recorded on the reachable condition.
+    :param prev_status: prior resource status used to preserve condition
+        transition timestamps.
     :return: the full ``.status`` object for a successful poll.
     """
     status = dict(readings)
-    status["conditions"] = [
-        _condition(
-            REACHABLE_CONDITION,
-            True,
-            "PollSucceeded",
-            message="",
-            changed_at=now,
-        )
-    ]
+    status["conditions"] = _merge_conditions(
+        prev_status or {},
+        [
+            (REACHABLE_CONDITION, True, "RedfishServiceResponding", ""),
+            (AUTHENTICATED_CONDITION, True, "CredentialsAccepted", ""),
+            (PROFILE_RESOLVED_CONDITION, True, "DmtfProfileSelected", ""),
+            (READY_CONDITION, True, "PollSucceeded", ""),
+        ],
+        changed_at=now,
+    )
     status["consecutiveFailures"] = 0
     # Null clears the field via merge-patch when the endpoint recovers.
     status["lastError"] = None
@@ -558,7 +641,7 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 def _close_manager(manager: Any) -> None:
     """Best-effort close of the manager's pooled HTTP session.
 
-    ``IDracManager`` lazily caches a keep-alive ``requests.Session`` (with
+    ``RedfishManager`` lazily caches a keep-alive ``requests.Session`` (with
     its urllib3 connection pool) in ``_session_cache``. The controller builds one
     manager per poll, so at fleet scale unclosed sessions would leak sockets/FDs.
 
@@ -610,10 +693,10 @@ def _make_manager(
     """
     address, is_http = _manager_address(spec)
     return manager_factory(
-        idrac_ip=address,
-        idrac_username=credentials.get("username", DEFAULT_USERNAME),
-        idrac_password=credentials.get("password", ""),
-        idrac_port=int(spec.get("port") or DEFAULT_PORT),
+        host=address,
+        username=credentials.get("username", DEFAULT_USERNAME),
+        password=credentials.get("password", ""),
+        port=int(spec.get("port") or DEFAULT_PORT),
         insecure=bool(spec.get("insecure", True)),
         is_http=is_http,
         is_debug=False,
@@ -643,7 +726,7 @@ def poll_endpoint(
     spec: Mapping[str, Any],
     *,
     credentials: Mapping[str, str] | None = None,
-    manager_factory: ManagerFactory = IDracManager,
+    manager_factory: ManagerFactory = RedfishManager,
     polled_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Read a BMC through the facade and return a status patch payload.
@@ -800,7 +883,11 @@ def poll_redfish_endpoint(
                     new_status["lastError"],
                 )
         else:
-            new_status = build_success_status(readings, now=now)
+            new_status = build_success_status(
+                readings,
+                now=now,
+                prev_status=current_status,
+            )
             if logger is not None:
                 logger.info("polled RedfishEndpoint %s/%s", namespace or "", name or "")
 

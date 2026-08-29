@@ -61,22 +61,22 @@ if caps.one_query_param_per_uri:
 The cleanest shared commands are link-following Redfish readers:
 
 ```bash
-redfish_ctl system
-redfish_ctl chassis
 redfish_ctl sensors
+redfish_ctl environment-metrics
+redfish_ctl thermal
 redfish_ctl network-adapters
-redfish_ctl network-ports
-redfish_ctl ethernet-interfaces
+redfish_ctl nvlink-ports
 redfish_ctl metric-reports
 redfish_ctl component-integrity
-redfish_ctl secure-boot
-redfish_ctl logs
-redfish_ctl oem-info
+redfish_ctl actions
+redfish_ctl discovery
 ```
 
 These commands are valuable because they start from advertised Redfish links instead of assuming Dell
-resource ids. On multi-system hosts, `IDracManager` also picks the host ComputerSystem by looking for
-`Bios` or `Boot` links. That keeps a GB300 host (`System_0`) distinct from the HGX baseboard member.
+resource ids. Use the same commands after `--vendor supermicro` or `--vendor hp` to combine the DMTF
+registry with the selected vendor manager. On multi-system hosts, `RedfishManager` picks the host
+ComputerSystem by looking for `Bios` or `Boot` links, keeping a GB300 host (`System_0`) distinct from
+the HGX baseboard member.
 
 ## Adding A Vendor
 

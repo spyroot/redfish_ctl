@@ -10,7 +10,7 @@ TaskService id), proving the command never bakes in the Dell ``JID_`` shape.
 import pytest
 
 from redfish_ctl.compute.cmd_power_state import RebootHost
-from redfish_ctl.idrac_shared import ApiRequestType, Singleton
+from redfish_ctl.redfish_api_common import ApiRequestType, Singleton
 from redfish_ctl.redfish_manager import CommandResult
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kubernetes.render (merge, mutates:false): statically render + validate the k8s manifests and the
-# Helm chart. YAML-parses every non-templated manifest (always runnable) and, when helm is present,
-# lints + templates the chart. No cluster contact — pure render/validate.
+# Helm charts. YAML-parses every non-templated manifest, then requires Helm to
+# lint strictly and render every chart. No cluster contact is made.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 
@@ -24,10 +24,40 @@ if bad:
 print("kubernetes.render: static manifests parse OK")
 PY
 
-if command -v helm >/dev/null 2>&1; then
-  helm lint charts/redfish-controller >/dev/null
-  helm template charts/redfish-controller >/dev/null
-  echo "kubernetes.render: helm lint + template OK"
-else
-  echo "kubernetes.render: helm not installed — chart render skipped"
+if ! command -v helm >/dev/null 2>&1; then
+  echo "kubernetes.render: helm not installed in this gate environment" >&2
+  exit 1
 fi
+
+source_commit="${CI_COMMIT_SHA:-}"
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  source_commit="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "kubernetes.render: exact source commit is unavailable" >&2
+  exit 1
+fi
+
+helm lint --strict charts/redfish-controller >/dev/null
+helm template redfish-controller charts/redfish-controller \
+  --namespace redfish-system >/dev/null
+helm lint --strict charts/dmtf-sim \
+  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+helm template dmtf-sim charts/dmtf-sim \
+  --namespace dmtf-bmc \
+  --skip-tests \
+  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+helm template dmtf-sim charts/dmtf-sim \
+  --namespace dmtf-bmc \
+  --show-only templates/tests/test-connection.yaml \
+  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+
+if helm template dmtf-sim charts/dmtf-sim \
+  --namespace dmtf-bmc \
+  --set-string provenance.sourceCommit="$source_commit" \
+  --set-string dmtf.profile=no-such-profile >/dev/null 2>&1; then
+  echo "kubernetes.render: dmtf-sim accepted an unknown profile" >&2
+  exit 1
+fi
+
+echo "kubernetes.render: strict Helm lint + template OK"

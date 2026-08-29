@@ -1,8 +1,8 @@
 """Preview or run guarded HPE iLO chassis OEM actions.
 
-    redfish_ctl hpe-chassis-actions
-    redfish_ctl hpe-chassis-actions --action disable-mctp
-    redfish_ctl hpe-chassis-actions --action disable-mctp --confirm
+    redfish_ctl --vendor hp hpe-chassis-actions
+    redfish_ctl --vendor hp hpe-chassis-actions --action disable-mctp
+    redfish_ctl --vendor hp hpe-chassis-actions --action disable-mctp --confirm
 
 The command discovers supported HPE chassis OEM action targets from the live
 Redfish tree and dry-runs by default. It deliberately exposes only
@@ -15,8 +15,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..ilo_manager import IloManager
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 from ..redfish_shared import RedfishApi
 
@@ -41,7 +41,7 @@ _ACTION_SPECS = {
 }
 
 
-class HpeChassisActions(IDracManager,
+class HpeChassisActions(IloManager,
                         scm_type=ApiRequestType.HpeChassisActions,
                         name="hpe-chassis-actions",
                         metaclass=Singleton):

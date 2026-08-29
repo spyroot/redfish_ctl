@@ -8,7 +8,6 @@ Example::
 from __future__ import annotations
 
 import argparse
-import os
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -18,8 +17,9 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
+from ..config import named_env
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -50,7 +50,7 @@ def _env_value(raw: Mapping[str, Any], field: str, env_field: str, default: str)
         return str(value)
     env_name = raw.get(env_field)
     if env_name:
-        return os.environ.get(str(env_name), default)
+        return named_env(str(env_name), default)
     return default
 
 
@@ -173,10 +173,10 @@ def _node_manager(node: FleetNode) -> IDracManager:
     :return: a :class:`IDracManager` bound to the node.
     """
     return IDracManager(
-        idrac_ip=node.address,
-        idrac_username=node.username,
-        idrac_password=node.password,
-        idrac_port=node.port,
+        host=node.address,
+        username=node.username,
+        password=node.password,
+        port=node.port,
         insecure=node.insecure,
         is_http=node.use_http,
     )
