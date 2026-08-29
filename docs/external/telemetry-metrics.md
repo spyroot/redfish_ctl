@@ -115,6 +115,30 @@ SignalFx push and provide the realm plus an API read token as documented in
 > realm's `SPLUNK_INGEST_URL`; without them, use `--once --output signalfx`
 > to validate the datapoint envelope offline.
 
+## Build Identity And Fleet Read-Back
+
+`hw.build_info` is an always-on gauge emitted once per scrape with the shared
+identity dimensions plus `commit`, package `version`, and
+`schema_contract_version`. The production image receives `commit` through the
+`REDFISH_BUILD_REVISION` build argument; an uninjected build reports `unknown`.
+
+Create a complete deployment inventory with one `host.name` value per line in
+`hosts.txt`, then run the read-only fleet check with an API-scoped token:
+
+```bash
+SPLUNK_O11Y_REALM=<realm> SPLUNK_API_TOKEN=<api-token> \
+python tools/splunk_metric_gate.py \
+  --token-env SPLUNK_API_TOKEN \
+  --expected-build-revision <commit> \
+  --expected-schema-contract-version <version> \
+  --expected-hosts-file hosts.txt
+```
+
+The default identity key is `host.name`; use `--host-dimension` only when the
+inventory uses another emitted dimension. Success reports
+`build-info-gate: N/N hosts match; mismatched=0 missing=0`. Missing or stale
+series and mixed build identities fail the gate.
+
 ## Scheduled Splunk Liveness
 
 The read-only `telemetry.full-coverage` gate selects every entry whose name
@@ -153,10 +177,10 @@ definition exists but the current fixture did not include a matching sample.
 | Metric name | Context | Unit | Observed value type | Expanded rows | Exporter metric |
 |---|---|---|---:|---:|---|
 | `ProcessorModule_{ProcessorId}_CPU_{CpuId}_CoreUtil_{CoreId}` | Chassis/HGX_CPU_{CpuId}/Sensors | not declared | number:144 | 144 | `hw.gb300.processor_module_processor_id_cpu_cpu_id_core_util_core_id` |
-| `ProcessorModule_{ProcessorId}_MemCntl_0_Freq_0` | Chassis/HGX_CPU_{CpuId}/Sensors | name hint: MHz | number:2 | 2 | `hw.gb300.processor_module_processor_id_mem_cntl_0_freq_0` |
-| `ProcessorModule_{ProcessorId}_CPU_0_CpuFreq_0` | Chassis/HGX_CPU_{CpuId}/Sensors | name hint: MHz | number:2 | 2 | `hw.gb300.processor_module_processor_id_cpu_0_cpu_freq_0` |
-| `ProcessorModule_{ProcessorId}_Vreg_0_CpuVoltage_0` | Chassis/HGX_CPU_{CpuId}/Sensors | name hint: voltage | number:2 | 2 | `hw.gb300.processor_module_processor_id_vreg_0_cpu_voltage_0` |
-| `ProcessorModule_{ProcessorId}_Vreg_0_SocVoltage_0` | Chassis/HGX_CPU_{CpuId}/Sensors | name hint: voltage | number:2 | 2 | `hw.gb300.processor_module_processor_id_vreg_0_soc_voltage_0` |
+| `ProcessorModule_{ProcessorId}_MemCntl_0_Freq_0` | Chassis/HGX_CPU_{CpuId}/Sensors | MHz | number:2 | 2 | `hw.gb300.processor_module_processor_id_mem_cntl_0_freq_0` |
+| `ProcessorModule_{ProcessorId}_CPU_0_CpuFreq_0` | Chassis/HGX_CPU_{CpuId}/Sensors | MHz | number:2 | 2 | `hw.gb300.processor_module_processor_id_cpu_0_cpu_freq_0` |
+| `ProcessorModule_{ProcessorId}_Vreg_0_CpuVoltage_0` | Chassis/HGX_CPU_{CpuId}/Sensors | V | number:2 | 2 | `hw.gb300.processor_module_processor_id_vreg_0_cpu_voltage_0` |
+| `ProcessorModule_{ProcessorId}_Vreg_0_SocVoltage_0` | Chassis/HGX_CPU_{CpuId}/Sensors | V | number:2 | 2 | `hw.gb300.processor_module_processor_id_vreg_0_soc_voltage_0` |
 | `MemoryPageRetirementCount` | Oem/Nvidia | name hint: count | number:2 | 2 | `hw.gb300.memory_page_retirement_count` |
 | `EDPViolationState` | Oem/Nvidia | not declared | string:2 | 2 | `hw.power.edp_violation_state` |
 | `PowerBreakPerformanceState` | Oem/Nvidia | name hint: power | string:2 | 2 | `hw.power.break_performance_state` |
@@ -197,25 +221,25 @@ definition exists but the current fixture did not include a matching sample.
 
 | Metric name | Context | Unit | Observed value type | Expanded rows | Exporter metric |
 |---|---|---|---:|---:|---|
-| `HGX_BMC_0_Temp_0` | Chassis/HGX_BMC_0/Sensors | name hint: temperature | number:1 | 1 | `hw.gb300.hgx_bmc_0_temp_0` |
-| `{BSWild}` | Chassis/HGX_Chassis_0/Sensors | not declared | number:1 | 1 | `hw.gb300.<resolved_metric_property>` |
-| `ProcessorModule_{PMWild}_CPU_0_Energy_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: energy | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_energy_0` |
+| `HGX_BMC_0_Temp_0` | Chassis/HGX_BMC_0/Sensors | Cel | number:1 | 1 | `hw.gb300.hgx_bmc_0_temp_0` |
+| `{BSWild}` | Chassis/HGX_Chassis_0/Sensors | W | number:1 | 1 | `hw.gb300.<resolved_metric_property>` |
+| `ProcessorModule_{PMWild}_CPU_0_Energy_0` | Chassis/HGX_CPU_{PMWild}/Sensors | kWh | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_energy_0` |
 | `ProcessorModule_{PMWild}_CPU_0_EnforcedEDPc_0` | Chassis/HGX_CPU_{PMWild}/Sensors | not declared | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_enforced_edpc_0` |
 | `ProcessorModule_{PMWild}_CPU_0_EnforcedEDPp_0` | Chassis/HGX_CPU_{PMWild}/Sensors | not declared | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_enforced_edpp_0` |
-| `ProcessorModule_{PMWild}_CPU_0_Power_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: power | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_power_0` |
-| `ProcessorModule_{PMWild}_CPU_0_TempAvg_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: temperature | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_temp_avg_0` |
-| `ProcessorModule_{PMWild}_CPU_0_TempLimit_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: temperature | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_temp_limit_0` |
-| `ProcessorModule_{PMWild}_Vreg_0_CpuPower_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: power | number:2 | 2 | `hw.gb300.processor_module_pmwild_vreg_0_cpu_power_0` |
-| `ProcessorModule_{PMWild}_Vreg_0_SocPower_0` | Chassis/HGX_CPU_{PMWild}/Sensors | name hint: power | number:2 | 2 | `hw.gb300.processor_module_pmwild_vreg_0_soc_power_0` |
-| `HGX_GPU_{GWild}_DRAM_0_Power_0` | Chassis/HGX_GPU_{GWild}/Sensors | name hint: power | number:4 | 4 | `hw.gb300.hgx_gpu_gwild_dram_0_power_0` |
+| `ProcessorModule_{PMWild}_CPU_0_Power_0` | Chassis/HGX_CPU_{PMWild}/Sensors | W | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_power_0` |
+| `ProcessorModule_{PMWild}_CPU_0_TempAvg_0` | Chassis/HGX_CPU_{PMWild}/Sensors | Cel | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_temp_avg_0` |
+| `ProcessorModule_{PMWild}_CPU_0_TempLimit_0` | Chassis/HGX_CPU_{PMWild}/Sensors | Cel | number:2 | 2 | `hw.gb300.processor_module_pmwild_cpu_0_temp_limit_0` |
+| `ProcessorModule_{PMWild}_Vreg_0_CpuPower_0` | Chassis/HGX_CPU_{PMWild}/Sensors | W | number:2 | 2 | `hw.gb300.processor_module_pmwild_vreg_0_cpu_power_0` |
+| `ProcessorModule_{PMWild}_Vreg_0_SocPower_0` | Chassis/HGX_CPU_{PMWild}/Sensors | W | number:2 | 2 | `hw.gb300.processor_module_pmwild_vreg_0_soc_power_0` |
+| `HGX_GPU_{GWild}_DRAM_0_Power_0` | Chassis/HGX_GPU_{GWild}/Sensors | W | number:4 | 4 | `hw.gb300.hgx_gpu_gwild_dram_0_power_0` |
 | `HGX_GPU_{GWild}_DRAM_0_Temp_0` | Chassis/HGX_GPU_{GWild}/Sensors | Cel | number:4 | 4 | `hw.gpu.temperature` |
-| `HGX_GPU_{GWild}_Energy_0` | Chassis/HGX_GPU_{GWild}/Sensors | name hint: energy | number:4 | 4 | `hw.gb300.hgx_gpu_gwild_energy_0` |
-| `HGX_GPU_{GWild}_Power_0` | Chassis/HGX_GPU_{GWild}/Sensors | name hint: power | number:8 | 8 | `hw.gb300.hgx_gpu_gwild_power_0` |
+| `HGX_GPU_{GWild}_Energy_0` | Chassis/HGX_GPU_{GWild}/Sensors | kWh | number:4 | 4 | `hw.gb300.hgx_gpu_gwild_energy_0` |
+| `HGX_GPU_{GWild}_Power_0` | Chassis/HGX_GPU_{GWild}/Sensors | W | number:8 | 8 | `hw.gb300.hgx_gpu_gwild_power_0` |
 | `HGX_GPU_{GWild}_TEMP_0` | Chassis/HGX_GPU_{GWild}/Sensors | Cel | number:4 | 4 | `hw.gpu.temperature` |
 | `HGX_GPU_{GWild}_TEMP_1` | Chassis/HGX_GPU_{GWild}/Sensors | Cel | number:4 | 4 | `hw.gpu.temperature` |
-| `HGX_ProcessorModule_{PMWild}_Exhaust_Temp_0` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | name hint: temperature | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_exhaust_temp_0` |
-| `HGX_ProcessorModule_{PMWild}_Inlet_Temp_0` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | name hint: temperature | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_inlet_temp_0` |
-| `HGX_ProcessorModule_{PMWild}_Inlet_Temp_1` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | name hint: temperature | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_inlet_temp_1` |
+| `HGX_ProcessorModule_{PMWild}_Exhaust_Temp_0` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | Cel | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_exhaust_temp_0` |
+| `HGX_ProcessorModule_{PMWild}_Inlet_Temp_0` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | Cel | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_inlet_temp_0` |
+| `HGX_ProcessorModule_{PMWild}_Inlet_Temp_1` | Chassis/HGX_ProcessorModule_{PMWild}/Sensors | Cel | number:2 | 2 | `hw.gb300.hgx_processor_module_pmwild_inlet_temp_1` |
 
 ### `HGX_ProcessorGPMMetrics_0`
 
@@ -253,7 +277,7 @@ definition exists but the current fixture did not include a matching sample.
 | `MaxLanes` | PCIeInterface | not declared | number:4 | 4 | `hw.gb300.max_lanes` |
 | `LanesInUse` | PCIeInterface | not declared | number:4 | 4 | `hw.gb300.lanes_in_use` |
 | `OperatingSpeedMHz` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId} | MHz | number:4 | 4 | `hw.gpu.clock_mhz` |
-| `BandwidthPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId} | name hint: percent | number:4 | 4 | `hw.gb300.bandwidth_percent` |
+| `BandwidthPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId} | % | number:4 | 4 | `hw.gb300.bandwidth_percent` |
 | `SMUtilizationPercent` | Oem/Nvidia | % | number:4 | 4 | `hw.gpu.compute.utilization` |
 | `CorrectableECCErrorCount` | CacheMetricsTotal/LifeTime | name hint: count | number:4 | 4 | `hw.gb300.correctable_eccerror_count` |
 | `UncorrectableECCErrorCount` | CacheMetricsTotal/LifeTime | name hint: count | number:4 | 4 | `hw.gb300.uncorrectable_eccerror_count` |
@@ -275,11 +299,11 @@ definition exists but the current fixture did not include a matching sample.
 | `AccumulatedGPUContextUtilizationDuration` | Oem/Nvidia | not declared | string:4 | 4 | not exported by exporter |
 | `AccumulatedSMUtilizationDuration` | Oem/Nvidia | not declared | string:4 | 4 | not exported by exporter |
 | `RampDownWattsPerSecond` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | not declared | number:4 | 4 | `hw.gb300.ramp_down_watts_per_second` |
-| `RampDownHysteresisSeconds` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | not declared | number:4 | 4 | `hw.gb300.ramp_down_hysteresis_seconds` |
+| `RampDownHysteresisSeconds` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | s | number:4 | 4 | `hw.gb300.ramp_down_hysteresis_seconds` |
 | `RampUpWattsPerSecond` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | not declared | number:4 | 4 | `hw.gb300.ramp_up_watts_per_second` |
-| `TMPFloorPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | name hint: percent | number:4 | 4 | `hw.gb300.tmpfloor_percent` |
+| `TMPFloorPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | % | number:4 | 4 | `hw.gb300.tmpfloor_percent` |
 | `ImmediateRampDown` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | not declared | boolean:4 | 4 | `hw.gb300.immediate_ramp_down` |
-| `RemainingLifetimeCircuitryPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | name hint: percent | number:4 | 4 | `hw.gb300.remaining_lifetime_circuitry_percent` |
+| `RemainingLifetimeCircuitryPercent` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | % | number:4 | 4 | `hw.gb300.remaining_lifetime_circuitry_percent` |
 | `Enabled` | Systems/HGX_Baseboard_0/Processors/GPU_{GpuId}/Oem/Nvidia | not declared | boolean:4 | 4 | `hw.gb300.enabled` |
 | `AllowFLRPersistentConfig` | Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall | not declared | boolean:4 | 4 | `hw.gb300.allow_flrpersistent_config` |
 | `AllowOneShotConfig` | Oem/Nvidia/InbandReconfigPermissions/BAR0Firewall | not declared | boolean:4 | 4 | `hw.gb300.allow_one_shot_config` |
@@ -489,11 +513,11 @@ definition exists but the current fixture did not include a matching sample.
 
 | Metric name | Context | Unit | Observed value type | Expanded rows | Exporter metric |
 |---|---|---|---:|---:|---|
-| `BMC_0_DCSCM_Temp_0` | Chassis/BMC_0/Sensors | name hint: temperature | number:1 | 1 | `hw.gb300.bmc_0_dcscm_temp_0` |
+| `BMC_0_DCSCM_Temp_0` | Chassis/BMC_0/Sensors | Cel | number:1 | 1 | `hw.gb300.bmc_0_dcscm_temp_0` |
 | `{BSWild}` | Chassis/HGX_Chassis_0/Sensors | not declared | - | 0 | not observed in fixture |
 | `IO_Board_{IWild}_CX7_0_Temp_0` | Chassis/IO_Board_{IWild}/Sensors | name hint: temperature | - | 0 | not observed in fixture |
 | `IO_Board_{IWild}_CX7_1_Temp_0` | Chassis/IO_Board_{IWild}/Sensors | name hint: temperature | - | 0 | not observed in fixture |
-| `NVME_M2_0_Temp_0` | Chassis/NVME_M2_0/Sensors | name hint: temperature | number:1 | 1 | `hw.gb300.nvme_m2_0_temp_0` |
-| `{PDBWild}` | Chassis/PDB_0/Sensors | not declared | number:13 | 13 | `hw.gb300.<resolved_metric_property>` |
+| `NVME_M2_0_Temp_0` | Chassis/NVME_M2_0/Sensors | Cel | number:1 | 1 | `hw.gb300.nvme_m2_0_temp_0` |
+| `{PDBWild}` | Chassis/PDB_0/Sensors | Cel | number:13 | 13 | `hw.gb300.<resolved_metric_property>` |
 | `{BFSWild}` | Chassis/Riser_Slot{BFWild}_BlueField_3_SmartNIC_Main_Card/Sensors | not declared | - | 0 | not observed in fixture |
 | `StorageBackplane_{SBWild}_SSD_{SBDWild}_Temp_0` | Chassis/StorageBackplane_{SBWild}/Sensors | name hint: temperature | number:8 | 8 | not exported by exporter |

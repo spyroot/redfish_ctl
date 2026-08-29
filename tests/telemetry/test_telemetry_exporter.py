@@ -614,6 +614,51 @@ def test_scrape_health_samples_emit_bmc_up_gauge():
     assert REQUIRED_DIMS <= set(down.dimensions)
 
 
+def test_scrape_health_samples_emit_injected_build_identity(monkeypatch):
+    """Every scrape reports the injected revision, package, and schema versions."""
+    monkeypatch.setenv("REDFISH_BUILD_REVISION", "0123456789abcdef")
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    for ok in (True, False):
+        info = _single_metric(
+            exporter_mod.scrape_health_samples(
+                dims,
+                ok=ok,
+                duration_seconds=0.5,
+            ),
+            "hw.build_info",
+        )
+        assert info.value == 1.0
+        assert info.dimensions["commit"] == "0123456789abcdef"
+        assert info.dimensions["version"] == exporter_mod.PACKAGE_VERSION
+        assert info.dimensions["schema_contract_version"] == "1"
+        assert REQUIRED_DIMS <= set(info.dimensions)
+
+
+def test_build_info_marks_missing_revision_unknown(monkeypatch):
+    """An uninjected build remains visible and cannot look current by accident."""
+    monkeypatch.delenv("REDFISH_BUILD_REVISION", raising=False)
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    info = exporter_mod.build_info_sample(dims)
+
+    assert info.dimensions["commit"] == "unknown"
+
+
+def test_build_info_serializes_to_prometheus():
+    """Prometheus output preserves the build identity as metric labels."""
+    dims = build_identity_dimensions("172.25.230.29", vendor="supermicro")
+
+    text = render_prometheus_text([
+        exporter_mod.build_info_sample(dims, build_revision="abc123"),
+    ])
+
+    assert "# TYPE hw.build_info gauge" in text
+    assert 'commit="abc123"' in text
+    assert f'version="{exporter_mod.PACKAGE_VERSION}"' in text
+    assert 'schema_contract_version="1"' in text
+
+
 def test_exporter_collect_samples_reachable_bmc_reports_up(monkeypatch):
     """A reachable BMC scrape emits hw.bmc.up=1 without dropping hw.* readings."""
     manager = Exporter(
@@ -1005,6 +1050,21 @@ def test_metric_catalog_yaml_matches_runtime_static_catalog():
             assert row.get("unit") == definition.unit
             assert row["prometheus_name"] == definition.prometheus_name
             assert row["family"] == definition.family
+            assert row.get("availability", "baseline") == definition.availability
+            assert row.get("profile_required", False) == definition.profile_required
+
+    shared_runtime = exporter_mod.metric_definitions()
+    build_info = shared_runtime["hw.build_info"]
+    shared_rows = {row["name"]: row for row in shared_spec["metrics"]}
+    assert build_info.availability == "self"
+    assert build_info.profile_required is True
+    assert set(shared_rows["hw.build_info"]["dimensions"]) <= set(
+        build_info.dimensions
+    )
+    assert (
+        str(shared_spec["version"])
+        == exporter_mod.TELEMETRY_SCHEMA_CONTRACT_VERSION
+    )
 
     assert "hw.scrape.ok" in exporter_mod.metric_definitions()
     assert "hw.power" in metric_definitions()
@@ -1131,8 +1191,10 @@ def test_signalfx_token_resolves_direct_file_and_env(tmp_path, monkeypatch):
     assert resolve_signalfx_token() == "env-token"
 
 
-def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_factory):
+def test_exporter_command_collects_supermicro_fixture_metrics(
+        redfish_mock_factory, monkeypatch):
     """The exporter scrapes the GB300 corpus offline and emits SignalFx datapoints."""
+    monkeypatch.setenv("REDFISH_BUILD_REVISION", "abc123")
     mgr, service = redfish_mock_factory("supermicro")
 
     result = mgr.sync_invoke(
@@ -1151,6 +1213,10 @@ def test_exporter_command_collects_supermicro_fixture_metrics(redfish_mock_facto
         point["metric"] for point in result.data["cumulative_counter"]
     }
     assert {"hw.scrape.ok", "hw.scrape.duration_seconds"} <= metrics
+    build_info = next(point for point in points if point["metric"] == "hw.build_info")
+    assert build_info["value"] == 1
+    assert build_info["dimensions"]["commit"] == "abc123"
+    assert build_info["dimensions"]["schema_contract_version"] == "1"
     scrape_ok = next(point for point in points if point["metric"] == "hw.scrape.ok")
     scrape_duration = next(
         point for point in points

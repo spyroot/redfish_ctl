@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from ..config import exporter_config_file, exporter_credential_file
+from ..config import (
+    exporter_build_revision,
+    exporter_config_file,
+    exporter_credential_file,
+)
+from ..version import __version__ as PACKAGE_VERSION
 from . import identity as identity_mod
 from .metric_model import MetricDefinition, MetricSample, _definition
 
@@ -32,6 +37,9 @@ ISO_DURATION = re.compile(
 SECRET_ARG_NAMES = {"--password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
 POLL_JITTER_FRACTION = 0.10
+# Must match specs/telemetry/catalog.yaml; enforced by the catalog parity test.
+TELEMETRY_SCHEMA_CONTRACT_VERSION = "1"
+UNKNOWN_BUILD_REVISION = "unknown"
 
 
 _COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
@@ -45,6 +53,19 @@ _STATIC_METRIC_DEFINITIONS = (
     _definition("hw.bmc.up",
                 description="Per-BMC 0/1 liveness gauge (1 reachable, 0 unreachable).",
                 family="scrape", liveness="scrape"),
+    _definition(
+        "hw.build_info",
+        description="Exporter build and telemetry schema identity.",
+        family="exporter",
+        dimensions=_COMMON_DIMS + (
+            "commit",
+            "version",
+            "schema_contract_version",
+        ),
+        liveness="scrape",
+        availability="self",
+        profile_required=True,
+    ),
     _definition(
         "redfish_exporter_scrape_success",
         description="Whether the latest scrape completed without a supported collector failure.",
@@ -359,6 +380,7 @@ def scrape_health_samples(
         partial: bool = False,
         timestamp_seconds: Optional[float] = None,
         collection_error_totals: Optional[Mapping[tuple[str, str], float]] = None,
+        build_revision: Optional[str] = None,
         ) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
@@ -376,6 +398,7 @@ def scrape_health_samples(
     :param timestamp_seconds: wall-clock timestamp of the latest successful scrape.
     :param collection_error_totals: cumulative error counts keyed by
         ``(collector, error_kind)``; when omitted, current errors emit as 1.
+    :param build_revision: exact source revision injected at image build or deployment.
     :return: scrape-level, collector-level, and deprecated compatibility samples.
     """
     dims = _with_dims(identity, source="exporter")
@@ -400,6 +423,7 @@ def scrape_health_samples(
         _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
         # Always emit hw.bmc.up so failed scrapes differ from absent series.
         _sample("hw.bmc.up", 1.0 if ok else 0.0, dims, None),
+        build_info_sample(identity, build_revision=build_revision),
         _sample(
             "hw.scrape.duration_seconds",
             safe_duration,
@@ -467,6 +491,34 @@ def scrape_health_samples(
             metric_type="counter",
         ))
     return health
+
+
+def build_info_sample(
+        identity: Mapping[str, str],
+        build_revision: Optional[str] = None) -> MetricSample:
+    """Return the build and schema identity emitted on every scrape.
+
+    ``REDFISH_BUILD_REVISION`` is defined by the production image build argument
+    or deployment environment. An absent value remains visible as ``unknown`` so
+    the fleet currency gate can distinguish an uninjected build from a match.
+
+    :param identity: fixed join dimensions for the exporter instance.
+    :param build_revision: explicit source revision, overriding the environment.
+    :return: the ``hw.build_info`` gauge with a constant value of 1.0.
+    """
+    revision = (
+        str(build_revision).strip()
+        if build_revision not in (None, "")
+        else exporter_build_revision(UNKNOWN_BUILD_REVISION)
+    ) or UNKNOWN_BUILD_REVISION
+    dims = _with_dims(
+        identity,
+        source="exporter",
+        commit=revision,
+        version=PACKAGE_VERSION,
+        schema_contract_version=TELEMETRY_SCHEMA_CONTRACT_VERSION,
+    )
+    return _sample("hw.build_info", 1.0, dims, None)
 
 
 def collector_scrape_status(results: Iterable[CollectorResult]) -> tuple[bool, bool]:

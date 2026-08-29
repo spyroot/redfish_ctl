@@ -154,7 +154,7 @@ def test_dry_run_validates_real_catalog_without_credentials(monkeypatch, capsys)
         "hw.power.break_performance_state",
     }
     assert len(policies) > len(condition_gated)
-    assert len(policies) == 62
+    assert len(policies) == 63
     assert "CONDITION_GATED=4" in capsys.readouterr().out
 
 
