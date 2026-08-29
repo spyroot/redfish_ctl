@@ -37,6 +37,48 @@
         "minLength": 1
       }
     },
+    "trusted_includes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project", "ref", "file", "templates"],
+        "properties": {
+          "project": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+          },
+          "ref": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "file": {
+            "type": "string",
+            "pattern": "^/[^\\n]+\\.ya?ml$"
+          },
+          "templates": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "mutates"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^\\.[A-Za-z0-9_.-]+$"
+                },
+                "mutates": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "mandatory_ids": {
       "type": "array",
       "minItems": 1,

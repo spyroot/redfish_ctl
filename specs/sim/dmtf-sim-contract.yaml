@@ -1,7 +1,6 @@
-# DMTF SIM — machine-readable contract. Written for AGENTS, not humans.
-# An agent parses this to CONSUME the sim correctly without re-deriving its
-# behavior, and to REVIEW any sim change: an implementation that disagrees
-# with this file is the bug (same authority rule as the architecture spec).
+# DMTF SIM — machine-readable contract.
+# Consumers use this contract without re-deriving simulator behavior. An
+# implementation that disagrees with this file is the bug.
 # Conformance is PROVEN, not promised: the consistency check named under
 # `conformance` interrogates every URI the bundle declares.
 schema: redfish_ctl.dmtf_sim_contract/v1
@@ -24,7 +23,7 @@ binding:
     proof: "tools/mockup_consistency_check.py — harvests EVERY @odata.id the
       bundle itself declares, interrogates the sim, asserts 1:1 (see
       guarantees.fidelity); exit 0 is the gate for every deliverable built on
-      the sim (queue item dmtf-sim-deployment D0)"
+      the sim"
 
 # ---------------------------------------------------------------------------
 # PROVIDES — the full caller-visible surface. Nothing else exists.
@@ -84,7 +83,7 @@ guarantees:
     declare readOnlyRootFilesystem + runAsNonRoot as a matter of contract."
 
 # ---------------------------------------------------------------------------
-# NOT PROVIDED — agents must not test these against this sim.
+# NOT PROVIDED — unsupported behavior must not be tested against this sim.
 # ---------------------------------------------------------------------------
 not_provided:
   mutation: "no POST/PATCH/DELETE semantics — no subscription create, no BIOS
@@ -109,14 +108,12 @@ not_provided:
 consumers:
   - {use: dmtf_generic_lens_tests, how: "in-process/subprocess server in
       tests/k8s/; the DMTF side of dual-lens assertions"}
-  - {use: overlap_diff, how: "the DMTF side of the executable 5-check diff
-      (queue item dmtf-overlap-diff): same command against sim and corpus,
-      diff = subset|full|full_plus_oem"}
+  - {use: overlap_diff, how: "the DMTF side of the executable 5-check diff:
+      same command against sim and corpus, diff = subset|full|full_plus_oem"}
   - {use: telemetry_loop, how: "T2: telemetry requests read FROM the bundle's
       own JSON, sent to the sim, telemetry mocked back to the caller"}
-  - {use: persistent_reference, how: "the deployed pod (charts/dmtf-sim,
-      queue item dmtf-sim-deployment D1-D7 approved 2026-07-25): a standing
-      DMTF BMC address for smoke/admission tests and live-diff targets"}
+  - {use: persistent_reference, how: "the charts/dmtf-sim pod provides a
+      standing DMTF BMC address for smoke/admission tests and live-diff targets"}
   - {use: live_diff_target, how: "tools/corpus.py live-diff --ip <sim> proves
       pod == bundle over the network; the same engine, zero new code"}
 
@@ -128,6 +125,6 @@ deployment:
     used by unit tests)"
   subprocess: "python k8s/sandbox/mock_bmc_server.py --mockup-dir <root>
     --port <p> (used by the conformance proof and integration tests)"
-  persistent_pod: "k8s/sandbox/dmtf-sim.yaml today; charts/dmtf-sim once the
-    deployment deliverables land (image from Harbor via the private CI, the
-    bundle BAKED at build time — no runtime LFS, no PVC)"
+  persistent_pod: "charts/dmtf-sim deploys the persistent pod; the Harbor
+    image is digest-pinned and the bundle is baked at build time — no runtime
+    LFS and no PVC"

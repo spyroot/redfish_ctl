@@ -2,6 +2,7 @@
 import ast
 import json
 import re
+import textwrap
 from pathlib import Path
 
 import yaml
@@ -10,6 +11,24 @@ from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
+BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
+PROJECT_SERVICE_JOBS = {
+    "project-service-image-publish": ".builder-project-image-publish",
+    "project-service-chart-publish": ".builder-project-chart-publish",
+    "project-service-deploy-plan": ".builder-project-deploy-plan",
+    "project-service-deploy": ".builder-project-deploy",
+    "project-service-verify": ".builder-project-verify",
+    "project-service-live-test": ".builder-project-live-test",
+    "project-service-rollback": ".builder-project-rollback",
+    "project-service-release-evidence": ".builder-project-release-evidence",
+}
+PROJECT_SERVICE_TEMPLATE_NAMES = set(PROJECT_SERVICE_JOBS.values())
+MUTATING_PROJECT_SERVICE_TEMPLATES = {
+    ".builder-project-image-publish",
+    ".builder-project-chart-publish",
+    ".builder-project-deploy",
+    ".builder-project-rollback",
+}
 
 
 def _ci_config() -> dict:
@@ -32,6 +51,67 @@ def _script_lines(job: dict) -> list[str]:
     if isinstance(script, str):
         return [script]
     return [str(line) for line in script]
+
+
+def _trusted_project_service_registry(
+    *,
+    required_jobs: list[str] | None = None,
+) -> dict:
+    """Return the minimal registry contract for one trusted Builder include.
+
+    :param required_jobs: GitLab job names the meta-gate must find.
+    :return: a registry dict suitable for direct ``gate_meta`` unit checks.
+    """
+    return {
+        "version": 1,
+        "runner_tag": "homelab-k8s",
+        "required_jobs": required_jobs or ["gate-merge"],
+        "mandatory_ids": [],
+        "trusted_includes": [
+            {
+                "project": "spyroot/builder",
+                "ref": "a" * 40,
+                "file": BUILDER_PROJECT_INCLUDE_FILE,
+                "templates": [
+                    {
+                        "name": name,
+                        "mutates": name in MUTATING_PROJECT_SERVICE_TEMPLATES,
+                    }
+                    for name in sorted(PROJECT_SERVICE_TEMPLATE_NAMES)
+                ],
+            }
+        ],
+        "gates": [],
+    }
+
+
+def _check_temp_gitlab(
+    tmp_path: Path,
+    monkeypatch,
+    body: str,
+    registry: dict,
+) -> tuple[list[str], bool]:
+    """Run the GitLab meta-check against a temporary pipeline file."""
+    (tmp_path / ".gitlab-ci.yml").write_text(textwrap.dedent(body), encoding="utf-8")
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+    return gate_meta._check_gitlab(registry)
+
+
+def _registry_trusted_include() -> dict:
+    """Return the single trusted include declared by the live gate registry."""
+    registry = gate_meta._load_registry()
+    records = registry.get("trusted_includes") or []
+    assert len(records) == 1, "the provider include contract must be single-sourced"
+    include = records[0]
+    assert include["project"] == "spyroot/builder"
+    assert include["file"] == BUILDER_PROJECT_INCLUDE_FILE
+    assert re.fullmatch(r"[0-9a-f]{40}", include["ref"])
+    contracts = {item["name"]: item["mutates"] for item in include["templates"]}
+    assert set(contracts) == PROJECT_SERVICE_TEMPLATE_NAMES
+    assert {
+        name for name, mutates in contracts.items() if mutates
+    } == MUTATING_PROJECT_SERVICE_TEMPLATES
+    return include
 
 
 _ALLOWED_GITLAB_EXPR_NODES = (
@@ -199,6 +279,234 @@ def test_registry_declares_exactly_one_diagnostic_focused_gate_job() -> None:
     assert "focused-gate" not in registry.get("required_jobs", [])
 
 
+def test_registry_pins_exact_builder_project_service_include() -> None:
+    """The only trusted provider include is a registry-declared exact commit."""
+    _registry_trusted_include()
+
+
+def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """A trusted exact include plus a locally guarded allowed template is analyzable."""
+    registry = _trusted_project_service_registry(
+        required_jobs=["gate-merge", "project-service-deploy-plan"]
+    )
+    ref = registry["trusted_includes"][0]["ref"]
+
+    failures, ran = _check_temp_gitlab(
+        tmp_path,
+        monkeypatch,
+        f"""
+        include:
+          - project: spyroot/builder
+            ref: {ref}
+            file: {BUILDER_PROJECT_INCLUDE_FILE}
+
+        gate-merge:
+          stage: validate
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+
+        project-service-deploy-plan:
+          stage: validate
+          tags: [homelab-k8s]
+          allow_failure: false
+          rules:
+            - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+              when: never
+            - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+              when: on_success
+            - when: never
+          extends: .builder-project-deploy-plan
+        """,
+        registry,
+    )
+
+    assert ran
+    assert failures == []
+
+
+def test_meta_gate_rejects_floating_or_untrusted_provider_include() -> None:
+    """Floating refs, unknown providers, unknown files, and local includes fail closed."""
+    registry = _trusted_project_service_registry()
+    ref = registry["trusted_includes"][0]["ref"]
+    cases = (
+        {"project": "spyroot/builder", "ref": "main", "file": BUILDER_PROJECT_INCLUDE_FILE},
+        {"project": "spyroot/other", "ref": ref, "file": BUILDER_PROJECT_INCLUDE_FILE},
+        {"project": "spyroot/builder", "ref": ref, "file": "/ci/templates/other.yml"},
+        {"local": "ci/project-service.yml"},
+    )
+
+    for include in cases:
+        failures, allowed_templates = gate_meta._check_trusted_includes(
+            {"include": [include]}, registry
+        )
+        assert failures, include
+        assert set(allowed_templates) == PROJECT_SERVICE_TEMPLATE_NAMES
+
+
+def test_meta_gate_rejects_unknown_external_template(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """A local job may extend only templates declared by the trusted include contract."""
+    registry = _trusted_project_service_registry()
+    ref = registry["trusted_includes"][0]["ref"]
+
+    failures, ran = _check_temp_gitlab(
+        tmp_path,
+        monkeypatch,
+        f"""
+        include:
+          - project: spyroot/builder
+            ref: {ref}
+            file: {BUILDER_PROJECT_INCLUDE_FILE}
+
+        gate-merge:
+          stage: validate
+          tags: [homelab-k8s]
+          allow_failure: false
+          rules:
+            - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+          extends: .builder-project-unknown
+        """,
+        registry,
+    )
+
+    assert ran
+    assert any("untrusted external templates" in failure for failure in failures)
+
+
+def test_meta_gate_rejects_unconditional_project_service_deploy(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """An unconditional provider deploy override cannot bypass the MR fence."""
+    registry = _trusted_project_service_registry(
+        required_jobs=["project-service-deploy"]
+    )
+    ref = registry["trusted_includes"][0]["ref"]
+
+    failures, ran = _check_temp_gitlab(
+        tmp_path,
+        monkeypatch,
+        f"""
+        include:
+          - project: spyroot/builder
+            ref: {ref}
+            file: {BUILDER_PROJECT_INCLUDE_FILE}
+
+        project-service-deploy:
+          stage: deploy
+          tags: [homelab-k8s]
+          allow_failure: false
+          rules:
+            - when: manual
+          extends: .builder-project-deploy
+        """,
+        registry,
+    )
+
+    assert ran
+    assert any("does not preserve" in failure for failure in failures)
+
+
+def test_meta_gate_rejects_early_rules_for_every_provider_mutation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Publication, deployment, and rollback require a leading MR deny."""
+    registry = _trusted_project_service_registry()
+    ref = registry["trusted_includes"][0]["ref"]
+
+    for index, template in enumerate(sorted(MUTATING_PROJECT_SERVICE_TEMPLATES)):
+        job_name = f"unsafe-mutation-{index}"
+        failures, ran = _check_temp_gitlab(
+            tmp_path,
+            monkeypatch,
+            f"""
+            include:
+              - project: spyroot/builder
+                ref: {ref}
+                file: {BUILDER_PROJECT_INCLUDE_FILE}
+
+            gate-merge:
+              stage: validate
+              tags: [homelab-k8s]
+              script: [./scripts/check.sh --profile merge]
+
+            {job_name}:
+              stage: deploy
+              tags: [homelab-k8s]
+              allow_failure: false
+              rules:
+                - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+                  when: manual
+                - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+                  when: never
+                - when: never
+              extends: {template}
+            """,
+            registry,
+        )
+
+        assert ran
+        assert any("does not preserve" in failure for failure in failures), template
+
+
+def test_gitlab_consumes_builder_project_service_contract_without_local_secrets() -> None:
+    """The real pipeline wires the exact include and local project-service wrappers."""
+    trusted_include = _registry_trusted_include()
+    ci = _ci_config()
+    raw_includes = ci.get("include") or []
+    includes = raw_includes if isinstance(raw_includes, list) else [raw_includes]
+    include_identities = {
+        gate_meta._include_key(include)
+        for include in includes
+        if gate_meta._include_key(include) is not None
+    }
+
+    assert (
+        trusted_include["project"],
+        trusted_include["ref"],
+        trusted_include["file"],
+    ) in include_identities
+
+    jobs = _gitlab_jobs()
+    missing_jobs = sorted(set(PROJECT_SERVICE_JOBS) - set(jobs))
+    assert missing_jobs == []
+
+    for name in sorted(PROJECT_SERVICE_JOBS):
+        job = jobs[name]
+        extended = gate_meta._external_templates(job)
+        job_text = repr(job)
+        assert extended, f"{name} must inherit a trusted provider template"
+        assert extended == [PROJECT_SERVICE_JOBS[name]]
+        trusted_names = {item["name"] for item in trusted_include["templates"]}
+        assert set(extended) <= trusted_names
+        mutates = PROJECT_SERVICE_JOBS[name] in MUTATING_PROJECT_SERVICE_TEMPLATES
+        expected_when = "manual" if mutates else "on_success"
+        assert gate_meta._protected_template_rules_match(job, expected_when)
+        assert job.get("stage") in {"validate", "integration", "deploy", "publish"}
+        assert "homelab-k8s" in job.get("tags", [])
+        assert job.get("allow_failure") is False
+        assert job.get("rules"), f"{name} must declare local rules"
+        assert "script" not in job, f"{name} must not shadow the provider template body"
+        assert "trigger" not in job, f"{name} must not hide work in a child pipeline"
+        assert "/Users/" not in job_text
+        assert "~/" not in job_text
+        assert "PRIVATE-TOKEN" not in job_text
+        assert "Authorization:" not in job_text
+
+    image_publish_setup = "\n".join(
+        str(line)
+        for line in jobs["project-service-image-publish"].get("before_script", [])
+    )
+    assert "git lfs install --local" in image_publish_setup
+    assert "DSP2043_2026.1.zip" in image_publish_setup
+
+
 def test_gitlab_uses_full_history_checkout_for_exact_ref_dispatches() -> None:
     """Direct exact-ref pipelines need origin/main history for repo.format merge-base."""
     variables = _ci_config().get("variables") or {}
@@ -253,7 +561,12 @@ def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:
 
 def test_focused_and_merge_dispatch_exclude_private_follow_on_jobs() -> None:
     """API/web dispatch cannot also enqueue integration, deploy, or publish jobs."""
-    forbidden = {"gate-integration", "k8s-live-check", "deploy-apply", "publish-github"}
+    forbidden = {
+        "gate-integration",
+        "k8s-live-check",
+        "publish-github",
+        *PROJECT_SERVICE_JOBS,
+    }
     focused = set(_selected_jobs(
         CI_PIPELINE_SOURCE="api",
         FOCUSED_GATE="unit.all",
@@ -279,5 +592,5 @@ def test_other_gitlab_hosts_open_no_private_dispatch_route() -> None:
         )
         assert "focused-gate" not in selected
         assert "gate-merge" not in selected
-        assert "deploy-apply" not in selected
+        assert set(selected).isdisjoint(PROJECT_SERVICE_JOBS)
         assert "publish-github" not in selected

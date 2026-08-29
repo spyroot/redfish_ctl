@@ -20,6 +20,23 @@ required_jobs:
 diagnostic_jobs:
   - focused-gate
 
+# GitLab resolves this content-addressed provider template before creating a
+# pipeline. The meta-gate permits only these hidden templates from this exact
+# immutable include; floating refs and unknown external templates remain fatal.
+trusted_includes:
+  - project: spyroot/builder
+    ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
+    file: /ci/templates/project-service.yml
+    templates:
+      - {name: .builder-project-image-publish, mutates: true}
+      - {name: .builder-project-chart-publish, mutates: true}
+      - {name: .builder-project-deploy-plan, mutates: false}
+      - {name: .builder-project-deploy, mutates: true}
+      - {name: .builder-project-verify, mutates: false}
+      - {name: .builder-project-live-test, mutates: false}
+      - {name: .builder-project-rollback, mutates: true}
+      - {name: .builder-project-release-evidence, mutates: false}
+
 mandatory_ids:
   - meta.gate-registry
   - meta.ci-runner-tags

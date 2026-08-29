@@ -4,6 +4,7 @@
 # lint strictly and render every chart. No cluster contact is made.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+source scripts/gates/kubernetes/dmtf_sim_values.bash
 
 # YAML syntax gate over static (non-__PLACEHOLDER__) manifests.
 python - <<'PY'
@@ -38,23 +39,25 @@ if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
+dmtf_sim_set_helm_values "$source_commit"
+
 helm lint --strict charts/redfish-controller >/dev/null
 helm template redfish-controller charts/redfish-controller \
   --namespace redfish-system >/dev/null
 helm lint --strict charts/dmtf-sim \
-  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
 helm template dmtf-sim charts/dmtf-sim \
   --namespace dmtf-bmc \
   --skip-tests \
-  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
 helm template dmtf-sim charts/dmtf-sim \
   --namespace dmtf-bmc \
   --show-only templates/tests/test-connection.yaml \
-  --set-string provenance.sourceCommit="$source_commit" >/dev/null
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
 
 if helm template dmtf-sim charts/dmtf-sim \
   --namespace dmtf-bmc \
-  --set-string provenance.sourceCommit="$source_commit" \
+  "${DMTF_SIM_HELM_VALUES[@]}" \
   --set-string dmtf.profile=no-such-profile >/dev/null 2>&1; then
   echo "kubernetes.render: dmtf-sim accepted an unknown profile" >&2
   exit 1
