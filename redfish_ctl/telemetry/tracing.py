@@ -3,13 +3,14 @@
 Emits spans so BMC operations render in an OTLP APM backend (for example Splunk
 APM) as a service map + trace waterfall:
 
-* ``sync_invoke`` wraps each command in an operation root span named by the
-  command, with status taken from the returned ``CommandResult.error``.
-* ``api_get_call`` (and, later, the write verbs) wrap each BMC HTTP call in a
-  ``SpanKind.CLIENT`` span. The BMC is uninstrumented, so an APM backend infers
-  it as a downstream service from ``peer.service`` — set to the constant
-  ``"bmc"`` so a whole fleet collapses into one downstream node, sliced by tag
-  rather than exploding into one node per address.
+* The CLI wraps its complete command lifecycle in one independent operation
+  root; direct manager dispatch ensures an operation span when the CLI is not
+  present.
+* The base HTTP verbs wrap each BMC call in a ``SpanKind.CLIENT`` span. The BMC
+  is uninstrumented, so an APM backend infers it as a downstream service from
+  ``peer.service`` — set to the constant ``"bmc"`` so a whole fleet collapses
+  into one downstream node, sliced by tag rather than exploding into one node
+  per address.
 
 The module is a no-op and does not import the OpenTelemetry SDK until tracing is
 explicitly enabled, so the default install and the offline test suite are
@@ -22,7 +23,8 @@ from __future__ import annotations
 import contextlib
 import logging
 from contextvars import ContextVar
-from typing import Any, Callable, Iterator, Mapping, Optional
+from enum import Enum
+from typing import Any, Callable, Iterator, Mapping, Optional, Sequence
 from urllib.parse import urlsplit
 
 # Set by enable_tracing(); None means tracing is off and every helper no-ops.
@@ -36,9 +38,52 @@ _OTLP_SETUP_RESOURCE_ATTRIBUTES: tuple[tuple[str, str], ...] | None = None
 # server.address) is what makes an APM backend render one inferred "bmc" node
 # instead of one node per BMC IP.
 BMC_PEER_SERVICE = "bmc"
+_SECRET_ATTRIBUTE_PARTS = (
+    "authorization",
+    "password",
+    "session_key",
+    "token",
+)
+_FORBIDDEN_ATTRIBUTE_KEYS = {
+    "query_string",
+    "raw_url",
+    "request.body",
+    "response.body",
+}
 _CLIENT_ATTRIBUTES: ContextVar[dict[str, Any]] = ContextVar(
     "redfish_client_span_attributes", default={}
 )
+
+
+class SpanParentPolicy(Enum):
+    """Parent selection for an operation span."""
+
+    ROOT = "root"
+    CHILD = "child"
+    ENSURE = "ensure"
+
+
+def _creation_attributes(
+    attributes: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return non-secret, non-null attributes safe for span creation.
+
+    :param attributes: candidate span attributes.
+    :return: sanitized attributes, or None when no mapping was supplied.
+    """
+    if attributes is None:
+        return None
+    safe = {}
+    for key, value in attributes.items():
+        normalized = str(key).lower()
+        if value is None:
+            continue
+        if normalized in _FORBIDDEN_ATTRIBUTE_KEYS:
+            continue
+        if any(part in normalized for part in _SECRET_ATTRIBUTE_PARTS):
+            continue
+        safe[str(key)] = value
+    return safe
 
 
 def enable_tracing(tracer: Any) -> None:
@@ -213,27 +258,72 @@ def is_enabled() -> bool:
 
 
 @contextlib.contextmanager
-def operation_span(name: str) -> Iterator[Any]:
-    """Root/parent span for one command operation. No-op when tracing is off.
+def operation_span(
+    name: str,
+    *,
+    parent_policy: SpanParentPolicy,
+    attributes: Mapping[str, Any] | None = None,
+    links: Sequence[Any] = (),
+) -> Iterator[Any]:
+    """Open an operation span with an explicit parent policy.
 
     :param name: span name, typically the command being executed.
+    :param parent_policy: whether to force a root, require a parent, or use the
+        active parent when one exists.
+    :param attributes: attributes supplied before sampling begins.
+    :param links: span links supplied before sampling begins.
+    :raises RuntimeError: when CHILD is requested without an active parent.
+    :raises ValueError: when parent_policy is not a SpanParentPolicy value.
     """
+    if not isinstance(parent_policy, SpanParentPolicy):
+        raise ValueError("parent_policy must be a SpanParentPolicy value")
     if _TRACER is None:
         yield None
         return
-    from opentelemetry.trace import SpanKind
+    from opentelemetry.context import Context
+    from opentelemetry.trace import SpanKind, get_current_span
 
-    with _TRACER.start_as_current_span(name, kind=SpanKind.INTERNAL) as span:
+    if parent_policy is SpanParentPolicy.CHILD:
+        parent_context = get_current_span().get_span_context()
+        if not parent_context.is_valid:
+            raise RuntimeError(
+                "CHILD operation span requires an active parent span"
+            )
+    context = Context() if parent_policy is SpanParentPolicy.ROOT else None
+    creation_attributes = _creation_attributes(attributes)
+
+    with _TRACER.start_as_current_span(
+        name,
+        context=context,
+        kind=SpanKind.INTERNAL,
+        attributes=creation_attributes,
+        links=tuple(links),
+        record_exception=False,
+        set_status_on_exception=False,
+    ) as span:
         yield span
+
+
+def link_to_current_span() -> tuple[Any, ...]:
+    """Return a link to the active span, or an empty tuple when unavailable.
+
+    :return: a one-item tuple containing an OpenTelemetry Link, or ``()``.
+    """
+    if _TRACER is None:
+        return ()
+    from opentelemetry.trace import Link, get_current_span
+
+    span_context = get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return ()
+    return (Link(span_context),)
 
 
 def current_span() -> Optional[Any]:
     """Return the currently-active span, or None when tracing is off / no span.
 
-    The call stack IS the span tree, so this lets a lower frame record a
-    result/exception on the operation root, and lets ``sync_invoke`` detect it is
-    already inside an operation root (opened by ``main``) and skip opening a
-    redundant second one.
+    The call stack is the span tree, so lower frames can inspect the active
+    operation span without maintaining separate parent state.
 
     :return: the active span, or None when tracing is off or no span is current.
     """
@@ -312,13 +402,6 @@ def _path_family(path: str) -> str:
     return _CANONICAL_FAMILIES.get(segments[0].lower(), segments[0])
 
 
-# Request-span attributes derived internally from the URL/method; a caller-
-# supplied attribute of the same key must not override them.
-_FIXED_SPAN_ATTRIBUTES = frozenset({
-    "peer.service", "server.address", "http.request.method", "redfish.path_family",
-})
-
-
 @contextlib.contextmanager
 def client_span(
     url: str,
@@ -343,18 +426,20 @@ def client_span(
     span_attributes = dict(_CLIENT_ATTRIBUTES.get())
     if attributes:
         span_attributes.update(attributes)
+    span_attributes["peer.service"] = BMC_PEER_SERVICE
+    span_attributes["server.address"] = host or "unknown"
+    span_attributes["http.request.method"] = method
+    span_attributes["redfish.path_family"] = _path_family(parts.path)
+    span_attributes = _creation_attributes(span_attributes) or {}
     with _TRACER.start_as_current_span(
-        "redfish.bmc.request", kind=SpanKind.CLIENT
+        "redfish.bmc.request",
+        kind=SpanKind.CLIENT,
+        attributes=span_attributes,
+        record_exception=False,
+        set_status_on_exception=False,
     ) as span:
-        # Fixed contract attributes: always present, never overridable by a
-        # caller-supplied attribute of the same key.
-        span.set_attribute("peer.service", BMC_PEER_SERVICE)
-        span.set_attribute("server.address", host or "unknown")
-        span.set_attribute("http.request.method", method)
-        span.set_attribute("redfish.path_family", _path_family(parts.path))
         for key, value in span_attributes.items():
-            if value is not None and key not in _FIXED_SPAN_ATTRIBUTES:
-                span.set_attribute(key, value)
+            span.set_attribute(key, value)
         yield span
 
 
@@ -472,6 +557,33 @@ def record_exception(span: Any, exc: BaseException) -> None:
     span.set_attribute("error.type", type(exc).__name__)
 
 
+def record_error(span: Any, message: str, error_type: str) -> None:
+    """Mark a span failed without manufacturing an exception event.
+
+    :param span: span to annotate, or None to no-op.
+    :param message: bounded error description.
+    :param error_type: stable error classification.
+    """
+    if span is None:
+        return
+    from opentelemetry.trace import Status, StatusCode
+
+    span.set_status(Status(StatusCode.ERROR, str(message)))
+    span.set_attribute("error.type", error_type)
+
+
+def record_success(span: Any) -> None:
+    """Mark a completed operation span successful.
+
+    :param span: span to annotate, or None to no-op.
+    """
+    if span is None:
+        return
+    from opentelemetry.trace import Status, StatusCode
+
+    span.set_status(Status(StatusCode.OK))
+
+
 def record_result(span: Any, result: Any) -> None:
     """Mark an operation span failed when its CommandResult carries an error.
 
@@ -482,7 +594,6 @@ def record_result(span: Any, result: Any) -> None:
         return
     error = getattr(result, "error", None)
     if error:
-        from opentelemetry.trace import Status, StatusCode
-
-        span.set_status(Status(StatusCode.ERROR, str(error)))
-        span.set_attribute("error.type", "command_error")
+        record_error(span, str(error), "command_error")
+    else:
+        record_success(span)

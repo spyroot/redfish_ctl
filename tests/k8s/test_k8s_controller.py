@@ -54,6 +54,7 @@ class FakeSpan:
     def __init__(self, name: str) -> None:
         self.name = name
         self.attributes: dict[str, object] = {}
+        self.status = None
 
     def set_attribute(self, key: str, value: object) -> None:
         """Record a span attribute assignment.
@@ -62,6 +63,13 @@ class FakeSpan:
         :param value: span attribute value.
         """
         self.attributes[key] = value
+
+    def set_status(self, status: object) -> None:
+        """Record a span status assignment.
+
+        :param status: OpenTelemetry status value.
+        """
+        self.status = status
 
 
 def _conditions_by_type(status: dict) -> dict[str, dict]:
@@ -380,6 +388,35 @@ def test_kopf_handler_patches_status_only(monkeypatch) -> None:
     ]
 
 
+def test_kopf_handler_treats_missing_poll_readings_as_failure(monkeypatch) -> None:
+    """A poll returning no readings must not overwrite failure status with success."""
+    module = _load_controller_module()
+    fixed_now = datetime(2026, 7, 10, 14, 50, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(module, "_utc_now", lambda: fixed_now)
+    monkeypatch.setattr(module, "poll_endpoint", lambda *args, **kwargs: None)
+
+    patch: dict = {}
+    result = module.poll_redfish_endpoint(
+        spec={"address": "mock-bmc"},
+        body={},
+        namespace="default",
+        name="node-a",
+        logger=None,
+        patch=patch,
+    )
+
+    assert result is None
+    status = patch["status"]
+    assert status["consecutiveFailures"] == 1
+    assert status["lastError"] == "poll returned no status readings"
+    assert status["nextPollAfter"] is not None
+    assert "powerState" not in status
+    assert "lastPolled" not in status
+    conditions = _conditions_by_type(status)
+    assert conditions["Ready"]["status"] == "False"
+    assert conditions["Ready"]["reason"] == "PollFailed"
+
+
 def test_controller_tracing_setup_is_env_gated(monkeypatch) -> None:
     """Controller OTLP setup runs only when the deployment env flag is true."""
     module = _load_controller_module()
@@ -400,10 +437,19 @@ def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
     """Each endpoint reconcile gets a bounded root span with BMC identity."""
     module = _load_controller_module()
     spans: list[FakeSpan] = []
+    span_calls = []
 
     @contextlib.contextmanager
-    def fake_operation_span(name: str):
+    def fake_operation_span(
+        name: str,
+        *,
+        parent_policy=None,
+        attributes=None,
+        links=(),
+    ):
+        span_calls.append((parent_policy, dict(attributes or {}), tuple(links)))
         span = FakeSpan(name)
+        span.attributes.update(attributes or {})
         spans.append(span)
         yield span
 
@@ -431,6 +477,20 @@ def test_kopf_handler_wraps_poll_in_controller_span(monkeypatch) -> None:
 
     assert len(spans) == 1
     assert spans[0].name == "k8s.redfish_endpoint.reconcile"
+    parent_policy = getattr(module.tracing, "SpanParentPolicy", None)
+    assert parent_policy is not None
+    assert span_calls == [
+        (
+            parent_policy.ROOT,
+            {
+                "server.address": "mock-bmc",
+                "k8s.namespace.name": "default",
+                "k8s.resource.name": "node-a",
+                "k8s.resource.kind": "RedfishEndpoint",
+            },
+            (),
+        )
+    ]
     assert spans[0].attributes == {
         "server.address": "mock-bmc",
         "k8s.namespace.name": "default",

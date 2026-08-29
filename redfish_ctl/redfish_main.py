@@ -373,6 +373,34 @@ def is_fleet_command(args) -> bool:
     return getattr(args, "subcommand", None) in FLEET_COMMANDS
 
 
+def _command_span_attributes(
+    args: argparse.Namespace,
+    *,
+    scan_mode: bool,
+    local_mode: bool,
+    fleet_mode: bool,
+) -> dict[str, str]:
+    """Return creation-time identity for a CLI command root span.
+
+    :param args: parsed CLI arguments.
+    :param scan_mode: whether the command scans a network rather than one BMC.
+    :param local_mode: whether the command reads only local data.
+    :param fleet_mode: whether the command manages multiple BMC connections.
+    :return: bounded operation-span attributes with a non-empty target scope.
+    """
+    address = str(getattr(args, "redfish_host", "") or "").strip()
+    if not address:
+        if fleet_mode:
+            address = "fleet"
+        elif scan_mode:
+            address = "network"
+        elif local_mode:
+            address = "local"
+        else:
+            address = "unknown"
+    return {"server.address": address}
+
+
 def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -> None:
     """Main entry point.
 
@@ -398,18 +426,15 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -
         tracing.setup_otlp()
         tracing.install_termination_flush()
 
-    redfish_api = manager_cls(host=cmd_args.redfish_host,
-                              username=cmd_args.redfish_username,
-                              password=cmd_args.redfish_password,
-                              port=cmd_args.redfish_port,
-                              insecure=insecure,
-                              is_http=cmd_args.use_http,
-                              is_debug=cmd_args.debug)
-
-    connectionless_mode = (
-        is_network_scan(cmd_args)
-        or is_local_command(cmd_args)
-        or is_fleet_command(cmd_args)
+    scan_mode = is_network_scan(cmd_args)
+    local_mode = is_local_command(cmd_args)
+    fleet_mode = is_fleet_command(cmd_args)
+    connectionless_mode = scan_mode or local_mode or fleet_mode
+    span_attributes = _command_span_attributes(
+        cmd_args,
+        scan_mode=scan_mode,
+        local_mode=local_mode,
+        fleet_mode=fleet_mode,
     )
 
     if cmd_args.subcommand not in command_name_to_cmd:
@@ -424,8 +449,32 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -
     # SIGTERM (see install_termination_flush). Everything is a no-op when tracing
     # is off.
     try:
-        with tracing.operation_span(cmd.name) as root_span:
-            _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span)
+        with tracing.operation_span(
+            cmd.name,
+            parent_policy=tracing.SpanParentPolicy.ROOT,
+            attributes=span_attributes,
+        ) as root_span:
+            try:
+                redfish_api = manager_cls(
+                    host=cmd_args.redfish_host,
+                    username=cmd_args.redfish_username,
+                    password=cmd_args.redfish_password,
+                    port=cmd_args.redfish_port,
+                    insecure=insecure,
+                    is_http=cmd_args.use_http,
+                    is_debug=cmd_args.debug,
+                )
+                _run(
+                    cmd,
+                    cmd_args,
+                    redfish_api,
+                    insecure,
+                    connectionless_mode,
+                    root_span,
+                )
+            except BaseException as exc:
+                tracing.record_exception(root_span, exc)
+                raise
     finally:
         tracing.shutdown()
 
@@ -489,7 +538,10 @@ def _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span):
             command_result = redfish_api.invoke(cmd.type, cmd.name, **invoke_kwargs)
         else:
             command_result = redfish_api.sync_invoke(
-                cmd.type, cmd.name, **arg_dict
+                cmd.type,
+                cmd.name,
+                _trace_operation_span=False,
+                **arg_dict,
             )
 
         if not connectionless_mode and redfish_api.redfish_vendor == "Dell":

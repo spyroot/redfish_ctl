@@ -53,6 +53,11 @@ Two signals, one pipeline:
   which drives the red edges, error rate, and Root Cause in APM. The public span contract lives in
   `specs/telemetry/span_contract.yaml`; the merge-gate coverage requirements live in
   `specs/telemetry/gates.md`, and the implementation is in `redfish_ctl/telemetry/tracing.py`.
+  CLI commands use an independent root that covers manager construction, preflight, dispatch,
+  post-processing, and rendering; direct manager calls create an operation span only when needed.
+  Fleet nodes use independent roots linked to their coordinator, and each Kubernetes reconcile is
+  independent of framework tracing. Root attributes and fleet links are available when sampling
+  begins.
 - **Metrics.** The exporter samples hardware state (power, thermal, fans, GPU, leak detection, fabric)
   into the stable `hw.*` metric family. Traces say *what operation ran and whether it failed*; metrics
   say *what the hardware did* — a firmware-update span sits next to the `hw.power` spike it caused,

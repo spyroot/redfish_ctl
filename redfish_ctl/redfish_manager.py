@@ -568,15 +568,20 @@ class RedfishManager:
         )
         inst._redfish_query = _redfish_query
         inst._redfish_query_one_param_per_uri = _redfish_query_one_param_per_uri
-        # Operation root span named by the command (matches sync_invoke) so an
-        # async command's BMC client spans nest into ONE trace instead of
-        # surfacing as orphan "redfish.bmc.request" root traces in APM.
-        with tracing.operation_span(name) as span:
-            if _redfish_cache is None:
-                result = inst.execute(**kwargs)
-            else:
-                with redfish_response_cache_scope(_redfish_cache):
+        with tracing.operation_span(
+            name,
+            parent_policy=tracing.SpanParentPolicy.ENSURE,
+            attributes={"server.address": str(_host or "unknown")},
+        ) as span:
+            try:
+                if _redfish_cache is None:
                     result = inst.execute(**kwargs)
+                else:
+                    with redfish_response_cache_scope(_redfish_cache):
+                        result = inst.execute(**kwargs)
+            except Exception as exc:
+                tracing.record_exception(span, exc)
+                raise
             tracing.record_result(span, result)
             return result
 
@@ -591,6 +596,7 @@ class RedfishManager:
         :return: Return result depends on actual command,
                  encapsulated in generic CommandResult
         """
+        trace_operation_span = kwargs.pop("_trace_operation_span", True)
         if len(self._username) == 0:
             raise ValueError("Username is empty string.")
         if len(self._password) == 0:
@@ -614,15 +620,18 @@ class RedfishManager:
             redfish_cache = active_redfish_response_cache()
             if redfish_cache is not None:
                 kwargs["redfish_cache"] = redfish_cache
-        # Operation root span named by the command (no-op unless tracing is on).
-        # When main already opened the operation root, nest under it instead of
-        # opening a second same-named root (the call stack IS the span tree); main
-        # records the result on that root. Only root here for direct/standalone
-        # callers (tests, nested tooling) where no operation span is active yet.
-        if tracing.current_span() is not None:
+        if not trace_operation_span:
             return self.invoke(api_call, name, **kwargs)
-        with tracing.operation_span(name) as span:
-            result = self.invoke(api_call, name, **kwargs)
+        with tracing.operation_span(
+            name,
+            parent_policy=tracing.SpanParentPolicy.ENSURE,
+            attributes={"server.address": self.redfish_ip},
+        ) as span:
+            try:
+                result = self.invoke(api_call, name, **kwargs)
+            except Exception as exc:
+                tracing.record_exception(span, exc)
+                raise
             tracing.record_result(span, result)
             return result
 

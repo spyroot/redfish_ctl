@@ -14,7 +14,7 @@ against the code; drift in either direction blocks merge.
 | G0 — Signal contract | merge | Every metric and span change is represented in a machine-readable contract. Generated documentation has no diff after regeneration. |
 | G1 — High-value telemetry completeness | merge | Every fixture row for `Status.Health`, `Status.HealthRollup`, `Status.State`, `LinkDownReasonCode`, `EDPViolationState`, `PowerBreakPerformanceState`, and `LastResetType` produces the expected signal or an explicitly documented unsupported result. |
 | G2 — Metric semantic correctness | merge | Name, unit, type, temporality, dimensions, boolean conversion, enum conversion, and OTLP Sum/Gauge classification match the contract across all three backends (Prometheus, SignalFx, OTLP). |
-| G3 — HTTP trace coverage | merge | Every GET, POST, PATCH, DELETE, async request, Redfish Action, and firmware upload produces exactly one CLIENT request span. No new direct HTTP bypass is introduced (repository check detects direct `requests.*` calls outside the traced seams). |
+| G3 — HTTP trace coverage | merge | Every GET, POST, PATCH, DELETE, async request, Redfish Action, and firmware upload produces exactly one CLIENT request span. No new direct HTTP bypass is introduced (repository check detects module aliases, imported verbs, and Session/client methods outside the traced seams). |
 | G6 — Lifecycle and flush | merge | Finished spans are exported on normal exit, command failure, interrupt, and termination. Shutdown does not hang beyond the configured budget. |
 | G10 — Runtime regression | production canary | Scrape latency, BMC request count, exporter failures, dropped spans, and trace volume stay within the agreed canary budgets. |
 | G11 — Documentation truth | merge | `observability.md` and the generated telemetry catalog contain only capabilities verified by contract tests. |
@@ -63,8 +63,14 @@ Normal CLI operation:
 
 ```
 Operation ROOT
-└── redfish.bmc.request CLIENT
+├── preflight redfish.bmc.request CLIENT
+├── command redfish.bmc.request CLIENT
+└── post-processing redfish.bmc.request CLIENT
 ```
+
+The CLI root encloses manager construction, version/vendor preflight, command
+dispatch, vendor post-processing, and rendering. A surrounding ambient span is
+never its parent.
 
 Action followed by a task:
 
@@ -104,10 +110,14 @@ Fleet:
 
 ```
 Fleet coordinator ROOT
-├── link → Node A operation ROOT
-├── link → Node B operation ROOT
-└── link → Node C operation ROOT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+└── link → fleet.node ROOT → redfish.bmc.request CLIENT
 ```
+
+Each node span is an independent root linked to the coordinator. Its bounded
+BMC identity and coordinator link are supplied at span creation so samplers can
+use them.
 
 For `N` nodes:
 
@@ -134,7 +144,8 @@ k8s.redfish_node_profile.reconcile ROOT
 Controller root spans carry the bounded Kubernetes identity fields
 `k8s.namespace.name`, `k8s.resource.name`, and `k8s.resource.kind`, plus
 `server.address`. They do not record Secret data, request bodies, response
-bodies, raw URLs, or query strings.
+bodies, raw URLs, or query strings. Each reconcile is a root independent of any
+framework span, with its sampler-visible identity supplied at span creation.
 
 ## Lifecycle gate (G6 details)
 

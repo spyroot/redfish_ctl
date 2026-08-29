@@ -37,6 +37,16 @@ def test_inline_client_span_is_traced():
     assert _orphans(src) == []
 
 
+def test_operation_span_does_not_replace_client_span():
+    """An INTERNAL operation span is insufficient coverage for raw HTTP."""
+    src = (
+        "import requests\ndef f():\n"
+        "    with tracing.operation_span('command'):\n"
+        "        requests.get('u')\n"
+    )
+    assert _orphans(src) == ["<mod>:4"]
+
+
 def test_partial_to_traced_request_is_traced():
     """A partial handed to traced_request (sync mutation path) is not flagged."""
     src = ("import requests, functools\ndef f():\n"
