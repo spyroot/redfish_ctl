@@ -1,6 +1,6 @@
 """Dual-mode tests for the manager reset command."""
 
-from redfish_ctl.idrac_shared import ApiRequestType, JobState
+from redfish_ctl.redfish_api_common import ApiRequestType, DellJobState
 from redfish_ctl.manager.cmd_manager_reset import ManagerReset
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -12,7 +12,7 @@ def test_manager_reset_posts_graceful_restart_in_mock_mode(
 
     def fetch_task(self, task_id):
         assert task_id == redfish_service.JOB_ID
-        return JobState.Completed
+        return DellJobState.Completed
 
     monkeypatch.setattr(ManagerReset, "fetch_task", fetch_task)
 
@@ -22,7 +22,7 @@ def test_manager_reset_posts_graceful_restart_in_mock_mode(
 
     assert isinstance(result, CommandResult)
     assert result.data["task_id"] == redfish_service.JOB_ID
-    assert result.data["task_state"] == JobState.Completed
+    assert result.data["task_state"] == DellJobState.Completed
 
     reset_requests = [
         request
@@ -46,7 +46,7 @@ def test_manager_reset_wait_posts_reset_and_attaches_reachability(
 
     def fetch_task(self, task_id):
         assert task_id == redfish_service.JOB_ID
-        return JobState.Completed
+        return DellJobState.Completed
 
     def wait_reachable(url, auth, verify, timeout, interval, reboot_cycle):
         wait_calls.append(
@@ -73,7 +73,7 @@ def test_manager_reset_wait_posts_reset_and_attaches_reachability(
 
     assert isinstance(result, CommandResult)
     assert result.data["task_id"] == redfish_service.JOB_ID
-    assert result.data["task_state"] == JobState.Completed
+    assert result.data["task_state"] == DellJobState.Completed
     assert result.data["wait"] == {
         "reachable": True,
         "went_down": True,

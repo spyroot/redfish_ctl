@@ -9,7 +9,7 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.dell_lc.cmd_dell_lc_autodiscovery import DellLcAutoDiscovery
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -42,9 +42,9 @@ def dell_lc_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

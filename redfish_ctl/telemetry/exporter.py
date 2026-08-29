@@ -1,4 +1,4 @@
-"""Map Redfish telemetry rows into Prometheus and SignalFx metrics."""
+"""Shared exporter config, identity, sample, and scrape-health helpers."""
 
 from __future__ import annotations
 
@@ -7,113 +7,19 @@ import math
 import os
 import random
 import re
-import sys
-import time
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
-from datetime import timezone
-from email.utils import parsedate_to_datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Optional
 
-from ..config import ConfigurationConflict
+from ..config import exporter_config_file, exporter_credential_file
 from . import identity as identity_mod
+from .metric_model import MetricDefinition, MetricSample, _definition
 
 REQUIRED_DIMENSIONS = identity_mod.IDENTITY_DIMENSIONS
 build_identity_dimensions = identity_mod.build_identity_dimensions
-build_telemetry_identity = identity_mod.build_legacy_gb300_identity
 common_sample_dimensions = identity_mod.common_sample_dimensions
 parse_dimension_pairs = identity_mod.parse_dimension_pairs
 resolve_identity_options = identity_mod.resolve_identity_options
-METRIC_KINDS = frozenset({"gauge", "counter", "cumulative_counter"})
-COUNTER_SUFFIXES = (
-    "_bytes", "_frames", "_packets", "_errors", "_discards", "_count", "_wait",
-)
-COUNTER_EXACT = frozenset({"hw.energy_kwh"})
-SENSOR_METRIC = {
-    "Temperature": ("hw.temperature", "sensor"),
-    "Rotational": ("hw.fan_speed", "fan"),
-    "Voltage": ("hw.voltage", "sensor"),
-}
-FABRIC_PROPERTY_METRICS = {
-    "BitErrorRate": "hw.fabric.bit_error_rate",
-    "CurrentSpeedGbps": "hw.fabric.port_speed",
-    "CRCErrorCount": "hw.fabric.crc_errors",
-    "EffectiveBER": "hw.fabric.effective_ber",
-    "EffectiveError": "hw.fabric.effective_errors",
-    "FECErrorCount": "hw.fabric.fec_errors",
-    "IntentionalLinkDownCount": "hw.fabric.intentional_link_down_count",
-    "LinkDownedCount": "hw.fabric.link_down_count",
-    "LinkErrorRecoveryCount": "hw.fabric.link_error_recovery_count",
-    "MalformedPackets": "hw.fabric.malformed_packets",
-    "NVLinkDataRxBandwidthGbps": "hw.fabric.rx_gbps",
-    "NVLinkDataTxBandwidthGbps": "hw.fabric.tx_gbps",
-    "NVLinkRawRxBandwidthGbps": "hw.fabric.raw_rx_gbps",
-    "NVLinkRawTxBandwidthGbps": "hw.fabric.raw_tx_gbps",
-    "RXBytes": "hw.fabric.rx_bytes",
-    "RXErrors": "hw.fabric.rx_errors",
-    "RXFrames": "hw.fabric.rx_frames",
-    "RXNoProtocolBytes": "hw.fabric.rx_no_protocol_bytes",
-    "RXRemotePhysicalErrors": "hw.fabric.rx_remote_physical_errors",
-    "RXSwitchRelayErrors": "hw.fabric.rx_switch_relay_errors",
-    "SymbolErrors": "hw.fabric.symbol_errors",
-    "TXBytes": "hw.fabric.tx_bytes",
-    "TXDiscards": "hw.fabric.tx_discards",
-    "TXFrames": "hw.fabric.tx_frames",
-    "TXNoProtocolBytes": "hw.fabric.tx_no_protocol_bytes",
-    "TXWait": "hw.fabric.tx_wait",
-    "TotalRawBER": "hw.fabric.raw_ber",
-    "TotalRawError": "hw.fabric.raw_errors",
-    "UnintentionalLinkDownCount": "hw.fabric.unintentional_link_down_count",
-    "VL15Dropped": "hw.fabric.vl15_dropped",
-    "VL15TXBytes": "hw.fabric.vl15_tx_bytes",
-    "VL15TXPackets": "hw.fabric.vl15_tx_packets",
-}
-GPU_COMPUTE_PROPERTIES = {
-    "DMMAUtilizationPercent": "dmma",
-    "FP16ActivityPercent": "fp16_activity",
-    "FP32ActivityPercent": "fp32_activity",
-    "FP64ActivityPercent": "fp64_activity",
-    "GraphicsEngineActivityPercent": "graphics_engine_activity",
-    "HMMAUtilizationPercent": "hmma",
-    "IMMAUtilizationPercent": "imma",
-    "IntegerActivityUtilizationPercent": "integer_activity",
-    "NVDecInstanceUtilizationPercent": "nvdec_instance",
-    "NVDecUtilizationPercent": "nvdec",
-    "NVJpgInstanceUtilizationPercent": "nvjpg_instance",
-    "NVJpgUtilizationPercent": "nvjpg",
-    "NVOfaUtilizationPercent": "nvofa",
-    "SMActivityPercent": "sm_activity",
-    "SMOccupancyPercent": "sm_occupancy",
-    "SMUtilizationPercent": "sm",
-    "TensorCoreActivityPercent": "tensor_core_activity",
-}
-GPU_MEMORY_PROPERTIES = {
-    "BandwidthPercent": ("hw.gpu.memory.bandwidth_utilization", "bandwidth", "%"),
-    "CapacityUtilizationPercent": ("hw.gpu.memory.capacity_utilization", "capacity", "%"),
-    "OperatingSpeedMHz": ("hw.gpu.memory.clock_mhz", "operating_speed", "MHz"),
-}
-GPU_MEMORY_ECC_PROPERTIES = {
-    "CorrectableECCErrorCount": "correctable",
-    "UncorrectableECCErrorCount": "uncorrectable",
-}
-GPU_MEMORY_ROW_REMAP_PROPERTIES = {
-    "CorrectableRowRemappingCount": "correctable",
-    "HighAvailabilityBankCount": "high_availability",
-    "LowAvailabilityBankCount": "low_availability",
-    "MaxAvailabilityBankCount": "max_availability",
-    "NoAvailabilityBankCount": "no_availability",
-    "PartialAvailabilityBankCount": "partial_availability",
-    "UncorrectableRowRemappingCount": "uncorrectable",
-}
-GPU_THROTTLE_PROPERTIES = {
-    "GlobalSoftwareViolationThrottleDuration": "global_software_violation",
-    "HardwareViolationThrottleDuration": "hardware_violation",
-    "PowerLimitThrottleDuration": "power_limit",
-    "ThermalLimitThrottleDuration": "thermal_limit",
-}
 ISO_DURATION = re.compile(
     r"^P"
     r"(?:(?P<days>\d+(?:\.\d+)?)D)?"
@@ -123,285 +29,14 @@ ISO_DURATION = re.compile(
     r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
     r")?$"
 )
-SECRET_ARG_NAMES = {"--password", "--idrac_password", "--idrac-password"}
+SECRET_ARG_NAMES = {"--password"}
 DIM_VALUE_OK = re.compile(r"[^A-Za-z0-9_.\-/]")
-# push_signalfx POSTs the ingest URL as-is, so it must be the full SignalFx
-# datapoint endpoint (…/v2/datapoint), never a bare host.
-# One-hot state-metric label allowlists (specs/telemetry/gates.md, M1): each
-# categorical row emits value 1 with a normalized lowercase label; values
-# outside the allowlist map to "unknown" (health/state) or "other"
-# (reason/reset_type) — never dropped, never free-form. A contract test
-# asserts these sets match specs/telemetry/expected_signals.yaml.
-HEALTH_LABELS = {"ok", "warning", "critical"}
-STATE_LABELS = {"enabled", "disabled", "standby_offline", "standby_spare",
-                "in_test", "starting", "absent", "unavailable_offline",
-                "deferring", "quiesced", "updating", "qualified"}
-LINK_DOWN_REASONS = {"peer_reset_event"}
-RESET_TYPES = {"pf_flr", "conventional", "fundamental"}
-EDP_STATES = {"normal", "asserted"}
-POWER_BREAK_STATES = {"normal", "active"}
-
-SIGNALFX_DATAPOINT_PATH = "/v2/datapoint"
 POLL_JITTER_FRACTION = 0.10
 
 
-class _SignalFxNoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Fail closed instead of forwarding token-bearing SignalFx requests."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        """Reject an HTTP redirect before urllib can replay the request.
-
-        :param req: original urllib request object.
-        :param fp: response file object supplied by urllib.
-        :param code: redirect HTTP status code.
-        :param msg: redirect HTTP status message.
-        :param headers: redirect response headers.
-        :param newurl: URL urllib would otherwise follow.
-        :return: never returns; raises :class:`ValueError`.
-        :raises ValueError: always, so credential headers stay on the original host.
-        """
-        raise ValueError("SignalFx request refused redirect")
-
-
-def _open_signalfx_request(request: urllib.request.Request, timeout: float):
-    """Open a SignalFx request without following redirects.
-
-    SignalFx ingest and readback tokens are sent as ``X-SF-Token``. urllib's
-    default opener follows redirects and can replay that custom header to the
-    redirected host, so token-bearing requests must use a redirect-disabled
-    opener.
-
-    :param request: prepared urllib request for SignalFx ingest or readback.
-    :param timeout: HTTP timeout in seconds.
-    :return: urllib response object suitable for use as a context manager.
-    :raises ValueError: if the server returns a redirect response.
-    """
-    opener = urllib.request.build_opener(_SignalFxNoRedirectHandler)
-    return opener.open(request, timeout=timeout)
-
-
-def _require_https_url(url: str, label: str) -> urllib.parse.ParseResult:
-    """Return a parsed URL when it is HTTPS, else raise a clear error.
-
-    :param url: URL string to validate.
-    :param label: human-readable name for error messages.
-    :return: parsed URL for a non-empty HTTPS URL with a network location.
-    :raises ValueError: when the URL is missing a host or does not use HTTPS.
-    """
-    parsed = urllib.parse.urlparse(url or "")
-    if parsed.scheme.lower() != "https" or not parsed.netloc:
-        raise ValueError(f"{label} must use https; got {url!r}")
-    return parsed
-
-
-@dataclass(frozen=True)
-class MetricDefinition:
-    """Catalog entry describing one exported telemetry metric."""
-
-    name: str
-    kind: str = "gauge"
-    unit: Optional[str] = None
-    description: str = ""
-    prometheus_name: Optional[str] = None
-    family: str = "telemetry"
-    dimensions: tuple[str, ...] = ()
-    liveness: str = "signal"
-
-    def __post_init__(self) -> None:
-        """Validate and normalize the immutable definition."""
-        if self.kind not in METRIC_KINDS:
-            raise ValueError(f"unknown metric kind {self.kind!r} for {self.name}")
-        if not self.prometheus_name:
-            object.__setattr__(self, "prometheus_name", self.name)
-        object.__setattr__(self, "dimensions", tuple(self.dimensions))
-
-
-@dataclass(frozen=True)
-class MetricSample:
-    """One vendor-neutral telemetry sample ready for export."""
-
-    metric: str
-    value: float
-    dimensions: Mapping[str, str]
-    metric_type: str = "gauge"
-    unit: Optional[str] = None
-    timestamp: Optional[str] = None
-
-
-def _definition(
-        name: str,
-        kind: str = "gauge",
-        unit: Optional[str] = None,
-        description: str = "",
-        family: str = "telemetry",
-        dimensions: tuple[str, ...] = (),
-        liveness: str = "signal") -> MetricDefinition:
-    """Construct a catalog definition with concise defaults.
-
-    :param name: exported metric name.
-    :param kind: SignalFx/OpenTelemetry metric kind.
-    :param unit: optional unit annotation.
-    :param description: human-readable metric description.
-    :param family: broad metric family used by specs and docs.
-    :param dimensions: expected dimension keys for this metric family.
-    :param liveness: liveness role, usually ``signal`` or ``scrape``.
-    :return: immutable MetricDefinition.
-    """
-    return MetricDefinition(
-        name=name,
-        kind=kind,
-        unit=unit,
-        description=description,
-        family=family,
-        dimensions=dimensions,
-        liveness=liveness,
-    )
-
-
 _COMMON_DIMS = REQUIRED_DIMENSIONS + ("source",)
-_FABRIC_DIMS = _COMMON_DIMS + ("fabric", "system", "gpu", "port", "report")
 
 _STATIC_METRIC_DEFINITIONS = (
-    _definition("hw.power", unit="W", description="Power draw in watts."),
-    _definition("hw.energy_kwh", "counter", "kWh",
-                "Cumulative energy consumed in kilowatt-hours."),
-    _definition("hw.temperature", unit="Cel", description="Temperature in Celsius."),
-    _definition("hw.voltage", unit="V", description="Voltage reading."),
-    _definition("hw.fan_speed", unit="RPM", description="Fan speed in revolutions per minute."),
-    _definition("hw.gpu.power", unit="W", description="GPU power draw in watts.", family="gpu"),
-    _definition("hw.gpu.temperature", unit="Cel", description="GPU temperature.", family="gpu"),
-    _definition("hw.gpu.clock_mhz", unit="MHz", description="GPU operating clock.", family="gpu"),
-    _definition("hw.gpu.compute.utilization", unit="%",
-                description="GPU compute engine utilization.", family="gpu"),
-    _definition("hw.gpu.throttle.duration_seconds", "counter", "s",
-                description="GPU throttle duration in seconds.", family="gpu"),
-    _definition("hw.gpu.memory.bandwidth_utilization", unit="%",
-                description="GPU memory bandwidth utilization.", family="gpu"),
-    _definition("hw.gpu.memory.capacity_utilization", unit="%",
-                description="GPU memory capacity utilization.", family="gpu"),
-    _definition("hw.gpu.memory.clock_mhz", unit="MHz",
-                description="GPU memory operating speed.", family="gpu"),
-    _definition("hw.gpu.memory.ecc_errors", "counter", None,
-                "Cumulative GPU memory ECC error count.", family="gpu"),
-    _definition("hw.gpu.memory.row_remap_count", "counter", None,
-                "Cumulative GPU memory row-remap count.", family="gpu"),
-    _definition("hw.gpu.memory.row_remapping_failed", unit=None,
-                description="GPU memory row-remapping failure state.", family="gpu"),
-    _definition("hw.component.health", description="One-hot component health state.",
-                family="state"),
-    _definition("hw.component.health_rollup",
-                description="One-hot component aggregate health state.", family="state"),
-    _definition("hw.component.state", description="One-hot component enabled state.",
-                family="state"),
-    _definition("hw.component.last_reset_type",
-                description="One-hot component last reset type.", family="state"),
-    _definition("hw.power.edp_violation_state",
-                description="One-hot EDP violation state.", family="state"),
-    _definition("hw.power.break_performance_state",
-                description="One-hot power-break performance state.", family="state"),
-    _definition("hw.fabric.link_up", description="Fabric link-up state.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_down_reason",
-                description="One-hot fabric link-down reason.", family="fabric",
-                dimensions=_FABRIC_DIMS + ("reason",)),
-    _definition("hw.fabric.port_speed", unit="Gbps",
-                description="Fabric port negotiated speed.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.bit_error_rate", description="Fabric bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.effective_ber", description="Fabric effective bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_ber", description="Fabric raw bit error rate.",
-                family="fabric", dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_gbps", unit="Gbps",
-                description="Fabric receive bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_gbps", unit="Gbps",
-                description="Fabric transmit bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_rx_gbps", unit="Gbps",
-                description="Fabric raw receive bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_tx_gbps", unit="Gbps",
-                description="Fabric raw transmit bandwidth.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_bytes", "counter", "By",
-                "Cumulative fabric receive bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_bytes", "counter", "By",
-                "Cumulative fabric transmit bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_bytes", "counter", "By",
-                "Cumulative fabric VL15 transmit bytes.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_frames", "counter", None,
-                "Cumulative fabric receive frames.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_frames", "counter", None,
-                "Cumulative fabric transmit frames.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_tx_packets", "counter", None,
-                "Cumulative fabric VL15 transmit packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.crc_errors", "counter", None,
-                "Cumulative fabric CRC errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.effective_errors", "counter", None,
-                "Cumulative fabric effective errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.fec_errors", "counter", None,
-                "Cumulative fabric FEC errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.malformed_packets", "counter", None,
-                "Cumulative malformed fabric packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.raw_errors", "counter", None,
-                "Cumulative fabric raw errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_errors", "counter", None,
-                "Cumulative fabric receive errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_no_protocol_bytes", "counter", "By",
-                "Cumulative receive bytes without protocol.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_remote_physical_errors", "counter", None,
-                "Cumulative receive remote physical errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.rx_switch_relay_errors", "counter", None,
-                "Cumulative receive switch relay errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.symbol_errors", "counter", None,
-                "Cumulative fabric symbol errors.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_discards", "counter", None,
-                "Cumulative fabric transmit discards.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_no_protocol_bytes", "counter", "By",
-                "Cumulative transmit bytes without protocol.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.tx_wait", "counter", None,
-                "Cumulative fabric transmit wait events.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.intentional_link_down_count", "counter", None,
-                "Cumulative intentional link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_down_count", "counter", None,
-                "Cumulative link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.link_error_recovery_count", "counter", None,
-                "Cumulative link error recovery count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.unintentional_link_down_count", "counter", None,
-                "Cumulative unintentional link-down count.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.fabric.vl15_dropped", "counter", None,
-                "Cumulative fabric VL15 dropped packets.", family="fabric",
-                dimensions=_FABRIC_DIMS),
-    _definition("hw.leak.state", description="Leak detector state.", family="chassis"),
-    _definition("hw.fabric.adapter_present", description="Network adapter presence.",
-                family="fabric"),
-    _definition("hw.component_integrity.enabled",
-                description="ComponentIntegrity enabled state.", family="component"),
     _definition("hw.scrape.ok", description="Exporter scrape success.", family="scrape",
                 liveness="scrape"),
     _definition("hw.scrape.duration_seconds", unit="s",
@@ -487,79 +122,15 @@ def metric_definitions() -> Mapping[str, MetricDefinition]:
 
 
 def metric_definition(metric_name: str) -> MetricDefinition:
-    """Return the catalog definition for ``metric_name``.
-
-    Curated ``hw.*`` metrics are registered statically. The GB300 MetricReport
-    catch-all family is generated deterministically from the metric name so new
-    firmware properties keep exporting without adding free-form backend logic.
+    """Return a shared exporter self-metric definition.
 
     :param metric_name: exported metric name.
-    :return: static or generated MetricDefinition.
-    :raises KeyError: when the metric is not registered and is not in a dynamic family.
+    :return: shared MetricDefinition.
+    :raises KeyError: when the metric belongs to a concrete vendor reader.
     """
     if metric_name in METRIC_DEFINITIONS:
         return METRIC_DEFINITIONS[metric_name]
-    if metric_name.startswith("hw.gb300."):
-        return MetricDefinition(
-            name=metric_name,
-            kind=_infer_metric_kind(metric_name),
-            unit=_infer_metric_unit(metric_name),
-            description="GB300 MetricReport numeric property.",
-            family="gb300",
-            dimensions=_COMMON_DIMS + ("property", "system", "gpu", "port",
-                                       "chassis", "index", "report"),
-        )
-    raise KeyError(f"metric {metric_name!r} is not registered in the catalog")
-
-
-def _infer_metric_kind(metric_name: str) -> str:
-    """Infer the metric kind for generated metric families.
-
-    :param metric_name: generated metric name.
-    :return: ``counter`` for monotonic totals, else ``gauge``.
-    """
-    if metric_name in COUNTER_EXACT:
-        return "counter"
-    if any(metric_name.endswith(suffix) for suffix in COUNTER_SUFFIXES):
-        return "counter"
-    return "gauge"
-
-
-def _infer_metric_unit(metric_name: str) -> Optional[str]:
-    """Infer a unit annotation for generated metric families.
-
-    :param metric_name: generated metric name.
-    :return: inferred unit string, or None when dimensionless or unknown.
-    """
-    lowered = metric_name.lower()
-    if lowered.endswith("_bytes"):
-        return "By"
-    if lowered.endswith("_gbps") or lowered.endswith("port_speed"):
-        return "Gbps"
-    if lowered.endswith("_mhz") or "_freq_" in lowered or "frequency" in lowered:
-        return "MHz"
-    if lowered.endswith("_seconds"):
-        return "s"
-    if lowered.endswith("_kwh") or "energy" in lowered:
-        return "kWh"
-    if "temp" in lowered or "temperature" in lowered:
-        return "Cel"
-    if "power" in lowered:
-        return "W"
-    if "voltage" in lowered:
-        return "V"
-    if "percent" in lowered or "utilization" in lowered:
-        return "%"
-    return None
-
-
-def _prometheus_type(kind: str) -> str:
-    """Map exporter metric kind to the Prometheus exposition type.
-
-    :param kind: exporter metric kind.
-    :return: Prometheus metric type.
-    """
-    return "counter" if kind in {"counter", "cumulative_counter"} else "gauge"
+    raise KeyError(f"metric {metric_name!r} is not a shared exporter metric")
 
 
 @dataclass(frozen=True)
@@ -574,20 +145,13 @@ class CollectorResult:
     error_kind: Optional[str] = None
 
 
-# Credential-file keys the exporter honors. REDFISH_* is the going-forward set;
-# the legacy IDRAC_* keys still work as a fallback during the rename.
 _EXPORTER_CRED_KEYS = frozenset({
     "REDFISH_IP", "REDFISH_USERNAME", "REDFISH_PASSWORD", "REDFISH_PORT",
-    "IDRAC_IP", "IDRAC_USERNAME", "IDRAC_PASSWORD", "IDRAC_PORT",
 })
-_EXPORTER_CONFIG_FILE_ENVS = (
-    "REDFISH_EXPORTER_CONFIG_FILE",
-    "IDRAC_EXPORTER_CONFIG_FILE",
-)
 def load_exporter_env_file(path: os.PathLike[str] | str) -> dict[str, str]:
     """Read a simple KEY=VALUE runtime env file without printing secret values.
 
-    Accepts REDFISH_IP/USERNAME/PASSWORD/PORT and the legacy IDRAC_* names.
+    Accepts the canonical REDFISH_IP/USERNAME/PASSWORD/PORT keys.
 
     :param path: path to the credential env file to read.
     :return: mapping of recognized credential keys to their unquoted values.
@@ -637,10 +201,7 @@ def _config_path(path: Optional[str] = None) -> Optional[str]:
     :param path: explicit config path.
     :return: config path from argument or environment, or None.
     """
-    return _first_non_empty(
-        path,
-        *(os.environ.get(name) for name in _EXPORTER_CONFIG_FILE_ENVS),
-    )
+    return _first_non_empty(path, exporter_config_file())
 
 
 def load_exporter_config_file(path: os.PathLike[str] | str) -> dict:
@@ -766,84 +327,28 @@ def apply_exporter_env_file(args, path: Optional[str] = None) -> None:
         the REDFISH_/IDRAC_ exporter credential-file environment variables.
     """
     file_path = path or getattr(args, "exporter_credential_file", None)
-    file_path = (file_path
-                 or os.environ.get("REDFISH_EXPORTER_CREDENTIAL_FILE")
-                 or os.environ.get("IDRAC_EXPORTER_CREDENTIAL_FILE"))
+    file_path = file_path or exporter_credential_file()
     if not file_path:
         return
     values = load_exporter_env_file(file_path)
-    # (canonical namespace attr, legacy namespace attr, REDFISH_* key, legacy
-    # IDRAC_* key). Matching pairs are harmless; conflicting pairs fail closed.
-    # Legacy attrs keep older programmatic callers working.
     mapping = (
-        ("redfish_host", "idrac_ip", "REDFISH_IP", "IDRAC_IP"),
-        ("redfish_username", "idrac_username", "REDFISH_USERNAME", "IDRAC_USERNAME"),
-        ("redfish_password", "idrac_password", "REDFISH_PASSWORD", "IDRAC_PASSWORD"),
-        ("redfish_port", "idrac_port", "REDFISH_PORT", "IDRAC_PORT"),
+        ("redfish_host", "REDFISH_IP"),
+        ("redfish_username", "REDFISH_USERNAME"),
+        ("redfish_password", "REDFISH_PASSWORD"),
+        ("redfish_port", "REDFISH_PORT"),
     )
-    for primary_attr, legacy_attr, redfish_key, idrac_key in mapping:
-        if (
-            redfish_key in values
-            and idrac_key in values
-            and values[redfish_key].strip() != values[idrac_key].strip()
-        ):
-            raise ConfigurationConflict(
-                f"Configuration conflict in {file_path}: "
-                f"use only {redfish_key} for this credential.")
-        attrs = [
-            attr
-            for attr in (primary_attr, legacy_attr)
-            if hasattr(args, attr)
-        ]
-        if not attrs:
+    for attr, key in mapping:
+        if not hasattr(args, attr):
             continue
-        attr = primary_attr if primary_attr in attrs else legacy_attr
-        key = redfish_key if redfish_key in values else idrac_key
         if key not in values:
             continue
-        is_password = attr in {"redfish_password", "idrac_password"}
+        is_password = attr == "redfish_password"
         current = getattr(args, attr, "")
         if current in ("", None, "root") or is_password:
             value = values[key]
-            is_port = attr in {"redfish_port", "idrac_port"}
+            is_port = attr == "redfish_port"
             value = int(value) if is_port else value
-            for target_attr in attrs:
-                setattr(args, target_attr, value)
-
-
-def build_metric_samples(
-        identity: Mapping[str, str],
-        environment_rows: Iterable[Mapping],
-        sensor_rows: Iterable[Mapping],
-        nvlink_rows: Iterable[Mapping],
-        metric_report_rows: Iterable[Mapping],
-        thermal_rows: Iterable[Mapping] = (),
-        leak_detection_rows: Iterable[Mapping] = (),
-        network_rows: Iterable[Mapping] = (),
-        component_integrity_rows: Iterable[Mapping] = ()) -> list[MetricSample]:
-    """Build exporter samples from normalized Redfish command rows.
-
-    :param identity: fixed join dimensions applied to every sample.
-    :param environment_rows: Chassis EnvironmentMetrics rows (power/energy/fan).
-    :param sensor_rows: Redfish Sensor rows (thermal/fan/voltage/power).
-    :param nvlink_rows: nvlink-ports rows for per-link fabric metrics.
-    :param metric_report_rows: TelemetryService MetricReport rows.
-    :param thermal_rows: ThermalSubsystem temperature rows.
-    :param leak_detection_rows: LeakDetector rows.
-    :param network_rows: NIC/DPU network-adapter inventory rows.
-    :param component_integrity_rows: ComponentIntegrity rows.
-    :return: combined list of MetricSample objects from all row sources.
-    """
-    samples: list[MetricSample] = []
-    samples.extend(samples_from_environment_rows(environment_rows, identity))
-    samples.extend(samples_from_sensor_rows(sensor_rows, identity))
-    samples.extend(samples_from_nvlink_rows(nvlink_rows, identity))
-    samples.extend(samples_from_thermal_rows(thermal_rows, identity))
-    samples.extend(samples_from_metric_report_rows(metric_report_rows, identity))
-    samples.extend(samples_from_leak_detection_rows(leak_detection_rows, identity))
-    samples.extend(samples_from_network_rows(network_rows, identity))
-    samples.extend(samples_from_component_integrity_rows(component_integrity_rows, identity))
-    return samples
+            setattr(args, attr, value)
 
 
 def scrape_health_samples(
@@ -852,7 +357,9 @@ def scrape_health_samples(
         duration_seconds: float,
         collector_results: Iterable[CollectorResult] = (),
         partial: bool = False,
-        timestamp_seconds: Optional[float] = None) -> list[MetricSample]:
+        timestamp_seconds: Optional[float] = None,
+        collection_error_totals: Optional[Mapping[tuple[str, str], float]] = None,
+        ) -> list[MetricSample]:
     """Return per-scrape liveness and duration samples.
 
     Includes ``hw.bmc.up`` — a per-BMC 0/1 liveness gauge carrying the full
@@ -866,10 +373,13 @@ def scrape_health_samples(
     :param collector_results: per-collector outcomes for exporter self-telemetry.
     :param partial: whether at least one supported collector failed while another
         collector still returned a usable result.
-    :param timestamp_seconds: wall-clock timestamp used for last-success freshness.
+    :param timestamp_seconds: wall-clock timestamp of the latest successful scrape.
+    :param collection_error_totals: cumulative error counts keyed by
+        ``(collector, error_kind)``; when omitted, current errors emit as 1.
     :return: scrape-level, collector-level, and deprecated compatibility samples.
     """
     dims = _with_dims(identity, source="exporter")
+    collector_results = tuple(collector_results)
     duration = _as_float(duration_seconds)
     safe_duration = max(0.0, duration if duration is not None else 0.0)
     health = [
@@ -883,19 +393,12 @@ def scrape_health_samples(
         _sample("redfish_exporter_scrape_duration_seconds", safe_duration, dims, "s"),
         _sample(
             "redfish_exporter_last_success_timestamp_seconds",
-            float(timestamp_seconds or 0.0) if ok else 0.0,
+            float(timestamp_seconds or 0.0),
             dims,
             "s",
         ),
         _sample("hw.scrape.ok", 1.0 if ok else 0.0, dims, None),
-        # hw.bmc.up is a per-BMC 0/1 liveness gauge (Prometheus-style ``up``),
-        # emitted on EVERY scrape cycle regardless of outcome: 1 when the BMC
-        # scrape succeeds, 0 when it fails (connection error, timeout, auth
-        # failure, or a non-2xx ServiceRoot). Because it is emitted with the
-        # full exporter identity dimensions even on failure, a dashboard can
-        # tell an UNREACHABLE BMC (hw.bmc.up=0) apart from MISSING telemetry
-        # (no series at all). See specs/telemetry/expected_signals.yaml and
-        # gates.md; issue #402.
+        # Always emit hw.bmc.up so failed scrapes differ from absent series.
         _sample("hw.bmc.up", 1.0 if ok else 0.0, dims, None),
         _sample(
             "hw.scrape.duration_seconds",
@@ -941,15 +444,28 @@ def scrape_health_samples(
                 None,
             ),
         ])
-        if result.error_kind:
-            error_dims = collector_dims | {"error": _dim_value(result.error_kind)}
-            health.append(_sample(
-                "redfish_exporter_collection_errors_total",
-                1.0,
-                error_dims,
-                None,
-                metric_type="counter",
-            ))
+    if collection_error_totals is None:
+        error_totals = {
+            (result.name, result.error_kind): 1.0
+            for result in collector_results
+            if result.error_kind
+        }
+    else:
+        error_totals = collection_error_totals
+    for (collector, error_kind), total in sorted(error_totals.items()):
+        error_dims = _with_dims(
+            identity,
+            source="exporter",
+            collector=_dim_value(collector),
+            error=_dim_value(error_kind),
+        )
+        health.append(_sample(
+            "redfish_exporter_collection_errors_total",
+            float(total),
+            error_dims,
+            None,
+            metric_type="counter",
+        ))
     return health
 
 
@@ -965,7 +481,9 @@ def collector_scrape_status(results: Iterable[CollectorResult]) -> tuple[bool, b
         result for result in materialized
         if result.supported and not result.success
     ]
-    any_usable = any(result.success for result in materialized)
+    any_usable = any(
+        result.supported and result.success for result in materialized
+    )
     return not failed_supported, bool(failed_supported and any_usable)
 
 
@@ -994,879 +512,6 @@ def jittered_interval(
     return base * (1.0 - fraction + (2.0 * fraction * bounded))
 
 
-def samples_from_environment_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map Chassis EnvironmentMetrics rows into chassis/GPU power metrics.
-
-    :param rows: Chassis EnvironmentMetrics rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: power, energy and fan-speed samples derived from the rows.
-    """
-    samples = []
-    for row in rows:
-        chassis = _environment_chassis(row)
-        dims = _environment_dims(identity, row, chassis)
-        gpu = _environment_gpu(row, chassis)
-        power = _as_float(_reading(row.get("PowerWatts")))
-        if power is not None:
-            metric = "hw.gpu.power" if gpu and row.get("ParentType") != "Memory" else "hw.power"
-            samples.append(_sample(metric, power, dims | ({"gpu": gpu} if gpu else {}), unit="W"))
-        energy = _as_float(_reading(row.get("EnergykWh") or row.get("EnergyKWh")))
-        if energy is not None:
-            samples.append(_sample(
-                "hw.energy_kwh",
-                energy,
-                dims | ({"gpu": gpu} if gpu else {}),
-                unit="kWh",
-            ))
-        for fan_name, rpm in _fan_readings(row):
-            samples.append(_sample("hw.fan_speed", rpm, dims | {"fan": _dim_value(fan_name)}, "RPM"))
-    return samples
-
-
-def samples_from_sensor_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map Redfish Sensor rows into chassis thermal/fan/voltage/GPU power metrics.
-
-    :param rows: Redfish Sensor rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: thermal, fan, voltage and power samples derived from the rows.
-    """
-    samples = []
-    for row in rows:
-        value = _as_float(row.get("Reading"))
-        if value is None:
-            continue
-        chassis = str(row.get("Chassis") or "unknown")
-        reading_type = row.get("ReadingType")
-        name = str(row.get("Name") or "sensor")
-        dims = _with_dims(identity, source="sensor", chassis=chassis)
-        health = row.get("Health")
-        if health:
-            dims["health"] = str(health)
-        if reading_type == "Power" and _gpu_from_chassis(chassis):
-            samples.append(_sample("hw.gpu.power", value, dims | _gpu_dim(chassis), "W"))
-        elif reading_type == "Power":
-            samples.append(_sample("hw.power", value, dims | {"sensor": _dim_value(name)}, "W"))
-        elif reading_type in SENSOR_METRIC:
-            metric, label = SENSOR_METRIC[reading_type]
-            samples.append(_sample(metric, value, dims | {label: _dim_value(name)}, row.get("ReadingUnits")))
-    return samples
-
-
-def samples_from_nvlink_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map nvlink-ports rows into per-link fabric metrics.
-
-    :param rows: nvlink-ports rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: per-link fabric samples (link state, speed, byte counters, BER).
-    """
-    samples = []
-    for row in rows:
-        dims = _fabric_dims(identity, row.get("System"), row.get("GPU"), row.get("Port"), "nvlink")
-        link_up = 1.0 if row.get("LinkStatus") == "LinkUp" else 0.0
-        samples.append(_sample("hw.fabric.link_up", link_up, dims, None))
-        for key, metric, unit in (
-                ("CurrentSpeedGbps", "hw.fabric.port_speed", "Gbps"),
-                ("RXBytes", "hw.fabric.rx_bytes", "By"),
-                ("TXBytes", "hw.fabric.tx_bytes", "By"),
-                ("BitErrorRate", "hw.fabric.bit_error_rate", None)):
-            value = _as_float(row.get(key))
-            if value is not None:
-                samples.append(_sample(metric, value, dims, unit))
-    return samples
-
-
-def samples_from_metric_report_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map every TelemetryService MetricReport row into a metric sample.
-
-    Fabric properties get curated ``hw.fabric.*`` names and fabric dimensions;
-    every other numeric property (GPU FP16/FP32 activity, thermal, power,
-    memory, …) is emitted under a generic ``hw.gb300.*`` name so the FULL
-    telemetry surface reaches OTel/Prometheus, not just the fabric subset.
-    Categorical rows (Health, HealthRollup, State, LinkDownReasonCode,
-    EDPViolationState, PowerBreakPerformanceState, LastResetType) are mapped
-    to one-hot state samples by :func:`_state_enum_sample` per the M1 model
-    in ``specs/telemetry/gates.md`` instead of being dropped.
-
-    :param rows: TelemetryService MetricReport rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: one MetricSample per convertible MetricReport row.
-    """
-    samples = []
-    for row in rows:
-        prop = row.get("MetricProperty")
-        if not prop:
-            continue
-        prop_info = _parse_metric_property(str(prop))
-        prop_name = prop_info["property"]
-        gpu_sample = _gpu_metric_report_sample(prop_info, row, identity)
-        if gpu_sample is not None:
-            samples.append(gpu_sample)
-            continue
-
-        value = _as_float(row.get("MetricValue"))
-        if value is None:
-            state_sample = _state_enum_sample(prop_info, row, identity)
-            if state_sample is not None:
-                samples.append(state_sample)
-            continue
-        if prop_name in FABRIC_PROPERTY_METRICS:
-            metric = FABRIC_PROPERTY_METRICS[prop_name]
-            fabric = "ib" if prop_info.get("port", "").lower().startswith("ib") else "nvlink"
-            dims = _fabric_dims(identity, prop_info.get("system"),
-                                prop_info.get("gpu"), prop_info.get("port"), fabric)
-        else:
-            metric = _generic_metric_name(prop_name)
-            dims = _with_dims(identity, source="metric-report",
-                              property=_dim_value(prop_name))
-            for key in ("system", "gpu", "port", "chassis", "index"):
-                if prop_info.get(key):
-                    dims[key] = str(prop_info[key])
-        dims["report"] = str(row.get("Report") or "unknown")
-        samples.append(_sample(metric, value, dims, _unit_for_metric(metric), row.get("Timestamp")))
-    return samples
-
-
-def _state_label(text: str) -> str:
-    """Normalize an enum string to a lowercase snake_case label value.
-
-    :param text: raw vendor enum text (for example ``PeerResetEvent``).
-    :return: normalized label (for example ``peer_reset_event``).
-    """
-    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
-    snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
-    return snake or "unknown"
-
-
-def _state_enum_sample(
-        prop_info: Mapping[str, str],
-        row: Mapping,
-        identity: Mapping[str, str]) -> Optional[MetricSample]:
-    """Map a categorical MetricReport row to a one-hot state sample.
-
-    Implements the M1 model from ``specs/telemetry/gates.md``: every known
-    state/health enum row emits value 1 with a normalized, allowlisted
-    lowercase label — ``Health``/``HealthRollup`` → ``hw.component.health`` /
-    ``hw.component.health_rollup`` (``health`` label), ``State`` →
-    ``hw.component.state`` (``state`` label), ``LinkDownReasonCode`` →
-    ``hw.fabric.link_down_reason`` (``reason`` label — the WHY behind
-    link-down counters), ``EDPViolationState`` →
-    ``hw.power.edp_violation_state``, ``PowerBreakPerformanceState`` →
-    ``hw.power.break_performance_state``, ``LastResetType`` →
-    ``hw.component.last_reset_type`` (``reset_type`` label). Values outside
-    an allowlist map to ``unknown`` (health/state) or ``other``
-    (reason/reset_type/power states) so no vendor string is ever dropped and
-    no free-form text ever becomes a label.
-
-    :param prop_info: parsed MetricProperty fields (property, system, gpu, port, …).
-    :param row: the raw MetricReport row.
-    :param identity: fixed join dimensions applied to the sample.
-    :return: the mapped MetricSample, or None when the row is not a known
-        categorical property (or its value is empty).
-    """
-    prop_name = prop_info["property"]
-    text = str(row.get("MetricValue") or "").strip()
-    if not text:
-        return None
-    label = _state_label(text)
-    dims = _with_dims(identity, source="metric-report",
-                      property=_dim_value(prop_name))
-    for key in ("system", "gpu", "port", "chassis", "memory", "index"):
-        if prop_info.get(key):
-            dims[key] = str(prop_info[key])
-    dims["report"] = str(row.get("Report") or "unknown")
-
-    if prop_name in ("Health", "HealthRollup"):
-        metric = ("hw.component.health" if prop_name == "Health"
-                  else "hw.component.health_rollup")
-        dims["health"] = label if label in HEALTH_LABELS else "unknown"
-    elif prop_name == "State":
-        metric = "hw.component.state"
-        dims["state"] = label if label in STATE_LABELS else "unknown"
-    elif prop_name == "LinkDownReasonCode":
-        metric = "hw.fabric.link_down_reason"
-        dims["reason"] = label if label in LINK_DOWN_REASONS else "other"
-        dims["fabric"] = ("ib" if str(prop_info.get("port", "")).lower().startswith("ib")
-                          else "nvlink")
-    elif prop_name == "EDPViolationState":
-        metric = "hw.power.edp_violation_state"
-        dims["state"] = label if label in EDP_STATES else "other"
-    elif prop_name == "PowerBreakPerformanceState":
-        metric = "hw.power.break_performance_state"
-        dims["state"] = label if label in POWER_BREAK_STATES else "other"
-    elif prop_name == "LastResetType":
-        metric = "hw.component.last_reset_type"
-        dims["reset_type"] = label if label in RESET_TYPES else "other"
-    else:
-        return None
-    return _sample(metric, 1.0, dims, None, row.get("Timestamp"))
-
-
-def _gpu_metric_report_sample(
-        prop_info: Mapping[str, str],
-        row: Mapping,
-        identity: Mapping[str, str]) -> Optional[MetricSample]:
-    """Build a GPU-specific MetricSample from a MetricReport row, if applicable.
-
-    :param prop_info: parsed MetricProperty fields (property, source, gpu, index, …).
-    :param row: the raw MetricReport row.
-    :param identity: fixed join dimensions applied to the sample.
-    :return: a GPU temperature/clock/utilization/throttle/memory sample, or None
-        when the row is not a recognized GPU metric.
-    """
-    prop_name = str(prop_info.get("property") or "")
-    gpu = _gpu_from_metric_info(prop_info)
-    if not gpu:
-        return None
-
-    source = prop_info.get("metric_source")
-    value = _as_float(row.get("MetricValue"))
-    dims = _gpu_metric_dims(identity, prop_info, row, gpu)
-
-    if source == "sensor" and _is_gpu_temperature(prop_name):
-        if value is None:
-            return None
-        return _sample(
-            "hw.gpu.temperature",
-            value,
-            dims | {"property": "temperature", "sensor": _dim_value(prop_name)},
-            "Cel",
-            row.get("Timestamp"),
-        )
-
-    if source == "processor":
-        if prop_name == "OperatingSpeedMHz" and value is not None:
-            return _sample(
-                "hw.gpu.clock_mhz",
-                value,
-                dims | {"property": "operating_speed"},
-                "MHz",
-                row.get("Timestamp"),
-            )
-        if prop_name in GPU_COMPUTE_PROPERTIES and value is not None:
-            metric_dims = {
-                "property": GPU_COMPUTE_PROPERTIES[prop_name],
-            }
-            if prop_info.get("index"):
-                metric_dims["index"] = str(prop_info["index"])
-            return _sample(
-                "hw.gpu.compute.utilization",
-                value,
-                dims | metric_dims,
-                "%",
-                row.get("Timestamp"),
-            )
-        if prop_name in GPU_THROTTLE_PROPERTIES:
-            seconds = _duration_seconds(row.get("MetricValue"))
-            if seconds is None:
-                return None
-            return _sample(
-                "hw.gpu.throttle.duration_seconds",
-                seconds,
-                dims | {"property": GPU_THROTTLE_PROPERTIES[prop_name]},
-                "s",
-                row.get("Timestamp"),
-                metric_type="counter",  # cumulative throttle time, not a gauge
-            )
-
-    if source == "memory":
-        if prop_name in GPU_MEMORY_PROPERTIES and value is not None:
-            metric, property_name, unit = GPU_MEMORY_PROPERTIES[prop_name]
-            return _sample(
-                metric,
-                value,
-                dims | {"property": property_name},
-                unit,
-                row.get("Timestamp"),
-            )
-        if prop_name in GPU_MEMORY_ECC_PROPERTIES and value is not None:
-            return _sample(
-                "hw.gpu.memory.ecc_errors",
-                value,
-                dims | {"property": GPU_MEMORY_ECC_PROPERTIES[prop_name]},
-                None,
-                row.get("Timestamp"),
-            )
-        if prop_name in GPU_MEMORY_ROW_REMAP_PROPERTIES and value is not None:
-            return _sample(
-                "hw.gpu.memory.row_remap_count",
-                value,
-                dims | {"property": GPU_MEMORY_ROW_REMAP_PROPERTIES[prop_name]},
-                None,
-                row.get("Timestamp"),
-            )
-        if prop_name == "RowRemappingFailed" and value is not None:
-            return _sample(
-                "hw.gpu.memory.row_remapping_failed",
-                value,
-                dims | {"property": "row_remapping_failed"},
-                None,
-                row.get("Timestamp"),
-            )
-
-    return None
-
-
-def _gpu_metric_dims(
-        identity: Mapping[str, str],
-        prop_info: Mapping[str, str],
-        row: Mapping,
-        gpu: str) -> dict[str, str]:
-    """Build the GPU metric-report dimensions for one sample.
-
-    :param identity: fixed join dimensions applied to the sample.
-    :param prop_info: parsed MetricProperty fields providing system/chassis/memory context.
-    :param row: the raw MetricReport row (supplies the report name).
-    :param gpu: the resolved GPU identifier.
-    :return: dimension mapping for the GPU sample.
-    """
-    dims = _with_dims(identity, source="metric-report", gpu=gpu)
-    for key in ("system", "chassis", "memory"):
-        if prop_info.get(key):
-            dims[key] = str(prop_info[key])
-    if row.get("Report"):
-        dims["report"] = str(row["Report"])
-    return dims
-
-
-def samples_from_thermal_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map ThermalSubsystem temperature readings into per-zone metrics.
-
-    :param rows: ThermalSubsystem temperature rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: per-zone ``hw.temperature`` samples derived from the rows.
-    """
-    samples = []
-    for row in rows:
-        reading = (row.get("ReadingCelsius")
-                   if row.get("ReadingCelsius") is not None
-                   else row.get("Reading"))
-        value = _as_float(reading)
-        if value is None:
-            continue
-        chassis = str(row.get("Chassis") or "unknown")
-        name = str(row.get("DeviceName") or row.get("Name")
-                   or row.get("DataSourceUri") or "temperature").rsplit("/", 1)[-1]
-        zone = row.get("PhysicalContext") or name
-        dims = _with_dims(identity, source="thermal-subsystem",
-                          chassis=chassis, sensor=_dim_value(name),
-                          zone=_dim_value(zone))
-        samples.append(_sample("hw.temperature", value, dims, "Cel"))
-    return samples
-
-
-def samples_from_leak_detection_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Map LeakDetector rows into per-detector leak-state gauges.
-
-    :param rows: LeakDetector rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: per-detector ``hw.leak.state`` samples derived from the rows.
-    """
-    samples = []
-    for row in rows:
-        value = _leak_state_value(row.get("DetectorState"))
-        if value is None:
-            continue
-        chassis = str(row.get("Chassis") or "unknown")
-        detector = str(row.get("Id") or row.get("Name") or row.get("Uri") or "detector")
-        dims = _with_dims(
-            identity,
-            source="leak-detector",
-            chassis=chassis,
-            detector=_dim_value(detector),
-            detector_state=_dim_value(row.get("DetectorState")),
-        )
-        if row.get("LeakDetectorType"):
-            dims["detector_type"] = _dim_value(row["LeakDetectorType"])
-        if row.get("Health"):
-            dims["health"] = _dim_value(row["Health"])
-        if row.get("State"):
-            dims["state"] = _dim_value(row["State"])
-        samples.append(_sample("hw.leak.state", value, dims, None))
-    return samples
-
-
-def samples_from_network_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Expose NIC/DPU inventory health as lightweight fabric presence gauges.
-
-    :param rows: network-adapter inventory rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: ``hw.fabric.adapter_present`` presence samples for each adapter.
-    """
-    samples = []
-    for row in rows:
-        adapter = str(row.get("Id") or "adapter")
-        dims = _with_dims(identity, source="network-adapter", adapter=_dim_value(adapter))
-        dims["device_class"] = str(row.get("DeviceClass") or "NIC")
-        if row.get("Model"):
-            dims["model"] = _dim_value(row["Model"])
-        samples.append(_sample("hw.fabric.adapter_present", 1.0, dims, None))
-    return samples
-
-
-def samples_from_component_integrity_rows(
-        rows: Iterable[Mapping],
-        identity: Mapping[str, str]) -> list[MetricSample]:
-    """Expose ComponentIntegrity enabled state for attested fabric components.
-
-    :param rows: ComponentIntegrity rows to map.
-    :param identity: fixed join dimensions applied to every sample.
-    :return: ``hw.component_integrity.enabled`` samples for each component.
-    """
-    samples = []
-    for row in rows:
-        component = str(row.get("Id") or "component")
-        enabled = 1.0 if row.get("Enabled") is True else 0.0
-        dims = _with_dims(identity, source="component-integrity", component=_dim_value(component))
-        if row.get("Type"):
-            dims["component_integrity_type"] = str(row["Type"])
-        samples.append(_sample("hw.component_integrity.enabled", enabled, dims, None))
-    return samples
-
-
-def render_prometheus_text(samples: Iterable[MetricSample]) -> str:
-    """Render samples in Prometheus/OpenMetrics text exposition form.
-
-    :param samples: metric samples to render.
-    :return: Prometheus/OpenMetrics text exposition of the samples.
-    """
-    lines = []
-    seen_types = set()
-    for sample in samples:
-        definition = metric_definition(sample.metric)
-        prometheus_name = definition.prometheus_name or sample.metric
-        if prometheus_name not in seen_types:
-            if definition.description:
-                lines.append(
-                    f"# HELP {prometheus_name} "
-                    f"{_escape_help_text(definition.description)}")
-            lines.append(f"# TYPE {prometheus_name} {_prometheus_type(definition.kind)}")
-            seen_types.add(prometheus_name)
-        label_text = ",".join(
-            f'{key}="{_escape_label_value(value)}"'
-            for key, value in sorted(sample.dimensions.items())
-            if key not in identity_mod.RESOURCE_ONLY_DIMENSIONS
-        )
-        lines.append(f"{prometheus_name}{{{label_text}}} {_format_value(sample.value)}")
-    return "\n".join(lines) + "\n"
-
-
-def to_signalfx_body(samples: Iterable[MetricSample]) -> dict[str, list[dict]]:
-    """Wrap samples in the SignalFx /v2/datapoint typed envelopes.
-
-    :param samples: metric samples to wrap.
-    :return: SignalFx ``/v2/datapoint`` body with typed datapoint lists.
-    """
-    body = {"gauge": [], "counter": [], "cumulative_counter": []}
-    for sample in samples:
-        definition = metric_definition(sample.metric)
-        envelope = (
-            "cumulative_counter" if definition.kind == "counter"
-            else definition.kind
-        )
-        body[envelope].append({
-            "metric": sample.metric,
-            "value": sample.value,
-            "dimensions": {
-                key: value
-                for key, value in sample.dimensions.items()
-                if key not in identity_mod.RESOURCE_ONLY_DIMENSIONS
-            },
-        })
-    return {kind: points for kind, points in body.items() if points}
-
-
-def _require_datapoint_url(ingest_url: str) -> str:
-    """Return ``ingest_url`` when it is a full SignalFx datapoint endpoint, else raise.
-
-    ``push_signalfx`` POSTs the URL as-is (it does not append a path), so a bare
-    host such as ``https://ingest.us1.observability.splunkcloud.com`` accepts the
-    request context but silently drops every datapoint. Require the full
-    ``…/v2/datapoint`` endpoint so misconfiguration fails loudly instead. The host
-    itself is not restricted: ``ingest.<realm>.observability.splunkcloud.com`` is
-    the current Splunk ingest host and ``ingest.<realm>.signalfx.com`` is the
-    legacy one — both are accepted.
-
-    :param ingest_url: the SignalFx ingest URL to validate.
-    :return: ``ingest_url`` unchanged when it is a full datapoint endpoint.
-    :raises ValueError: if the URL is not a full ``…/v2/datapoint`` endpoint.
-    """
-    parsed = _require_https_url(ingest_url, "SignalFx ingest URL")
-    if parsed.path.rstrip("/") != SIGNALFX_DATAPOINT_PATH:
-        raise ValueError(
-            "SignalFx ingest URL must be the full datapoint endpoint ending in "
-            f"{SIGNALFX_DATAPOINT_PATH} (e.g. "
-            "https://ingest.us1.observability.splunkcloud.com/v2/datapoint), not a "
-            f"bare host; got {ingest_url!r}")
-    return ingest_url
-
-
-def resolve_signalfx_token(
-        token_env: Optional[str] = None,
-        token: Optional[str] = None,
-        token_file: Optional[str] = None) -> str:
-    """Return the SignalFx ingest token from direct, file, or env source.
-
-    :param token_env: env var name to read the token from; defaults to ``SPLUNK_ACCESS_TOKEN``.
-    :param token: direct token value.
-    :param token_file: path to a file containing the token.
-    :return: the ingest token value.
-    :raises ValueError: if the chosen source is unset or empty.
-    """
-    direct_token = _non_empty(token)
-    if direct_token is not None:
-        return str(direct_token)
-    file_path = _non_empty(token_file)
-    if file_path is not None:
-        value = Path(str(file_path)).expanduser().read_text(encoding="utf-8").strip()
-        if not value:
-            raise ValueError(f"{file_path} is empty")
-        return value
-    name = token_env or "SPLUNK_ACCESS_TOKEN"
-    token = os.environ.get(name, "")
-    if not token:
-        raise ValueError(f"{name} is not set")
-    return token
-
-
-def resolve_signalfx_ingest_url(ingest_url: Optional[str] = None) -> str:
-    """Return a validated SignalFx datapoint ingest URL.
-
-    Falls back to the ``SPLUNK_INGEST_URL`` environment variable and requires the
-    full ``…/v2/datapoint`` endpoint (see ``_require_datapoint_url``).
-
-    :param ingest_url: explicit ingest URL; falls back to ``SPLUNK_INGEST_URL``.
-    :return: a validated full ``…/v2/datapoint`` ingest URL.
-    :raises ValueError: if no URL is set or it is not a full datapoint endpoint.
-    """
-    url = ingest_url or os.environ.get("SPLUNK_INGEST_URL", "")
-    if not url:
-        raise ValueError("SPLUNK_INGEST_URL is not set")
-    return _require_datapoint_url(url)
-
-
-def push_signalfx(body: Mapping, token: str, ingest_url: str, timeout: float = 20.0) -> int:
-    """POST a SignalFx datapoint body and return the status code.
-
-    ``ingest_url`` must be the full SignalFx datapoint endpoint (``…/v2/datapoint``);
-    it is POSTed verbatim, so a bare host silently drops every datapoint
-    (see ``_require_datapoint_url``).
-
-    :param body: SignalFx datapoint payload to POST.
-    :param token: SignalFx ingest token for the ``X-SF-Token`` header.
-    :param ingest_url: full SignalFx datapoint endpoint (``…/v2/datapoint``).
-    :param timeout: request timeout in seconds.
-    :return: the HTTP status code of the POST response.
-    :raises ValueError: if ``ingest_url`` is not a full datapoint endpoint.
-    """
-    ingest_url = _require_datapoint_url(ingest_url)
-    data = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ingest_url,
-        data=data,
-        method="POST",
-        headers={"Content-Type": "application/json", "X-SF-Token": token},
-    )
-    with _open_signalfx_request(req, timeout=timeout) as response:
-        return response.status
-
-
-def _mts_query(metric: str, dimensions: Optional[Mapping] = None) -> str:
-    """Build a metrictimeseries query for one metric, scoped by dimensions.
-
-    A metric time series is identified by the metric name AND its dimension set
-    (Splunk data model), so scoping by a unique dimension such as ``host.name``
-    reads back this host's series rather than every host that reports the metric.
-
-    :param metric: the SignalFx metric name.
-    :param dimensions: dimension key->value pairs to AND into the query.
-    :return: the SignalFx search query string.
-    """
-    terms = [f'sf_metric:"{_escape_mts_value(metric)}"']
-    for key, value in sorted((dimensions or {}).items()):
-        terms.append(f'{key}:"{_escape_mts_value(value)}"')
-    return " AND ".join(terms)
-
-
-def _escape_mts_value(value) -> str:
-    """Escape a value for a Splunk Observability MTS search term.
-
-    :param value: raw metric or dimension value.
-    :return: escaped string representation.
-    """
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
-
-
-def signalfx_metric_readback(
-        realm: str, api_token: str, metric: str,
-        dimensions: Optional[Mapping] = None, timeout: float = 20.0) -> dict:
-    """Return how many time series exist for a metric in Splunk MTS, and how fresh.
-
-    A SignalFx datapoint POST returns HTTP 200/``OK`` even when the datapoints are
-    not recorded, so ingest success must be confirmed by reading the metric time
-    series back — not by trusting the POST status (issue #363). Because Splunk
-    retains inactive series for 13 months, the caller must also check freshness
-    (``newest_ms``), not merely a nonzero count.
-
-    :param realm: Splunk Observability realm (for example ``us1``).
-    :param api_token: API (read) token, sent as the ``X-SF-Token`` header; never logged.
-    :param metric: SignalFx metric name to look up.
-    :param dimensions: dimension key->value pairs to scope the query to one entity.
-    :param timeout: HTTP timeout in seconds.
-    :return: ``{"count": <matching series>, "newest_ms": <latest update ms, 0 if none>,
-        "server_ms": <response Date header in ms, 0 if unavailable>}``.
-    :raises ValueError: when the API answers with a non-JSON body.
-    """
-    query = urllib.parse.urlencode(
-        {"query": _mts_query(metric, dimensions), "limit": 50,
-         "orderBy": "-sf_updatedOnMs"})
-    url = f"https://api.{realm}.signalfx.com/v2/metrictimeseries?{query}"
-    _require_https_url(url, "SignalFx readback URL")
-    request = urllib.request.Request(url, headers={"X-SF-Token": api_token})
-    with _open_signalfx_request(request, timeout=timeout) as response:
-        server_ms = _response_date_ms(response)
-        raw = response.read()
-    try:
-        data = json.loads(raw)
-    except ValueError as exc:
-        raise ValueError(f"non-JSON metrictimeseries response for {metric}") from exc
-    results = data.get("results") or []
-    newest = 0
-    for row in results:
-        for key in ("lastUpdated", "sf_updatedOnMs", "updatedOnMs", "created"):
-            stamp = row.get(key)
-            if isinstance(stamp, (int, float)) and stamp > newest:
-                newest = int(stamp)
-    return {
-        "count": int(data.get("count") or len(results)),
-        "newest_ms": newest,
-        "server_ms": server_ms,
-    }
-
-
-def verify_signalfx_readback(
-        realm: str, api_token: str, metrics: Iterable[str],
-        dimensions: Optional[Mapping] = None, timeout: float = 20.0) -> dict:
-    """Confirm each pushed metric is visible in Splunk MTS for one entity.
-
-    :param realm: Splunk Observability realm.
-    :param api_token: API (read) token; never logged.
-    :param metrics: metric names to confirm (the names that were pushed).
-    :param dimensions: dimension key->value pairs scoping the query to this host.
-    :param timeout: per-query HTTP timeout in seconds.
-    :return: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` for each metric.
-    """
-    return {metric: signalfx_metric_readback(realm, api_token, metric, dimensions, timeout)
-            for metric in sorted(set(metrics))}
-
-
-def build_readback_result(
-        push_status: int, ingest_url: str, sample_count: int, metric_names: list,
-        readback: dict, timing_ms: dict, now_ms: Optional[int] = None,
-        freshness_ms: int = 900000) -> tuple:
-    """Build the compact canary summary and verdict from a readback.
-
-    A metric is confirmed only when its readback series is BOTH present
-    (``count`` > 0) AND fresh (``newest_ms`` within ``freshness_ms`` of ``now_ms``).
-    Splunk retains inactive series for 13 months, so a nonzero count alone can be a
-    stale series this push did not create; a missing or stale metric is an error:
-    the POST succeeded yet the datapoints were not ingested now (issue #363).
-
-    :param push_status: the HTTP status the SignalFx POST returned.
-    :param ingest_url: the ingest URL that was POSTed to.
-    :param sample_count: number of samples scraped and pushed.
-    :param metric_names: the distinct metric names that were pushed.
-    :param readback: ``{metric: {"count": int, "newest_ms": int, "server_ms": int}}`` from MTS.
-    :param timing_ms: ``{"scrape": int, "push": int, "readback": int}`` durations.
-    :param now_ms: current wall-clock time in ms, for the freshness window. When
-        omitted, freshness is anchored to the Splunk API response server time.
-    :param freshness_ms: how recent ``newest_ms`` must be to count as this push.
-    :return: ``(summary_dict, error_or_None)`` -- the compact result and verdict.
-    """
-    anchor_ms = now_ms
-    clock_source = "caller"
-    if anchor_ms is None:
-        anchor_ms = _readback_server_ms(readback)
-        clock_source = "signalfx_http_date" if anchor_ms is not None else "unavailable"
-
-    if anchor_ms is None:
-        fresh = []
-    else:
-        fresh = sorted(
-            name for name, series in readback.items()
-            if series["count"] > 0 and series["newest_ms"] >= anchor_ms - freshness_ms)
-    missing = sorted(set(metric_names) - set(fresh))
-    clock_error = None
-    if anchor_ms is None:
-        clock_error = (
-            "SignalFx readback did not include server time, so freshness cannot be "
-            "verified without trusting the local exporter clock")
-    summary = {
-        "push_status": push_status,
-        "ingest_url": ingest_url,
-        "sample_count": sample_count,
-        "metrics_pushed": len(metric_names),
-        "metrics_fresh": len(fresh),
-        "missing_metrics": missing,
-        "readback": readback,
-        "timing_ms": timing_ms,
-        "freshness_ms": freshness_ms,
-        "readback_now_ms": anchor_ms,
-        "clock_source": clock_source,
-    }
-    if clock_error:
-        error = clock_error
-    elif missing:
-        error = (
-            f"SignalFx POST returned {push_status} but {len(missing)} of "
-            f"{len(metric_names)} pushed metrics have no fresh time series in Splunk "
-            "MTS -- the POST succeeded yet the datapoints were not ingested")
-    else:
-        error = None
-    return summary, error
-
-
-def _response_date_ms(response) -> int:
-    """Return the HTTP Date header as epoch milliseconds, or 0 if absent.
-
-    :param response: urllib response object from the MTS readback request.
-    :return: epoch milliseconds parsed from the Date header, or 0 when absent.
-    """
-    header = None
-    getheader = getattr(response, "getheader", None)
-    if callable(getheader):
-        header = getheader("Date")
-    if not header:
-        headers = getattr(response, "headers", None)
-        getter = getattr(headers, "get", None)
-        if callable(getter):
-            header = getter("Date")
-    if not header:
-        return 0
-    try:
-        parsed = parsedate_to_datetime(str(header))
-    except (TypeError, ValueError):
-        return 0
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return int(parsed.timestamp() * 1000)
-
-
-def _readback_server_ms(readback: Mapping) -> Optional[int]:
-    """Return the newest server timestamp reported by readback API responses.
-
-    :param readback: per-metric readback summaries from Splunk MTS.
-    :return: newest server timestamp in milliseconds, or None when unavailable.
-    """
-    stamps = []
-    for series in readback.values():
-        if not isinstance(series, Mapping):
-            continue
-        try:
-            stamp = int(series.get("server_ms") or 0)
-        except (TypeError, ValueError):
-            continue
-        if stamp > 0:
-            stamps.append(stamp)
-    return max(stamps) if stamps else None
-
-
-def _report_signalfx_loop_error(exc: Exception) -> None:
-    """Report a failed SignalFx push without stopping the exporter loop.
-
-    :param exc: exception raised while scraping or pushing a SignalFx datapoint batch.
-    """
-    print(f"SignalFx push failed: {type(exc).__name__}: {exc}", file=sys.stderr)
-
-
-def serve_prometheus(
-        scrape: Callable[[], str],
-        bind: str = "0.0.0.0",
-        port: int = 9109) -> None:
-    """Serve ``/metrics`` by calling ``scrape`` for each request.
-
-    :param scrape: callable returning the Prometheus text body for each request.
-    :param bind: address to bind the HTTP server to.
-    :param port: TCP port to serve ``/metrics`` on.
-    """
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - http.server API
-            """Serve ``/metrics`` with the scrape body, or 404/500 on error."""
-            if self.path != "/metrics":
-                self.send_response(404)
-                self.end_headers()
-                return
-            try:
-                payload = scrape().encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-            except Exception as exc:  # noqa: BLE001 - exporter should return HTTP 500
-                payload = f"exporter scrape failed: {type(exc).__name__}\n".encode()
-                self.send_response(500)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-
-        def log_message(self, format, *args):  # noqa: A002 - http.server API
-            """Silence the default per-request stderr logging.
-
-            :param format: log format string (ignored).
-            """
-            return
-
-    HTTPServer((bind, port), Handler).serve_forever()
-
-
-def run_signalfx_loop(
-        scrape_samples: Callable[[], list[MetricSample]],
-        token: str,
-        ingest_url: str,
-        interval: float,
-        timeout: float = 20.0,
-        on_error: Optional[Callable[[Exception], None]] = None) -> None:
-    """Push SignalFx datapoints forever at ``interval`` seconds.
-
-    :param scrape_samples: callable returning the samples to push each cycle.
-    :param token: SignalFx ingest token.
-    :param ingest_url: full SignalFx datapoint endpoint.
-    :param interval: base seconds between pushes (jittered per cycle).
-    :param timeout: per-push request timeout in seconds.
-    :param on_error: optional callback for transient scrape or push failures.
-    """
-    report_error = on_error or _report_signalfx_loop_error
-    while True:
-        start = time.monotonic()
-        try:
-            push_signalfx(
-                to_signalfx_body(scrape_samples()),
-                token,
-                ingest_url,
-                timeout=timeout,
-            )
-        except Exception as exc:  # noqa: BLE001 - exporter must survive transient push failures
-            report_error(exc)
-        elapsed = time.monotonic() - start
-        time.sleep(max(1.0, jittered_interval(interval) - elapsed))
-
-
 def _reading(field):
     """Return the ``Reading`` of a mapping field, or the field itself.
 
@@ -1876,24 +521,6 @@ def _reading(field):
     if isinstance(field, Mapping):
         return field.get("Reading")
     return field
-
-
-def _fan_readings(row: Mapping) -> list[tuple[str, float]]:
-    """Extract (name, RPM) pairs from a row's ``FanSpeedsPercent`` list.
-
-    :param row: an EnvironmentMetrics row that may carry fan-speed entries.
-    :return: list of (fan name, RPM) tuples with a numeric SpeedRPM.
-    """
-    readings = []
-    for fan in row.get("FanSpeedsPercent") or []:
-        if not isinstance(fan, Mapping):
-            continue
-        rpm = _as_float(fan.get("SpeedRPM"))
-        if rpm is None:
-            continue
-        name = str(fan.get("DeviceName") or fan.get("@odata.id") or "fan").rsplit("/", 1)[-1]
-        readings.append((name, rpm))
-    return readings
 
 
 def _as_float(value) -> Optional[float]:
@@ -1945,33 +572,14 @@ def _duration_seconds(value) -> Optional[float]:
     return total if math.isfinite(total) else None
 
 
-def _leak_state_value(value) -> Optional[float]:
-    """Map a leak-detector state string to a gauge value.
-
-    :param value: the ``DetectorState`` string.
-    :return: 0.0 for a clear state, 1.0 for a leak, or None when empty.
-    """
-    if value in (None, ""):
-        return None
-    state = re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
-    clear_states = {
-        "ok",
-        "normal",
-        "none",
-        "absent",
-        "notdetected",
-        "noleak",
-        "noleakdetected",
-    }
-    return 0.0 if state in clear_states else 1.0
-
-
 def _sample(metric: str,
             value: float,
             dims: Mapping[str, str],
             unit: Optional[str] = None,
             timestamp: Optional[str] = None,
-            metric_type: Optional[str] = None) -> MetricSample:
+            metric_type: Optional[str] = None,
+            definition_lookup: Callable[[str], MetricDefinition] = metric_definition,
+            ) -> MetricSample:
     """Construct a MetricSample with stringified dimension values.
 
     :param metric: metric name.
@@ -1980,9 +588,11 @@ def _sample(metric: str,
     :param unit: source-provided unit annotation; the catalog's canonical unit wins.
     :param timestamp: optional sample timestamp.
     :param metric_type: optional caller classification, validated against the catalog.
+    :param definition_lookup: catalog resolver owned by the shared runtime or a
+        concrete vendor reader.
     :return: the assembled MetricSample.
     """
-    definition = metric_definition(metric)
+    definition = definition_lookup(metric)
     if metric_type is not None and metric_type != definition.kind:
         raise ValueError(
             f"{metric} type {metric_type!r} does not match catalog type "
@@ -2012,196 +622,6 @@ def _with_dims(identity: Mapping[str, str], **extra) -> dict[str, str]:
     return dims
 
 
-def _environment_chassis(row: Mapping) -> str:
-    """Resolve the chassis identifier for an EnvironmentMetrics row.
-
-    :param row: the EnvironmentMetrics row.
-    :return: the parent chassis id, falling back to Chassis/Id or ``unknown``.
-    """
-    parent_type = row.get("ParentType")
-    parent_id = row.get("ParentId")
-    if parent_type == "Chassis" and parent_id:
-        return str(parent_id)
-    return str(row.get("Chassis") or row.get("Id") or "unknown")
-
-
-def _environment_dims(identity: Mapping[str, str],
-                      row: Mapping,
-                      chassis: str) -> dict[str, str]:
-    """Build environment-source dimensions for an EnvironmentMetrics row.
-
-    :param identity: fixed join dimensions to seed the result.
-    :param row: the EnvironmentMetrics row supplying parent type/id.
-    :param chassis: the resolved chassis identifier.
-    :return: dimension mapping including resource/processor/memory context.
-    """
-    dims = _with_dims(identity, source="environment", chassis=chassis)
-    parent_type = row.get("ParentType")
-    parent_id = row.get("ParentId")
-    if parent_type:
-        dims["resource_type"] = str(parent_type)
-    if parent_id:
-        resource = _dim_value(parent_id)
-        dims["resource"] = resource
-        if parent_type == "Processor":
-            dims["processor"] = resource
-        elif parent_type == "Memory":
-            dims["memory"] = resource
-    return dims
-
-
-def _environment_gpu(row: Mapping, chassis: str) -> Optional[str]:
-    """Resolve the GPU identifier owning an EnvironmentMetrics row, if any.
-
-    :param row: the EnvironmentMetrics row.
-    :param chassis: the resolved chassis identifier.
-    :return: the ``GPU_<n>`` identifier, or None when the row is not GPU-scoped.
-    """
-    parent_type = row.get("ParentType")
-    parent_id = str(row.get("ParentId") or "")
-    if parent_type == "Processor" and parent_id.startswith("GPU_"):
-        return parent_id
-    if parent_type == "Memory":
-        match = re.match(r"(GPU_\d+)", parent_id)
-        if match:
-            return match.group(1)
-    return _gpu_from_chassis(chassis)
-
-
-def _fabric_dims(identity: Mapping[str, str],
-                 system,
-                 gpu,
-                 port,
-                 fabric: str) -> dict[str, str]:
-    """Build fabric-source dimensions for a link/port sample.
-
-    :param identity: fixed join dimensions to seed the result.
-    :param system: system identifier, if known.
-    :param gpu: GPU identifier, if known.
-    :param port: port identifier, if known.
-    :param fabric: fabric type label (e.g. ``nvlink`` or ``ib``).
-    :return: dimension mapping for the fabric sample.
-    """
-    dims = _with_dims(identity, source="fabric", fabric=fabric)
-    for key, value in (("system", system), ("gpu", gpu), ("port", port)):
-        if value:
-            dims[key] = str(value)
-    return dims
-
-
-def _gpu_from_chassis(chassis: str) -> Optional[str]:
-    """Extract the GPU identifier embedded in a chassis name.
-
-    :param chassis: the chassis identifier.
-    :return: the ``GPU_<n>`` identifier, or None when none is present.
-    """
-    parts = chassis.split("HGX_")
-    if len(parts) == 2 and parts[1].startswith("GPU_"):
-        return parts[1]
-    return chassis if chassis.startswith("GPU_") else None
-
-
-def _gpu_from_metric_info(info: Mapping[str, str]) -> Optional[str]:
-    """Resolve a GPU identifier from parsed MetricProperty fields.
-
-    :param info: parsed MetricProperty fields (gpu, memory, chassis, sensor, …).
-    :return: the ``GPU_<n>`` identifier, or None when none can be resolved.
-    """
-    gpu = str(info.get("gpu") or "")
-    if gpu.startswith("GPU_"):
-        return gpu
-    memory = str(info.get("memory") or "")
-    match = re.match(r"(GPU_\d+)", memory)
-    if match:
-        return match.group(1)
-    chassis_gpu = _gpu_from_chassis(str(info.get("chassis") or ""))
-    if chassis_gpu:
-        return chassis_gpu
-    sensor = str(info.get("sensor") or info.get("property") or "")
-    match = re.search(r"(?:^|_)(GPU_\d+)(?:_|$)", sensor)
-    return match.group(1) if match else None
-
-
-def _gpu_dim(chassis: str) -> dict[str, str]:
-    """Build a ``gpu`` dimension dict from a chassis name.
-
-    :param chassis: the chassis identifier.
-    :return: ``{"gpu": <id>}`` when a GPU is present, else an empty dict.
-    """
-    gpu = _gpu_from_chassis(chassis)
-    return {"gpu": gpu} if gpu else {}
-
-
-def _parse_metric_property(prop: str) -> dict[str, str]:
-    """Parse a Redfish MetricProperty URI into its addressing fields.
-
-    :param prop: the MetricProperty path (with optional ``#`` fragment).
-    :return: dict with the property name and any system/gpu/port/chassis/index/source context.
-    """
-    path, _, fragment = prop.partition("#")
-    parts = [part for part in path.strip("/").split("/") if part]
-    frag = [p for p in fragment.strip("/").split("/") if p] if fragment else []
-    idx = None
-    if frag:
-        # a trailing numeric segment (e.g. .../NVDECUtilizationPercent/0) is an
-        # array index, not the metric name — keep the name, expose the index
-        if frag[-1].isdigit() and len(frag) >= 2:
-            prop_name, idx = frag[-2], frag[-1]
-        else:
-            prop_name = frag[-1]
-    else:
-        prop_name = parts[-1] if parts else "metric"
-    info = {"property": prop_name}
-    if idx is not None:
-        info["index"] = idx
-    if "Sensors" in parts:
-        info["metric_source"] = "sensor"
-    elif "MemoryMetrics" in parts or "Memory" in parts or "MemorySummary" in parts:
-        info["metric_source"] = "memory"
-    elif "ProcessorMetrics" in parts:
-        info["metric_source"] = "processor"
-    for collection, key in (("Systems", "system"), ("Processors", "gpu"),
-                            ("Memory", "memory"), ("Ports", "port"),
-                            ("Chassis", "chassis"), ("Sensors", "sensor")):
-        if collection in parts:
-            i = parts.index(collection) + 1
-            if i < len(parts):
-                info[key] = parts[i]
-    return info
-
-
-def _unit_for_metric(metric: str) -> Optional[str]:
-    """Return the catalog unit annotation for a metric.
-
-    :param metric: the metric name.
-    :return: configured unit or inferred dynamic-family unit.
-    """
-    return metric_definition(metric).unit
-
-
-def _generic_metric_name(prop: str) -> str:
-    """Vendor-neutral metric name for any MetricReport property not in the
-    curated fabric map, so the full telemetry surface is exported rather than
-    just fabric counters. e.g. ``FP16ActivityPercent`` -> ``hw.gb300.fp16_activity_percent``.
-
-    :param prop: the MetricReport property name.
-    :return: the vendor-neutral ``hw.gb300.*`` metric name.
-    """
-    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", prop)
-    snake = re.sub(r"[^A-Za-z0-9]+", "_", snake).strip("_").lower()
-    return f"hw.gb300.{snake or 'metric'}"
-
-
-def _is_gpu_temperature(prop: str) -> bool:
-    """Whether a property name denotes a GPU temperature reading.
-
-    :param prop: the property name to test.
-    :return: True if the name refers to a temperature.
-    """
-    lowered = prop.lower()
-    return "temp" in lowered or "temperature" in lowered
-
-
 def _dim_value(value) -> str:
     """Sanitize a value into a safe, bounded dimension string.
 
@@ -2210,30 +630,3 @@ def _dim_value(value) -> str:
     """
     cleaned = DIM_VALUE_OK.sub("_", str(value)).strip("_")
     return (cleaned or "unknown")[:256]
-
-
-def _escape_label_value(value) -> str:
-    """Escape a value for a Prometheus label (backslash, newline, quote).
-
-    :param value: the raw label value.
-    :return: the escaped label string.
-    """
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
-
-
-def _escape_help_text(value) -> str:
-    """Escape a value for a Prometheus HELP line.
-
-    :param value: raw HELP text.
-    :return: escaped HELP text.
-    """
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n")
-
-
-def _format_value(value: float) -> str:
-    """Format a float as a Prometheus sample value.
-
-    :param value: the numeric sample value.
-    :return: an integer string when whole, else the float repr.
-    """
-    return str(int(value)) if float(value).is_integer() else repr(float(value))

@@ -9,7 +9,7 @@ from vendor_corpus import corpus_dir
 
 from redfish_ctl.actions.action_policy import classify
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.oem.cmd_dell_card_hw_proof import DellCardHwProof
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -40,9 +40,9 @@ def dell_corpus_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-xr8620t",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-xr8620t",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

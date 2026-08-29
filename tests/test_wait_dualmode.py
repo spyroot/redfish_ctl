@@ -2,7 +2,7 @@
 
 import json
 
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -18,7 +18,7 @@ def test_wait_dualmode_returns_reachable_service_root(redfish_mock):
     assert isinstance(result, CommandResult)
     assert result.error is None
     assert result.data["reachable"] is True
-    assert result.data["target"] == redfish_mock.idrac_ip
+    assert result.data["target"] == redfish_mock.host
     assert result.data["waiting_for"].endswith("/redfish/v1/")
     assert isinstance(result.data["waited_s"], float)
     assert result.data["waited_s"] >= 0.0

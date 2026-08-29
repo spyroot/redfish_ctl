@@ -12,7 +12,7 @@ import pytest
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.proxy import NodeConfig, NodeRegistry, ReadOnlyProxy, create_app
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry.exporter import MetricSample
@@ -58,9 +58,9 @@ def gb300_corpus_manager():
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=get_cb)
         manager = IDracManager(
-            idrac_ip="mock-gb300",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-gb300",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )
@@ -280,7 +280,7 @@ def test_proxy_metric_samples_reuse_exporter_contract_per_node():
             None,
             None,
         ),
-        (ApiRequestType.MetricReports, "metric-reports"): CommandResult(
+        (ApiRequestType.SupermicroMetricReports, "metric-reports"): CommandResult(
             [
                 {
                     "Report": "HGX_ProcessorMetrics_0",
@@ -357,7 +357,7 @@ def test_proxy_metric_samples_reuse_exporter_contract_per_node():
         (ApiRequestType.Thermal, "thermal", {}),
         (ApiRequestType.Sensors, "sensors", {"do_expanded": False}),
         (ApiRequestType.NvLinkPorts, "nvlink-ports", {"do_expanded": False}),
-        (ApiRequestType.MetricReports, "metric-reports", {"do_expanded": False}),
+        (ApiRequestType.SupermicroMetricReports, "metric-reports", {"do_expanded": False}),
         (ApiRequestType.LeakDetectors, "leak-detectors", {}),
         (ApiRequestType.NetworkAdapters, "network-adapters", {"do_expanded": False}),
         (ApiRequestType.ComponentIntegrity, "component-integrity", {"do_expanded": False}),

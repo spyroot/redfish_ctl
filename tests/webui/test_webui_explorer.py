@@ -121,7 +121,7 @@ def test_invoke_nic_firmware_end_to_end_against_corpus():
     with requests_mock.Mocker() as mocker:
         mocker.get(requests_mock.ANY, text=cb)
         manager = IDracManager(
-            idrac_ip="mock-gb300", idrac_username="root", idrac_password="x",
+            host="mock-gb300", username="root", password="x",
             insecure=True, is_debug=False,
         )
         out = server.invoke_command(manager, "nic-firmware")

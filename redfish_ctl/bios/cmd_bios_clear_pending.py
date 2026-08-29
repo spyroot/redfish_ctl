@@ -13,7 +13,7 @@ from typing import Optional
 from .. import ApiRequestType, CommandResult, IDracManager, Singleton
 from ..cmd_exceptions import FailedDiscoverAction
 from ..custom_argparser.customer_argdefault import BiosSubcommand
-from ..idrac_shared import RedfishApiRespond
+from ..redfish_api_common import RedfishApiRespond
 
 
 class BiosClearPending(IDracManager,

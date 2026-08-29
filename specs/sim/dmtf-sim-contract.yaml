@@ -1,0 +1,133 @@
+# DMTF SIM — machine-readable contract. Written for AGENTS, not humans.
+# An agent parses this to CONSUME the sim correctly without re-deriving its
+# behavior, and to REVIEW any sim change: an implementation that disagrees
+# with this file is the bug (same authority rule as the architecture spec).
+# Conformance is PROVEN, not promised: the consistency check named under
+# `conformance` interrogates every URI the bundle declares.
+schema: redfish_ctl.dmtf_sim_contract/v1
+
+# ---------------------------------------------------------------------------
+# BINDING — content-addressed: which bytes this sim speaks, and who serves them.
+# ---------------------------------------------------------------------------
+binding:
+  bundle:
+    artifact: spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip   # Git-LFS
+    release: "2026.1"
+    sha256: "481990aa1e77a675b5cc919483b4bc2dd8e832f91ba9b0e3f001ee2b2c8ddef7"
+    publisher: "DMTF DSP2043 Redfish Mockups Bundle"
+    note: "the sim's version IS the bundle release; a new bundle = a new
+      binding row + re-run of the conformance proof, never an in-place edit"
+  implementation:
+    server: "k8s/sandbox/mock_bmc_server.py --mockup-dir <profile-root>"
+    extractor: "tests/k8s/dmtf_mockup.py (cached unzip; LFS-pointer safe)"
+  conformance:
+    proof: "tools/mockup_consistency_check.py — harvests EVERY @odata.id the
+      bundle itself declares, interrogates the sim, asserts 1:1 (see
+      guarantees.fidelity); exit 0 is the gate for every deliverable built on
+      the sim (queue item dmtf-sim-deployment D0)"
+
+# ---------------------------------------------------------------------------
+# PROVIDES — the full caller-visible surface. Nothing else exists.
+# ---------------------------------------------------------------------------
+provides:
+  protocol: {transport: HTTP, methods: [GET], tls: none, auth: none}
+  resolution:
+    rule: "request path -> <profile-root>/<path>/index.json, 1:1; the profile
+      root's index.json IS /redfish/v1 (the service root)"
+    example:
+      request: /redfish/v1/TelemetryService/MetricDefinitions/PowerConsumedWatts
+      file: <profile-root>/TelemetryService/MetricDefinitions/PowerConsumedWatts/index.json
+    trailing_slash: "equivalent — /redfish/v1 == /redfish/v1/ for every path
+      (DSP0266 1.24.0 §6.7 Table 5)"
+  spec_uris:                                # DSP0266 §6.7 Table 4 rows served
+    - {uri: /redfish,             returns: version object, required: true,
+       note: "served from the bundle when present; synthesized as
+         {\"v1\": \"/redfish/v1/\"} when the profile lacks the file — the ONE
+         sanctioned synthesis (the document is spec-defined, not vendor data)"}
+    - {uri: /redfish/v1/,         returns: service root,   required: true}
+    - {uri: /redfish/v1/odata,    returns: OData service document, required: true,
+       note: "404 only when the profile genuinely lacks the file"}
+    - {uri: /redfish/v1/$metadata, returns: metadata document, required: true,
+       content_type: application/xml,
+       note: "XML, never JSON-wrapped; compared as bytes by the proof"}
+  content_types:
+    default: application/json
+    "$metadata": application/xml
+  profiles:
+    selection: "one sim instance serves exactly ONE profile (a container/CLI
+      arg); profiles are ENUMERATED from the bundle, never hardcoded —
+      examples at 2026.1: public-rackmount1, public-telemetry"
+    telemetry_reference: "public-telemetry is the DMTF telemetry lens
+      (TelemetryService/MetricDefinitions/... — the T2 loop's source)"
+  errors:
+    absent_resource: {status: 404, body: "DMTF-style error envelope"}
+    non_get_method: {status: 405, note: "the sim serves reads ONLY; a write
+      accepted by a DMTF sim would be an invented behavior (see
+      guarantees.no_invention)"}
+
+# ---------------------------------------------------------------------------
+# GUARANTEES — what a caller may RELY on. Each is enforced, not aspirational.
+# ---------------------------------------------------------------------------
+guarantees:
+  stateless: "no sessions, no auth state, no job queue, no pending config;
+    identical request -> identical response, for the lifetime of the binding.
+    THIS is why the persistent deployment needs no reset/shutdown lifecycle."
+  fidelity: "served content == bundle content (JSON parsed-equal; $metadata
+    byte-equal). Enforced by conformance.proof over the bundle's OWN declared
+    URI set — the sim can never drift from the zip."
+  no_invention: "a resource absent from the bundle is 404, NEVER synthesized
+    (single exception: the /redfish version object, spec_uris note). A 200 for
+    an absent path is a contract violation the proof fails."
+  deterministic_version: "responses change ONLY when binding.bundle changes;
+    the sha256 pin makes 'which DMTF is this sim' a checkable fact."
+  read_only_posture: "the server never writes its filesystem — deployments
+    declare readOnlyRootFilesystem + runAsNonRoot as a matter of contract."
+
+# ---------------------------------------------------------------------------
+# NOT PROVIDED — agents must not test these against this sim.
+# ---------------------------------------------------------------------------
+not_provided:
+  mutation: "no POST/PATCH/DELETE semantics — no subscription create, no BIOS
+    settings apply, no task/job creation. Write-path and realization testing
+    uses the vendor-faithful conftest mock (tests/conftest.py, lens-required)."
+  realization: "no @Redfish.Settings application, no TaskService state
+    machine, no job queue — check 4 evidence comes from the vendor mock,
+    never from here"
+  vendor_semantics: "no JID_, no 201=Created, no OEM blocks beyond what the
+    bundle files literally contain — this sim is the DMTF-GENERIC lens by
+    definition; vendor lenses come from the corpora"
+  auth_testing: "no credentials are checked; auth flows cannot be tested here"
+  http_caching: "no ETag/If-Match/conditional-request semantics — an
+    @odata.etag INSIDE a bundle document is served verbatim as body content
+    (fidelity covers it), but the sim derives NO ETag response headers and
+    honors no conditional headers; cache-validation flows cannot be tested
+    here"
+
+# ---------------------------------------------------------------------------
+# CONSUMERS — who calls this and for what (the sanctioned uses).
+# ---------------------------------------------------------------------------
+consumers:
+  - {use: dmtf_generic_lens_tests, how: "in-process/subprocess server in
+      tests/k8s/; the DMTF side of dual-lens assertions"}
+  - {use: overlap_diff, how: "the DMTF side of the executable 5-check diff
+      (queue item dmtf-overlap-diff): same command against sim and corpus,
+      diff = subset|full|full_plus_oem"}
+  - {use: telemetry_loop, how: "T2: telemetry requests read FROM the bundle's
+      own JSON, sent to the sim, telemetry mocked back to the caller"}
+  - {use: persistent_reference, how: "the deployed pod (charts/dmtf-sim,
+      queue item dmtf-sim-deployment D1-D7 approved 2026-07-25): a standing
+      DMTF BMC address for smoke/admission tests and live-diff targets"}
+  - {use: live_diff_target, how: "tools/corpus.py live-diff --ip <sim> proves
+      pod == bundle over the network; the same engine, zero new code"}
+
+# ---------------------------------------------------------------------------
+# DEPLOYMENT SURFACES — the three ways a caller reaches the sim.
+# ---------------------------------------------------------------------------
+deployment:
+  in_process: "tests import the extractor + resolution directly (fastest;
+    used by unit tests)"
+  subprocess: "python k8s/sandbox/mock_bmc_server.py --mockup-dir <root>
+    --port <p> (used by the conformance proof and integration tests)"
+  persistent_pod: "k8s/sandbox/dmtf-sim.yaml today; charts/dmtf-sim once the
+    deployment deliverables land (image from Harbor via the private CI, the
+    bundle BAKED at build time — no runtime LFS, no PVC)"

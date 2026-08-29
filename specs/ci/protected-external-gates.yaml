@@ -1,0 +1,95 @@
+# Required protected external-service checks. Implementations consume the
+# shared provider binding and emit sanitized evidence; this file never carries
+# secret values or environment-specific Secret locations.
+schema: redfish_ctl.protected_external_gates/v1
+
+authorities:
+  environment: specs/config/environment.yaml#application.secrets_and_config
+  secret_binding_owner: protected-private-provider
+
+lifecycle:
+  state: required-pending-provider
+  enforcement_active: false
+  activation_requires:
+    - provider capability shared.splunk-observability.auth-probe@v1 is available
+    - the capability is registered in gates/manifest.yaml
+    - the canonical integration runner executes it as a required gate
+    - sanitized exact-commit evidence is returned
+  note: >-
+    These are required target semantics, not evidence that the gate currently
+    executes. CI protection remains blocked until every activation requirement
+    is satisfied.
+
+gates:
+  - id: splunk.api-token.authenticated
+    purpose: fail CI when the shared API token is missing, expired, or revoked
+    profile: integration
+    required: true
+    mutates: false
+    execution:
+      runner: homelab-k8s
+      protection: protected-private-provider
+      public_ci: forbidden
+      laptop: forbidden
+      merge_request_pipeline: forbidden
+    provider_capability:
+      id: shared.splunk-observability.auth-probe
+      version: v1
+      required: true
+      secret_binding: splunk-observability
+      exact_commit_evidence: true
+    inputs:
+      token_key: SPLUNK_API_TOKEN
+      realm_key: SPLUNK_O11Y_REALM
+      token_value_output: forbidden
+    preflight_failures:
+      - provider-inventory-invalid
+      - provider-binding-missing
+      - secret-or-key-missing
+      - empty-token
+      - endpoint-unresolved
+    probe:
+      service: Splunk Observability API
+      method: GET
+      path: /v2/metrictimeseries
+      query:
+        query: 'sf_metric:"__redfish_ctl_ci_auth_probe_nonexistent__"'
+        limit: 1
+      redirects: forbidden
+      timeout_seconds: 15
+      success:
+        http_status: 200
+        content_type: application/json
+        body:
+          type: object
+          required_fields:
+            count: number
+            results: array
+          zero_results: allowed
+      failures:
+        - http-401-expired-revoked-or-invalid-token
+        - http-403-insufficient-scope
+        - unexpected-http-status
+        - unexpected-host-or-redirect
+        - dns-error
+        - tls-error
+        - connection-error
+        - timeout
+        - non-json-body
+        - unexpected-json-shape
+    evidence:
+      required_fields:
+        - gateId
+        - providerCapability
+        - exactCommit
+        - checkedAt
+        - endpointClass
+        - httpStatus
+        - jsonShapeValid
+        - result
+      forbidden_fields:
+        - token
+        - decodedSecretData
+        - requestHeaders
+        - responseBody
+      result_values: [pass, fail]

@@ -19,7 +19,7 @@ import json
 import pytest
 
 from redfish_ctl.firmware.cmd_firmware_update import FirmwareUpdate
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.telemetry import tracing
 
@@ -231,9 +231,9 @@ def test_firmware_upload_post_emits_action_metadata(
     )
 
     cmd = FirmwareUpdate(
-        idrac_ip="mock-idrac",
-        idrac_username="root",
-        idrac_password="mock",
+        host="mock-idrac",
+        username="root",
+        password="mock",
     )
     response = cmd._post_image_file(
         "/redfish/v1/UpdateService/upload",

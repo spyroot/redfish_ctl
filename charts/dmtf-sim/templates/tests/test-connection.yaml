@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-test-connection
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  serviceAccountName: {{ default .Release.Name .Values.serviceAccount.name }}
+  automountServiceAccountToken: false
+  activeDeadlineSeconds: 60
+  restartPolicy: Never
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range . }}
+    - name: {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test-connection
+      {{- if .Values.image.digest }}
+      image: {{ printf "%s@%s" .Values.image.repository .Values.image.digest | quote }}
+      {{- else }}
+      image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+      {{- end }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command:
+        - python
+        - -c
+      args:
+        - >-
+          import urllib.request;
+          response = urllib.request.urlopen(
+          "http://{{ .Release.Name }}:{{ .Values.service.port }}/redfish/v1/",
+          timeout=5);
+          status = response.status;
+          response.close();
+          raise SystemExit(0 if status == 200 else 1)
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi

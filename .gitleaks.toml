@@ -32,5 +32,5 @@ description = """Synthetic Dell key fixtures in the corpus contract test — lit
 exercise redaction; never real keys."""
 condition = "AND"
 regexTarget = "line"
-paths = ['''^tests/test_full_corpus_contract\.py$''']
+paths = ['''^tests/(?:tools/)?test_full_corpus_contract\.py$''']
 regexes = ['''"Users\.\d+\.(SHA\d*v3Key|MD5v3Key|IPMIKey|SHA256Password|SHA256PasswordSalt)"''']

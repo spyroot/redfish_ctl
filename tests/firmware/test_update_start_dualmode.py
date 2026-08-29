@@ -2,7 +2,7 @@
 
 from redfish_ctl.firmware.cmd_update_start import UpdateStart
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 UPDATE_SERVICE_PATH = "/redfish/v1/UpdateService"

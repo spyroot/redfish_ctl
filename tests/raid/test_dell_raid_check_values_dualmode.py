@@ -8,7 +8,7 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.raid.cmd_dell_raid_check_values import DellRaidCheckValues
 from redfish_ctl.redfish_manager import CommandResult
 
@@ -41,7 +41,7 @@ def dell_raid_manager_factory():
     requests_mock = pytest.importorskip("requests_mock")
     started = []
 
-    def factory(service_body=None, post_body=None):
+    def factory(service_body=None, post_body=None, post_status=200):
         requests = []
 
         def get_cb(request, context):
@@ -58,7 +58,7 @@ def dell_raid_manager_factory():
 
         def post_cb(request, context):
             requests.append(request)
-            context.status_code = 200
+            context.status_code = post_status
             return json.dumps(post_body or {"Status": "Valid"})
 
         mocker = requests_mock.Mocker()
@@ -67,9 +67,9 @@ def dell_raid_manager_factory():
         mocker.get(requests_mock.ANY, text=get_cb)
         mocker.post(requests_mock.ANY, text=post_cb)
         manager = IDracManager(
-            idrac_ip="mock-dell-raid",
-            idrac_username="root",
-            idrac_password="mock",
+            host="mock-dell-raid",
+            username="root",
+            password="mock",
             insecure=True,
             is_debug=False,
         )
@@ -179,6 +179,40 @@ def test_dell_raid_check_values_posts_read_only_action_by_default(
         "VDPropNameArrayIn": ["RAIDLevel"],
         "VDPropValueArrayIn": ["RAID1"],
     }
+
+
+@pytest.mark.parametrize(
+    "post_status",
+    [400, 405],
+    ids=["raised-error", "returned-error"],
+)
+def test_dell_raid_check_values_non_2xx_is_not_reported_as_executed(
+    dell_raid_manager_factory,
+    post_status,
+):
+    """Raised and returned POST failures cannot report successful execution."""
+    manager, requests = dell_raid_manager_factory(
+        post_status=post_status,
+        post_body={
+            "error": {
+                "code": "Base.1.12.ActionNotSupported",
+                "message": "The action is not supported.",
+            }
+        },
+    )
+
+    result = manager.sync_invoke(
+        ApiRequestType.DellRaidCheckValues,
+        "dell-raid-check-values",
+        property_names=["RAIDLevel"],
+        property_values=["RAID1"],
+    )
+
+    posts = _post_requests(requests)
+    assert result.error is not None
+    assert result.data["executed"] is False
+    assert result.data["action"] == "#DellRaidService.CheckVDValues"
+    assert len(posts) == 1
 
 
 def test_dell_raid_check_values_rejects_invalid_property_without_posting(
