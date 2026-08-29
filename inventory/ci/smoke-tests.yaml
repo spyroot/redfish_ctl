@@ -7,7 +7,7 @@ spec:
     - job: gate-merge
       class: wiring
       command: './scripts/check.sh --profile "${MERGE_PROFILE:-merge}"'
-      requiredTools: [bash, conda, git, git-lfs]
+      requiredTools: [bash, conda, git, git-lfs, python3]
       artifactUnderTest:
         type: repository
         digestSource: git-commit
@@ -18,26 +18,26 @@ spec:
       releaseBlocking: true
 
     - job: gate-integration
-      class: wiring
+      class: protected-live
       command: ./scripts/check.sh --profile integration
-      requiredTools: [bash, conda, git, git-lfs, jq, yq]
+      requiredTools: [bash, conda, git, git-lfs, jq, python3, yq]
       artifactUnderTest:
         type: repository-and-gitlab-integration
         digestSource: git-commit-and-pipeline
-      mutation: none
+      mutation: read-only-api
       timeoutSeconds: 1800
       evidencePath: reports/smoke/gate-integration.json
       cleanupPolicy: reports-only
       releaseBlocking: true
 
     - job: gate-scheduled
-      class: wiring
+      class: protected-live
       command: ./scripts/check.sh --profile scheduled
-      requiredTools: [bash, conda, git, git-lfs]
+      requiredTools: [bash, conda, git, git-lfs, python3]
       artifactUnderTest:
         type: repository-and-splunk-liveness
         digestSource: git-commit-and-metric-catalogs
-      mutation: none
+      mutation: read-only-api
       timeoutSeconds: 1800
       evidencePath: reports/smoke/gate-scheduled.json
       cleanupPolicy: reports-only
