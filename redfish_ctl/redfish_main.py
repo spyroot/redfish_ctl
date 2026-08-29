@@ -454,16 +454,27 @@ def main(cmd_args: argparse.Namespace, command_name_to_cmd: Dict, manager_cls) -
             parent_policy=tracing.SpanParentPolicy.ROOT,
             attributes=span_attributes,
         ) as root_span:
-            redfish_api = manager_cls(
-                host=cmd_args.redfish_host,
-                username=cmd_args.redfish_username,
-                password=cmd_args.redfish_password,
-                port=cmd_args.redfish_port,
-                insecure=insecure,
-                is_http=cmd_args.use_http,
-                is_debug=cmd_args.debug,
-            )
-            _run(cmd, cmd_args, redfish_api, insecure, connectionless_mode, root_span)
+            try:
+                redfish_api = manager_cls(
+                    host=cmd_args.redfish_host,
+                    username=cmd_args.redfish_username,
+                    password=cmd_args.redfish_password,
+                    port=cmd_args.redfish_port,
+                    insecure=insecure,
+                    is_http=cmd_args.use_http,
+                    is_debug=cmd_args.debug,
+                )
+                _run(
+                    cmd,
+                    cmd_args,
+                    redfish_api,
+                    insecure,
+                    connectionless_mode,
+                    root_span,
+                )
+            except BaseException as exc:
+                tracing.record_exception(root_span, exc)
+                raise
     finally:
         tracing.shutdown()
 

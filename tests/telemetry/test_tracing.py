@@ -525,12 +525,18 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
 ):
     """Preflight, dispatch, Dell enrichment, and rendering share one CLI root."""
     render_span_ids = []
+    construction_span_ids = []
 
     class FakeManager:
         redfish_vendor = "Dell"
 
         def __init__(self, **kwargs):
+            from opentelemetry.trace import get_current_span
+
             self.host = kwargs["host"]
+            construction_span_ids.append(
+                get_current_span().get_span_context().span_id
+            )
 
         @staticmethod
         def _request(phase):
@@ -609,6 +615,7 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
     assert root.kind is SpanKind.INTERNAL
     assert root.status.status_code is StatusCode.OK
     assert root.attributes["server.address"] == "bmc.example.test"
+    assert construction_span_ids == [root.context.span_id]
 
     clients = [span for span in spans if span.name == "redfish.bmc.request"]
     assert {span.attributes["test.phase"] for span in clients} == {
@@ -621,6 +628,41 @@ def test_cli_command_has_one_root_for_the_complete_lifecycle(
     assert all(span.attributes["redfish.path_family"] for span in clients)
     assert all(span.parent.span_id == root.context.span_id for span in clients)
     assert render_span_ids == [root.context.span_id, root.context.span_id]
+
+
+def test_cli_root_records_manager_construction_failure(span_exporter):
+    """A manager-construction failure marks the command root before propagating."""
+    class FailingManager:
+        def __init__(self, **kwargs):
+            raise RuntimeError("manager construction failed")
+
+    args = SimpleNamespace(
+        redfish_host="bmc.example.test",
+        redfish_username="root",
+        redfish_password="mock",
+        redfish_port=443,
+        verify_ssl=False,
+        use_http=False,
+        debug=False,
+        otlp_traces=False,
+        verbose=False,
+        nocolor=True,
+        subcommand="system",
+    )
+    command = SimpleNamespace(type=ApiRequestType.SystemQuery, name="system_query")
+
+    with pytest.raises(RuntimeError, match="manager construction failed"):
+        redfish_main.main(args, {"system": command}, FailingManager)
+
+    root = next(
+        span for span in span_exporter.get_finished_spans()
+        if span.name == "system_query"
+    )
+    from opentelemetry.trace import StatusCode
+
+    assert root.parent is None
+    assert root.status.status_code is StatusCode.ERROR
+    assert root.attributes["error.type"] == "RuntimeError"
 
 
 def test_fleet_nodes_are_independent_roots_linked_to_coordinator(

@@ -322,10 +322,8 @@ def link_to_current_span() -> tuple[Any, ...]:
 def current_span() -> Optional[Any]:
     """Return the currently-active span, or None when tracing is off / no span.
 
-    The call stack IS the span tree, so this lets a lower frame record a
-    result/exception on the operation root, and lets ``sync_invoke`` detect it is
-    already inside an operation root (opened by ``main``) and skip opening a
-    redundant second one.
+    The call stack is the span tree, so lower frames can inspect the active
+    operation span without maintaining separate parent state.
 
     :return: the active span, or None when tracing is off or no span is current.
     """
