@@ -15,6 +15,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from ..cmd_exceptions import ResourceNotFound
 from ..idrac_manager import IDracManager
 from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_exceptions import RedfishNotFound
@@ -167,8 +168,10 @@ class DellCardCertExport(IDracManager,
         """
         try:
             data = self.base_query(uri, do_async=do_async).data or {}
-        except RedfishNotFound:
+        except (ResourceNotFound, RedfishNotFound):
             return {}
+        except Exception as exc:
+            raise RuntimeError(f"{uri}: {exc}") from exc
         return data if isinstance(data, dict) else {}
 
     def _card_service_uris(self, do_async):
