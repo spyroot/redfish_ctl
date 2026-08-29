@@ -1,0 +1,54 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-redfish-error-response
+spec:
+  rules:
+    - id: global.error.extended-response
+      type: payload_contract
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["8.3", "8.6"]
+        statement: extended-error-shape
+        wording: should
+      match:
+        exchange:
+          responder: redfish_service
+        condition:
+          responseStatusClass: [4xx, 5xx]
+      expect:
+        body:
+          kind: redfish_error
+          recommended: true
+          rootProperty: error
+          requiredProperties: [code, message]
+          extendedInfo:
+            property: "@Message.ExtendedInfo"
+            presence: recommended
+            processingPriority: first
+          deterministicIdentity:
+            fields:
+              - HTTPStatus
+              - MessageId
+              - RelatedProperties
+      normative:
+        strength: recommended
+        keyword: should
+
+    - id: global.error.no-privileged-auth-details
+      type: security_invariant
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["8.3"]
+        statement: authentication-error-information-boundary
+        wording: shall_not
+      match:
+        condition:
+          authenticationFailure: true
+      expect:
+        privilegedInformationDisclosed: false
+      normative:
+        strength: prohibited
+        keyword: shall_not

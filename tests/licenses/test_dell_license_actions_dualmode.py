@@ -10,7 +10,8 @@ from vendor_corpus import corpus_dir
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.cmd_exceptions import InvalidArgument
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
+from redfish_ctl.licenses.cmd_dell_license_actions import DellLicenseActions
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
@@ -52,9 +53,9 @@ def dell_license_actions_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-license-actions",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-license-actions",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

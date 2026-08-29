@@ -37,7 +37,11 @@ tools/sync_claude_agents.py
 
 # Internal-only documentation (team/dev notes; external docs live in docs/)
 docs/internal/
-inventory/
+inventory/*
+!inventory/ci/
+inventory/ci/*
+!inventory/ci/go-no-go.yaml
+!inventory/ci/smoke-tests.yaml
 
 # macOS / stray test output
 .DS_Store
@@ -213,5 +217,3 @@ tests/popen_test.py
 # De-duplicated corpus: the redundant orig/ backup tree is never committed
 tests/supermicro_gb300_corpus/json_responses/orig/
 bios_firmware/
-
-

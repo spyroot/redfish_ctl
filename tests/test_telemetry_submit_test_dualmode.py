@@ -7,7 +7,7 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
@@ -42,9 +42,9 @@ def dell_telemetry_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-xr8620t",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-xr8620t",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),
@@ -64,7 +64,7 @@ def _post_requests(service):
 def _submit(manager, **kwargs):
     """Invoke the telemetry test metric command with concise defaults."""
     return manager.sync_invoke(
-        ApiRequestType.TelemetrySubmitTest,
+        ApiRequestType.SupermicroTelemetrySubmitTest,
         "telemetry-submit-test",
         metric_report_name="SyntheticReport",
         metric_id="SyntheticMetric",
@@ -169,7 +169,7 @@ def test_telemetry_submit_test_no_action_reports_clear_error(redfish_mock_factor
     manager, service = redfish_mock_factory("hpe")
 
     result = manager.sync_invoke(
-        ApiRequestType.TelemetrySubmitTest,
+        ApiRequestType.SupermicroTelemetrySubmitTest,
         "telemetry-submit-test",
         confirm=True,
     )

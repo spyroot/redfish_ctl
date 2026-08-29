@@ -11,7 +11,7 @@ from redfish_ctl.dell_lc.cmd_dell_lc_supportassist_schedule import (
     DellLcSupportAssistSchedule,
 )
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 DELL_CORPUS = corpus_dir(
@@ -52,9 +52,9 @@ def dell_lc_supportassist_mock():
         service.mocker = mocker
         yield (
             IDracManager(
-                idrac_ip="mock-dell-lc-supportassist",
-                idrac_username="root",
-                idrac_password="mock",
+                host="mock-dell-lc-supportassist",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),

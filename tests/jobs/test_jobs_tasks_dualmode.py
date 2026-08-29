@@ -6,7 +6,7 @@ import pytest
 import redfish_ctl.tasks.cmd_task_svc  # noqa: F401
 from redfish_ctl.cmd_exceptions import AuthenticationFailed, InvalidArgumentFormat
 from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.jobs.cmd_jobs import JobList
 from redfish_ctl.redfish_manager import CommandResult
 from tests.test_utils import create_json_resp

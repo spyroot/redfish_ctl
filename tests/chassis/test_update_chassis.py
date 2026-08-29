@@ -12,7 +12,7 @@ import pytest
 
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate  # noqa: F401
 from redfish_ctl.cmd_exceptions import InvalidArgument, InvalidArgumentFormat
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 

@@ -9,9 +9,9 @@ from conftest import MockRedfishService, _build_fixture_index
 from vendor_corpus import corpus_dir
 
 from redfish_ctl.cmd_exceptions import InvalidArgument
-from redfish_ctl.idrac_manager import IDracManager
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.ilo_manager import IloManager
 from redfish_ctl.oem.cmd_hpe_kerberos_keytab import HpeKerberosKeytabImport
+from redfish_ctl.redfish_api_common import ApiRequestType
 from redfish_ctl.redfish_manager import CommandResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -39,10 +39,10 @@ def hpe_keytab_mock():
         mocker.delete(requests_mock.ANY, text=service.delete_cb)
         service.mocker = mocker
         yield (
-            IDracManager(
-                idrac_ip="mock-hpe-keytab",
-                idrac_username="root",
-                idrac_password="mock",
+            IloManager(
+                host="mock-hpe-keytab",
+                username="root",
+                password="mock",
                 insecure=True,
                 is_debug=False,
             ),
@@ -199,7 +199,14 @@ def test_hpe_keytab_import_missing_target_reports_without_post(
     tmp_path,
 ):
     """A non-HPE fixture reports the missing action and does not POST."""
-    manager, service = redfish_mock_factory("generic")
+    _, service = redfish_mock_factory("generic")
+    manager = IloManager(
+        host="mock-generic",
+        username="root",
+        password="mock",
+        insecure=True,
+        is_debug=False,
+    )
     keytab = tmp_path / "krb5.keytab"
     keytab.write_bytes(b"\x05\x02placeholder-keytab")
 
@@ -221,7 +228,7 @@ def test_hpe_keytab_import_missing_target_reports_without_post(
 
 def test_hpe_keytab_import_exposes_cli_entrypoint():
     """The HPE Kerberos keytab command is wired into the package registry."""
-    registry = IDracManager().get_registry()
+    registry = IloManager().get_registry()
     assert registry[ApiRequestType.HpeKerberosKeytabImport][
         "hpe-kerberos-keytab-import"
     ] is HpeKerberosKeytabImport

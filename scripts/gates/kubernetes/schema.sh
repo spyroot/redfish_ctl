@@ -7,10 +7,20 @@ if ! command -v kubeconform >/dev/null 2>&1; then
   echo "kubernetes.schema: kubeconform not installed in this gate environment" >&2
   exit 1
 fi
-# Validate concrete manifests only. Skip by CONTENT: Helm templates ({{ ... }}) and manifests carrying
-# __PLACEHOLDER__ substitutions (not valid YAML/k8s until rendered). Skip by NAME: a Helm chart's
-# Chart.yaml / values.yaml -- plain YAML but chart metadata, not k8s resources (no 'kind'), so
-# kubeconform rejects them ("missing 'kind' key"). templates/ (rendered elsewhere) and crds/ still flow through.
+if ! command -v helm >/dev/null 2>&1; then
+  echo "kubernetes.schema: helm not installed in this gate environment" >&2
+  exit 1
+fi
+source_commit="${CI_COMMIT_SHA:-}"
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  source_commit="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "kubernetes.schema: exact source commit is unavailable" >&2
+  exit 1
+fi
+# Validate concrete manifests first. Skip Helm templates and placeholder
+# manifests here; rendered chart output is validated separately below.
 files="$(git ls-files 'k8s/**/*.yaml' 'charts/**/*.yaml' | while read -r f; do
   case "$(basename "$f")" in Chart.yaml | values.yaml) continue ;; esac
   grep -qE '\{\{|__[A-Z0-9_]+__' "$f" || echo "$f"
@@ -20,4 +30,18 @@ if [ -z "$files" ]; then
   exit 1
 fi
 echo "$files" | xargs kubeconform -ignore-missing-schemas -summary
-echo "kubernetes.schema: OK ($(echo "$files" | wc -l | tr -d ' ') manifests)"
+helm template redfish-controller charts/redfish-controller \
+  --namespace redfish-system |
+  kubeconform -ignore-missing-schemas -summary
+helm template dmtf-sim charts/dmtf-sim \
+  --namespace dmtf-bmc \
+  --skip-tests \
+  --set-string provenance.sourceCommit="$source_commit" |
+  kubeconform -ignore-missing-schemas -summary
+helm template dmtf-sim charts/dmtf-sim \
+  --namespace dmtf-bmc \
+  --show-only templates/tests/test-connection.yaml \
+  --set-string provenance.sourceCommit="$source_commit" |
+  kubeconform -ignore-missing-schemas -summary
+static_count="$(echo "$files" | wc -l | tr -d ' ')"
+echo "kubernetes.schema: OK (${static_count} static manifests + rendered charts)"
