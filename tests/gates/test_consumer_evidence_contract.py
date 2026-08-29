@@ -440,7 +440,7 @@ def test_dispatch_consumes_builder_full_profile_and_provider_credentials() -> No
 
     proc = _run_check(["--list", "--timeout", "30"])
     assert proc.returncode == 2
-    assert "require --dispatch" in (proc.stdout + proc.stderr)
+    assert "cannot be combined" in (proc.stdout + proc.stderr)
 
 
 def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
