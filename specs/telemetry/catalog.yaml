@@ -1,5 +1,9 @@
 version: 1
 description: Shared exporter self-metric definitions for redfish_ctl telemetry export.
+canary_liveness:
+  metric_prefix: hw.
+  default: always_on
+  condition_gated: []
 metrics:
   - {name: hw.scrape.ok, kind: gauge, prometheus_name: hw.scrape.ok, family: scrape}
   - {name: hw.scrape.duration_seconds, kind: gauge, unit: s, prometheus_name: hw.scrape.duration_seconds, family: scrape}

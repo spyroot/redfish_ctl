@@ -68,6 +68,7 @@
             "enum": [
               "merge",
               "integration",
+              "scheduled",
               "deploy",
               "repository-export"
             ]
