@@ -23,6 +23,10 @@ GITLAB_GLOBAL_KEYS = frozenset({
     "default", "include", "stages", "variables", "workflow", "spec",
     "image", "services", "before_script", "after_script", "cache", "types",
 })
+SMOKE_CLASSES = frozenset({
+    "wiring", "offline-component", "ephemeral-integration",
+    "protected-live", "recovery", "status-reflection",
+})
 
 
 def _load_registry() -> dict:
@@ -140,6 +144,129 @@ def _check_modules() -> tuple[list[str], bool]:
     return failures, True
 
 
+def _real_gitlab_jobs(ci: dict) -> dict:
+    """Return analyzable top-level GitLab jobs from a parsed pipeline.
+
+    :param ci: parsed ``.gitlab-ci.yml`` mapping.
+    :return: real job mappings, excluding global keywords and hidden templates.
+    """
+    return {
+        name: job
+        for name, job in ci.items()
+        if name not in GITLAB_GLOBAL_KEYS
+        and isinstance(job, dict)
+        and not name.startswith(".")
+    }
+
+
+def _script_lines(job: dict) -> list[str]:
+    """Normalize a GitLab job's script into individual command strings.
+
+    :param job: parsed GitLab job mapping.
+    :return: script commands, or an empty list when the job has no script.
+    """
+    script = job.get("script") or []
+    if isinstance(script, str):
+        return [script]
+    return [str(line) for line in script]
+
+
+def _check_smoke_inventory(registry: dict) -> list[str]:
+    """Enforce exact closed-world coverage of the required GitLab jobs.
+
+    :param registry: parsed gate registry containing ``required_jobs``.
+    :return: validation failure messages; empty means the inventory is consistent.
+    """
+    import yaml
+
+    inventory_path = REPO_ROOT / "inventory" / "ci" / "smoke-tests.yaml"
+    ci_path = REPO_ROOT / ".gitlab-ci.yml"
+    if not inventory_path.is_file():
+        return ["CI smoke inventory missing: inventory/ci/smoke-tests.yaml"]
+    if not ci_path.is_file():
+        return ["CI smoke inventory cannot be checked without .gitlab-ci.yml"]
+
+    try:
+        inventory = yaml.safe_load(inventory_path.read_text(encoding="utf-8")) or {}
+        ci = yaml.safe_load(ci_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        return [f"CI smoke inventory input is invalid YAML: {exc}"]
+
+    failures: list[str] = []
+    if inventory.get("apiVersion") != "homelab.embedings.ai/v1alpha1":
+        failures.append("CI smoke inventory apiVersion mismatch")
+    if inventory.get("kind") != "CiSmokeInventory":
+        failures.append("CI smoke inventory kind mismatch")
+
+    spec = inventory.get("spec") or {}
+    records = spec.get("smokeTests") if isinstance(spec, dict) else None
+    if not isinstance(records, list) or not records:
+        return failures + ["CI smoke inventory has no spec.smokeTests records"]
+
+    jobs = [record.get("job") for record in records if isinstance(record, dict)]
+    if len(jobs) != len(records) or any(not isinstance(job, str) or not job for job in jobs):
+        failures.append("every CI smoke record must declare a non-empty job")
+        return failures
+
+    duplicates = sorted({job for job in jobs if jobs.count(job) > 1})
+    if duplicates:
+        failures.append(f"duplicate CI smoke records: {duplicates}")
+
+    required_jobs = set(registry.get("required_jobs") or [])
+    smoke_jobs = set(jobs)
+    missing = sorted(required_jobs - smoke_jobs)
+    extra = sorted(smoke_jobs - required_jobs)
+    if missing:
+        failures.append(f"required CI jobs missing smoke records: {missing}")
+    if extra:
+        failures.append(f"smoke records reference non-required CI jobs: {extra}")
+
+    real_jobs = _real_gitlab_jobs(ci)
+    for record in records:
+        job = record["job"]
+        ci_job = real_jobs.get(job)
+        if ci_job is None:
+            failures.append(f"smoke record references missing GitLab job: {job}")
+            continue
+
+        smoke_class = record.get("class")
+        if smoke_class not in SMOKE_CLASSES:
+            failures.append(f"{job} smoke class is invalid: {smoke_class}")
+
+        command = record.get("command")
+        if not isinstance(command, str) or not command:
+            failures.append(f"{job} smoke command is missing")
+        elif command not in _script_lines(ci_job):
+            failures.append(
+                f"{job} smoke command is stale or not wired in .gitlab-ci.yml: {command}"
+            )
+
+        tools = record.get("requiredTools")
+        if (not isinstance(tools, list) or not tools
+                or any(not isinstance(tool, str) or not tool for tool in tools)
+                or len(tools) != len(set(tools))):
+            failures.append(f"{job} requiredTools must be a non-empty unique string list")
+
+        artifact = record.get("artifactUnderTest")
+        if (not isinstance(artifact, dict) or not artifact.get("type")
+                or not artifact.get("digestSource")):
+            failures.append(f"{job} artifactUnderTest needs type and digestSource")
+
+        if record.get("mutation") in (None, ""):
+            failures.append(f"{job} mutation classification is missing")
+        timeout = record.get("timeoutSeconds")
+        if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 3600:
+            failures.append(f"{job} timeoutSeconds must be an integer from 1 through 3600")
+        if record.get("evidencePath") != f"reports/smoke/{job}.json":
+            failures.append(f"{job} evidencePath must be reports/smoke/{job}.json")
+        if record.get("cleanupPolicy") in (None, "", "none", "not-applicable"):
+            failures.append(f"{job} cleanupPolicy is missing")
+        if record.get("releaseBlocking") is not True:
+            failures.append(f"{job} smoke must be releaseBlocking")
+
+    return failures
+
+
 def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     """Checks 4, 5 & 8 against ``.gitlab-ci.yml`` when it exists.
 
@@ -159,11 +286,8 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
             "gitlab: top-level 'include:' makes the pipeline unanalyzable by the meta-gate — jobs "
             "can be defined outside .gitlab-ci.yml; inline them or teach the meta-gate to resolve it")
     default_tags = (ci.get("default") or {}).get("tags") or []
-    real_jobs = {}
-    for name, job in ci.items():
-        if name in GITLAB_GLOBAL_KEYS or not isinstance(job, dict) or name.startswith("."):
-            continue  # reserved global keyword or hidden template, not a job
-        real_jobs[name] = job
+    real_jobs = _real_gitlab_jobs(ci)
+    for name, job in real_jobs.items():
         if job.get("allow_failure") is True:
             failures.append(f"gitlab job {name}: allow_failure:true is forbidden")
         tags = job["tags"] if "tags" in job else default_tags
@@ -203,7 +327,8 @@ def run() -> tuple[bool, list[str], list[str]]:
     """
     registry = _load_registry()
     failures = (_check_commands(registry) + _check_mandatory_ids(registry)
-                + _check_no_unregistered_scripts(registry))
+                + _check_no_unregistered_scripts(registry)
+                + _check_smoke_inventory(registry))
     skipped: list[str] = []
     mod_fail, mod_ran = _check_modules()
     failures += mod_fail

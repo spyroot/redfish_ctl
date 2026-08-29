@@ -39,8 +39,12 @@ _AGENT_FILE_GLOBS = [
 _AGENT_DIR_PREFIXES = (".codex/", ".claude/", ".agent-review/", ".internal/",
                        "docs/internal/", "inventory/")
 
-# inventory/ci/go-no-go.yaml is the public standards GoNoGoProfile binding.
-_ALLOWED_AGENT_FILE_PATHS = {"inventory/ci/go-no-go.yaml"}
+# These files are the public standards CI bindings allowed under the otherwise
+# private inventory tree.
+_ALLOWED_AGENT_FILE_PATHS = {
+    "inventory/ci/go-no-go.yaml",
+    "inventory/ci/smoke-tests.yaml",
+}
 
 # Agent-tool names (word-bounded) plus specialist-agent role names (either separator).
 _IDENTITIES = [
