@@ -92,6 +92,10 @@ python setup.py --version
 
 ## Build
 
+Activate the `redfish_ctl` conda environment defined by `environment.yml`; it
+provides the required `setuptools`, `wheel`, and `twine` build tools. Create it
+first with `conda env create -f environment.yml` when it is not already present.
+
 ```bash
 python setup.py sdist bdist_wheel
 python -m twine check dist/*
