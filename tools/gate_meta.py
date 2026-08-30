@@ -17,8 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 LIFECYCLE = ("validate", "plan", "apply", "verify", "rollback")
 
 # GitLab's reserved top-level keywords. Everything else at the top level of .gitlab-ci.yml is a job,
-# whether or not it declares an inline ``script`` — so the job checks must
-# exclude these by NAME and never by the presence of a job keyword.
+# whether or not it declares an inline ``script`` — so the job checks must exclude these by NAME and
+# never by the presence of a job keyword.
 GITLAB_GLOBAL_KEYS = frozenset({
     "default", "include", "stages", "variables", "workflow", "spec",
     "image", "services", "before_script", "after_script", "cache", "types",
@@ -27,9 +27,13 @@ SMOKE_CLASSES = frozenset({
     "wiring", "offline-component", "ephemeral-integration",
     "protected-live", "recovery", "status-reflection",
 })
-BUILDER_INCLUDE_PROJECT = "spyroot/builder"
-BUILDER_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
-BUILDER_IMPORTED_JOBS = frozenset({"project-ci-cpu-validation"})
+PROJECT_CI_SELECTOR_DENY = (
+    '($FOCUSED_GATE != null && $FOCUSED_GATE != "") || '
+    '$MERGE_PROFILE == "merge" || '
+    '(($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") && '
+    '$PROJECT_CI_PROFILE != "protected") || '
+    '($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")'
+)
 
 
 def _load_registry() -> dict:
@@ -70,9 +74,8 @@ def _load_registry() -> dict:
 def _check_commands(registry: dict) -> list[str]:
     """Checks 1 & 2: every gate command exists and is executable.
 
-    Optional gates are checked too. ``required: false`` used to skip the check,
-    so a registry row could name a missing or non-executable path that only
-    failed when the profile actually ran in CI.
+    Optional gates are checked too. ``required: false`` used to skip the check, so a registry row could
+    name a missing or non-executable path that only blew up when the profile actually ran in CI.
 
     :param registry: the parsed gate registry.
     :return: list of failure messages.
@@ -211,6 +214,24 @@ def _trusted_include_contract(
     return identities, templates
 
 
+def _trusted_external_jobs(registry: dict) -> dict[str, dict]:
+    """Return concrete jobs supplied by exact trusted provider includes.
+
+    Concrete provider jobs are not present in the consumer YAML before GitLab
+    resolves the include. Their closed-world contract therefore lives beside
+    the immutable include identity and is used for required-job and smoke
+    coverage without copying the provider job into this repository.
+
+    :param registry: parsed gate registry containing ``trusted_includes``.
+    :return: external job contracts keyed by exact job name.
+    """
+    jobs: dict[str, dict] = {}
+    for include in registry.get("trusted_includes") or []:
+        for job in include.get("jobs") or []:
+            jobs[job["name"]] = job
+    return jobs
+
+
 def _check_trusted_includes(
     ci: dict, registry: dict
 ) -> tuple[list[str], dict[str, dict]]:
@@ -288,9 +309,14 @@ def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
 
     :param job: parsed local wrapper job.
     :param protected_when: required protected-ref behavior from the registry.
-    :return: True only for MR deny, protected-ref action, then terminal deny.
+    :return: True only for project-ci validation selector deny, MR deny,
+        protected-ref action, then terminal deny.
     """
     return (job.get("rules") or []) == [
+        {
+            "if": PROJECT_CI_SELECTOR_DENY,
+            "when": "never",
+        },
         {
             "if": '$CI_PIPELINE_SOURCE == "merge_request_event"',
             "when": "never",
@@ -304,43 +330,6 @@ def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
         },
         {"when": "never"},
     ]
-
-
-def _builder_resource_include_failures(ci: dict, registry: dict) -> list[str]:
-    """Validate the imported CI job against the tracked Builder binding."""
-    import yaml
-
-    if "project-ci-cpu-validation" not in (registry.get("required_jobs") or []):
-        return []
-    binding_path = REPO_ROOT / "builder-binding.yaml"
-    if not binding_path.is_file():
-        return ["Builder include requires tracked builder-binding.yaml"]
-    binding = yaml.safe_load(binding_path.read_text(encoding="utf-8")) or {}
-    revision = (((binding.get("spec") or {}).get("source") or {}).get("revision"))
-    raw_includes = ci.get("include") or []
-    includes = raw_includes if isinstance(raw_includes, list) else [raw_includes]
-    identities = {_include_key(include) for include in includes}
-    expected = (BUILDER_INCLUDE_PROJECT, revision, BUILDER_INCLUDE_FILE)
-    if expected not in identities:
-        return [
-            "gitlab: CI resource include must use the exact Builder revision "
-            "declared by builder-binding.yaml"
-        ]
-    command = (ci.get("variables") or {}).get("PROJECT_CI_CPU_COMMAND")
-    entrypoint = REPO_ROOT / "scripts" / "project_ci_entrypoint.sh"
-    if command != "./scripts/project_ci_entrypoint.sh":
-        return ["gitlab: PROJECT_CI_CPU_COMMAND must select the project CI adapter"]
-    if not entrypoint.is_file() or not (entrypoint.stat().st_mode & 0o111):
-        return ["gitlab: project CI adapter is missing or not executable"]
-    return []
-
-
-def _artifact_paths(job: dict) -> set[str]:
-    """Return normalized artifact paths for one local GitLab job or overlay."""
-    paths = ((job.get("artifacts") or {}).get("paths") or [])
-    if isinstance(paths, str):
-        return {paths}
-    return {str(path) for path in paths}
 
 
 def _check_smoke_inventory(registry: dict) -> list[str]:
@@ -394,9 +383,10 @@ def _check_smoke_inventory(registry: dict) -> list[str]:
         failures.append(f"smoke records reference non-required CI jobs: {extra}")
 
     real_jobs = _real_gitlab_jobs(ci)
+    external_jobs = _trusted_external_jobs(registry)
     for record in records:
         job = record["job"]
-        ci_job = real_jobs.get(job)
+        ci_job = real_jobs.get(job) or external_jobs.get(job)
         if ci_job is None:
             failures.append(f"smoke record references missing GitLab job: {job}")
             continue
@@ -408,7 +398,7 @@ def _check_smoke_inventory(registry: dict) -> list[str]:
         command = record.get("command")
         if not isinstance(command, str) or not command:
             failures.append(f"{job} smoke command is missing")
-        elif command not in _script_lines(ci_job) and job not in BUILDER_IMPORTED_JOBS:
+        elif command not in _script_lines(ci_job):
             failures.append(
                 f"{job} smoke command is stale or not wired in .gitlab-ci.yml: {command}"
             )
@@ -453,9 +443,45 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     runner_tag = registry.get("runner_tag", "homelab-k8s")
     failures, trusted_templates = _check_trusted_includes(ci, registry)
-    failures += _builder_resource_include_failures(ci, registry)
+    trusted_external_jobs = _trusted_external_jobs(registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
+    external_names = [
+        job["name"]
+        for include in registry.get("trusted_includes") or []
+        for job in include.get("jobs") or []
+    ]
+    duplicate_external_names = sorted(
+        {name for name in external_names if external_names.count(name) > 1}
+    )
+    if duplicate_external_names:
+        failures.append(
+            f"duplicate trusted external jobs: {duplicate_external_names}"
+        )
+    for name, contract in trusted_external_jobs.items():
+        if name in real_jobs:
+            failures.append(
+                f"gitlab job {name}: local definition shadows a trusted concrete provider job"
+            )
+        if contract.get("required") is not True:
+            failures.append(f"gitlab job {name}: trusted provider job must be required")
+        if contract.get("allowFailure") is not False:
+            failures.append(
+                f"gitlab job {name}: trusted provider job must set allowFailure:false"
+            )
+        if contract.get("mutates") is not False:
+            failures.append(
+                f"gitlab job {name}: mutating concrete provider jobs require "
+                "a local protected wrapper"
+            )
+        if runner_tag not in (contract.get("tags") or []):
+            failures.append(
+                f"gitlab job {name}: trusted provider job is missing runner tag '{runner_tag}'"
+            )
+        if not contract.get("stage") or not contract.get("script"):
+            failures.append(
+                f"gitlab job {name}: trusted provider job lacks analyzable stage or script"
+            )
     for name, job in real_jobs.items():
         if job.get("allow_failure") is True:
             failures.append(f"gitlab job {name}: allow_failure:true is forbidden")
@@ -496,15 +522,6 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
                 failures.append(
                     f"gitlab job {name}: trusted external job must declare a local stage")
         else:
-            if name in BUILDER_IMPORTED_JOBS:
-                if "tags" not in job:
-                    failures.append(
-                        f"gitlab job {name}: imported job overlay must declare local runner tags"
-                    )
-                if job.get("allow_failure") is not False:
-                    failures.append(
-                        f"gitlab job {name}: imported job overlay must declare allow_failure:false"
-                    )
             protected_action = any(
                 token in name
                 for token in ("apply", "deploy", "publish", "rollback")
@@ -513,7 +530,7 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
                 failures.append(
                     f"gitlab job {name}: mutation is not explicitly denied "
                     "in a merge-request pipeline")
-            if "script" not in job and name not in BUILDER_IMPORTED_JOBS:
+            if "script" not in job:
                 failures.append(
                     f"gitlab job {name}: no script — not analyzable, inline the job body")
     required_jobs = registry.get("required_jobs") or []
@@ -521,19 +538,18 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
         failures.append(
             "registry declares no required_jobs while .gitlab-ci.yml exists — the required-jobs "
             "check would silently pass")
+    known_jobs = set(real_jobs) | set(trusted_external_jobs)
     for required in required_jobs:
-        if required not in real_jobs:
+        if required not in known_jobs:
             failures.append(f"required GitLab job missing: {required}")
-            continue
-        paths = _artifact_paths(real_jobs[required])
-        expected_ci = f"reports/ci/{required}.json"
-        expected_smoke = f"reports/smoke/{required}.json"
-        if expected_ci not in paths:
-            failures.append(f"required GitLab job {required}: missing artifact {expected_ci}")
-        if expected_smoke not in paths:
-            failures.append(f"required GitLab job {required}: missing artifact {expected_smoke}")
+    undeclared_external_jobs = sorted(set(trusted_external_jobs) - set(required_jobs))
+    if undeclared_external_jobs:
+        failures.append(
+            "trusted required provider jobs are absent from required_jobs: "
+            f"{undeclared_external_jobs}"
+        )
     for diagnostic in registry.get("diagnostic_jobs") or []:
-        if diagnostic not in real_jobs:
+        if diagnostic not in known_jobs:
             failures.append(f"diagnostic GitLab job missing: {diagnostic}")
     return failures, True
 

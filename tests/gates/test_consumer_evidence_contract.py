@@ -30,7 +30,6 @@ from tools.ci_evidence import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
-PROJECT_CI_ENTRYPOINT = REPO_ROOT / "scripts" / "project_ci_entrypoint.sh"
 SANITIZER = REPO_ROOT / "scripts" / "gates" / "evidence" / "sanitized.sh"
 CI_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "ci-evidence.schema.json"
 SMOKE_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "smoke-evidence.schema.json"
@@ -816,155 +815,6 @@ def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> Non
     assert "--dry-run" in output
 
 
-def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
-    """The imported Builder job cannot accept two independent selectors."""
-    proc = subprocess.run(
-        [str(PROJECT_CI_ENTRYPOINT)],
-        cwd=REPO_ROOT,
-        env={
-            **_off_cluster_env(),
-            "FOCUSED_GATE": "unit.all",
-            "PROJECT_CI_PROFILE": "full",
-        },
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    assert proc.returncode == 2
-    assert "mutually exclusive" in (proc.stdout + proc.stderr)
-
-
-def test_project_ci_entrypoint_accepts_focused_builder_profile(tmp_path: Path) -> None:
-    """The Builder focused profile delegates the unit.all default gate."""
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    adapter = scripts / PROJECT_CI_ENTRYPOINT.name
-    shutil.copyfile(PROJECT_CI_ENTRYPOINT, adapter)
-    adapter.chmod(0o755)
-    check = scripts / "check.sh"
-    check.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$@"\n', encoding="utf-8")
-    check.chmod(0o755)
-    proc = subprocess.run(
-        [str(adapter)],
-        cwd=tmp_path,
-        env={
-            **_off_cluster_env(),
-            "PROJECT_CI_PROFILE": "focused",
-        },
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    assert proc.returncode == 0
-    assert proc.stdout.splitlines() == ["--profile", "merge", "--gate", "unit.all"]
-
-
-def test_project_ci_entrypoint_help_needs_no_external_commands() -> None:
-    """Help is a dependency-free contract inspection, never a gate execution."""
-    proc = subprocess.run(
-        ["/bin/bash", str(PROJECT_CI_ENTRYPOINT), "--help"],
-        cwd=REPO_ROOT,
-        env={"PATH": ""},
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert proc.returncode == 0
-    assert "usage: project_ci_entrypoint.sh" in proc.stdout
-    assert proc.stderr == ""
-
-
-def test_project_ci_entrypoint_dry_run_supports_sanitized_logging(
-    tmp_path: Path,
-) -> None:
-    """Dry-run emits a machine result and secures optional diagnostics."""
-    log_file = tmp_path / "selector.jsonl"
-    proc = subprocess.run(
-        [
-            str(PROJECT_CI_ENTRYPOINT),
-            "--dry-run",
-            "--log-format",
-            "json",
-            "--log-level",
-            "info",
-            "--log-file",
-            str(log_file),
-            "--run-id",
-            "ci-17",
-        ],
-        cwd=REPO_ROOT,
-        env={**_off_cluster_env(), "PROJECT_CI_PROFILE": "focused"},
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert proc.returncode == 0
-    assert json.loads(proc.stdout) == {
-        "status": "dry-run",
-        "profile": "merge",
-        "gate": "unit.all",
-        "run_id": "ci-17",
-    }
-    diagnostic = json.loads(proc.stderr)
-    assert diagnostic["component"] == "project-ci-entrypoint"
-    assert diagnostic["result"] == "unit.all"
-    assert json.loads(log_file.read_text(encoding="utf-8")) == diagnostic
-    assert log_file.stat().st_mode & 0o777 == 0o600
-
-
-def test_project_ci_log_setup_restores_the_caller_umask(tmp_path: Path) -> None:
-    """Securing one log file must not alter later gate artifact permissions."""
-    log_file = tmp_path / "selector.log"
-    command = (
-        'umask 022; source "$1"; project_ci_log_file="$2"; '
-        "project_ci_prepare_log_file; umask"
-    )
-    proc = subprocess.run(
-        [
-            "/bin/bash",
-            "-c",
-            command,
-            "bash",
-            str(PROJECT_CI_ENTRYPOINT),
-            str(log_file),
-        ],
-        cwd=REPO_ROOT,
-        env=_off_cluster_env(),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.strip() == "0022"
-    assert log_file.stat().st_mode & 0o777 == 0o600
-
-
-def test_project_ci_entrypoint_rejects_unknown_flags_without_reflection() -> None:
-    """Unknown input fails before selection and is not copied into diagnostics."""
-    unsafe = "gl" + "pat-" + ("A" * 24)
-    proc = subprocess.run(
-        [str(PROJECT_CI_ENTRYPOINT), unsafe],
-        cwd=REPO_ROOT,
-        env=_off_cluster_env(),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert proc.returncode == 2
-    assert unsafe not in (proc.stdout + proc.stderr)
-    assert "unexpected argument" in proc.stderr
-
-
 def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:
     """Required unit evidence deselects hardware, emulator, and schema lanes."""
     source = (REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh").read_text(
@@ -1086,5 +936,5 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert resource_identity in include_identities
     assert "@sha256:" in ci["default"]["image"]
     assert ci["variables"]["PROJECT_CI_CPU_COMMAND"] == (
-        "./scripts/project_ci_entrypoint.sh"
+        "./tools/project-ci-cpu-validation.sh"
     )

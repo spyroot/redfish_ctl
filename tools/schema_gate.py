@@ -154,7 +154,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
     if not IMMUTABLE_IMAGE.fullmatch(default_image):
         raise SchemaGateError(".gitlab-ci.yml default image is not digest-pinned")
     project_command = str((ci.get("variables") or {}).get("PROJECT_CI_CPU_COMMAND", ""))
-    if project_command != "./scripts/project_ci_entrypoint.sh":
+    if project_command != "./tools/project-ci-cpu-validation.sh":
         raise SchemaGateError("PROJECT_CI_CPU_COMMAND does not select the project CI adapter")
     project_entrypoint = REPO_ROOT / project_command.removeprefix("./")
     if not project_entrypoint.is_file() or not (project_entrypoint.stat().st_mode & 0o111):

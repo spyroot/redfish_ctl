@@ -7,15 +7,15 @@
 # Job rules below isolate diagnostic, merge, integration, protected deployment,
 # scheduled canary, and publication paths. Operator guidance lives in
 # docs/external/ci.md.
+stages: [project-ci-validation, validate, integration, deploy, publish]
+
 include:
   - project: spyroot/builder
-    ref: f210055901973997a4c6c1fbf1fff189aa871bd9
-    file: /ci/templates/project-ci-resource-jobs.yml
-  - project: spyroot/builder
-    ref: bdf2c0c23332814075d7d3809ecffe09c37d1800
+    ref: 1511171608f913833004e29558468d8e481fd947
     file: /ci/templates/project-service.yml
-
-stages: [project-ci-validation, validate, integration, deploy, publish]
+  - project: spyroot/builder
+    ref: 1511171608f913833004e29558468d8e481fd947
+    file: /ci/templates/project-ci-resource-jobs.yml
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
 # git-lfs, gate tools); this project supplies its dependencies via environment.yml.
@@ -41,14 +41,13 @@ variables:
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
+  EXPECTED_PROVIDER_REVISION: 1511171608f913833004e29558468d8e481fd947
+  PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
   BUILDER_PROJECT_CONSUMER: redfish_ctl
   DMTF_RELEASE: "2026.1"
   PROJECT_LIVE_TEST_COMMAND: >-
     pytest -q -m dmtf_sim_live
     tests/k8s/test_dmtf_sim_live.py::test_dmtf_service_root
-  # The exact Builder include invokes this project-owned selector. It chooses
-  # one FOCUSED_GATE or the complete merge profile and nothing else.
-  PROJECT_CI_CPU_COMMAND: ./scripts/project_ci_entrypoint.sh
 
 .private-api-web:
   rules:
@@ -63,16 +62,7 @@ variables:
       if: >-
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
-        ($PROJECT_CI_PROFILE == null || $PROJECT_CI_PROFILE == "") &&
-        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
         $FOCUSED_GATE != null && $FOCUSED_GATE != ""
-    - &builder-focused-dispatch
-      if: >-
-        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
-        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
-        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
-        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
-        $PROJECT_CI_PROFILE == "focused"
 
 .merge-profile-dispatch:
   rules:
@@ -81,32 +71,29 @@ variables:
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
         ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
-        ($PROJECT_CI_PROFILE == null || $PROJECT_CI_PROFILE == "") &&
         $MERGE_PROFILE == "merge"
 
-focused-gate:
-  stage: validate
-  tags: [homelab-k8s]
+.project-ci-selector-deny:
   rules:
-    - *focused-dispatch
-    - *builder-focused-dispatch
-    - when: never
-  script:
-    # A focused result proves only this gate at this commit. It is not merge or release evidence.
-    - ./scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"
-  artifacts:
-    when: always
-    paths:
-      - reports/ci/focused-gate.json
-      - reports/gates/
+    - &project-ci-selector-deny
+      if: >-
+        ($FOCUSED_GATE != null && $FOCUSED_GATE != "") ||
+        $MERGE_PROFILE == "merge" ||
+        (($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") &&
+        $PROJECT_CI_PROFILE != "protected") ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+      when: never
 
 gate-merge:
   stage: validate
   tags: [homelab-k8s]
   rules:
-    - <<: *focused-dispatch
+    - if: >-
+        $PROJECT_CI_PROFILE == "focused" ||
+        $PROJECT_CI_PROFILE == "full" ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
       when: never
-    - <<: *builder-focused-dispatch
+    - <<: *focused-dispatch
       when: never
     - *merge-profile-dispatch
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -137,28 +124,6 @@ gate-integration:
       - reports/ci/gate-integration.json
       - reports/gates/
       - reports/smoke/gate-integration.json
-
-# The exact-revision Builder include owns this job's command. This overlay keeps
-# the required imported job full-profile only; focused diagnostics use the
-# local focused-gate job and cannot omit this job's required smoke artifact.
-project-ci-cpu-validation:
-  stage: project-ci-validation
-  tags: [homelab-k8s, homelab-k8s-validation]
-  allow_failure: false
-  rules:
-    - if: >-
-        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
-        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
-        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
-        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
-        $PROJECT_CI_PROFILE == "full"
-    - when: never
-  artifacts:
-    when: always
-    paths:
-      - reports/ci/project-ci-cpu-validation.json
-      - reports/gates/
-      - reports/smoke/project-ci-cpu-validation.json
 
 gate-scheduled:
   stage: integration
@@ -217,6 +182,7 @@ project-service-image-publish:
       git lfs pull
       --include='spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip'
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -233,6 +199,7 @@ project-service-chart-publish:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -249,6 +216,7 @@ project-service-deploy-plan:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -265,6 +233,7 @@ project-service-deploy:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -281,6 +250,7 @@ project-service-verify:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -296,6 +266,7 @@ project-service-live-test:
   tags: [homelab-k8s, homelab-k8s-validation]
   allow_failure: false
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -312,6 +283,7 @@ project-service-rollback:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-
@@ -328,6 +300,7 @@ project-service-release-evidence:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: >-

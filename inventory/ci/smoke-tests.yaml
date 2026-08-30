@@ -6,11 +6,11 @@ spec:
   smokeTests:
     - job: project-ci-cpu-validation
       class: wiring
-      command: bash -lc "$PROJECT_CI_CPU_COMMAND"
-      requiredTools: [bash, conda, git, git-lfs, python3]
+      command: 'bash -lc "$PROJECT_CI_CPU_COMMAND"'
+      requiredTools: [bash, conda, git, git-lfs, jq, python3, setsid]
       artifactUnderTest:
-        type: repository
-        digestSource: git-commit
+        type: repository-and-provider-resource-job
+        digestSource: git-commit-and-builder-revision
       mutation: none
       timeoutSeconds: 3600
       evidencePath: reports/smoke/project-ci-cpu-validation.json

@@ -7,7 +7,7 @@ spec:
     localPath: /Users/spyroot/dev/builder
     repository: https://gitlab.rnd.embedings.ai/spyroot/builder
     canonicalId: spyroot/builder
-    revision: f210055901973997a4c6c1fbf1fff189aa871bd9
+    revision: 1511171608f913833004e29558468d8e481fd947
   contract:
     path: docs/agents/contracts/builder-provider.md
   discovery:

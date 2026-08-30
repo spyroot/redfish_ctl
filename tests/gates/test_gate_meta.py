@@ -5,15 +5,30 @@ import re
 import textwrap
 from pathlib import Path
 
-import pytest
 import yaml
 
 from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
+EXPECTED_BUILDER_REF = "1511171608f913833004e29558468d8e481fd947"
 BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
-BUILDER_RESOURCE_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
+BUILDER_RESOURCE_JOBS_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
+PROJECT_CI_CPU_JOB = "project-ci-cpu-validation"
+BUILDER_INCLUDE_FILES = {
+    BUILDER_PROJECT_INCLUDE_FILE,
+    BUILDER_RESOURCE_JOBS_INCLUDE_FILE,
+}
+PROJECT_SERVICE_JOB_ORDER = [
+    "project-service-image-publish",
+    "project-service-chart-publish",
+    "project-service-deploy-plan",
+    "project-service-deploy",
+    "project-service-verify",
+    "project-service-live-test",
+    "project-service-rollback",
+    "project-service-release-evidence",
+]
 PROJECT_SERVICE_JOBS = {
     "project-service-image-publish": ".builder-project-image-publish",
     "project-service-chart-publish": ".builder-project-chart-publish",
@@ -37,8 +52,7 @@ def _ci_config() -> dict:
     return yaml.safe_load(CI_FILE.read_text(encoding="utf-8"))
 
 
-def _gitlab_jobs(*, include_imported_overlays: bool = False) -> dict:
-    """Return local jobs, optionally including imported-job overlays."""
+def _gitlab_jobs() -> dict:
     ci = _ci_config()
     return {
         name: job
@@ -46,10 +60,6 @@ def _gitlab_jobs(*, include_imported_overlays: bool = False) -> dict:
         if name not in gate_meta.GITLAB_GLOBAL_KEYS
         and isinstance(job, dict)
         and not name.startswith(".")
-        and (
-            include_imported_overlays
-            or name not in gate_meta.BUILDER_IMPORTED_JOBS
-        )
     }
 
 
@@ -105,24 +115,43 @@ def _check_temp_gitlab(
 
 
 def _registry_trusted_include() -> dict:
-    """Return the trusted project-service include from the live registry."""
+    """Return the trusted project-service include declared by the live gate registry."""
+    return _registry_trusted_includes()[BUILDER_PROJECT_INCLUDE_FILE]
+
+
+def _registry_trusted_includes() -> dict[str, dict]:
+    """Return the exact Builder includes declared by the live gate registry."""
     registry = gate_meta._load_registry()
     records = registry.get("trusted_includes") or []
-    matches = [
-        record for record in records
-        if record.get("file") == BUILDER_PROJECT_INCLUDE_FILE
-    ]
-    assert len(matches) == 1, "the project-service include must be single-sourced"
-    include = matches[0]
-    assert include["project"] == "spyroot/builder"
-    assert include["file"] == BUILDER_PROJECT_INCLUDE_FILE
-    assert re.fullmatch(r"[0-9a-f]{40}", include["ref"])
-    contracts = {item["name"]: item["mutates"] for item in include["templates"]}
+    by_file = {include.get("file"): include for include in records}
+    assert len(records) == len(BUILDER_INCLUDE_FILES), "unexpected duplicate provider includes"
+    assert set(by_file) == BUILDER_INCLUDE_FILES, (
+        "the provider include contract must consume project-service and resource templates"
+    )
+    for include in by_file.values():
+        assert include["project"] == "spyroot/builder"
+        assert include["ref"] == EXPECTED_BUILDER_REF
+        assert re.fullmatch(r"[0-9a-f]{40}", include["ref"])
+
+    service_include = by_file[BUILDER_PROJECT_INCLUDE_FILE]
+    contracts = {item["name"]: item["mutates"] for item in service_include["templates"]}
     assert set(contracts) == PROJECT_SERVICE_TEMPLATE_NAMES
     assert {
         name for name, mutates in contracts.items() if mutates
     } == MUTATING_PROJECT_SERVICE_TEMPLATES
-    return include
+    resource_jobs = by_file[BUILDER_RESOURCE_JOBS_INCLUDE_FILE].get("jobs") or []
+    assert [job["name"] for job in resource_jobs] == [PROJECT_CI_CPU_JOB]
+    resource_job = resource_jobs[0]
+    assert resource_job["required"] is True
+    assert resource_job["mutates"] is False
+    assert resource_job["allowFailure"] is False
+    assert "homelab-k8s" in resource_job["tags"]
+    assert re.fullmatch(
+        r"harbor\.rnd\.embedings\.ai/spyroot/builder/toolbox@sha256:[0-9a-f]{64}",
+        resource_job["image"],
+    )
+    assert 'bash -lc "$PROJECT_CI_CPU_COMMAND"' in resource_job["script"]
+    return by_file
 
 
 _ALLOWED_GITLAB_EXPR_NODES = (
@@ -208,11 +237,7 @@ def _job_selected(job: dict, variables: dict[str, str | None]) -> bool:
     return False
 
 
-def _selected_jobs(
-    *,
-    include_imported_overlays: bool = False,
-    **overrides: str | None,
-) -> list[str]:
+def _selected_jobs(**overrides: str | None) -> list[str]:
     variables: dict[str, str | None] = {
         "CI_SERVER_HOST": "gitlab.rnd.embedings.ai",
         "CI_PIPELINE_SOURCE": "push",
@@ -221,15 +246,11 @@ def _selected_jobs(
         "CI_COMMIT_REF_PROTECTED": "false",
         "FOCUSED_GATE": None,
         "MERGE_PROFILE": None,
+        "PROJECT_CI_PROFILE": None,
+        "PROJECT_CI_SMOKE": None,
     }
     variables.update(overrides)
-    return [
-        name
-        for name, job in _gitlab_jobs(
-            include_imported_overlays=include_imported_overlays
-        ).items()
-        if _job_selected(job, variables)
-    ]
+    return [name for name, job in _gitlab_jobs().items() if _job_selected(job, variables)]
 
 
 def _profile_enum(node):
@@ -293,33 +314,30 @@ def test_every_gate_declares_profile_and_mutates():
         assert isinstance(gate.get("mutates"), bool), f"{gate.get('id')} lacks a bool 'mutates'"
 
 
-def test_registry_declares_exactly_one_diagnostic_focused_gate_job() -> None:
-    """The focused CI job is diagnostic-only and cannot replace required merge evidence."""
+def test_registry_requires_the_builder_cpu_resource_job() -> None:
+    """The exact provider job is required and has one closed-world smoke record."""
     registry = gate_meta._load_registry()
-    assert registry.get("diagnostic_jobs") == ["focused-gate"]
-    assert "focused-gate" not in registry.get("required_jobs", [])
+    assert registry.get("diagnostic_jobs") is None
+    assert PROJECT_CI_CPU_JOB in registry.get("required_jobs", [])
+
+    smoke_inventory = yaml.safe_load(
+        (REPO_ROOT / "inventory" / "ci" / "smoke-tests.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    smoke_jobs = [record["job"] for record in smoke_inventory["spec"]["smokeTests"]]
+    assert smoke_jobs.count(PROJECT_CI_CPU_JOB) == 1
 
 
 def test_registry_pins_exact_builder_project_service_include() -> None:
-    """The trusted project-service include is a registry-declared exact commit."""
-    _registry_trusted_include()
-
-
-def test_registry_pins_builder_resource_include_to_provider_binding() -> None:
-    """The imported CI job uses the exact tracked Builder provider revision."""
-    registry = gate_meta._load_registry()
-    records = registry.get("trusted_includes") or []
-    matches = [
-        record for record in records
-        if record.get("file") == BUILDER_RESOURCE_INCLUDE_FILE
-    ]
-    assert len(matches) == 1, "the CI resource include must be single-sourced"
+    """Both trusted provider includes are registry-declared exact commits."""
+    includes = _registry_trusted_includes()
     binding = yaml.safe_load(
         (REPO_ROOT / "builder-binding.yaml").read_text(encoding="utf-8")
     )
-    assert matches[0]["project"] == "spyroot/builder"
-    assert matches[0]["ref"] == binding["spec"]["source"]["revision"]
-    assert matches[0]["templates"] == []
+    provider_revision = binding["spec"]["source"]["revision"]
+    assert provider_revision == EXPECTED_BUILDER_REF
+    assert {record["ref"] for record in includes.values()} == {provider_revision}
 
 
 def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
@@ -345,23 +363,24 @@ def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
           stage: validate
           tags: [homelab-k8s]
           script: [./scripts/check.sh --profile merge]
-          artifacts:
-            paths:
-              - reports/ci/gate-merge.json
-              - reports/smoke/gate-merge.json
 
         project-service-deploy-plan:
           stage: validate
           tags: [homelab-k8s]
           allow_failure: false
-          artifacts:
-            paths:
-              - reports/ci/project-service-deploy-plan.json
-              - reports/smoke/project-service-deploy-plan.json
           rules:
+            - if: >-
+                ($FOCUSED_GATE != null && $FOCUSED_GATE != "") ||
+                $MERGE_PROFILE == "merge" ||
+                (($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") &&
+                $PROJECT_CI_PROFILE != "protected") ||
+                ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+              when: never
             - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
               when: never
-            - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+            - if: >-
+                $CI_COMMIT_REF_PROTECTED == "true" &&
+                $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
               when: on_success
             - when: never
           extends: .builder-project-deploy-plan
@@ -503,7 +522,8 @@ def test_meta_gate_rejects_early_rules_for_every_provider_mutation(
 
 def test_gitlab_consumes_builder_project_service_contract_without_local_secrets() -> None:
     """The real pipeline wires the exact include and local project-service wrappers."""
-    trusted_include = _registry_trusted_include()
+    trusted_includes = _registry_trusted_includes()
+    trusted_include = trusted_includes[BUILDER_PROJECT_INCLUDE_FILE]
     ci = _ci_config()
     raw_includes = ci.get("include") or []
     includes = raw_includes if isinstance(raw_includes, list) else [raw_includes]
@@ -513,11 +533,11 @@ def test_gitlab_consumes_builder_project_service_contract_without_local_secrets(
         if gate_meta._include_key(include) is not None
     }
 
-    assert (
-        trusted_include["project"],
-        trusted_include["ref"],
-        trusted_include["file"],
-    ) in include_identities
+    expected_include_identities = {
+        (include["project"], include["ref"], include["file"])
+        for include in trusted_includes.values()
+    }
+    assert include_identities == expected_include_identities
 
     jobs = _gitlab_jobs()
     missing_jobs = sorted(set(PROJECT_SERVICE_JOBS) - set(jobs))
@@ -553,106 +573,156 @@ def test_gitlab_consumes_builder_project_service_contract_without_local_secrets(
     assert "DSP2043_2026.1.zip" in image_publish_setup
 
 
+def test_gitlab_project_service_variables_bind_builder_revision_and_live_suite() -> None:
+    """The consumer passes exact provider identity and the DMTF live command to Builder."""
+    variables = _ci_config().get("variables") or {}
+
+    assert variables.get("EXPECTED_PROVIDER_REVISION") == EXPECTED_BUILDER_REF
+    assert variables.get("PROJECT_CI_CPU_COMMAND") == (
+        "./tools/project-ci-cpu-validation.sh"
+    )
+    assert variables.get("BUILDER_PROJECT_CONSUMER") == "redfish_ctl"
+    assert variables.get("DMTF_RELEASE") == "2026.1"
+    assert variables.get("PROJECT_LIVE_TEST_COMMAND") == (
+        "pytest -q -m dmtf_sim_live "
+        "tests/k8s/test_dmtf_sim_live.py::test_dmtf_service_root"
+    )
+
+
+def test_gitlab_uses_digest_pinned_builder_images_for_project_service_jobs() -> None:
+    """All consumer-owned project-service wrappers override Builder's floating image."""
+    ci = _ci_config()
+    default_image = str((ci.get("default") or {}).get("image") or "")
+    assert re.fullmatch(r"harbor\.rnd\.embedings\.ai/spyroot/builder/toolbox@sha256:[0-9a-f]{64}",
+                        default_image)
+
+    jobs = _gitlab_jobs()
+    for name in PROJECT_SERVICE_JOB_ORDER:
+        image = str(jobs[name].get("image") or "")
+        assert image == default_image, f"{name} must use the digest-pinned toolbox image"
+        assert ":latest" not in image
+
+
+def test_gitlab_project_service_jobs_leave_artifact_dag_to_builder_templates() -> None:
+    """The local wrappers name the canonical DAG jobs without shadowing Builder artifacts."""
+    jobs = _gitlab_jobs()
+    observed = [name for name in jobs if name in PROJECT_SERVICE_JOBS]
+    assert observed == PROJECT_SERVICE_JOB_ORDER
+
+    expected_stage = {
+        **{name: "deploy" for name in PROJECT_SERVICE_JOB_ORDER[:-1]},
+        "project-service-release-evidence": "publish",
+    }
+    for name in PROJECT_SERVICE_JOB_ORDER:
+        job = jobs[name]
+        assert job.get("stage") == expected_stage[name]
+        assert gate_meta._external_templates(job) == [PROJECT_SERVICE_JOBS[name]]
+        for inherited_key in ("script", "needs", "dependencies", "artifacts", "resource_group"):
+            assert inherited_key not in job, f"{name} must inherit Builder {inherited_key}"
+
+
+def test_gitlab_contains_no_direct_project_service_deploy_bypass() -> None:
+    """The consumer never applies Helm or picks an independent simulator image tag."""
+    raw = CI_FILE.read_text(encoding="utf-8")
+
+    forbidden_patterns = {
+        r"\bhelm\s+upgrade\b": "direct Helm upgrade bypasses the Builder deploy executor",
+        r"\bkubectl\s+apply\b": "direct kubectl apply bypasses the Builder deploy executor",
+        r"redfish-dmtf-sim:[^\s\"']+": "floating simulator image tags are not deploy identities",
+    }
+    for pattern, reason in forbidden_patterns.items():
+        assert re.search(pattern, raw) is None, reason
+
+    variables = _ci_config().get("variables") or {}
+    forbidden_variables = {
+        "DMTF_SIM_IMAGE_TAG",
+        "PROJECT_SERVICE_IMAGE_TAG",
+        "SIM_IMAGE_TAG",
+    }
+    assert set(variables).isdisjoint(forbidden_variables)
+
+
 def test_gitlab_uses_full_history_checkout_for_exact_ref_dispatches() -> None:
     """Direct exact-ref pipelines need origin/main history for repo.format merge-base."""
     variables = _ci_config().get("variables") or {}
     assert variables.get("GIT_DEPTH") == "0"
 
 
-def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
-    """Only the local job consumes FOCUSED_GATE; the imported overlay excludes it."""
+def test_gitlab_leaves_focused_execution_to_the_builder_resource_job() -> None:
+    """No local job competes with the exact included CPU resource job."""
     jobs = _gitlab_jobs()
     focused_jobs = [
         name
         for name, job in jobs.items()
         if any("--gate" in line and "FOCUSED_GATE" in line for line in _script_lines(job))
     ]
-    assert focused_jobs == ["focused-gate"]
-
-    focused = jobs["focused-gate"]
-    rules_text = repr(focused.get("rules"))
-    script = "\n".join(_script_lines(focused))
-    assert focused.get("stage") == "validate"
-    assert "homelab-k8s" in focused.get("tags", [])
-    assert '$CI_SERVER_HOST == "gitlab.rnd.embedings.ai"' in rules_text
-    assert '$CI_PIPELINE_SOURCE == "web"' in rules_text
-    assert '$CI_PIPELINE_SOURCE == "api"' in rules_text
-    assert "$FOCUSED_GATE != null" in rules_text
-    assert '$FOCUSED_GATE != ""' in rules_text
-    assert './scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"' in script
-    assert "scripts/gates/run.sh" not in script
-
-    provider_rules = repr(
-        _ci_config()["project-ci-cpu-validation"].get("rules")
-    )
-    assert "$FOCUSED_GATE == null" in provider_rules
-    assert '$FOCUSED_GATE == ""' in provider_rules
-    assert '$PROJECT_CI_PROFILE == "focused"' not in provider_rules
-    assert '$PROJECT_CI_PROFILE == "full"' in provider_rules
-    assert '$CI_SERVER_HOST == "gitlab.rnd.embedings.ai"' in provider_rules
-    provider = _ci_config()["project-ci-cpu-validation"]
-    assert provider.get("allow_failure") is False
-    assert "homelab-k8s" in provider.get("tags", [])
+    assert focused_jobs == []
+    assert PROJECT_CI_CPU_JOB not in jobs
 
 
-def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> None:
-    """FOCUSED_GATE selects one local job after the imported-rule override."""
+def test_internal_api_web_focused_dispatch_selects_no_competing_local_job() -> None:
+    """Focused provider dispatch leaves the local job set empty."""
     for source in ("api", "web"):
         selected = _selected_jobs(
-            include_imported_overlays=True,
             CI_PIPELINE_SOURCE=source,
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE="unit.all",
-            MERGE_PROFILE=None,
-        )
-        assert selected == ["focused-gate"]
-
-
-def test_builder_focused_profile_selects_only_local_focused_job() -> None:
-    """Builder's focused profile selects the diagnostic unit.all job."""
-    for source in ("api", "web"):
-        selected = _selected_jobs(
-            include_imported_overlays=True,
-            CI_PIPELINE_SOURCE=source,
-            FOCUSED_GATE=None,
             MERGE_PROFILE=None,
             PROJECT_CI_PROFILE="focused",
         )
-        assert selected == ["focused-gate"]
+        assert selected == []
 
 
-def test_builder_full_profile_selects_only_provider_cpu_job() -> None:
-    """Builder's full profile selects the required smoke-producing job."""
+def test_builder_full_dispatch_fences_the_local_merge_job() -> None:
+    """The provider full profile is the only merge-suite owner in that pipeline."""
     for source in ("api", "web"):
         selected = _selected_jobs(
-            include_imported_overlays=True,
             CI_PIPELINE_SOURCE=source,
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE=None,
             MERGE_PROFILE=None,
             PROJECT_CI_PROFILE="full",
         )
-        assert selected == ["project-ci-cpu-validation"]
+        assert "gate-merge" not in selected
+        assert set(selected).isdisjoint(PROJECT_SERVICE_JOBS)
 
 
-@pytest.mark.parametrize(
-    "variables",
-    [
-        {"FOCUSED_GATE": "unit.all", "PROJECT_CI_PROFILE": "full"},
-        {"FOCUSED_GATE": "unit.all", "MERGE_PROFILE": "merge"},
-        {"PROJECT_CI_PROFILE": "full", "MERGE_PROFILE": "merge"},
-    ],
-)
-def test_conflicting_dispatch_selectors_create_no_validation_job(variables) -> None:
-    """Conflicting selectors fail closed before they can enqueue duplicate work."""
-    selected = set(
-        _selected_jobs(
-            include_imported_overlays=True,
+def test_project_ci_smoke_dispatch_fences_project_service_jobs() -> None:
+    """A targeted provider smoke selects no competing local CI job."""
+    selected = set(_selected_jobs(
+        CI_PIPELINE_SOURCE="api",
+        CI_COMMIT_BRANCH="main",
+        CI_COMMIT_REF_PROTECTED="true",
+        PROJECT_CI_SMOKE=PROJECT_CI_CPU_JOB,
+    ))
+
+    assert selected == set()
+
+
+def test_protected_profile_keeps_project_service_dag_reachable() -> None:
+    """The explicit protected profile is not mistaken for read-only project CI."""
+    selected = set(_selected_jobs(
+        CI_PIPELINE_SOURCE="api",
+        CI_COMMIT_BRANCH="main",
+        CI_COMMIT_REF_PROTECTED="true",
+        PROJECT_CI_PROFILE="protected",
+    ))
+
+    assert set(PROJECT_SERVICE_JOBS) <= selected
+
+
+def test_unknown_project_ci_profile_fails_closed_on_protected_main() -> None:
+    """A selector typo cannot expose the protected project-service DAG."""
+    for profile in ("protectd", "unknown", "FULL"):
+        selected = set(_selected_jobs(
             CI_PIPELINE_SOURCE="api",
-            **variables,
-        )
-    )
-    assert selected.isdisjoint(
-        {"focused-gate", "gate-merge", "project-ci-cpu-validation"}
-    )
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
+            PROJECT_CI_PROFILE=profile,
+        ))
+        assert selected.isdisjoint(PROJECT_SERVICE_JOBS), profile
 
 
 def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:
@@ -660,6 +730,8 @@ def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:
     for source in ("api", "web"):
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE=None,
             MERGE_PROFILE="merge",
         )
@@ -696,8 +768,8 @@ def test_other_gitlab_hosts_open_no_private_dispatch_route() -> None:
             CI_PIPELINE_SOURCE="api",
             FOCUSED_GATE="unit.all",
             MERGE_PROFILE="merge",
+            PROJECT_CI_PROFILE="focused",
         )
-        assert "focused-gate" not in selected
         assert "gate-merge" not in selected
         assert set(selected).isdisjoint(PROJECT_SERVICE_JOBS)
         assert "publish-github" not in selected

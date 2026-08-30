@@ -21,7 +21,7 @@ For gate semantics see [Gates](gates.md); for the release procedure, see
 
 The tracked `builder-binding.yaml` file pins the Builder provider revision and
 dispatch authority. The `PROJECT_CI_CPU_COMMAND` variable, defined in
-`.gitlab-ci.yml`, selects the tracked `scripts/project_ci_entrypoint.sh` adapter;
+`.gitlab-ci.yml`, selects the tracked `tools/project-ci-cpu-validation.sh` adapter;
 no operator-created command variable is required. The adapter supports
 dependency-free `--help`, non-executing `--dry-run`, and sanitized logging
 controls; unknown arguments fail before a gate is selected.
@@ -72,18 +72,16 @@ HEAD_SHA="$(git rev-parse HEAD)"
 
 ### Internal validation jobs
 
-The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
-Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
-merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
-`repo.format`; the job runs that one gate through the Kubernetes-guarded
-`scripts/check.sh` entrypoint. The `.gitlab-ci.yml` rules disable the imported
-`project-ci-cpu-validation` job for this selector, so a focused pipeline has
-exactly one job. Builder's `focused` profile also selects the local
-project `focused-gate` job and runs its `unit.all` default. Builder's `full`
-profile selects only the imported job, executes every merge gate, and publishes
-its required smoke artifact. A focused result cannot replace complete merge
-evidence. Merge-request and default-branch pipelines continue to select
-`gate-merge` through their normal GitLab rules.
+The exact Builder include defines one required `project-ci-cpu-validation` job.
+The dispatcher sets `FOCUSED_GATE` to a merge-profile gate ID from
+`gates/manifest.yaml`, such as `unit.all` or `repo.format`; the provider job
+runs that one gate through the Kubernetes-guarded `scripts/check.sh` entrypoint.
+Builder's `focused` profile selects the same job and defaults to `unit.all`,
+while its `full` profile runs the complete merge profile. Selector rules fence
+off local merge and project-service jobs, so each provider request has one
+validation owner. A focused result cannot replace complete merge evidence.
+Merge-request and default-branch pipelines continue to select `gate-merge`
+through their normal GitLab rules.
 
 The `k8s-live-check` job, defined in `.gitlab-ci.yml`, is a separate status
 probe. An unavailable Kubernetes API is reported as `UNAVAILABLE` and does not
@@ -97,7 +95,8 @@ availability.
    Sync Now path. The pipeline commit must resolve to that exact head SHA.
 2. For diagnostic feedback, unset `PROJECT_CI_PROFILE` and `MERGE_PROFILE`, then
    set `FOCUSED_GATE=unit.all` (or another merge-profile gate ID). The pipeline
-   creates only `focused-gate`; the result is diagnostic-only and must pass.
+   creates only `project-ci-cpu-validation`; the result is diagnostic-only and
+   must pass.
 3. For merge evidence, unset `PROJECT_CI_PROFILE` and `FOCUSED_GATE`, then set
    `MERGE_PROFILE=merge`. The pipeline must create only `gate-merge`.
 4. Verify the terminal job is successful, its commit SHA equals the requested
@@ -107,15 +106,16 @@ availability.
 
 ### Evidence artifacts
 
-Each required job publishes `reports/ci/<job>.json`, each executed gate
-publishes `reports/gates/<gate-id>.json`, and each required smoke
-publishes `reports/smoke/<job>.json`. These sanitized documents bind the result
-to the exact project commit, Standards revision, pipeline/job IDs, and immutable
-runner digest. Warning/skip counts come from captured gate output; cleanup comes
-from tracked-state comparison; exact identity comes from independent Git
-read-back; and sanitization is recorded only after a quiet content scan and
-atomic file read-back. See [Gates](gates.md#failure-behavior) for execution and
-timeout policy.
+Local required jobs publish `reports/ci/<job>.json`, executed gates publish
+`reports/gates/<gate-id>.json`, and required local smokes publish
+`reports/smoke/<job>.json`. The provider-owned CPU job emits its terminal result
+and gate evidence path through the Builder result contract. Evidence binds the
+result to the exact project commit, Standards revision, pipeline/job IDs, and
+immutable runner digest. Warning/skip counts come from captured gate output;
+cleanup comes from tracked-state comparison; exact identity comes from
+independent Git read-back; and sanitization is recorded only after a quiet
+content scan and atomic file read-back. See
+[Gates](gates.md#failure-behavior) for execution and timeout policy.
 
 The upstream access prerequisite for `repo.schemas` is documented in
 [Gates](gates.md#selected-gate-summary).
