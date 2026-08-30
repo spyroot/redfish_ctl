@@ -9,15 +9,14 @@ Inside that approved CI environment, clear live connection variables before
 the offline suite:
 
 ```bash
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
-  -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest -q -m "not live and not dmtf_sim_live"
 ruff check <changed>
 ```
 
-The CLI reads only the canonical `REDFISH_*` connection variables. The
-dual-mode fixture switches to live mode when `IDRAC_IP` is present, so unset
-both connection-variable families for the default suite.
+The CLI reads only the canonical `REDFISH_*` connection variables. The explicit
+marker selector keeps both live lanes out of the default suite; clearing the
+canonical variables also prevents accidental CLI or simulator connections.
 
 ## Which Lane To Use
 
@@ -29,21 +28,10 @@ offline.
 Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock, and
 `redfish_service` when you need to inspect requests or state changes.
 
-**Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
-by default and against approved hardware when `IDRAC_IP` is set. Tests that require hardware are
-marked `@pytest.mark.live` and skip without that variable.
-
-For approved live hardware from an authorized Kubernetes job only:
-
-```bash
-IDRAC_IP=<idrac> \
-IDRAC_USERNAME=root \
-IDRAC_PASSWORD=<password> \
-pytest -q -m live
-```
-
-That keeps the variables scoped to one command. If you exported them earlier, unset them before
-returning to the default suite.
+**Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs against
+the mock by default. Tests that require hardware carry `@pytest.mark.live` and
+run only through the approved private CI job with its project-bound endpoint
+and credentials. This guide does not define a laptop activation path.
 
 **Vendor-aware mock lane.** `redfish_mock_factory`, defined in `tests/conftest.py`, overlays
 `tests/<vendor>_fixtures/` on the DMTF base. The repo has four corpora now: Dell
@@ -93,8 +81,7 @@ variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
-  -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest --cov=redfish_ctl -m "not live and not dmtf_sim_live"
 ```
 
