@@ -36,8 +36,8 @@ def _ci_config() -> dict:
     return yaml.safe_load(CI_FILE.read_text(encoding="utf-8"))
 
 
-def _gitlab_jobs() -> dict:
-    """Return local jobs; imported Builder jobs have separate exact-pin tests."""
+def _gitlab_jobs(*, include_imported_overlays: bool = False) -> dict:
+    """Return local jobs, optionally including imported-job overlays."""
     ci = _ci_config()
     return {
         name: job
@@ -45,7 +45,10 @@ def _gitlab_jobs() -> dict:
         if name not in gate_meta.GITLAB_GLOBAL_KEYS
         and isinstance(job, dict)
         and not name.startswith(".")
-        and name not in gate_meta.BUILDER_IMPORTED_JOBS
+        and (
+            include_imported_overlays
+            or name not in gate_meta.BUILDER_IMPORTED_JOBS
+        )
     }
 
 
@@ -204,7 +207,11 @@ def _job_selected(job: dict, variables: dict[str, str | None]) -> bool:
     return False
 
 
-def _selected_jobs(**overrides: str | None) -> list[str]:
+def _selected_jobs(
+    *,
+    include_imported_overlays: bool = False,
+    **overrides: str | None,
+) -> list[str]:
     variables: dict[str, str | None] = {
         "CI_SERVER_HOST": "gitlab.rnd.embedings.ai",
         "CI_PIPELINE_SOURCE": "push",
@@ -215,7 +222,13 @@ def _selected_jobs(**overrides: str | None) -> list[str]:
         "MERGE_PROFILE": None,
     }
     variables.update(overrides)
-    return [name for name, job in _gitlab_jobs().items() if _job_selected(job, variables)]
+    return [
+        name
+        for name, job in _gitlab_jobs(
+            include_imported_overlays=include_imported_overlays
+        ).items()
+        if _job_selected(job, variables)
+    ]
 
 
 def _profile_enum(node):
@@ -568,7 +581,9 @@ def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
     assert './scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"' in script
     assert "scripts/gates/run.sh" not in script
 
-    provider_rules = repr(jobs["project-ci-cpu-validation"].get("rules"))
+    provider_rules = repr(
+        _ci_config()["project-ci-cpu-validation"].get("rules")
+    )
     assert "FOCUSED_GATE" not in provider_rules
     assert '$PROJECT_CI_PROFILE == "focused"' in provider_rules
     assert '$PROJECT_CI_PROFILE == "full"' in provider_rules
@@ -578,6 +593,7 @@ def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> N
     """FOCUSED_GATE selects one local job after the imported-rule override."""
     for source in ("api", "web"):
         selected = _selected_jobs(
+            include_imported_overlays=True,
             CI_PIPELINE_SOURCE=source,
             FOCUSED_GATE="unit.all",
             MERGE_PROFILE=None,
@@ -589,6 +605,7 @@ def test_builder_focused_profile_selects_only_provider_cpu_job() -> None:
     """Builder's focused profile selects one provider job with the unit default."""
     for source in ("api", "web"):
         selected = _selected_jobs(
+            include_imported_overlays=True,
             CI_PIPELINE_SOURCE=source,
             FOCUSED_GATE=None,
             MERGE_PROFILE=None,

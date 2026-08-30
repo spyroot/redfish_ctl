@@ -63,10 +63,11 @@
     "observation_sources": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["warnings", "skips", "cleanup", "sanitization"],
+      "required": ["warnings", "skips", "timeout", "cleanup", "sanitization"],
       "properties": {
         "warnings": {"type": "string", "minLength": 1},
         "skips": {"type": "string", "minLength": 1},
+        "timeout": {"type": "string", "minLength": 1},
         "cleanup": {"type": "string", "minLength": 1},
         "sanitization": {"type": "string", "minLength": 1}
       }

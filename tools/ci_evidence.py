@@ -195,7 +195,7 @@ def build_evidence(
         raise EvidenceError("observed cleanup remainder is invalid")
     if not isinstance(sources, Mapping) or not all(
         isinstance(sources.get(key), str) and sources[key]
-        for key in ("warnings", "skips", "cleanup", "sanitization")
+        for key in ("warnings", "skips", "timeout", "cleanup", "sanitization")
     ):
         raise EvidenceError("evidence observation sources are incomplete")
     effective_status = status
