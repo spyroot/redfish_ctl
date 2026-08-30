@@ -449,7 +449,7 @@ def render_document(
         "fail the gate. A quiet `condition_gated` metric is reported as explicit",
         "`NOT_APPLICABLE`, while malformed payloads and query errors always fail.",
         "Every run preserves raw `FLOWING`, `INACTIVE`, `MISSING`, and `ERROR` counts.",
-        "See [Gates](gates.md#the-gates), [Secrets](secrets.md#splunk-metric-query-gate),",
+        "See [Gates](gates.md#selected-gate-summary), [Secrets](secrets.md#splunk-metric-query-gate),",
         "and [Telemetry liveness checks](gates.md#telemetry-liveness-checks).",
         "",
         "## Report Inventory",

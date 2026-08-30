@@ -11,7 +11,7 @@ the offline suite:
 ```bash
 env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
   -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest -q
+  pytest -q -m "not live and not dmtf_sim_live"
 ruff check <changed>
 ```
 
@@ -95,7 +95,7 @@ variables unset:
 python -m pip install pytest-cov
 env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
   -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest --cov=redfish_ctl
+  pytest --cov=redfish_ctl -m "not live and not dmtf_sim_live"
 ```
 
 ## Fleet And Concurrency Tests
