@@ -215,12 +215,13 @@ def _artifact_paths(job: dict) -> set[str]:
 
 
 def _off_cluster_env() -> dict[str, str]:
-    """Return a process environment outside the Kubernetes authority."""
+    """Return an environment outside Kubernetes and GitLab job authority."""
     return {
         key: value
         for key, value in os.environ.items()
         if key
         not in {
+            "CI_PROJECT_NAME",
             "FOCUSED_GATE",
             "KUBERNETES_SERVICE_HOST",
             "KUBERNETES_SERVICE_PORT",
