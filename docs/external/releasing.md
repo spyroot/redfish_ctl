@@ -126,10 +126,9 @@ PyPI versions are immutable. Once uploaded, the same version number cannot be re
 
 ## Tag
 
-```bash
-git tag "v$(python setup.py --version)"
-git push origin --tags
-```
+After a manual upload, use the exact validated-and-mirrored commit procedure in
+[Automated release](#automated-release-recommended). Do not tag an implicit
+working-tree `HEAD` or push unrelated local tags.
 
 ## Helper Scripts
 
