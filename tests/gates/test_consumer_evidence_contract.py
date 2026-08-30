@@ -606,22 +606,32 @@ def test_focused_execution_cannot_emit_release_blocking_smoke() -> None:
     assert selected == inventory["spec"]["smokeTests"][0]
 
 
-def test_required_jobs_publish_exact_job_and_smoke_evidence() -> None:
-    """Every required job publishes its own schema-backed evidence paths."""
+def test_required_jobs_have_local_artifacts_or_external_contracts() -> None:
+    """Required jobs have local artifacts or one exact provider contract."""
     registry = _yaml(REPO_ROOT / "gates/manifest.yaml")
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     smoke = _yaml(REPO_ROOT / "inventory/ci/smoke-tests.yaml")
     smoke_jobs = {record["job"] for record in smoke["spec"]["smokeTests"]}
+    external_jobs = {
+        job["name"]: job
+        for include in registry["trusted_includes"]
+        for job in include.get("jobs", [])
+    }
     assert ci["gate-merge"]["script"] == [
         "./scripts/check.sh --list",
         "./scripts/check.sh --profile merge",
     ]
     for job_name in registry["required_jobs"]:
+        assert job_name in smoke_jobs
+        if job_name in external_jobs:
+            assert job_name not in ci
+            assert external_jobs[job_name]["required"] is True
+            assert external_jobs[job_name]["allowFailure"] is False
+            continue
         assert job_name in ci
         paths = _artifact_paths(ci[job_name])
         assert f"reports/ci/{job_name}.json" in paths
         assert f"reports/smoke/{job_name}.json" in paths
-        assert job_name in smoke_jobs
 
 
 def test_evidence_sanitizer_rejects_missing_evidence(tmp_path: Path) -> None:
