@@ -43,7 +43,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["project", "ref", "file", "templates"],
+        "required": ["project", "ref", "file"],
+        "anyOf": [
+          {"required": ["templates"]},
+          {"required": ["jobs"]}
+        ],
         "properties": {
           "project": {
             "type": "string",
@@ -72,6 +76,50 @@
                 },
                 "mutates": {
                   "type": "boolean"
+                }
+              }
+            }
+          },
+          "jobs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "required",
+                "mutates",
+                "stage",
+                "image",
+                "tags",
+                "allowFailure",
+                "script"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                },
+                "required": {"const": true},
+                "mutates": {"type": "boolean"},
+                "stage": {"type": "string", "minLength": 1},
+                "image": {
+                  "type": "string",
+                  "pattern": "^[^\\s]+@sha256:[0-9a-f]{64}$"
+                },
+                "tags": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {"type": "string", "minLength": 1}
+                },
+                "allowFailure": {"const": false},
+                "script": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {"type": "string", "minLength": 1}
                 }
               }
             }

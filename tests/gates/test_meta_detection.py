@@ -26,6 +26,32 @@ def _valid_registry():
     }
 
 
+def _registry_with_external_job() -> dict:
+    """Return a closed-world contract for one exact concrete provider job."""
+    registry = _valid_registry()
+    registry["required_jobs"].append("project-ci-cpu-validation")
+    registry["trusted_includes"] = [
+        {
+            "project": "spyroot/builder",
+            "ref": "a" * 40,
+            "file": "/ci/templates/project-ci-resource-jobs.yml",
+            "jobs": [
+                {
+                    "name": "project-ci-cpu-validation",
+                    "required": True,
+                    "mutates": False,
+                    "stage": "project-ci-validation",
+                    "image": "registry.example/toolbox@sha256:" + "b" * 64,
+                    "tags": ["homelab-k8s", "homelab-k8s-validation"],
+                    "allowFailure": False,
+                    "script": ["./scripts/check.sh --profile merge"],
+                }
+            ],
+        }
+    ]
+    return registry
+
+
 def test_detects_missing_mandatory_id():
     """A mandatory ID absent from the registry is a failure."""
     reg = _valid_registry()
@@ -124,6 +150,46 @@ def test_detects_missing_runner_tag(tmp_path, monkeypatch):
     monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
     failures, _ = gate_meta._check_gitlab(_valid_registry())
     assert any("runner tag" in f for f in failures)
+
+
+def test_accepts_required_job_from_exact_trusted_include(tmp_path, monkeypatch):
+    """A concrete provider job can satisfy required-job coverage without a copy."""
+    _write_gitlab(tmp_path, f"""
+        include:
+          - project: spyroot/builder
+            ref: {'a' * 40}
+            file: /ci/templates/project-ci-resource-jobs.yml
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+
+    failures, ran = gate_meta._check_gitlab(_registry_with_external_job())
+
+    assert ran
+    assert failures == []
+
+
+def test_rejects_local_shadow_of_trusted_concrete_job(tmp_path, monkeypatch):
+    """The consumer cannot silently replace an exact included resource job."""
+    _write_gitlab(tmp_path, f"""
+        include:
+          - project: spyroot/builder
+            ref: {'a' * 40}
+            file: /ci/templates/project-ci-resource-jobs.yml
+        gate-merge:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+        project-ci-cpu-validation:
+          tags: [homelab-k8s]
+          script: [./scripts/check.sh --profile merge]
+    """)
+    monkeypatch.setattr(gate_meta, "REPO_ROOT", tmp_path)
+
+    failures, _ = gate_meta._check_gitlab(_registry_with_external_job())
+
+    assert any("shadows a trusted concrete provider job" in failure for failure in failures)
 
 
 def test_detects_live_apply_in_merge_request(tmp_path, monkeypatch):

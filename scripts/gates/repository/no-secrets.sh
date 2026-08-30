@@ -7,5 +7,5 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   echo "repo.no-secrets: gitleaks not installed in this gate environment" >&2
   exit 1
 fi
-gitleaks detect --no-banner --redact --source . \
+gitleaks detect --no-banner --redact --log-level error --source . \
   && echo "repo.no-secrets: OK"
