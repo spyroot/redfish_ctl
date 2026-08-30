@@ -17,8 +17,8 @@ Design (deliberately conservative so release automation never surprises anyone):
 * It does NOT run git. It prints the guarded branch, mirror, and exact-SHA tag
   steps so a human performs the release deliberately.
 * The CI release workflow refuses to publish unless the pushed ``vX.Y.Z`` tag
-  matches this file, so a forgotten bump fails loudly instead of shipping a
-  wrong or duplicate version.
+  matches this file, so a forgotten bump fails before upload. PyPI rejects a
+  duplicate version during the publish step.
 """
 from __future__ import annotations
 
