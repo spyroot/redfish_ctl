@@ -8,9 +8,12 @@ if ! command -v shellcheck >/dev/null 2>&1; then
 fi
 mapfile -t files < <(
   git ls-files \
+    '*.sh' \
     'scripts/*.sh' \
     'scripts/gates/**/*.sh' \
     'scripts/gates/**/*.bash' \
+    'tools/*.sh' \
+    'tools/**/*.sh' \
     'docker/**/*.sh'
 )
 # The repo tracks shell scripts under these pathspecs, so an empty set means the listing failed or the

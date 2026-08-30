@@ -32,11 +32,17 @@ spec:
         - conda
         - git
         - git-lfs
+        - gitleaks
         - helm
         - jq
         - kubeconform
+        - kube-linter
+        - pytest
+        - python
         - python3
+        - ruff
         - setsid
+        - shellcheck
       artifactUnderTest:
         type: repository-and-provider-resource-job
         digestSource: git-commit-and-builder-revision
@@ -54,9 +60,15 @@ spec:
         - conda
         - git
         - git-lfs
+        - gitleaks
         - helm
         - kubeconform
+        - kube-linter
+        - pytest
+        - python
         - python3
+        - ruff
+        - shellcheck
       artifactUnderTest:
         type: repository
         digestSource: git-commit
@@ -69,7 +81,15 @@ spec:
     - job: gate-integration
       class: protected-live
       command: ./scripts/check.sh --profile integration
-      requiredTools: [bash, conda, git, git-lfs, jq, python3, yq]
+      requiredTools:
+        - bash
+        - builder-project-resolve-binding
+        - conda
+        - git
+        - git-lfs
+        - jq
+        - python3
+        - yq
       artifactUnderTest:
         type: repository-and-gitlab-integration
         digestSource: git-commit-and-pipeline
@@ -82,7 +102,13 @@ spec:
     - job: gate-scheduled
       class: protected-live
       command: ./scripts/check.sh --profile scheduled
-      requiredTools: [bash, conda, git, git-lfs, python3]
+      requiredTools:
+        - bash
+        - conda
+        - git
+        - git-lfs
+        - python
+        - python3
       artifactUnderTest:
         type: repository-and-splunk-liveness
         digestSource: git-commit-and-metric-catalogs

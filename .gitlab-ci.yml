@@ -115,11 +115,11 @@ gate-integration:
       when: never
     - if: >-
         $CI_COMMIT_REF_PROTECTED == "true" &&
-        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: >-
-        $CI_COMMIT_REF_PROTECTED == "true" &&
         $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
         $CI_PIPELINE_SOURCE == "schedule"
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - ./scripts/check.sh --profile integration
   artifacts:

@@ -231,18 +231,21 @@ def test_kubernetes_schema_validates_a_non_empty_manifest_set(tmp_path) -> None:
     """
     command_dir = tmp_path / "bin"
     command_dir.mkdir()
-    kubeconform = command_dir / "kubeconform"
-    kubeconform.write_text(
-        "#!/bin/sh\ncat >/dev/null || exit $?\nexit 0\n",
-        encoding="utf-8",
-    )
-    kubeconform.chmod(0o755)
+    selected_path = os.environ["PATH"]
+    if shutil.which("kubeconform") is None:
+        kubeconform = command_dir / "kubeconform"
+        kubeconform.write_text(
+            "#!/bin/sh\ncat >/dev/null || exit $?\nexit 0\n",
+            encoding="utf-8",
+        )
+        kubeconform.chmod(0o755)
+        selected_path = f"{command_dir}:{selected_path}"
 
     proc = subprocess.run(
         [str(REPO_ROOT / "scripts" / "gates" / "kubernetes" / "schema.sh")],
         capture_output=True,
         text=True,
-        env={**os.environ, "PATH": f"{command_dir}:{os.environ['PATH']}"},
+        env={**os.environ, "PATH": selected_path},
     )
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined

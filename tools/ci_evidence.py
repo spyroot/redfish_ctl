@@ -512,8 +512,11 @@ def observe_smoke(
         )
         and timed_out is False
     )
+    protected_surface_source = (
+        f"not applicable: smoke class {smoke_class} has no protected live surface"
+    )
     protected_surface = smoke_class != "protected-live"
-    if not protected_surface:
+    if smoke_class == "protected-live":
         try:
             expected_provider_host = provider_host(root)
         except (OSError, ProviderContractError, yaml.YAMLError):
@@ -521,6 +524,9 @@ def observe_smoke(
         protected_surface = (
             selected_env.get("CI_SERVER_HOST") == expected_provider_host
             and selected_env.get("CI_COMMIT_REF_PROTECTED") == "true"
+        )
+        protected_surface_source = (
+            "Internal GitLab host and protected-ref environment assertion"
         )
     return {
         "startup": True,
@@ -549,7 +555,7 @@ def observe_smoke(
                 f"timed_out={timed_out!r}"
             ),
             "idempotent_noop": "two identical scripts/check.sh --list executions",
-            "protected_surface": "Internal GitLab protected-ref environment assertion",
+            "protected_surface": protected_surface_source,
             "cleanup": "git status tracked-state comparison after temporary-directory cleanup",
             "sanitization": "quiet credential-pattern scan before atomic write",
         },

@@ -50,7 +50,7 @@ it without executing a gate.
 | -- | ------- | ------- | -------------- | ---------- |
 | `meta.gate-registry` | merge | no | registry is schema-valid, ids unique, commands exist+executable, mandatory present | any registry inconsistency |
 | `meta.ci-runner-tags` | merge | no | every GitLab job carries the `homelab-k8s` tag | a job missing the tag |
-| `meta.required-jobs` | merge | no | required jobs and exact job/smoke artifact paths exist, with no `allow_failure` or MR-reachable live apply | a required job or evidence path is missing/misconfigured |
+| `meta.required-jobs` | merge | no | required jobs and their smoke contracts/evidence paths exist, with no `allow_failure` or MR-reachable live apply | a required job or smoke contract is missing or misconfigured |
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
 | `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |

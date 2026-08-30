@@ -65,8 +65,21 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
         record["job"]: record
         for record in inventory["spec"]["smokeTests"]
     }
+    merge_tools = {
+        "gitleaks",
+        "helm",
+        "kubeconform",
+        "kube-linter",
+        "pytest",
+        "python",
+        "ruff",
+        "shellcheck",
+    }
     for job in ("project-ci-cpu-validation", "gate-merge"):
-        assert {"helm", "kubeconform"} <= set(records[job]["requiredTools"])
+        assert merge_tools <= set(records[job]["requiredTools"])
+    assert "builder-project-resolve-binding" in records["gate-integration"][
+        "requiredTools"
+    ]
 
     for job in ("gate-integration", "gate-scheduled"):
         rules = repr(ci[job].get("rules") or [])
@@ -439,6 +452,10 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
 
     assert smoke_timeout_seconds(record) == 1800
     assert smoke_observations["bounded_timeout"] is True
+    assert smoke_observations["protected_surface"] is True
+    assert smoke_observations["sources"]["protected_surface"] == (
+        "not applicable: smoke class wiring has no protected live surface"
+    )
     gate_observations["applied_timeout_seconds"] = [1800.1]
     mismatched = observe_smoke(
         record=record,
@@ -447,6 +464,28 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
         root=root,
     )
     assert mismatched["bounded_timeout"] is False
+
+    protected_env = _ci_env_for(root, job="gate-integration")
+    protected_env.update(
+        {
+            "CI_SERVER_HOST": "ci.example.invalid",
+            "CI_COMMIT_REF_PROTECTED": "true",
+        }
+    )
+    protected = observe_smoke(
+        record={**record, "job": "gate-integration", "class": "protected-live"},
+        gate_observations={
+            **_gate_observations(),
+            "timeout_seconds": 1800,
+            "applied_timeout_seconds": [1800],
+        },
+        env=protected_env,
+        root=root,
+    )
+    assert protected["protected_surface"] is True
+    assert protected["sources"]["protected_surface"] == (
+        "Internal GitLab host and protected-ref environment assertion"
+    )
     with pytest.raises(EvidenceError, match="timeoutSeconds"):
         smoke_timeout_seconds({**record, "timeoutSeconds": 0})
 
@@ -688,6 +727,20 @@ def test_required_jobs_have_local_artifacts_or_external_contracts() -> None:
         paths = _artifact_paths(ci[job_name])
         assert f"reports/ci/{job_name}.json" in paths
         assert f"reports/smoke/{job_name}.json" in paths
+
+
+def test_smoke_inventory_generator_matches_the_tracked_inventory() -> None:
+    """The canonical inventory renderer cannot drift from its tracked output."""
+    proc = subprocess.run(
+        [str(REPO_ROOT / "check.sh"), "--dry-run"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "action=no-op" in proc.stdout
 
 
 def test_evidence_sanitizer_rejects_missing_evidence(tmp_path: Path) -> None:
