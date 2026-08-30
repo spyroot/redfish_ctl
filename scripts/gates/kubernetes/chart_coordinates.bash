@@ -29,7 +29,8 @@ PY
 # Exit classes: 0 valid, 1 too long. Side effects: none.
 # Idempotency: deterministic. Cleanup: none.
 helm_render_namespace() {
-    local chart_name="$1" namespace="${chart_name}-render"
+    local chart_name="$1"
+    local namespace="${chart_name}-render"
     [ "${#namespace}" -le 63 ] || return 1
     printf '%s\n' "$namespace"
 }
