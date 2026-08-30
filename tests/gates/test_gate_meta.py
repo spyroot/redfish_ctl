@@ -584,7 +584,8 @@ def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
     provider_rules = repr(
         _ci_config()["project-ci-cpu-validation"].get("rules")
     )
-    assert "FOCUSED_GATE" not in provider_rules
+    assert "$FOCUSED_GATE == null" in provider_rules
+    assert '$FOCUSED_GATE == ""' in provider_rules
     assert '$PROJECT_CI_PROFILE == "focused"' not in provider_rules
     assert '$PROJECT_CI_PROFILE == "full"' in provider_rules
     assert '$CI_SERVER_HOST == "gitlab.rnd.embedings.ai"' in provider_rules
@@ -629,6 +630,28 @@ def test_builder_full_profile_selects_only_provider_cpu_job() -> None:
             PROJECT_CI_PROFILE="full",
         )
         assert selected == ["project-ci-cpu-validation"]
+
+
+@pytest.mark.parametrize(
+    "variables",
+    [
+        {"FOCUSED_GATE": "unit.all", "PROJECT_CI_PROFILE": "full"},
+        {"FOCUSED_GATE": "unit.all", "MERGE_PROFILE": "merge"},
+        {"PROJECT_CI_PROFILE": "full", "MERGE_PROFILE": "merge"},
+    ],
+)
+def test_conflicting_dispatch_selectors_create_no_validation_job(variables) -> None:
+    """Conflicting selectors fail closed before they can enqueue duplicate work."""
+    selected = set(
+        _selected_jobs(
+            include_imported_overlays=True,
+            CI_PIPELINE_SOURCE="api",
+            **variables,
+        )
+    )
+    assert selected.isdisjoint(
+        {"focused-gate", "gate-merge", "project-ci-cpu-validation"}
+    )
 
 
 def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:

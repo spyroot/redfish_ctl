@@ -62,6 +62,7 @@ from tools.ci_evidence import (
     EvidenceError,
     build_evidence,
     build_smoke_evidence,
+    gate_timeout_seconds,
     observe_gate,
     observe_smoke,
     select_release_blocking_smoke,
@@ -76,6 +77,11 @@ if selected_gate and not safe_gate:
     print("run.sh: unsafe gate identifier", file=sys.stderr)
     sys.exit(2)
 registry = yaml.safe_load(pathlib.Path("gates/manifest.yaml").read_text(encoding="utf-8"))
+provider_gates = {
+    record.get("id"): record
+    for record in registry.get("spec", {}).get("gates", [])
+    if isinstance(record, dict) and record.get("id")
+}
 known = sorted({g.get("profile") for g in registry["gates"] if g.get("profile")})
 if profile not in known:
     print(f"run.sh: unknown profile '{profile}' — registered profiles: {', '.join(known)}", file=sys.stderr)
@@ -152,9 +158,22 @@ job_observations = {
 for gate in gates:
     print(f"=== gate {gate['id']} ({gate['command']}) ===")
     remaining_seconds = max(profile_deadline - time.monotonic(), 0.001)
+    provider_gate = provider_gates.get(gate["id"])
+    if provider_gate is None:
+        print(
+            f"EVIDENCE FAILED: provider gate metadata missing for {gate['id']}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    try:
+        selected_timeout_seconds = gate_timeout_seconds(provider_gate)
+    except EvidenceError as exc:
+        print(f"EVIDENCE FAILED: {exc}", file=sys.stderr)
+        sys.exit(1)
+    applied_timeout_seconds = min(remaining_seconds, selected_timeout_seconds)
     observations = observe_gate(
         command=gate["command"],
-        timeout_seconds=remaining_seconds,
+        timeout_seconds=applied_timeout_seconds,
     )
     job_observations["applied_timeout_seconds"].append(
         observations["timeout_seconds"]

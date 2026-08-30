@@ -20,6 +20,7 @@ from tools.ci_evidence import (
     EvidenceError,
     build_evidence,
     build_smoke_evidence,
+    gate_timeout_seconds,
     observe_gate,
     observe_smoke,
     select_release_blocking_smoke,
@@ -229,13 +230,10 @@ def test_provider_gate_index_covers_the_executable_registry() -> None:
         assert indexed["output"] == f"reports/gates/{gate_id}.json"
         if record["profile"] == "merge" and not record["mutates"]:
             assert indexed["timeoutSeconds"] >= 60
-            assert indexed["executionSurface"] in {
-                "github",
-                "internal-gitlab",
-                "protected-internal-gitlab",
-                "protected-kubernetes",
-                "harbor",
-            }
+        expected_surface = (
+            "protected-kubernetes" if record["mutates"] else "internal-gitlab"
+        )
+        assert indexed["executionSurface"] == expected_surface
 
 
 def test_runtime_skips_are_required_and_make_evidence_non_green(
@@ -396,6 +394,19 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
     assert mismatched["bounded_timeout"] is False
     with pytest.raises(EvidenceError, match="timeoutSeconds"):
         smoke_timeout_seconds({**record, "timeoutSeconds": 0})
+
+
+@pytest.mark.parametrize("timeout", [59, 3601, True, None])
+def test_provider_gate_timeout_rejects_out_of_contract_values(timeout) -> None:
+    """A provider gate cannot escape the registered per-gate timeout bounds."""
+    with pytest.raises(EvidenceError, match="timeoutSeconds"):
+        gate_timeout_seconds({"timeoutSeconds": timeout})
+
+
+def test_provider_gate_timeout_accepts_schema_bounds() -> None:
+    """The execution adapter accepts both documented timeout boundaries."""
+    assert gate_timeout_seconds({"timeoutSeconds": 60}) == 60
+    assert gate_timeout_seconds({"timeoutSeconds": 3600}) == 3600
 
 
 def test_evidence_rejects_missing_or_mutable_runner_identity(tmp_path: Path) -> None:
@@ -778,6 +789,35 @@ def test_project_ci_entrypoint_dry_run_supports_sanitized_logging(
     assert diagnostic["component"] == "project-ci-entrypoint"
     assert diagnostic["result"] == "unit.all"
     assert json.loads(log_file.read_text(encoding="utf-8")) == diagnostic
+    assert log_file.stat().st_mode & 0o777 == 0o600
+
+
+def test_project_ci_log_setup_restores_the_caller_umask(tmp_path: Path) -> None:
+    """Securing one log file must not alter later gate artifact permissions."""
+    log_file = tmp_path / "selector.log"
+    command = (
+        'umask 022; source "$1"; project_ci_log_file="$2"; '
+        "project_ci_prepare_log_file; umask"
+    )
+    proc = subprocess.run(
+        [
+            "/bin/bash",
+            "-c",
+            command,
+            "bash",
+            str(PROJECT_CI_ENTRYPOINT),
+            str(log_file),
+        ],
+        cwd=REPO_ROOT,
+        env=_off_cluster_env(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.strip() == "0022"
     assert log_file.stat().st_mode & 0o777 == 0o600
 
 

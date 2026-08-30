@@ -107,7 +107,7 @@ project_ci_parse_args() {
 # Side effects: creates or appends one mode-0600 regular file when requested.
 # Idempotency: repeated setup preserves the same file. Cleanup: caller-owned.
 project_ci_prepare_log_file() {
-  local log_dir
+  local log_dir original_umask
   [ -n "$project_ci_log_file" ] || return 0
   log_dir="${project_ci_log_file%/*}"
   [ "$log_dir" != "$project_ci_log_file" ] || log_dir="."
@@ -123,11 +123,14 @@ project_ci_prepare_log_file() {
     project_ci_usage_error "--log-file must be a regular file"
     return 2
   fi
+  original_umask="$(umask)"
   umask 077
   if ! : >>"$project_ci_log_file"; then
+    umask "$original_umask"
     project_ci_usage_error "cannot open --log-file"
     return 2
   fi
+  umask "$original_umask"
   if ! chmod 0600 "$project_ci_log_file"; then
     project_ci_usage_error "cannot secure --log-file"
     return 2

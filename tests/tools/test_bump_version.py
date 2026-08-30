@@ -17,8 +17,11 @@ def test_bump_guidance_preserves_validated_mirror_and_exact_tag(
 
     output = capsys.readouterr().out
     assert "git push origin main" not in output
-    assert "git push <internal-gitlab-remote> HEAD" in output
-    assert "exact-head Internal GitLab gates" in output
+    assert "git push <internal-gitlab-remote> HEAD" not in output
+    assert "git push <github-remote> HEAD" in output
+    assert "configured Sync Now path" in output
+    assert "--confirm-project-ci-run" in output
+    assert "exact-head merge profile" in output
     assert "publish-github" in output
     assert 'git tag v1.2.4 <validated-internal-main-sha>' in output
     assert "git push <github-remote> refs/tags/v1.2.4" in output

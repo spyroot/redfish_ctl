@@ -38,9 +38,12 @@ python tools/bump_version.py patch      # or minor / major — edits redfish_ctl
 NEW_VERSION="$(python tools/bump_version.py --show)"
 git add redfish_ctl/version.py
 git commit -m "Release ${NEW_VERSION}"
-git push <internal-gitlab-remote> HEAD
-# Merge this release branch only after exact-head Internal GitLab gates pass.
-# Wait for that job to mirror the protected internal main commit, then:
+git push <github-remote> HEAD
+# Open or update the GitHub pull request for this release branch. After the
+# configured Sync Now path makes this exact head available on Internal GitLab:
+./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
+# Merge the GitHub pull request only after the exact-head merge profile passes.
+# Wait for inbound sync, the protected internal-main gate, and publish-github.
 git fetch <github-remote> main
 test "$(git rev-parse <github-remote>/main)" = "<validated-internal-main-sha>"
 git tag "v${NEW_VERSION}" <validated-internal-main-sha>

@@ -197,10 +197,42 @@ def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
-            resolved = RedfishManager._event_loop()
+            resolved, created = RedfishManager._event_loop(include_ownership=True)
         assert resolved is loop
+        assert created is True
     finally:
         loop.close()
+
+
+def test_sync_helper_closes_a_historically_auto_created_loop(monkeypatch):
+    """A warning-signaled policy loop is owned and closed by the sync helper."""
+    loop = asyncio.new_event_loop()
+    installed = []
+
+    def historical_direct_lookup():
+        warnings.warn(
+            "There is no current event loop",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return loop
+
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop",
+        historical_direct_lookup,
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "set_event_loop",
+        installed.append,
+    )
+
+    assert RedfishManager._run_coroutine_sync(
+        asyncio.sleep(0, result="done")
+    ) == "done"
+    assert loop.is_closed()
+    assert installed == [None]
 
 
 def test_event_loop_helper_does_not_hide_unrelated_deprecation(monkeypatch):

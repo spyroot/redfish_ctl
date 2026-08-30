@@ -238,6 +238,25 @@ def smoke_timeout_seconds(record: Mapping[str, object]) -> int:
     return timeout
 
 
+def gate_timeout_seconds(record: Mapping[str, object]) -> int:
+    """Return one bounded provider gate timeout.
+
+    :param record: one provider-facing gate record from ``gates/manifest.yaml``.
+    :return: timeout from 60 through 3600 seconds.
+    :raises EvidenceError: when the provider record omits or corrupts the timeout.
+    """
+    timeout = record.get("timeoutSeconds")
+    if (
+        not isinstance(timeout, int)
+        or isinstance(timeout, bool)
+        or not 60 <= timeout <= 3600
+    ):
+        raise EvidenceError(
+            "provider gate timeoutSeconds must be an integer from 60 through 3600"
+        )
+    return timeout
+
+
 def select_release_blocking_smoke(
     inventory: Mapping[str, object],
     *,

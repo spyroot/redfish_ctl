@@ -77,9 +77,13 @@ def release_next_steps(new: str) -> tuple[str, ...]:
     return (
         "git add redfish_ctl/version.py",
         f"git commit -m 'Release {new}'",
-        "git push <internal-gitlab-remote> HEAD",
-        "Merge the release branch only after exact-head Internal GitLab gates pass.",
-        "Wait for publish-github, defined in .gitlab-ci.yml, to mirror that commit.",
+        "git push <github-remote> HEAD",
+        "Open or update the GitHub pull request for this release branch.",
+        "Wait for the configured Sync Now path to mirror this exact head.",
+        "./scripts/check.sh --profile merge --dispatch --apply "
+        "--confirm-project-ci-run",
+        "Merge the GitHub pull request only after the exact-head merge profile passes.",
+        "Wait for inbound sync, the protected internal-main gate, and publish-github.",
         "git fetch <github-remote> main",
         'test "$(git rev-parse <github-remote>/main)" = '
         '"<validated-internal-main-sha>"',

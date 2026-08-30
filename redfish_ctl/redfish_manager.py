@@ -178,14 +178,19 @@ class RedfishManager:
         :raises RuntimeError: never — the no-loop case is handled by creating one.
         """
         try:
-            with warnings.catch_warnings():
+            with warnings.catch_warnings(record=True) as caught:
                 warnings.filterwarnings(
-                    "ignore",
+                    "always",
                     message="There is no current event loop",
                     category=DeprecationWarning,
                 )
                 loop = asyncio.get_event_loop()
-                return (loop, False) if include_ownership else loop
+                created = any(
+                    issubclass(item.category, DeprecationWarning)
+                    and "There is no current event loop" in str(item.message)
+                    for item in caught
+                )
+                return (loop, created) if include_ownership else loop
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

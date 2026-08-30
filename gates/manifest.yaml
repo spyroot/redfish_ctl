@@ -169,7 +169,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -187,7 +187,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -205,7 +205,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -223,7 +223,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -241,7 +241,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -259,7 +259,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -277,7 +277,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -295,7 +295,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -313,7 +313,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -331,7 +331,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -367,7 +367,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -385,7 +385,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -403,7 +403,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -421,7 +421,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -439,7 +439,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -457,7 +457,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -475,7 +475,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -493,7 +493,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -511,7 +511,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -529,7 +529,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -547,7 +547,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -565,7 +565,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -583,7 +583,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -601,7 +601,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -619,7 +619,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -637,7 +637,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -655,7 +655,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -673,7 +673,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -691,7 +691,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -799,7 +799,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -835,7 +835,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -853,7 +853,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -871,7 +871,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -889,7 +889,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu
@@ -907,7 +907,7 @@ spec:
       status: active
       isolation: offline
       permissions: read-only
-      executionSurface: github
+      executionSurface: internal-gitlab
       requiredCredentialNames: []
       platform: portable
       workload: cpu

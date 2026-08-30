@@ -63,12 +63,15 @@ variables:
       if: >-
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        ($PROJECT_CI_PROFILE == null || $PROJECT_CI_PROFILE == "") &&
+        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
         $FOCUSED_GATE != null && $FOCUSED_GATE != ""
     - &builder-focused-dispatch
       if: >-
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
         ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
         $PROJECT_CI_PROFILE == "focused"
 
 .merge-profile-dispatch:
@@ -78,6 +81,7 @@ variables:
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
         ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        ($PROJECT_CI_PROFILE == null || $PROJECT_CI_PROFILE == "") &&
         $MERGE_PROFILE == "merge"
 
 focused-gate:
@@ -93,7 +97,6 @@ focused-gate:
   artifacts:
     when: always
     paths:
-      - reports/gate-report.sanitized.json
       - reports/ci/focused-gate.json
       - reports/gates/
 
@@ -114,7 +117,6 @@ gate-merge:
   artifacts:
     when: always
     paths:
-      - reports/gate-report.sanitized.json
       - reports/ci/gate-merge.json
       - reports/gates/
       - reports/smoke/gate-merge.json
@@ -132,7 +134,6 @@ gate-integration:
   artifacts:
     when: always
     paths:
-      - reports/gate-report.sanitized.json
       - reports/ci/gate-integration.json
       - reports/gates/
       - reports/smoke/gate-integration.json
@@ -148,6 +149,8 @@ project-ci-cpu-validation:
     - if: >-
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        ($MERGE_PROFILE == null || $MERGE_PROFILE == "") &&
         $PROJECT_CI_PROFILE == "full"
     - when: never
   artifacts:

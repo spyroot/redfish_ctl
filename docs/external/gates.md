@@ -123,7 +123,9 @@ GitLab pipeline evidence.
 A runtime test skip in `unit.all` also makes its evidence non-green; live and
 vendored-schema-only lanes are excluded before execution. The `timeoutSeconds`
 field, defined for each required job in `inventory/ci/smoke-tests.yaml`, bounds
-the complete gate sequence.
+the complete gate sequence. Each provider-facing gate record in
+`gates/manifest.yaml` defines its own `timeoutSeconds`; the runner applies the
+lesser of that value and the time remaining for the complete sequence.
 
 The gate runner writes exact-identity JSON under `reports/gates/`. Required job
 and smoke artifacts are defined in
