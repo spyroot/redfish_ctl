@@ -90,7 +90,14 @@ assert_dmtf_bundle() {
 		awk '$1 == "sha256:" {gsub(/"/, "", $2); print $2; exit}' \
 			"$DMTF_CONTRACT_PATH"
 	)"
-	actual_sha="$(shasum -a 256 "$DMTF_BUNDLE_PATH" | awk '{print $1}')"
+	if command -v sha256sum >/dev/null 2>&1; then
+		actual_sha="$(sha256sum "$DMTF_BUNDLE_PATH" | awk '{print $1}')"
+	elif command -v shasum >/dev/null 2>&1; then
+		actual_sha="$(shasum -a 256 "$DMTF_BUNDLE_PATH" | awk '{print $1}')"
+	else
+		printf 'DSP2043 verification requires sha256sum or shasum\n' >&2
+		return 1
+	fi
 	if [ -z "$expected_sha" ] || [ "$actual_sha" != "$expected_sha" ]; then
 		printf 'DSP2043 bundle hash mismatch: expected %s, got %s\n' \
 			"${expected_sha:-missing-contract-hash}" "$actual_sha" >&2
@@ -340,7 +347,6 @@ require_tool kind
 require_tool kubectl
 if has_backend "dmtf-sim"; then
 	require_tool git
-	require_tool shasum
 	assert_dmtf_bundle
 fi
 
