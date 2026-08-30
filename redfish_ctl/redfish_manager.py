@@ -192,18 +192,26 @@ class RedfishManager:
             return (loop, True) if include_ownership else loop
 
     @classmethod
-    def _run_coroutine_sync(cls, coroutine):
+    def _run_coroutine_sync(cls, coroutine_or_factory):
         """Run one coroutine without leaking a helper-created event loop.
 
         A loop installed by an embedding application remains owned by that
         application. When no loop is installed, this helper creates, installs,
-        closes, and clears one around the synchronous operation.
+        closes, and clears one around the synchronous operation. A callable may
+        be supplied when constructing the coroutine itself requires the selected
+        loop.
 
-        :param coroutine: coroutine object to execute to completion.
+        :param coroutine_or_factory: coroutine object, or callable accepting the
+            selected loop and returning a coroutine.
         :return: the coroutine result.
         """
         loop, created = cls._event_loop(include_ownership=True)
         try:
+            coroutine = (
+                coroutine_or_factory(loop)
+                if callable(coroutine_or_factory)
+                else coroutine_or_factory
+            )
             return loop.run_until_complete(coroutine)
         finally:
             if created:

@@ -56,17 +56,19 @@ publication.
 Before pushing a release tag, configure the Docker Hub repository secrets when
 `docker/Dockerfile` is present.
 
-The manual steps below remain valid as a fallback before the trusted publisher is configured.
+Trusted Publishing must be configured before any `v*` release tag. The build
+and install steps below inspect an artifact; they are not a manual publication
+fallback.
 
 ## Release Checklist
 
 Use this order so a broken package does not reach PyPI:
 
-1. Verify the tree.
+1. Verify the exact commit through Internal GitLab.
 2. Build source and wheel distributions.
 3. Inspect/install the built artifact locally.
-4. Upload with `twine`.
-5. Tag the release.
+4. Wait for the gated GitHub mirror of that commit.
+5. Tag the exact mirrored commit; the release workflow publishes it.
 
 ## Verify
 
@@ -94,7 +96,8 @@ python setup.py sdist bdist_wheel
 python -m twine check dist/*
 ```
 
-`twine check`, run by you before upload, verifies the built package metadata and README rendering.
+`twine check` verifies the built package metadata and README rendering without
+uploading it.
 
 ## Local Install Check
 
@@ -113,24 +116,16 @@ The current `local_install.sh` helper creates a `test1` conda environment, build
 then runs `python setup.py install`. It does not install the wheel with `pip`, so treat it as a
 developer shortcut, not the full release gate above.
 
-## Upload
-
-`TWINE_USERNAME` and `TWINE_PASSWORD`, set by the maintainer shell or `~/.pypirc`, provide PyPI
-credentials for `twine upload`.
-
-```bash
-python -m twine upload dist/*
-```
-
-PyPI versions are immutable. Once uploaded, the same version number cannot be reused.
-
 ## Tag
 
-After a manual upload, use the exact validated-and-mirrored commit procedure in
+Use the exact validated-and-mirrored commit procedure in
 [Automated release](#automated-release-recommended). Do not tag an implicit
 working-tree `HEAD` or push unrelated local tags.
 
 ## Helper Scripts
+
+These legacy helpers are not part of the tagged release path. Two upload
+directly, so do not run them for a release managed by Trusted Publishing.
 
 - `build_dist.sh`, defined in the repo root, builds `sdist`, installs `check-manifest`, builds wheel
   plus `sdist` again, then uploads `dist/*` with `twine`. It installs `check-manifest` but does not
@@ -139,5 +134,3 @@ working-tree `HEAD` or push unrelated local tags.
   `dist/*` with `twine`.
 - `local_install.sh`, defined in the repo root, creates `test1`, builds distributions, and runs
   `python setup.py install`.
-
-Because those scripts can upload, read them before running them.

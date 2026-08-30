@@ -151,6 +151,25 @@ def test_sync_coroutine_helper_preserves_an_installed_loop():
         asyncio.set_event_loop(None)
 
 
+def test_sync_coroutine_helper_supplies_and_closes_its_selected_loop():
+    """Loop-dependent transports receive the helper-owned loop before cleanup."""
+    asyncio.set_event_loop(None)
+    selected = []
+
+    async def identify_loop(loop):
+        return asyncio.get_running_loop() is loop
+
+    def coroutine_factory(loop):
+        selected.append(loop)
+        return identify_loop(loop)
+
+    assert RedfishManager._run_coroutine_sync(coroutine_factory) is True
+    assert len(selected) == 1
+    assert selected[0].is_closed()
+    with pytest.raises(RuntimeError, match="There is no current event loop"):
+        asyncio.get_event_loop()
+
+
 def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     monkeypatch,
 ):
