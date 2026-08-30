@@ -12,6 +12,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = REPO_ROOT / "tools" / "project-ci-cpu-validation.sh"
+YQ_MERGE_ANCHOR_WARNING = (
+    'time=2026-08-30T00:00:00Z level=WARN '
+    'msg="--yaml-fix-merge-anchor-to-spec is false; '
+    'this flag will default to true in late 2025."'
+)
 
 
 def _resolve_mode(
@@ -74,6 +79,37 @@ def _run_adapter(
     return subprocess.run(
         [str(ADAPTER), *args],
         cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_public_adapter_with_successful_stderr(
+    tmp_path: Path,
+    stderr_lines: list[str],
+) -> subprocess.CompletedProcess[str]:
+    """Run the public adapter entrypoint against a successful fake check.sh."""
+    project_root = tmp_path / "project"
+    scripts_dir = project_root / "scripts"
+    scripts_dir.mkdir(parents=True)
+    stderr_path = project_root / "dependency.stderr"
+    stderr_path.write_text("\n".join(stderr_lines) + "\n", encoding="utf-8")
+    check_script = scripts_dir / "check.sh"
+    check_script.write_text(
+        "#!/bin/bash\n"
+        "set -Eeuo pipefail\n"
+        "cat \"$PROJECT_CI_TEST_STDERR\" >&2\n",
+        encoding="utf-8",
+    )
+    check_script.chmod(0o755)
+    env = os.environ.copy()
+    env["PROJECT_CI_PROFILE"] = "full"
+    env["PROJECT_CI_TEST_STDERR"] = str(stderr_path)
+    return subprocess.run(
+        [str(ADAPTER), "--run-id", "public-stderr-contract"],
+        cwd=project_root,
         env=env,
         check=False,
         capture_output=True,
@@ -379,7 +415,7 @@ def test_successful_dependency_yq_warning_is_sanitized(tmp_path: Path) -> None:
     dependency = tmp_path / "dependency.sh"
     dependency.write_text(
         "#!/bin/bash\n"
-        "printf 'level=WARN msg=\"yq wrote advisory warning\"\\n' >&2\n",
+        f"printf '%s\\n' '{YQ_MERGE_ANCHOR_WARNING}' >&2\n",
         encoding="utf-8",
     )
     dependency.chmod(0o755)
@@ -398,7 +434,56 @@ def test_successful_dependency_yq_warning_is_sanitized(tmp_path: Path) -> None:
     assert "classes=auth:0,network:0,warning:1,error:0,other:0" in result.stderr
     assert "redaction=full" in result.stderr
     assert "level=WARN" not in combined
-    assert "yq wrote advisory warning" not in combined
+    assert "--yaml-fix-merge-anchor-to-spec is false" not in combined
+
+
+def test_public_entrypoint_non_warning_stderr_fails_closed(tmp_path: Path) -> None:
+    cases = [
+        (
+            "auth",
+            ["HTTP 401 Unauthorized while reading private credential"],
+            "classes=auth:1,network:0,warning:0,error:0,other:0",
+        ),
+        (
+            "network",
+            ["DNS timeout while connecting to dependency"],
+            "classes=auth:0,network:1,warning:0,error:0,other:0",
+        ),
+        (
+            "error",
+            ["fatal: dependency failed with error"],
+            "classes=auth:0,network:0,warning:0,error:1,other:0",
+        ),
+        (
+            "other",
+            ["private dependency detail"],
+            "classes=auth:0,network:0,warning:0,error:0,other:1",
+        ),
+        (
+            "mixed-warning-error",
+            [YQ_MERGE_ANCHOR_WARNING.replace('2025."', '2025: fatal failure."')],
+            "classes=auth:0,network:0,warning:0,error:1,other:0",
+        ),
+    ]
+
+    for case_name, stderr_lines, expected_classes in cases:
+        case_tmp_path = tmp_path / case_name
+        result = _run_public_adapter_with_successful_stderr(
+            case_tmp_path,
+            stderr_lines,
+        )
+        combined = result.stdout + result.stderr
+
+        assert result.returncode == 2, case_name
+        assert "status=failed" in result.stdout
+        assert "warning_count=1" in result.stdout
+        assert "error_class=dependency-stderr" in result.stdout
+        assert "result=failed" in result.stderr
+        assert "stderr-lines=" in result.stderr
+        assert expected_classes in result.stderr
+        assert "redaction=full" in result.stderr
+        for raw_line in stderr_lines:
+            assert raw_line not in combined
 
 
 def test_dependency_stderr_is_counted_but_not_replayed(tmp_path: Path) -> None:

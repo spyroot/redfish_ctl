@@ -458,10 +458,14 @@ project_ci_stderr_counts() {
         auth++
       } else if (text ~ /(timeout|connection|network|dns|unreachable|reset)/) {
         network++
-      } else if (text ~ /(warning|deprecated|level=warn)/) {
-        warning++
       } else if (text ~ /(error|failed|failure|fatal)/) {
         error++
+      } else if (
+        text ~ /^time=[^[:space:]]+ level=warn msg="/ &&
+        text ~ /--yaml-fix-merge-anchor-to-spec is false;/ &&
+        text ~ /this flag will default to true in late 2025\."$/
+      ) {
+        warning++
       } else {
         other++
       }
