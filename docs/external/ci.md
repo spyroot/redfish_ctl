@@ -144,6 +144,9 @@ Triggers on pushes to `main` and on every pull request.
   Python **3.10**.
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
+- Runs blocking docstring checks with `python tools/docstring_gate.py --base FETCH_HEAD`
+  for pull-request changes and `python tools/docstring_gate.py --all` for the
+  whole tree.
 - Uses **no secrets** and never contacts a BMC (live `@pytest.mark.live` tests
   auto-skip with no `REDFISH_IP`). Checkout enables Git LFS for the committed
   offline corpus and specification artifacts used by the suite.
