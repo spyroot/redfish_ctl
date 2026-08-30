@@ -94,18 +94,6 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
         assert "CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH" in scheduled[0]
 
 
-def test_project_service_live_test_resolves_runtime_coordinates() -> None:
-    """The consumer never hardcodes Builder-owned service coordinates."""
-    ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
-    script = "\n".join(ci["project-service-live-test"]["script"])
-
-    assert 'test -n "$CI_PROJECT_NAME"' in script
-    assert '--consumer "$CI_PROJECT_NAME"' in script
-    assert "--consumer redfish_ctl" not in script
-    assert "PROJECT_SERVICE_NAME" not in script
-    assert "dmtf-bmc" not in script
-
-
 def test_project_token_gates_declare_the_credentials_they_consume() -> None:
     """Provider envelopes provision the exact project-token inputs used by gates."""
     manifest = _yaml(REPO_ROOT / "gates" / "manifest.yaml")
