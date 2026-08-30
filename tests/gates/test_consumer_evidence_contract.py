@@ -102,6 +102,7 @@ def _gate_observations(return_code: int = 0) -> dict:
         "return_code": return_code,
         "timed_out": False,
         "timeout_seconds": 3600,
+        "applied_timeout_seconds": [3600],
         "warnings": 0,
         "skipped_required_tests": 0,
         "skipped_optional_tests": 0,
@@ -273,6 +274,7 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
     }
     gate_observations = _gate_observations()
     gate_observations["timeout_seconds"] = 1800
+    gate_observations["applied_timeout_seconds"] = [1799.5, 1200]
     smoke_observations = observe_smoke(
         record=record,
         gate_observations=gate_observations,
@@ -282,7 +284,7 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
 
     assert smoke_timeout_seconds(record) == 1800
     assert smoke_observations["bounded_timeout"] is True
-    gate_observations["timeout_seconds"] = 3600
+    gate_observations["applied_timeout_seconds"] = [1800.1]
     mismatched = observe_smoke(
         record=record,
         gate_observations=gate_observations,
@@ -326,6 +328,20 @@ def test_evidence_rejects_missing_or_mutable_runner_identity(tmp_path: Path) -> 
     env = _ci_env_for(root)
     env["PROJECT_CI_IMAGE_DIGEST"] = "sha256:" + ("0" * 64)
     with pytest.raises(EvidenceError, match="disagrees with CI_JOB_IMAGE"):
+        build_evidence(
+            kind="job",
+            name="gate-merge",
+            command="./scripts/check.sh --profile merge",
+            status="passed",
+            return_code=0,
+            observations=_gate_observations(),
+            env=env,
+            root=root,
+        )
+    env = _ci_env_for(root)
+    del env["CI_JOB_IMAGE"]
+    env["PROJECT_CI_IMAGE_DIGEST"] = DIGEST
+    with pytest.raises(EvidenceError, match="CI_JOB_IMAGE"):
         build_evidence(
             kind="job",
             name="gate-merge",

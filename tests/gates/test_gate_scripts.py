@@ -269,6 +269,23 @@ def test_check_sh_accepts_focused_gate_syntax_but_preserves_local_refusal() -> N
     assert "=== gate" not in combined, f"the guard let a gate start locally: {combined}"
 
 
+def test_check_sh_rejects_unsafe_gate_without_reflecting_it() -> None:
+    """Dispatcher input is bounded before it can reach runner diagnostics."""
+    unsafe = "gl" + "pat-" + ("A" * 24) + "/newline\n"
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", unsafe],
+        capture_output=True,
+        text=True,
+        env=_off_cluster_env(),
+        cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 2
+    assert unsafe not in combined
+    assert "safe registry identifier" in combined
+    assert "=== gate" not in combined
+
+
 @pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
 def test_check_sh_still_runs_in_cluster() -> None:
     """check.sh accepts a real pod, so the hardened guard cannot break the in-cluster CI job.

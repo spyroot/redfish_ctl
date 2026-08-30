@@ -65,11 +65,12 @@ The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
 Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
 merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
 `repo.format`; the job runs that one gate through the Kubernetes-guarded
-`scripts/check.sh` entrypoint. The local overlay disables the imported
+`scripts/check.sh` entrypoint. The `.gitlab-ci.yml` rules disable the imported
 `project-ci-cpu-validation` job for this selector, so a focused pipeline has
-exactly one job. Builder profile dispatch selects only the imported job:
-`focused` runs its `unit.all` default, while `full` executes every merge gate
-and publishes required smoke. A focused result cannot replace complete merge
+exactly one job. Builder's `focused` profile also selects the local
+project `focused-gate` job and runs its `unit.all` default. Builder's `full`
+profile selects only the imported job, executes every merge gate, and publishes
+its required smoke artifact. A focused result cannot replace complete merge
 evidence. Merge-request and default-branch pipelines continue to select
 `gate-merge` through their normal GitLab rules.
 

@@ -496,6 +496,15 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
                 failures.append(
                     f"gitlab job {name}: trusted external job must declare a local stage")
         else:
+            if name in BUILDER_IMPORTED_JOBS:
+                if "tags" not in job:
+                    failures.append(
+                        f"gitlab job {name}: imported job overlay must declare local runner tags"
+                    )
+                if job.get("allow_failure") is not False:
+                    failures.append(
+                        f"gitlab job {name}: imported job overlay must declare allow_failure:false"
+                    )
             protected_action = any(
                 token in name
                 for token in ("apply", "deploy", "publish", "rollback")

@@ -585,8 +585,12 @@ def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
         _ci_config()["project-ci-cpu-validation"].get("rules")
     )
     assert "FOCUSED_GATE" not in provider_rules
-    assert '$PROJECT_CI_PROFILE == "focused"' in provider_rules
+    assert '$PROJECT_CI_PROFILE == "focused"' not in provider_rules
     assert '$PROJECT_CI_PROFILE == "full"' in provider_rules
+    assert '$CI_SERVER_HOST == "gitlab.rnd.embedings.ai"' in provider_rules
+    provider = _ci_config()["project-ci-cpu-validation"]
+    assert provider.get("allow_failure") is False
+    assert "homelab-k8s" in provider.get("tags", [])
 
 
 def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> None:
@@ -601,8 +605,8 @@ def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> N
         assert selected == ["focused-gate"]
 
 
-def test_builder_focused_profile_selects_only_provider_cpu_job() -> None:
-    """Builder's focused profile selects one provider job with the unit default."""
+def test_builder_focused_profile_selects_only_local_focused_job() -> None:
+    """Builder's focused profile selects the diagnostic unit.all job."""
     for source in ("api", "web"):
         selected = _selected_jobs(
             include_imported_overlays=True,
@@ -610,6 +614,19 @@ def test_builder_focused_profile_selects_only_provider_cpu_job() -> None:
             FOCUSED_GATE=None,
             MERGE_PROFILE=None,
             PROJECT_CI_PROFILE="focused",
+        )
+        assert selected == ["focused-gate"]
+
+
+def test_builder_full_profile_selects_only_provider_cpu_job() -> None:
+    """Builder's full profile selects the required smoke-producing job."""
+    for source in ("api", "web"):
+        selected = _selected_jobs(
+            include_imported_overlays=True,
+            CI_PIPELINE_SOURCE=source,
+            FOCUSED_GATE=None,
+            MERGE_PROFILE=None,
+            PROJECT_CI_PROFILE="full",
         )
         assert selected == ["project-ci-cpu-validation"]
 

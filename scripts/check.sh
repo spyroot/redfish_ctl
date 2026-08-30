@@ -40,6 +40,20 @@ _in_cluster() {
     _kubelet_evidence
 }
 
+# Summary: Validate one bounded registry gate identifier without reflection.
+# Arguments: candidate gate id. Environment: none. Stdout/stderr: none.
+# Exit classes: zero safe, one unsafe. Side effects: none.
+_safe_gate_id() {
+  [ "$#" -eq 1 ] || return 1
+  [ -n "$1" ] || return 1
+  [ "${#1}" -le 128 ] || return 1
+  case "$1" in
+    [A-Za-z0-9]*[!A-Za-z0-9._-]*) return 1 ;;
+    [A-Za-z0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Summary: Resolve the exact Builder-owned project CI entrypoint.
 # Arguments: none. Environment: none. Stdout: executable path.
 # Stderr: classified blocker text. Exit classes: 0 resolved, 78 blocked.
@@ -237,6 +251,11 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+if [ -n "$gate" ] && ! _safe_gate_id "$gate"; then
+  echo "check.sh: --gate must be a safe registry identifier" >&2
+  exit 2
+fi
 
 if $list; then
   if [ -n "$profile" ] || [ -n "$gate" ] || $dispatch || \

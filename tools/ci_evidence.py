@@ -108,15 +108,11 @@ def _runner_digest(env: Mapping[str, str], root: Path) -> str:
         )
         if env.get(name, "").strip()
     ]
-    if image_digest:
-        if any(value != image_digest for value in asserted_digests):
-            raise EvidenceError("runner digest assertion disagrees with CI_JOB_IMAGE")
-        value = image_digest
-    else:
-        unique_assertions = set(asserted_digests)
-        if len(unique_assertions) != 1:
-            raise EvidenceError("approved runner image digest is missing or ambiguous")
-        value = unique_assertions.pop()
+    if not image_digest:
+        raise EvidenceError("CI_JOB_IMAGE must carry the immutable runner digest")
+    if any(value != image_digest for value in asserted_digests):
+        raise EvidenceError("runner digest assertion disagrees with CI_JOB_IMAGE")
+    value = image_digest
     if not _DIGEST_RE.fullmatch(value):
         raise EvidenceError("approved runner image digest is missing or not immutable")
     ci = yaml.safe_load((root / ".gitlab-ci.yml").read_text(encoding="utf-8"))
@@ -424,12 +420,17 @@ def observe_smoke(
     remaining = sorted(set(after) - set(before))
     smoke_class = str(record.get("class", ""))
     inventory_timeout = smoke_timeout_seconds(record)
-    observed_timeout = gate_observations.get("timeout_seconds")
+    applied_timeouts = gate_observations.get("applied_timeout_seconds")
     timed_out = gate_observations.get("timed_out")
     bounded_timeout = (
-        isinstance(observed_timeout, (int, float))
-        and not isinstance(observed_timeout, bool)
-        and observed_timeout == inventory_timeout
+        isinstance(applied_timeouts, list)
+        and bool(applied_timeouts)
+        and all(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and 0 < value <= inventory_timeout
+            for value in applied_timeouts
+        )
         and timed_out is False
     )
     protected_surface = smoke_class != "protected-live" or (
@@ -458,8 +459,9 @@ def observe_smoke(
             "negative_path": "real scripts/check.sh --list with python3 removed from PATH",
             "read_back": "independent git rev-parse HEAD",
             "bounded_timeout": (
-                f"inventory timeoutSeconds={inventory_timeout} applied to the "
-                f"registered gate profile; timed_out={timed_out!r}"
+                f"observed per-gate subprocess bounds are positive and no greater "
+                f"than inventory timeoutSeconds={inventory_timeout}; "
+                f"timed_out={timed_out!r}"
             ),
             "idempotent_noop": "two identical scripts/check.sh --list executions",
             "protected_surface": "Internal GitLab protected-ref environment assertion",

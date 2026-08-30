@@ -64,6 +64,12 @@ variables:
         $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
         ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
         $FOCUSED_GATE != null && $FOCUSED_GATE != ""
+    - &builder-focused-dispatch
+      if: >-
+        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        $PROJECT_CI_PROFILE == "focused"
 
 .merge-profile-dispatch:
   rules:
@@ -79,6 +85,7 @@ focused-gate:
   tags: [homelab-k8s]
   rules:
     - *focused-dispatch
+    - *builder-focused-dispatch
     - when: never
   script:
     # A focused result proves only this gate at this commit. It is not merge or release evidence.
@@ -95,6 +102,8 @@ gate-merge:
   tags: [homelab-k8s]
   rules:
     - <<: *focused-dispatch
+      when: never
+    - <<: *builder-focused-dispatch
       when: never
     - *merge-profile-dispatch
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -128,14 +137,18 @@ gate-integration:
       - reports/gates/
       - reports/smoke/gate-integration.json
 
-# The exact-revision Builder include owns this job's runner and command. This
-# overlay prevents FOCUSED_GATE from also selecting the imported job: the local
-# focused-gate job is the single focused-gate contract. Builder focused/full
-# profile dispatches continue to use this imported job.
+# The exact-revision Builder include owns this job's command. This overlay keeps
+# the required imported job full-profile only; focused diagnostics use the
+# local focused-gate job and cannot omit this job's required smoke artifact.
 project-ci-cpu-validation:
+  stage: project-ci-validation
+  tags: [homelab-k8s, homelab-k8s-validation]
+  allow_failure: false
   rules:
-    - if: '$PROJECT_CI_PROFILE == "focused"'
-    - if: '$PROJECT_CI_PROFILE == "full"'
+    - if: >-
+        $CI_SERVER_HOST == "gitlab.rnd.embedings.ai" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        $PROJECT_CI_PROFILE == "full"
     - when: never
   artifacts:
     when: always

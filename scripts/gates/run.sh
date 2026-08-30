@@ -52,6 +52,7 @@ fi
 exec python3 - "$profile" "$gate" <<'PY'
 import os
 import pathlib
+import re
 import sys
 import time
 
@@ -70,6 +71,10 @@ from tools.ci_evidence import (
 
 profile = sys.argv[1]
 selected_gate = sys.argv[2] or None
+safe_gate = re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", selected_gate or "")
+if selected_gate and not safe_gate:
+    print("run.sh: unsafe gate identifier", file=sys.stderr)
+    sys.exit(2)
 registry = yaml.safe_load(pathlib.Path("gates/manifest.yaml").read_text(encoding="utf-8"))
 known = sorted({g.get("profile") for g in registry["gates"] if g.get("profile")})
 if profile not in known:
@@ -113,9 +118,12 @@ if selected_gate:
         f"for {job_name}"
     )
 try:
-    profile_timeout_seconds = (
-        smoke_timeout_seconds(smoke_record) if smoke_record else 3600
-    )
+    if smoke_record:
+        profile_timeout_seconds = smoke_timeout_seconds(smoke_record)
+        timeout_source = "inventory timeoutSeconds applied across registered gates"
+    else:
+        profile_timeout_seconds = 3600
+        timeout_source = "runner default: no smoke inventory record for this job"
 except EvidenceError as exc:
     print(f"EVIDENCE FAILED: {exc}", file=sys.stderr)
     sys.exit(1)
@@ -127,6 +135,7 @@ job_observations = {
     "return_code": 0,
     "timed_out": False,
     "timeout_seconds": profile_timeout_seconds,
+    "applied_timeout_seconds": [],
     "warnings": 0,
     "skipped_required_tests": 0,
     "skipped_optional_tests": 0,
@@ -135,7 +144,7 @@ job_observations = {
     "sources": {
         "warnings": "captured output from every executed gate",
         "skips": "pytest -ra reasons from every executed gate",
-        "timeout": "inventory timeoutSeconds applied across registered gates",
+        "timeout": timeout_source,
         "cleanup": "per-gate git status tracked-state comparisons",
         "sanitization": "quiet credential-pattern scan before atomic write",
     },
@@ -146,6 +155,9 @@ for gate in gates:
     observations = observe_gate(
         command=gate["command"],
         timeout_seconds=remaining_seconds,
+    )
+    job_observations["applied_timeout_seconds"].append(
+        observations["timeout_seconds"]
     )
     return_code = observations["return_code"]
     status = "passed" if return_code == 0 else "failed"
