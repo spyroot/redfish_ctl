@@ -290,6 +290,7 @@ def test_namespace_gate_resolves_builder_owned_namespace_and_service(
         env={
             **os.environ,
             "CI_PROJECT_NAME": "runtime-project",
+            "PROJECT_SERVICE_NAME": "redfish-ctl-dmtf-sim",
             "PATH": f"{command_dir}:{os.environ['PATH']}",
             "RESOLVER_ARGS": str(arguments),
         },
@@ -301,6 +302,8 @@ def test_namespace_gate_resolves_builder_owned_namespace_and_service(
     assert arguments.read_text(encoding="utf-8").splitlines() == [
         "--consumer",
         "runtime-project",
+        "--service",
+        "redfish-ctl-dmtf-sim",
         "--format",
         "json",
     ]

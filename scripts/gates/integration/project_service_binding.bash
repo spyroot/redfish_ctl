@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 # Resolve and validate Builder-owned project-service coordinates.
 
-# Summary: Resolve the project-service binding for one runtime consumer.
-# Arguments: consumer project name. Stdout: Builder binding JSON.
+# Summary: Resolve one binding by consumer project and service inventory key.
+# Arguments: consumer project name and service inventory name.
+# Stdout: Builder binding JSON.
 # Exit classes: provider resolver status. Side effects: read-only inventory access.
 # Idempotency: deterministic for one provider inventory revision. Cleanup: none.
 project_service_binding_resolve() {
-    local consumer="$1" resolver
+    local consumer="$1" service="$2" resolver
     resolver="$(command -v builder-project-resolve-binding 2>/dev/null || true)"
     if [ -z "$resolver" ]; then
         echo "BLOCKER: Builder project-service resolver is unavailable" >&2
         echo "SAFE_NEXT_STEP: use the toolbox image declared by the Builder binding" >&2
         return 78
     fi
-    "$resolver" --consumer "$consumer" --format json
+    "$resolver" \
+        --consumer "$consumer" \
+        --service "$service" \
+        --format json
 }
 
 # Summary: Extract the namespace and service endpoint from a resolved binding.

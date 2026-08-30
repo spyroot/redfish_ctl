@@ -43,6 +43,8 @@ variables:
   CONDA_ENV: redfish_ctl
   EXPECTED_PROVIDER_REVISION: d3234c26f71f5a229bba28971d37ff38085c1da3
   PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
+  # Inventory selector only. Builder resolves namespace and endpoint coordinates.
+  PROJECT_SERVICE_NAME: redfish-ctl-dmtf-sim
   DMTF_RELEASE: "2026.1"
   PROJECT_LIVE_TEST_COMMAND: >-
     pytest -q -m dmtf_sim_live

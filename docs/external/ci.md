@@ -128,10 +128,12 @@ Run the simulator deployment only from the protected default-branch pipeline
 in Internal GitLab. The exact provider template is allow-listed by
 `trusted_includes` in `gates/manifest.yaml`; see [Trusted provider
 includes](gates.md#trusted-provider-includes). The pipeline supplies
-`DMTF_RELEASE` and `PROJECT_LIVE_TEST_COMMAND`. The inherited exact Builder
-template resolves its registered service binding at runtime; that binding
-supplies `REDFISH_IP` and `REDFISH_PORT` to the live test. The consumer does
-not name or create the live namespace or service.
+`DMTF_RELEASE`, `PROJECT_LIVE_TEST_COMMAND`, and `PROJECT_SERVICE_NAME`; the
+last value is the service inventory key, not a runtime coordinate. The
+`integration.namespace` gate pairs that key with GitLab's runtime project
+identity when calling the Builder resolver. The resolver returns the namespace,
+service host, port, and transport; the consumer does not name or create those
+runtime resources. The inherited deployment templates remain provider-owned.
 
 1. Play `project-service-image-publish` and
    `project-service-chart-publish`. Their exact-commit receipts supply the

@@ -10,9 +10,15 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 source scripts/gates/integration/project_service_binding.bash
 
 consumer="${CI_PROJECT_NAME:-}"
+service="${PROJECT_SERVICE_NAME:-}"
 if [ -z "$consumer" ]; then
     echo "BLOCKER: integration.namespace requires CI_PROJECT_NAME from GitLab" >&2
     echo "SAFE_NEXT_STEP: run this gate through the registered Builder project CI path" >&2
+    exit 78
+fi
+if [ -z "$service" ]; then
+    echo "BLOCKER: integration.namespace requires PROJECT_SERVICE_NAME from project CI" >&2
+    echo "SAFE_NEXT_STEP: set the registered Builder service inventory name in .gitlab-ci.yml" >&2
     exit 78
 fi
 case "$consumer" in
@@ -23,7 +29,7 @@ case "$consumer" in
 esac
 
 set +e
-binding="$(project_service_binding_resolve "$consumer")"
+binding="$(project_service_binding_resolve "$consumer" "$service")"
 resolve_status=$?
 set -e
 if [ "$resolve_status" -ne 0 ]; then

@@ -600,6 +600,7 @@ def test_gitlab_project_service_variables_bind_builder_revision_and_live_suite()
         "./tools/project-ci-cpu-validation.sh"
     )
     assert "BUILDER_PROJECT_CONSUMER" not in variables
+    assert variables.get("PROJECT_SERVICE_NAME") == "redfish-ctl-dmtf-sim"
     assert variables.get("DMTF_RELEASE") == "2026.1"
     assert variables.get("PROJECT_LIVE_TEST_COMMAND") == (
         "pytest -q -m dmtf_sim_live "
