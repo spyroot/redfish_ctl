@@ -106,16 +106,17 @@ availability.
 
 ### Evidence artifacts
 
-Local required jobs publish `reports/ci/<job>.json`, executed gates publish
+Local required jobs publish `reports/ci/<job>.json`, executed gates write
 `reports/gates/<gate-id>.json`, and required local smokes publish
-`reports/smoke/<job>.json`. The provider-owned CPU job emits its terminal result
-and gate evidence path through the Builder result contract. Evidence binds the
-result to the exact project commit, Standards revision, pipeline/job IDs, and
-immutable runner digest. Warning/skip counts come from captured gate output;
-cleanup comes from tracked-state comparison; exact identity comes from
+`reports/smoke/<job>.json`. The provider-owned CPU job emits terminal status
+through the Builder result contract; its current result does not carry an
+artifact path. Use the full `gate-merge` artifacts for merge evidence. Evidence
+binds the result to the exact project commit, Standards revision, pipeline/job
+IDs, and immutable runner digest. Warning/skip counts come from captured gate
+output; cleanup comes from tracked-state comparison; exact identity comes from
 independent Git read-back; and sanitization is recorded only after a quiet
-content scan and atomic file read-back. See
-[Gates](gates.md#failure-behavior) for execution and timeout policy.
+content scan and atomic file read-back. See [Gates](gates.md#failure-behavior)
+for execution and timeout policy.
 
 The upstream access prerequisite for `repo.schemas` is documented in
 [Gates](gates.md#selected-gate-summary).

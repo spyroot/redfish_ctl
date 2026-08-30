@@ -310,9 +310,7 @@ project-service-release-evidence:
     - when: never
 
 # Gated outbound mirror for an already-validated internal default-branch commit.
-# Runs exact-commit, agent-artifact, large-artifact, secret, and evidence-sanitization
-# boundary gates first, then pushes on pass. Protected default
-# branch only — never a merge request or scheduled canary pipeline.
+# Protected default branch only — never a merge request or scheduled canary.
 publish-github:
   stage: publish
   tags: [homelab-k8s]
@@ -327,13 +325,9 @@ publish-github:
         $CI_COMMIT_REF_PROTECTED == "true"
   before_script: []          # boundary gates need no project environment
   script:
-    # Run the PROFILE, not a hand-listed set of scripts. A hand-listed set silently stops covering
-    # the boundary the moment a gate is added to the registry — which is exactly how the exact-commit,
-    # agent-artifact and large-artifact checks came to be missing here.
+    # Run the configured repository-export profile, then the publication
+    # boundary scans that cannot share that profile.
     - ./scripts/check.sh --profile repository-export
-    # The shared contract's export chain also requires a secret scan and sanitized evidence. Both are
-    # registered under `merge` because they run there too, and the schema allows a gate exactly one
-    # profile, so they are named explicitly rather than duplicated under a second id.
     - ./scripts/gates/repository/no-secrets.sh
     - ./scripts/gates/evidence/sanitized.sh
     - ./scripts/publish_github.sh

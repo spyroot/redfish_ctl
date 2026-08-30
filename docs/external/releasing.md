@@ -50,6 +50,13 @@ HEAD_SHA="$(git rev-parse HEAD)"
 VALIDATION_REF="sync/pr-${PR_NUMBER}/${HEAD_SHA}"
 ./scripts/check.sh --profile merge --dispatch --ref "${VALIDATION_REF}" \
   --apply --confirm-project-ci-run
+```
+
+Stop before merging. Complete [Build](#build) and
+[Local Install Check](#local-install-check) for this exact head, then resume
+only after both artifact checks pass:
+
+```bash
 # Merge the GitHub pull request only after the exact-head merge profile passes.
 # Wait for inbound sync and the protected internal-main gate. If the project
 # enables publish-github, require its successful exact-commit read-back too.
