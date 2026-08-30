@@ -452,19 +452,15 @@ project_ci_stderr_counts() {
   awk '
     BEGIN {
       auth = network = warning = error = other = total = 0
-      apostrophe = sprintf("%c", 39)
-      expected_yq_warning = \
-        "level=warn msg=\"--yaml-fix-merge-anchor-to-spec is false; "
-      expected_yq_warning = expected_yq_warning \
-        "causing merge anchors to override the existing values which isn"
-      expected_yq_warning = expected_yq_warning apostrophe \
-        "t to the yaml spec. this flag will default to true in late 2025.\""
     }
     {
       text = tolower($0)
-      yq_warning_text = text
-      sub(/^time=[^[:space:]]+ /, "", yq_warning_text)
-      is_yq_merge_warning = (yq_warning_text == expected_yq_warning)
+      is_yq_merge_warning = 0
+      if (text ~ /^time=[^[:space:]]+ level=warn msg="/) {
+        if (text ~ /--yaml-fix-merge-anchor-to-spec is false/) {
+          is_yq_merge_warning = 1
+        }
+      }
       total++
       if (text ~ /(unauthorized|forbidden|credential|password|token|401|403)/) {
         auth++
