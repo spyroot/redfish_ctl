@@ -39,7 +39,7 @@ spec:
 
     - job: gate-merge
       class: wiring
-      command: './scripts/check.sh --profile "${MERGE_PROFILE:-merge}"'
+      command: ./scripts/check.sh --profile merge
       requiredTools: [bash, conda, git, git-lfs, python3]
       artifactUnderTest:
         type: repository
