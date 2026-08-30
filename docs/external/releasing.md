@@ -38,7 +38,8 @@ python tools/bump_version.py patch      # or minor / major — edits redfish_ctl
 NEW_VERSION="$(python tools/bump_version.py --show)"
 git add redfish_ctl/version.py
 git commit -m "Release ${NEW_VERSION}"
-# Push a release branch and merge it only after exact-head Internal GitLab gates pass.
+git push <internal-gitlab-remote> HEAD
+# Merge this release branch only after exact-head Internal GitLab gates pass.
 # Wait for that job to mirror the protected internal main commit, then:
 git fetch <github-remote> main
 test "$(git rev-parse <github-remote>/main)" = "<validated-internal-main-sha>"
