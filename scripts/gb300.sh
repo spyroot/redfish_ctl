@@ -95,11 +95,13 @@ case "$cmd" in
             _check image "$GB300_IMAGE" '^[A-Za-z0-9._/:-]+$'
             image_snippet="img=$GB300_IMAGE;"
         else
+            # shellcheck disable=SC2016 # $img expands only on the remote host.
             image_snippet='img=redfish-ctl-agent;
 docker image inspect "$img" >/dev/null 2>&1 || { echo "gb300: agent image not on this node yet, using base redfish-ctl-dev" >&2; img=redfish-ctl-dev; };'
         fi
         # The remote snippet assembles the secret mounts on the node itself so
         # a missing key file never turns into a root-owned bind-mount dir.
+        # shellcheck disable=SC2016 # $HOME and $m expand only on the remote host.
         remote_prefix='m="";
 [ -f "$HOME/.ssh/redfish_ctl_git" ] && m="$m -v $HOME/.ssh/redfish_ctl_git:/secrets/git_key:ro";
 [ -f "$HOME/.ssh/redfish_ctl_gh_token" ] && m="$m -v $HOME/.ssh/redfish_ctl_gh_token:/secrets/gh_token:ro";'

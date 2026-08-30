@@ -272,6 +272,15 @@ project-service-live-test:
   image: *builder-toolbox
   tags: [homelab-k8s, homelab-k8s-validation]
   allow_failure: false
+  before_script: []
+  script:
+    - test -n "$PROJECT_LIVE_TEST_COMMAND"
+    - test -n "$CI_PROJECT_NAME"
+    - >-
+      eval "$(/usr/local/bin/builder-project-resolve-binding
+      --consumer "$CI_PROJECT_NAME" --format shell)"
+    - /bin/bash -lc "$PROJECT_LIVE_TEST_COMMAND"
+    - /usr/local/bin/builder-project-record-live-test-evidence
   rules:
     - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

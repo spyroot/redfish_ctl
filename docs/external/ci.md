@@ -128,9 +128,12 @@ Run the simulator deployment only from the protected default-branch pipeline
 in Internal GitLab. The exact provider template is allow-listed by
 `trusted_includes` in `gates/manifest.yaml`; see [Trusted provider
 includes](gates.md#trusted-provider-includes). The pipeline supplies
-`DMTF_RELEASE` and `PROJECT_LIVE_TEST_COMMAND`. The exact Builder template
-resolves the registered consumer binding at runtime; that binding supplies
-`REDFISH_IP` and `REDFISH_PORT` to the live test.
+`DMTF_RELEASE` and `PROJECT_LIVE_TEST_COMMAND`. The
+`project-service-live-test` job defined in `.gitlab-ci.yml` requires GitLab's
+runtime `CI_PROJECT_NAME` and calls the Builder-provided
+`builder-project-resolve-binding` command. The resolved binding supplies
+`REDFISH_IP` and `REDFISH_PORT` to the live test; the consumer does not name
+the live namespace or service.
 
 1. Play `project-service-image-publish` and
    `project-service-chart-publish`. Their exact-commit receipts supply the

@@ -169,6 +169,7 @@ write_smoke_inventory() (
   mkdir -p "$output_dir"
   temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
 
+  # shellcheck disable=SC2329 # trap invokes this function by name.
   cleanup_smoke_inventory_temp() {
     if [[ -n "$temporary_path" && -e "$temporary_path" ]]; then
       rm -f -- "$temporary_path"

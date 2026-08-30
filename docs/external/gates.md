@@ -52,7 +52,7 @@ it without executing a gate.
 | `meta.ci-runner-tags` | merge | no | every GitLab job carries the `homelab-k8s` tag | a job missing the tag |
 | `meta.required-jobs` | merge | no | required jobs and their smoke contracts/evidence paths exist, with no `allow_failure` or MR-reachable live apply | a required job or smoke contract is missing or misconfigured |
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
-| `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
+| `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
 | `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a schema, revision, provider-include, or upstream job-token allow-list mismatch |

@@ -116,11 +116,8 @@ project_ci_log_event() {
           risk: $risk
         } end)')"
   else
-    printf -v text_format '%s' \
-      'level=%s run_id=%s component=project-ci-cpu-validation' \
-      ' operation=validate mode=%s event=%s attempt=1 resource=%s' \
-      ' result=%s elapsed_ms=%s error_class=%s'
-    printf -v record "$text_format" \
+    printf -v record \
+      'level=%s run_id=%s component=project-ci-cpu-validation operation=validate mode=%s event=%s attempt=1 resource=%s result=%s elapsed_ms=%s error_class=%s' \
       "$level" "$run_id" "$mode" "$event" "$resource" "$result" \
       "$elapsed_ms" "$error_class"
     if [[ -n "$message" ]]; then
@@ -670,30 +667,30 @@ project_ci_run_gate() {
 
   if (( status != 0 )); then
     result_status=failed
-    error_class=gate-failed
+    error_class="gate-failed"
     event_level=error
   elif (( stderr_lines > 0 )); then
     status=2
     result_status=failed
-    error_class=dependency-stderr
+    error_class="dependency-stderr"
     event_level=error
   elif [[ "$cleanup_status" != "passed" ]]; then
     status=2
     result_status=failed
-    error_class=cleanup-failed
+    error_class="cleanup-failed"
     event_level=error
   elif [[ "$mode" != "focused" ]]; then
     if [[ ! "${CI_JOB_NAME:-}" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
       status=2
       result_status=failed
-      error_class=evidence-identity-missing
+      error_class="evidence-identity-missing"
       event_level=error
     else
       evidence_path="reports/smoke/${CI_JOB_NAME}.json"
       if [[ ! -s "$evidence_path" ]]; then
         status=2
         result_status=failed
-        error_class=evidence-missing
+        error_class="evidence-missing"
         event_level=error
         evidence_path=""
       fi
