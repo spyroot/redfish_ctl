@@ -156,12 +156,13 @@ in `pytest`, `requests-mock`, `ruff`, `mypy`, and `numpy`, the last needed for t
 
 Triggers **only** on tags matching `v*` (e.g. `v1.1.2`). A normal push to `main` never publishes.
 
-1. **Verifies the tag matches `redfish_ctl/version.py`** — a mismatch or a duplicate version fails
-   before any upload.
+1. **Verifies the tag matches `redfish_ctl/version.py`** — a mismatch fails before
+   any upload.
 2. Builds the sdist + wheel and runs `twine check`.
 3. Publishes to PyPI via **Trusted Publishing (OIDC)** — no API token is stored anywhere, and PyPI
    records a verified link back to this repo/workflow (this is what makes the project page show
-   *verified* details instead of "unverified").
+   *verified* details instead of "unverified"). PyPI rejects a duplicate version
+   during this publish step; the workflow has no earlier version-existence preflight.
 4. Creates a GitHub Release with the artifacts attached.
 5. Builds and publishes multi-architecture production images to Docker Hub and
    GitHub Container Registry when `docker/Dockerfile` exists. Controller and
@@ -169,6 +170,10 @@ Triggers **only** on tags matching `v*` (e.g. `v1.1.2`). A normal push to `main`
    Docker Hub requires repository secrets `DOCKERHUB_USERNAME` and
    `DOCKERHUB_TOKEN`; GitHub Container Registry uses the workflow-provided
    `GITHUB_TOKEN`. Published tags are the release version and `latest`.
+
+The GitHub Release and image jobs currently depend on the build job, not on the
+PyPI publish job. A PyPI duplicate-version rejection therefore does not make the
+other release surfaces atomic with PyPI.
 
 Complete the one-time publisher and repository-secret setup in
 [Installing And Releasing](releasing.md#automated-release-recommended) before
