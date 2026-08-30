@@ -5,19 +5,19 @@ Author: Mus <spyroot@gmail.com>
 For merge authority, runner placement, and required gate evidence, see
 [CI/CD Pipeline](ci.md). Do not treat laptop commands as merge evidence.
 
-Inside that approved CI environment, clear live connection variables before
-the offline suite:
+Inside that approved CI environment, run `unit.all` and `repo.format`, both
+defined in [`gates/manifest.yaml`](../../gates/manifest.yaml), through the
+registered gate adapter:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest -q -m "not live and not emulator_live and not dmtf_sim_live"
-ruff check <changed>
+./scripts/check.sh --profile merge --gate unit.all
+./scripts/check.sh --profile merge --gate repo.format
 ```
 
-The CLI reads only the canonical `REDFISH_*` connection variables. The explicit
-marker selector keeps hardware, emulator, and DMTF simulator lanes out of the
-default suite; clearing the canonical variables also prevents accidental CLI
-or simulator connections.
+The gate adapter clears both canonical and compatibility connection inputs,
+then excludes the hardware, emulator, and DMTF simulator markers. This keeps
+the required unit evidence offline even when its CI environment inherited a
+live binding.
 
 ## Which Lane To Use
 
@@ -82,7 +82,7 @@ variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+env -i PATH="$PATH" HOME="$HOME" \
   pytest --cov=redfish_ctl \
     -m "not live and not emulator_live and not dmtf_sim_live"
 ```

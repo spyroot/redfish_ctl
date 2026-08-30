@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -804,6 +805,22 @@ def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:
     )
     assert '-m "not live and not emulator_live and not dmtf_sim_live"' in source
     assert "--ignore=tests/gates/test_redfish_schema.py" in source
+
+
+def test_unit_profile_clears_fixture_connection_inputs() -> None:
+    """The offline gate clears every connection input read by the dual fixture."""
+    fixture_source = (REPO_ROOT / "tests" / "conftest.py").read_text(
+        encoding="utf-8"
+    )
+    fixture_names = set(
+        re.findall(r'os\.environ(?:\.get\(|\[)["\']([A-Z0-9_]+)', fixture_source)
+    )
+    gate_source = (REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert fixture_names
+    assert fixture_names <= set(gate_source.split())
 
 
 @pytest.mark.parametrize(
