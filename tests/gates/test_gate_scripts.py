@@ -222,6 +222,42 @@ def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
     assert "repo.yaml: OK (python fallback)" in combined
 
 
+def test_yaml_gate_publishes_only_blocking_linter_diagnostics(tmp_path) -> None:
+    """Accepted yamllint style notices never contaminate exact CI evidence."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    arguments = tmp_path / "yamllint.args"
+    yamllint = command_dir / "yamllint"
+    yamllint.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$@\" >\"$YAMLLINT_ARGS\"\n"
+        "case \" $* \" in\n"
+        "  *' --no-warnings '*) ;;\n"
+        "  *) printf 'warning: accepted style notice\\n' ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    yamllint.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+            "YAMLLINT_ARGS": str(arguments),
+        },
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    assert "warning" not in combined.lower()
+    linter_arguments = arguments.read_text(encoding="utf-8").splitlines()
+    assert "--no-warnings" in linter_arguments
+    assert "repo.yaml: OK (yamllint)" in combined
+
+
 def test_kubernetes_schema_validates_a_non_empty_manifest_set(tmp_path) -> None:
     """kubernetes.schema selects concrete manifests and reports how many it validated.
 
