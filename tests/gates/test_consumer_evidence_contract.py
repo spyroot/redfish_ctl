@@ -160,7 +160,14 @@ def _off_cluster_env() -> dict[str, str]:
     return {
         key: value
         for key, value in os.environ.items()
-        if key not in {"KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"}
+        if key
+        not in {
+            "FOCUSED_GATE",
+            "KUBERNETES_SERVICE_HOST",
+            "KUBERNETES_SERVICE_PORT",
+            "MERGE_PROFILE",
+            "PROJECT_CI_PROFILE",
+        }
     }
 
 
