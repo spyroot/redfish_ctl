@@ -1,3 +1,7 @@
+apiVersion: homelab.embedings.ai/v1alpha1
+kind: GateRegistry
+metadata:
+  name: redfish_ctl-gates
 # Gate registry — the ONE canonical source of every mandatory gate (validated by schemas/gates.schema.json).
 # Each gate: id, profile (when it runs), command (executable), required, mutates (does it change a target).
 # Enforced by tools/gate_meta.py (the meta-gate) + tests/gates/. Run gates through scripts/check.sh.
@@ -8,7 +12,6 @@
 # Runner tag: every CI job carries homelab-k8s.
 version: 1
 runner_tag: homelab-k8s
-
 # GitLab jobs that MUST exist and MUST NOT use allow_failure (meta.required-jobs checks these when
 # .gitlab-ci.yml is present).
 required_jobs:
@@ -16,11 +19,9 @@ required_jobs:
   - gate-merge
   - gate-integration
   - gate-scheduled
-
 # Diagnostic evidence is exact-commit but never merge or release evidence.
 diagnostic_jobs:
   - focused-gate
-
 # GitLab resolves this content-addressed provider template before creating a
 # pipeline. The meta-gate permits only these hidden templates from this exact
 # immutable include; floating refs and unknown external templates remain fatal.
@@ -41,7 +42,6 @@ trusted_includes:
       - {name: .builder-project-live-test, mutates: false}
       - {name: .builder-project-rollback, mutates: true}
       - {name: .builder-project-release-evidence, mutates: false}
-
 mandatory_ids:
   - meta.gate-registry
   - meta.ci-runner-tags
@@ -86,27 +86,26 @@ mandatory_ids:
   - mutation.verify-required
   - mutation.rollback-required
   - evidence.sanitized
-
 gates:
   # --- repository-export: the public boundary. Every gate here inspects the EXACT commit
   #     being pushed, because an export ships history, not a snapshot. ---
-  - {id: scm.exact-commit,          profile: repository-export, command: scripts/gates/scm/exact-commit.sh,                 required: true, mutates: false}
-  - {id: repo.no-agent-artifacts,   profile: repository-export, command: scripts/gates/repository/no-agent-artifacts.sh,    required: true, mutates: false}
-  - {id: repo.large-artifact-policy,profile: repository-export, command: scripts/gates/repository/large-artifact-policy.sh, required: true, mutates: false}
+  - {id: scm.exact-commit, profile: repository-export, command: scripts/gates/scm/exact-commit.sh, required: true, mutates: false}
+  - {id: repo.no-agent-artifacts, profile: repository-export, command: scripts/gates/repository/no-agent-artifacts.sh, required: true, mutates: false}
+  - {id: repo.large-artifact-policy, profile: repository-export, command: scripts/gates/repository/large-artifact-policy.sh, required: true, mutates: false}
   # --- toolbox: the shared image can still run this project ---
   - {id: toolbox.consumer-smoke, profile: merge, command: scripts/gates/toolbox/consumer-smoke.sh, required: true, mutates: false}
   # --- meta: validate the registry + pipeline themselves ---
-  - {id: meta.gate-registry,   profile: merge, command: scripts/gates/meta/gate-registry.sh,   required: true, mutates: false}
-  - {id: meta.ci-runner-tags,  profile: merge, command: scripts/gates/meta/ci-runner-tags.sh,  required: true, mutates: false}
-  - {id: meta.required-jobs,   profile: merge, command: scripts/gates/meta/required-jobs.sh,   required: true, mutates: false}
+  - {id: meta.gate-registry, profile: merge, command: scripts/gates/meta/gate-registry.sh, required: true, mutates: false}
+  - {id: meta.ci-runner-tags, profile: merge, command: scripts/gates/meta/ci-runner-tags.sh, required: true, mutates: false}
+  - {id: meta.required-jobs, profile: merge, command: scripts/gates/meta/required-jobs.sh, required: true, mutates: false}
   # --- repository: static repo hygiene ---
-  - {id: repo.no-secrets,      profile: merge, command: scripts/gates/repository/no-secrets.sh, required: true, mutates: false}
-  - {id: repo.shellcheck,      profile: merge, command: scripts/gates/repository/shellcheck.sh,  required: true, mutates: false}
-  - {id: repo.format,          profile: merge, command: scripts/gates/repository/format.sh,      required: true, mutates: false}
-  - {id: repo.yaml,            profile: merge, command: scripts/gates/repository/yaml.sh,         required: true, mutates: false}
-  - {id: repo.schemas,         profile: merge, command: scripts/gates/repository/schemas.sh,      required: true, mutates: false}
-  - {id: repo.no-agent-names,  profile: merge, command: scripts/gates/repository/no-agent-names.sh, required: true, mutates: false}
-  - {id: repo.no-agent-files,  profile: merge, command: scripts/gates/repository/no-agent-files.sh, required: true, mutates: false}
+  - {id: repo.no-secrets, profile: merge, command: scripts/gates/repository/no-secrets.sh, required: true, mutates: false}
+  - {id: repo.shellcheck, profile: merge, command: scripts/gates/repository/shellcheck.sh, required: true, mutates: false}
+  - {id: repo.format, profile: merge, command: scripts/gates/repository/format.sh, required: true, mutates: false}
+  - {id: repo.yaml, profile: merge, command: scripts/gates/repository/yaml.sh, required: true, mutates: false}
+  - {id: repo.schemas, profile: merge, command: scripts/gates/repository/schemas.sh, required: true, mutates: false}
+  - {id: repo.no-agent-names, profile: merge, command: scripts/gates/repository/no-agent-names.sh, required: true, mutates: false}
+  - {id: repo.no-agent-files, profile: merge, command: scripts/gates/repository/no-agent-files.sh, required: true, mutates: false}
   - {id: repo.live-mutation-roundtrip, profile: merge, command: scripts/gates/repository/live-mutation-roundtrip.sh, required: true, mutates: false}
   - {id: repo.mutation-policy, profile: merge, command: scripts/gates/repository/mutation-policy.sh, required: true, mutates: false}
   - {id: repo.dry-run-contract, profile: merge, command: scripts/gates/repository/dry-run-contract.sh, required: true, mutates: false}
@@ -120,26 +119,805 @@ gates:
   - {id: repo.span-root, profile: merge, command: scripts/gates/repository/span-root.sh, required: true, mutates: false}
   - {id: repo.no-legacy-resurrection, profile: merge, command: scripts/gates/repository/no-legacy-resurrection.sh, required: true, mutates: false}
   # --- unit: the offline suite ---
-  - {id: unit.all,             profile: merge, command: scripts/gates/unit/all.sh,               required: true, mutates: false}
+  - {id: unit.all, profile: merge, command: scripts/gates/unit/all.sh, required: true, mutates: false}
   # --- kubernetes: render + validate manifests ---
-  - {id: kubernetes.render,    profile: merge, command: scripts/gates/kubernetes/render.sh,      required: true, mutates: false}
-  - {id: kubernetes.schema,    profile: merge, command: scripts/gates/kubernetes/schema.sh,      required: true, mutates: false}
-  - {id: kubernetes.policy,    profile: merge, command: scripts/gates/kubernetes/policy.sh,      required: true, mutates: false}
+  - {id: kubernetes.render, profile: merge, command: scripts/gates/kubernetes/render.sh, required: true, mutates: false}
+  - {id: kubernetes.schema, profile: merge, command: scripts/gates/kubernetes/schema.sh, required: true, mutates: false}
+  - {id: kubernetes.policy, profile: merge, command: scripts/gates/kubernetes/policy.sh, required: true, mutates: false}
   # --- integration: render-only namespace plus live GitLab token checks; no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
   # --- scheduled: read-only production canaries ---
   - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}
   # --- gitlab.project-token: the CI token is least-privilege and usable (shared, needs live GitLab) ---
-  - {id: gitlab.project-token.exists,                profile: integration, command: scripts/gates/gitlab/project-token-exists.sh,                required: true, mutates: false}
-  - {id: gitlab.project-token.project-bound,         profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh,         required: true, mutates: false}
-  - {id: gitlab.project-token.api-access,            profile: integration, command: scripts/gates/gitlab/project-token-api-access.sh,            required: true, mutates: false}
+  - {id: gitlab.project-token.exists, profile: integration, command: scripts/gates/gitlab/project-token-exists.sh, required: true, mutates: false}
+  - {id: gitlab.project-token.project-bound, profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh, required: true, mutates: false}
+  - {id: gitlab.project-token.api-access, profile: integration, command: scripts/gates/gitlab/project-token-api-access.sh, required: true, mutates: false}
   - {id: gitlab.project-token.no-cross-project-access, profile: integration, command: scripts/gates/gitlab/project-token-no-cross-project-access.sh, required: true, mutates: false}
   # --- mutation protection: govern live applies (deploy profile) ---
-  - {id: mutation.plan-required,     profile: deploy, command: scripts/gates/mutation/plan-required.sh,     required: true, mutates: false}
-  - {id: mutation.protected-apply,   profile: deploy, command: scripts/gates/mutation/protected-apply.sh,   required: true, mutates: true}
-  - {id: mutation.same-commit,       profile: deploy, command: scripts/gates/mutation/same-commit.sh,       required: true, mutates: false}
-  - {id: mutation.serialized,        profile: deploy, command: scripts/gates/mutation/serialized.sh,        required: true, mutates: false}
-  - {id: mutation.verify-required,   profile: deploy, command: scripts/gates/mutation/verify-required.sh,   required: true, mutates: false}
+  - {id: mutation.plan-required, profile: deploy, command: scripts/gates/mutation/plan-required.sh, required: true, mutates: false}
+  - {id: mutation.protected-apply, profile: deploy, command: scripts/gates/mutation/protected-apply.sh, required: true, mutates: true}
+  - {id: mutation.same-commit, profile: deploy, command: scripts/gates/mutation/same-commit.sh, required: true, mutates: false}
+  - {id: mutation.serialized, profile: deploy, command: scripts/gates/mutation/serialized.sh, required: true, mutates: false}
+  - {id: mutation.verify-required, profile: deploy, command: scripts/gates/mutation/verify-required.sh, required: true, mutates: false}
   - {id: mutation.rollback-required, profile: deploy, command: scripts/gates/mutation/rollback-required.sh, required: true, mutates: false}
   # --- evidence: the artifact is sanitized (no secrets) ---
-  - {id: evidence.sanitized,   profile: merge, command: scripts/gates/evidence/sanitized.sh,     required: true, mutates: false}
+  - {id: evidence.sanitized, profile: merge, command: scripts/gates/evidence/sanitized.sh, required: true, mutates: false}
+# Provider-facing selection metadata. Builder reads this exact envelope before
+# dispatching a focused gate; the meta-gate proves it remains a one-to-one view
+# of the executable registry above.
+spec:
+  gates:
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      requiredCredentialNames: []
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: scm.exact-commit
+      category: scm
+      phase: repository
+      profiles: [repository-export]
+      output: reports/gates/scm.exact-commit.json
+      description: Verify that exported history contains the requested exact commit.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-agent-artifacts
+      category: repo
+      phase: repository
+      profiles: [repository-export]
+      output: reports/gates/repo.no-agent-artifacts.json
+      description: Reject private coordination artifacts from the public export.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.large-artifact-policy
+      category: repo
+      phase: repository
+      profiles: [repository-export]
+      output: reports/gates/repo.large-artifact-policy.json
+      description: Reject unapproved large artifacts from the public export.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: toolbox.consumer-smoke
+      category: toolbox
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/toolbox.consumer-smoke.json
+      description: Verify the shared toolbox can execute this consumer repository.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: meta.gate-registry
+      category: meta
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/meta.gate-registry.json
+      description: Validate the gate registry and its executable bindings.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: meta.ci-runner-tags
+      category: meta
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/meta.ci-runner-tags.json
+      description: Require approved Kubernetes runner tags on CI jobs.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: meta.required-jobs
+      category: meta
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/meta.required-jobs.json
+      description: Require every registered CI job and its closed smoke record.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-secrets
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.no-secrets.json
+      description: Scan tracked content for secret-shaped material.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.shellcheck
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.shellcheck.json
+      description: Run static shell diagnostics on tracked scripts.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.format
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.format.json
+      description: Run changed-file Python and shell formatting checks.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.yaml
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.yaml.json
+      description: Parse and lint tracked YAML configuration.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.schemas
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.schemas.json
+      description: Validate schema-backed repository contracts.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-agent-names
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.no-agent-names.json
+      description: Reject private agent identities from public content.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-agent-files
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.no-agent-files.json
+      description: Reject private agent files from tracked content.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.live-mutation-roundtrip
+      category: repo
+      phase: policy
+      profiles: [merge]
+      output: reports/gates/repo.live-mutation-roundtrip.json
+      description: Require recovery coverage for every live mutation test.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.mutation-policy
+      category: repo
+      phase: policy
+      profiles: [merge]
+      output: reports/gates/repo.mutation-policy.json
+      description: Require explicit guards around destructive command behavior.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.dry-run-contract
+      category: repo
+      phase: policy
+      profiles: [merge]
+      output: reports/gates/repo.dry-run-contract.json
+      description: Require dry-run and explicit confirmation for mutable tools.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-local-build
+      category: repo
+      phase: policy
+      profiles: [merge]
+      output: reports/gates/repo.no-local-build.json
+      description: Reject laptop-local build and cluster-mutation paths.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-ghost-env
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.no-ghost-env.json
+      description: Require every consumed environment variable to be declared.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.arg-consistency
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.arg-consistency.json
+      description: Keep public command arguments consistent across adapters.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.config-loader
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.config-loader.json
+      description: Require the shared configuration loader on supported paths.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.exception-interface
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.exception-interface.json
+      description: Preserve the public exception interface contract.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.test-layout
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.test-layout.json
+      description: Keep domain tests in the canonical repository layout.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.rename-tombstone
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.rename-tombstone.json
+      description: Prevent removed public names from being reintroduced.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.span-root
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.span-root.json
+      description: Require one observable operation root for command requests.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: repo.no-legacy-resurrection
+      category: repo
+      phase: repository
+      profiles: [merge]
+      output: reports/gates/repo.no-legacy-resurrection.json
+      description: Reject retired product names and interfaces.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      mutation: false
+      id: unit.all
+      category: unit
+      phase: unit
+      expectedCost: high
+      timeoutSeconds: 3600
+      offlineFixture: tests
+      profiles: [merge]
+      output: reports/gates/unit.all.json
+      description: Run the complete deterministic offline Python unit suite.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: kubernetes.render
+      category: render
+      phase: render
+      profiles: [merge]
+      output: reports/gates/kubernetes.render.json
+      description: Render Kubernetes and Helm resources without cluster mutation.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: kubernetes.schema
+      category: render
+      phase: render
+      profiles: [merge]
+      output: reports/gates/kubernetes.schema.json
+      description: Validate rendered Kubernetes resources against schemas.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: kubernetes.policy
+      category: policy
+      phase: policy
+      profiles: [merge]
+      output: reports/gates/kubernetes.policy.json
+      description: Enforce static Kubernetes workload safety policy.
+    - required: true
+      status: active
+      isolation: cluster
+      permissions: namespace-scoped
+      executionSurface: protected-kubernetes
+      requiredCredentialNames: [KUBECONFIG]
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: integration.namespace
+      category: integration
+      phase: integration
+      profiles: [integration]
+      output: reports/gates/integration.namespace.json
+      description: Exercise the disposable integration namespace and clean it up.
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      requiredCredentialNames: []
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: telemetry.full-coverage
+      category: integration
+      phase: integration
+      profiles: [scheduled]
+      output: reports/gates/telemetry.full-coverage.json
+      description: Verify scheduled telemetry coverage through read-only queries.
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: gitlab.project-token.exists
+      category: integration
+      phase: integration
+      requiredCredentialNames: [CI_JOB_TOKEN]
+      profiles: [integration]
+      output: reports/gates/gitlab.project-token.exists.json
+      description: Verify the project-scoped CI job token is available.
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: gitlab.project-token.project-bound
+      category: integration
+      phase: integration
+      requiredCredentialNames: [CI_JOB_TOKEN]
+      profiles: [integration]
+      output: reports/gates/gitlab.project-token.project-bound.json
+      description: Verify the CI job token remains bound to this project.
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: gitlab.project-token.api-access
+      category: integration
+      phase: integration
+      requiredCredentialNames: [CI_JOB_TOKEN]
+      profiles: [integration]
+      output: reports/gates/gitlab.project-token.api-access.json
+      description: Verify the CI job token has the declared read-only API access.
+    - required: true
+      status: active
+      isolation: network
+      permissions: read-only
+      executionSurface: internal-gitlab
+      platform: linux/amd64
+      workload: project-integration
+      expectedCost: medium
+      timeoutSeconds: 1800
+      mutation: false
+      offlineFixture: null
+      id: gitlab.project-token.no-cross-project-access
+      category: integration
+      phase: integration
+      requiredCredentialNames: [CI_JOB_TOKEN]
+      profiles: [integration]
+      output: reports/gates/gitlab.project-token.no-cross-project-access.json
+      description: Reject undeclared cross-project CI job token access.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: mutation.plan-required
+      category: mutation
+      phase: plan
+      profiles: [deploy]
+      output: reports/gates/mutation.plan-required.json
+      description: Require a reviewed plan before any protected mutation.
+    - required: true
+      status: active
+      isolation: cluster
+      permissions: protected-live-apply
+      executionSurface: protected-kubernetes
+      requiredCredentialNames: [KUBECONFIG]
+      platform: linux/amd64
+      workload: protected-mutation
+      expectedCost: high
+      timeoutSeconds: 1800
+      mutation: true
+      offlineFixture: null
+      id: mutation.protected-apply
+      category: apply-protection
+      phase: apply
+      profiles: [deploy]
+      output: reports/gates/mutation.protected-apply.json
+      description: Restrict live apply to a protected runner and explicit intent.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: mutation.same-commit
+      category: apply-protection
+      phase: apply
+      profiles: [deploy]
+      output: reports/gates/mutation.same-commit.json
+      description: Bind apply to the exact commit that produced its plan.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: mutation.serialized
+      category: apply-protection
+      phase: apply
+      profiles: [deploy]
+      output: reports/gates/mutation.serialized.json
+      description: Require serialization around protected mutation targets.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: mutation.verify-required
+      category: verification
+      phase: verify
+      profiles: [deploy]
+      output: reports/gates/mutation.verify-required.json
+      description: Require independent read-back after protected mutation.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: mutation.rollback-required
+      category: rollback
+      phase: rollback
+      profiles: [deploy]
+      output: reports/gates/mutation.rollback-required.json
+      description: Require a registered recovery path for protected mutation.
+    - required: true
+      status: active
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
+      mutation: false
+      offlineFixture: gates/manifest.yaml
+      id: evidence.sanitized
+      category: evidence
+      phase: evidence
+      profiles: [merge]
+      output: reports/gates/evidence.sanitized.json
+      description: Reject secret-shaped content from CI evidence artifacts.

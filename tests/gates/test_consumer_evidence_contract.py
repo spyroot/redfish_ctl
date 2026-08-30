@@ -209,6 +209,33 @@ def test_gate_and_job_evidence_validate_and_read_back(tmp_path: Path) -> None:
         assert finalized["skipped_optional_tests"] == 0
 
 
+def test_provider_gate_index_covers_the_executable_registry() -> None:
+    """Builder can resolve every gate without a second command registry."""
+    manifest = _yaml(REPO_ROOT / "gates" / "manifest.yaml")
+    executable = {record["id"]: record for record in manifest["gates"]}
+    provider = {record["id"]: record for record in manifest["spec"]["gates"]}
+
+    assert manifest["apiVersion"] == "homelab.embedings.ai/v1alpha1"
+    assert manifest["kind"] == "GateRegistry"
+    assert provider.keys() == executable.keys()
+    for gate_id, record in executable.items():
+        indexed = provider[gate_id]
+        assert indexed["required"] is record["required"]
+        assert indexed["mutation"] is record["mutates"]
+        assert indexed["profiles"] == [record["profile"]]
+        assert indexed["status"] == "active"
+        assert indexed["output"] == f"reports/gates/{gate_id}.json"
+        if record["profile"] == "merge" and not record["mutates"]:
+            assert indexed["timeoutSeconds"] >= 60
+            assert indexed["executionSurface"] in {
+                "github",
+                "internal-gitlab",
+                "protected-internal-gitlab",
+                "protected-kubernetes",
+                "harbor",
+            }
+
+
 def test_runtime_skips_are_required_and_make_evidence_non_green(
     tmp_path: Path,
 ) -> None:
