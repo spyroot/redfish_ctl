@@ -25,7 +25,7 @@ required_jobs:
 # from the exact immutable includes; floating refs and unknown content fail.
 trusted_includes:
   - project: spyroot/builder
-    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-service.yml
     templates:
       - {name: .builder-project-image-publish, mutates: true}
@@ -37,7 +37,7 @@ trusted_includes:
       - {name: .builder-project-rollback, mutates: true}
       - {name: .builder-project-release-evidence, mutates: false}
   - project: spyroot/builder
-    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-ci-resource-jobs.yml
     jobs:
       - name: project-ci-cpu-validation

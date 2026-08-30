@@ -11,10 +11,10 @@ stages: [project-ci-validation, validate, integration, deploy, publish]
 
 include:
   - project: spyroot/builder
-    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-service.yml
   - project: spyroot/builder
-    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-ci-resource-jobs.yml
 
 # The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
@@ -41,7 +41,7 @@ variables:
   # Gates resolve pytest/ruff through the project environment, never a
   # pre-installed toolchain in the image.
   CONDA_ENV: redfish_ctl
-  EXPECTED_PROVIDER_REVISION: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
+  EXPECTED_PROVIDER_REVISION: d3234c26f71f5a229bba28971d37ff38085c1da3
   PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
   DMTF_RELEASE: "2026.1"
   PROJECT_LIVE_TEST_COMMAND: >-
