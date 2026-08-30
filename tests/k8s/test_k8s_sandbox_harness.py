@@ -348,6 +348,7 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert "assert_dmtf_bundle" in script
     assert "git check-attr filter" in script
     assert "version https://git-lfs.github.com/spec/v1" in script
+    assert "sha256sum" in script
     assert "shasum -a 256" in script
     assert "has_backend \"ilo-sim\"" in script
     assert "kubectl_sandbox apply -f k8s/sandbox/dmtf-credentials.yaml" in script
