@@ -9,7 +9,6 @@ import re
 import shutil
 import signal
 import subprocess
-import textwrap
 import threading
 import time
 from pathlib import Path
@@ -722,17 +721,13 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
     scripts.mkdir()
     check = scripts / "check.sh"
     check.write_text(
-        textwrap.dedent(
-            """\
-            #!/bin/sh
-            command -v python3 >/dev/null 2>&1 || {
-              printf 'python3 missing\n' >&2
-              exit 1
-            }
-            python3 "$PROBE_CHILD_SCRIPT" "$PROBE_CHILD_PID" &
-            sleep 5
-            """
-        ),
+        "#!/bin/sh\n"
+        "command -v python3 >/dev/null 2>&1 || {\n"
+        "  printf 'python3 missing\\n' >&2\n"
+        "  exit 1\n"
+        "}\n"
+        'python3 "$PROBE_CHILD_SCRIPT" "$PROBE_CHILD_PID" &\n'
+        "sleep 5\n",
         encoding="utf-8",
     )
     check.chmod(0o755)

@@ -366,6 +366,7 @@ def _run_captured_command(
     command: str | Sequence[str],
     root: Path,
     timeout_seconds: float,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[str, int, bool]:
     """Run one command while privately retaining its ordered output.
 
@@ -377,6 +378,8 @@ def _run_captured_command(
     :param command: executable path or exact argument vector.
     :param root: working directory for the gate.
     :param timeout_seconds: positive wall-clock limit.
+    :param env: optional subprocess environment; inherits the caller environment
+        when omitted.
     :return: combined output, effective return code, and timeout flag.
     """
     command_args = [command] if isinstance(command, str) else list(command)
@@ -387,6 +390,7 @@ def _run_captured_command(
     process = subprocess.Popen(
         command_args,
         cwd=root,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -511,6 +515,7 @@ def observe_smoke(
         command=command_args,
         root=root,
         timeout_seconds=inventory_timeout,
+        env=probe_env,
     )
     probe_output_sanitized = _CREDENTIAL_RE.search(probe_output) is None
     after = _tracked_state(root)
