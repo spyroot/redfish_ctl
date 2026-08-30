@@ -3,14 +3,17 @@
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -273,29 +276,12 @@ def observe_gate(
     if isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
         raise EvidenceError("gate timeout must be positive")
     before = _tracked_state(root)
-    timed_out = False
-    try:
-        completed = subprocess.run(
-            [command],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout_seconds,
-        )
-        stdout = completed.stdout
-        stderr = completed.stderr
-        return_code = completed.returncode
-    except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
-        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
-        return_code = 124
-        timed_out = True
-    if stdout:
-        print(stdout, end="")
-    if stderr:
-        print(stderr, end="", file=sys.stderr)
-    combined = f"{stdout}\n{stderr}"
+    output, return_code, timed_out = _run_streamed_command(
+        command=command,
+        root=root,
+        timeout_seconds=timeout_seconds,
+    )
+    combined = output
     warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(combined)]
     warnings = max(warning_counts, default=0)
     required_skips = sum(
@@ -321,6 +307,78 @@ def observe_gate(
             "sanitization": "quiet credential-pattern scan before atomic write",
         },
     }
+
+
+def _run_streamed_command(
+    *,
+    command: str,
+    root: Path,
+    timeout_seconds: float,
+) -> tuple[str, int, bool]:
+    """Run one command while streaming and retaining its ordered output.
+
+    Stdout and stderr share one pipe so their observed ordering is retained for
+    operators and evidence parsing. A new process group lets a timeout stop the
+    gate and any child processes that inherited the output pipe.
+
+    :param command: executable gate path.
+    :param root: working directory for the gate.
+    :param timeout_seconds: positive wall-clock limit.
+    :return: combined output, effective return code, and timeout flag.
+    """
+    process = subprocess.Popen(
+        [command],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    if process.stdout is None:  # pragma: no cover - PIPE guarantees this.
+        process.kill()
+        raise EvidenceError("gate output pipe is unavailable")
+
+    chunks: list[str] = []
+
+    def _pump_output() -> None:
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        while raw := os.read(process.stdout.fileno(), 65536):
+            text = decoder.decode(raw)
+            if text:
+                chunks.append(text)
+                sys.stdout.write(text)
+                sys.stdout.flush()
+        tail = decoder.decode(b"", final=True)
+        if tail:
+            chunks.append(tail)
+            sys.stdout.write(tail)
+            sys.stdout.flush()
+
+    reader = threading.Thread(target=_pump_output, name="gate-output", daemon=True)
+    reader.start()
+    timed_out = False
+    try:
+        process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+    finally:
+        reader.join(timeout=1)
+        if reader.is_alive():
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            reader.join(timeout=5)
+        if reader.is_alive():
+            process.stdout.close()
+            raise EvidenceError("gate output pipe did not close after process exit")
+        process.stdout.close()
+
+    return "".join(chunks), 124 if timed_out else process.returncode, timed_out
 
 
 def _tracked_state(root: Path) -> list[str]:

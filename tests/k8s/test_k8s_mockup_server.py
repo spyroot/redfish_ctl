@@ -63,7 +63,8 @@ def _get_raw(base: str, path: str) -> tuple[int, bytes, str]:
                 response.headers.get("Content-Type", ""),
             )
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.read(), exc.headers.get("Content-Type", "")
+        with exc:
+            return exc.code, exc.read(), exc.headers.get("Content-Type", "")
 
 
 def _subdirs(tree: Path) -> set[str]:
@@ -204,10 +205,11 @@ def test_mockup_non_get_methods_return_405(tmp_path: Path) -> None:
             )
             with pytest.raises(urllib.error.HTTPError) as exc_info:
                 urllib.request.urlopen(request, timeout=5)
-            assert exc_info.value.code == 405, method
-            assert exc_info.value.headers["Allow"] == "GET", method
-            if method == "HEAD":
-                assert exc_info.value.read() == b""
+            with exc_info.value as error:
+                assert error.code == 405, method
+                assert error.headers["Allow"] == "GET", method
+                if method == "HEAD":
+                    assert error.read() == b""
 
 
 # --- the DMTF public-telemetry profile (bundle-backed) --------------------------

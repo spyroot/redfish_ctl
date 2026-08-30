@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import jsonschema
@@ -253,6 +255,68 @@ def test_runtime_skips_are_required_and_make_evidence_non_green(
         root=root,
     )
     assert tampered_evidence["status"] == "failed"
+
+
+def test_observe_gate_streams_output_before_the_command_finishes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gate progress is visible while the bounded command is still running."""
+    command = tmp_path / "stream.sh"
+    command.write_text(
+        "#!/bin/sh\nprintf 'first line\\n'\nsleep 1\nprintf 'second line\\n'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+
+    first_seen = threading.Event()
+
+    class LiveOutput(io.StringIO):
+        def write(self, value: str) -> int:
+            written = super().write(value)
+            if "first line" in self.getvalue():
+                first_seen.set()
+            return written
+
+    output = LiveOutput()
+    monkeypatch.setattr("tools.ci_evidence.sys.stdout", output)
+    observed: dict[str, dict] = {}
+    worker = threading.Thread(
+        target=lambda: observed.setdefault(
+            "result",
+            observe_gate(command=str(command), root=tmp_path, timeout_seconds=5),
+        ),
+        daemon=True,
+    )
+    worker.start()
+    try:
+        assert first_seen.wait(2), "first progress line was buffered"
+        assert worker.is_alive(), "command finished before streaming was observed"
+    finally:
+        worker.join(5)
+
+    assert not worker.is_alive()
+    assert observed["result"]["return_code"] == 0
+    assert output.getvalue() == "first line\nsecond line\n"
+
+
+def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
+    """A timed-out gate returns bounded evidence without a surviving child."""
+    command = tmp_path / "timeout.sh"
+    command.write_text(
+        "#!/bin/sh\nprintf 'started\\n'\nsleep 5\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+
+    observations = observe_gate(
+        command=str(command),
+        root=tmp_path,
+        timeout_seconds=0.1,
+    )
+
+    assert observations["timed_out"] is True
+    assert observations["return_code"] == 124
 
 
 def test_smoke_timeout_comes_from_inventory_and_is_observed(

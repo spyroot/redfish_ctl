@@ -305,13 +305,17 @@ def test_idrac_async_get_call_returns_resolved_response_and_forwards_timeout(mon
     monkeypatch.setattr(idrac_manager_module.requests, "get", fake_get)
 
     loop = manager._event_loop()
-    result = loop.run_until_complete(
-        manager.api_async_get_call(
-            loop,
-            "http://idrac-async-query.test/redfish/v1/",
-            {"Accept": "application/json"},
+    try:
+        result = loop.run_until_complete(
+            manager.api_async_get_call(
+                loop,
+                "http://idrac-async-query.test/redfish/v1/",
+                {"Accept": "application/json"},
+            )
         )
-    )
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
 
     assert result is response
     assert len(calls) == 1
