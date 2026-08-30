@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import stat
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -33,6 +35,141 @@ MOCK_BMC_MANIFEST = REPO_ROOT / "k8s" / "sandbox" / "mock-bmc.yaml"
 
 def _yaml_documents(path: Path) -> list[dict]:
     return [doc for doc in yaml.safe_load_all(path.read_text(encoding="utf-8")) if doc]
+
+
+def _write_executable(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+def _link_required_tool(bin_dir: Path, name: str) -> None:
+    target = shutil.which(name)
+    assert target is not None, f"{name} is required to execute the shell harness"
+    (bin_dir / name).symlink_to(target)
+
+
+def _copy_sandbox_script_workspace(
+    tmp_path: Path,
+    *,
+    expected_sha: str = "expected-dsp2043-sha",
+) -> Path:
+    workspace = tmp_path / "workspace"
+    script_path = workspace / "k8s" / "sandbox" / "run-sandbox.sh"
+    bundle_path = (
+        workspace / "spec" / "dmtf" / "redfish" / "2026.1" / "mockups"
+        / "DSP2043_2026.1.zip"
+    )
+    contract_path = workspace / "specs" / "sim" / "dmtf-sim-contract.yaml"
+
+    script_path.parent.mkdir(parents=True)
+    shutil.copy2(SMOKE_SCRIPT, script_path)
+    bundle_path.parent.mkdir(parents=True)
+    bundle_path.write_text("hydrated DSP2043 bundle\n", encoding="utf-8")
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text(
+        f"artifacts:\n  sha256: \"{expected_sha}\"\n",
+        encoding="utf-8",
+    )
+    return script_path
+
+
+def _run_sandbox_hash_check(
+    tmp_path: Path,
+    *,
+    hash_tool: str | None,
+    actual_sha: str = "expected-dsp2043-sha",
+    expected_sha: str = "expected-dsp2043-sha",
+) -> tuple[subprocess.CompletedProcess[str], str]:
+    script_path = _copy_sandbox_script_workspace(
+        tmp_path,
+        expected_sha=expected_sha,
+    )
+    bin_dir = tmp_path / "bin"
+    journal_path = tmp_path / "calls.log"
+    bin_dir.mkdir()
+
+    for tool in ("bash", "dirname", "head", "grep", "awk"):
+        _link_required_tool(bin_dir, tool)
+
+    _write_executable(
+        bin_dir / "git",
+        """#!/usr/bin/env bash
+printf 'git %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+if [ "$1" = "check-attr" ]; then
+    for arg in "$@"; do
+        last_arg="$arg"
+    done
+    printf '%s: filter: lfs\\n' "$last_arg"
+    exit 0
+fi
+printf 'unexpected git invocation: %s\\n' "$*" >&2
+exit 99
+""",
+    )
+    _write_executable(
+        bin_dir / "docker",
+        """#!/usr/bin/env bash
+printf 'docker %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+printf 'fake docker sentinel\\n' >&2
+exit 42
+""",
+    )
+    _write_executable(
+        bin_dir / "kind",
+        """#!/usr/bin/env bash
+printf 'kind %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+printf 'kind should not run during hash verification tests\\n' >&2
+exit 43
+""",
+    )
+    _write_executable(
+        bin_dir / "kubectl",
+        """#!/usr/bin/env bash
+printf 'kubectl %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+printf 'kubectl should not run during hash verification tests\\n' >&2
+exit 44
+""",
+    )
+    if hash_tool == "sha256sum":
+        _write_executable(
+            bin_dir / "sha256sum",
+            """#!/usr/bin/env bash
+printf 'sha256sum %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+printf '%s  %s\\n' "$SANDBOX_FAKE_SHA" "$1"
+""",
+        )
+    elif hash_tool == "shasum":
+        _write_executable(
+            bin_dir / "shasum",
+            """#!/usr/bin/env bash
+printf 'shasum %s\\n' "$*" >> "$SANDBOX_FAKE_JOURNAL"
+if [ "$1" != "-a" ] || [ "$2" != "256" ]; then
+    printf 'unexpected shasum arguments: %s\\n' "$*" >&2
+    exit 99
+fi
+printf '%s  %s\\n' "$SANDBOX_FAKE_SHA" "$3"
+""",
+        )
+    else:
+        assert hash_tool is None
+
+    env = {
+        "PATH": str(bin_dir),
+        "SANDBOX_BACKENDS": "dmtf-sim",
+        "SANDBOX_FAKE_JOURNAL": str(journal_path),
+        "SANDBOX_FAKE_SHA": actual_sha,
+    }
+    result = subprocess.run(
+        [str(script_path)],
+        cwd=script_path.parents[2],
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    journal = journal_path.read_text(encoding="utf-8") if journal_path.exists() else ""
+    return result, journal
 
 
 def test_kind_config_defines_a_local_redfish_sandbox_cluster() -> None:
@@ -381,6 +518,72 @@ def test_sandbox_smoke_script_applies_manifests_and_waits_for_status() -> None:
     assert "wait_for_endpoint ilo-sim" in script
     assert "kubectl delete" not in script
     assert "docker push" not in script
+
+
+def test_sandbox_script_accepts_sha256sum_without_shasum(tmp_path: Path) -> None:
+    """Linux-style sha256sum is enough to verify the DSP2043 bundle."""
+    result, journal = _run_sandbox_hash_check(tmp_path, hash_tool="sha256sum")
+
+    assert result.returncode == 42
+    assert (
+        "DSP2043 bundle verified: release=2026.1 "
+        "sha256=expected-dsp2043-sha"
+    ) in result.stdout
+    assert "sha256sum spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip" in journal
+    assert "shasum" not in journal
+    assert "docker build -f docker/Dockerfile.dmtf-sim" in journal
+
+
+def test_sandbox_script_falls_back_to_shasum_when_sha256sum_is_absent(
+    tmp_path: Path,
+) -> None:
+    """macOS-style shasum remains supported when sha256sum is unavailable."""
+    result, journal = _run_sandbox_hash_check(tmp_path, hash_tool="shasum")
+
+    assert result.returncode == 42
+    assert (
+        "DSP2043 bundle verified: release=2026.1 "
+        "sha256=expected-dsp2043-sha"
+    ) in result.stdout
+    assert (
+        "shasum -a 256 spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip"
+    ) in journal
+    assert "sha256sum" not in journal
+    assert "docker build -f docker/Dockerfile.dmtf-sim" in journal
+
+
+def test_sandbox_script_fails_when_no_sha256_tool_is_available(
+    tmp_path: Path,
+) -> None:
+    """The bundle gate fails closed when no SHA-256 implementation is available."""
+    result, journal = _run_sandbox_hash_check(tmp_path, hash_tool=None)
+
+    assert result.returncode == 1
+    assert "DSP2043 verification requires sha256sum or shasum" in result.stderr
+    assert "docker " not in journal
+    assert "kind " not in journal
+    assert "kubectl " not in journal
+
+
+def test_sandbox_script_rejects_wrong_dsp2043_digest_before_mutation(
+    tmp_path: Path,
+) -> None:
+    """A digest mismatch stops before Docker, kind, or Kubernetes commands run."""
+    result, journal = _run_sandbox_hash_check(
+        tmp_path,
+        hash_tool="sha256sum",
+        actual_sha="wrong-dsp2043-sha",
+    )
+
+    assert result.returncode == 1
+    assert (
+        "DSP2043 bundle hash mismatch: expected expected-dsp2043-sha, "
+        "got wrong-dsp2043-sha"
+    ) in result.stderr
+    assert "sha256sum spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip" in journal
+    assert "docker " not in journal
+    assert "kind " not in journal
+    assert "kubectl " not in journal
 
 
 def test_sandbox_readme_documents_simulator_backend_selection() -> None:
