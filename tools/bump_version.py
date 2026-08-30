@@ -3,19 +3,19 @@
 
 Usage::
 
-    python scripts/bump_version.py patch     # 1.1.1 -> 1.1.2
-    python scripts/bump_version.py minor     # 1.1.1 -> 1.2.0
-    python scripts/bump_version.py major     # 1.1.1 -> 2.0.0
-    python scripts/bump_version.py --set 1.4.0
-    python scripts/bump_version.py --show     # print current version, change nothing
+    python tools/bump_version.py patch     # 1.1.1 -> 1.1.2
+    python tools/bump_version.py minor     # 1.1.1 -> 1.2.0
+    python tools/bump_version.py major     # 1.1.1 -> 2.0.0
+    python tools/bump_version.py --set 1.4.0
+    python tools/bump_version.py --show     # print current version, change nothing
 
 Design (deliberately conservative so release automation never surprises anyone):
 
 * It edits ONLY ``redfish_ctl/version.py`` — the single source of truth that
   ``setup.py`` reads and the CLI reports via ``--version``. There is nowhere else
   to keep in sync.
-* It does NOT run git. It prints the exact tag+push commands so a human performs
-  the release step deliberately.
+* It does NOT run git. It prints the guarded branch, mirror, and exact-SHA tag
+  steps so a human performs the release deliberately.
 * The CI release workflow refuses to publish unless the pushed ``vX.Y.Z`` tag
   matches this file, so a forgotten bump fails loudly instead of shipping a
   wrong or duplicate version.
@@ -67,6 +67,27 @@ def write_version(new: str) -> None:
     VERSION_FILE.write_text(_VERSION_RE.sub(f"__version__ = '{new}'", text, count=1))
 
 
+def release_next_steps(new: str) -> tuple[str, ...]:
+    """Return the guarded human steps for releasing ``new``.
+
+    :param new: validated semantic version without the ``v`` tag prefix.
+    :return: ordered instructions that preserve internal validation and mirror
+        identity before the public tag push.
+    """
+    return (
+        "git add redfish_ctl/version.py",
+        f"git commit -m 'Release {new}'",
+        "git push <internal-gitlab-remote> HEAD",
+        "Merge the release branch only after exact-head Internal GitLab gates pass.",
+        "Wait for publish-github, defined in .gitlab-ci.yml, to mirror that commit.",
+        "git fetch <github-remote> main",
+        'test "$(git rev-parse <github-remote>/main)" = '
+        '"<validated-internal-main-sha>"',
+        f"git tag v{new} <validated-internal-main-sha>",
+        f"git push <github-remote> refs/tags/v{new}",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     group = parser.add_mutually_exclusive_group(required=True)
@@ -89,10 +110,8 @@ def main(argv: list[str] | None = None) -> int:
     write_version(new)
     print(f"{current} -> {new}  (redfish_ctl/version.py)")
     print("\nNext steps (run deliberately):")
-    print("  git add redfish_ctl/version.py")
-    print(f"  git commit -m 'Release {new}'")
-    print("  git push origin main")
-    print(f"  git tag v{new} && git push origin v{new}   # CI builds + publishes on the tag")
+    for step in release_next_steps(new):
+        print(f"  {step}")
     return 0
 
 
