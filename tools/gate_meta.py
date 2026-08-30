@@ -27,6 +27,13 @@ SMOKE_CLASSES = frozenset({
     "wiring", "offline-component", "ephemeral-integration",
     "protected-live", "recovery", "status-reflection",
 })
+PROJECT_CI_SELECTOR_DENY = (
+    '($FOCUSED_GATE != null && $FOCUSED_GATE != "") || '
+    '$MERGE_PROFILE == "merge" || '
+    '(($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") && '
+    '$PROJECT_CI_PROFILE != "protected") || '
+    '($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")'
+)
 
 
 def _load_registry() -> dict:
@@ -302,9 +309,14 @@ def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
 
     :param job: parsed local wrapper job.
     :param protected_when: required protected-ref behavior from the registry.
-    :return: True only for MR deny, protected-ref action, then terminal deny.
+    :return: True only for project-ci validation selector deny, MR deny,
+        protected-ref action, then terminal deny.
     """
     return (job.get("rules") or []) == [
+        {
+            "if": PROJECT_CI_SELECTOR_DENY,
+            "when": "never",
+        },
         {
             "if": '$CI_PIPELINE_SOURCE == "merge_request_event"',
             "when": "never",

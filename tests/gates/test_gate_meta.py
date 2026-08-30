@@ -247,6 +247,7 @@ def _selected_jobs(**overrides: str | None) -> list[str]:
         "FOCUSED_GATE": None,
         "MERGE_PROFILE": None,
         "PROJECT_CI_PROFILE": None,
+        "PROJECT_CI_SMOKE": None,
     }
     variables.update(overrides)
     return [name for name, job in _gitlab_jobs().items() if _job_selected(job, variables)]
@@ -649,6 +650,8 @@ def test_internal_api_web_focused_dispatch_selects_no_competing_local_job() -> N
     for source in ("api", "web"):
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE="unit.all",
             MERGE_PROFILE=None,
             PROJECT_CI_PROFILE="focused",
@@ -662,11 +665,49 @@ def test_builder_full_dispatch_fences_the_local_merge_job() -> None:
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,
             CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE=None,
             MERGE_PROFILE=None,
             PROJECT_CI_PROFILE="full",
         )
         assert "gate-merge" not in selected
+        assert set(selected).isdisjoint(PROJECT_SERVICE_JOBS)
+
+
+def test_project_ci_smoke_dispatch_fences_project_service_jobs() -> None:
+    """A targeted provider smoke selects no competing local CI job."""
+    selected = set(_selected_jobs(
+        CI_PIPELINE_SOURCE="api",
+        CI_COMMIT_BRANCH="main",
+        CI_COMMIT_REF_PROTECTED="true",
+        PROJECT_CI_SMOKE=PROJECT_CI_CPU_JOB,
+    ))
+
+    assert selected == set()
+
+
+def test_protected_profile_keeps_project_service_dag_reachable() -> None:
+    """The explicit protected profile is not mistaken for read-only project CI."""
+    selected = set(_selected_jobs(
+        CI_PIPELINE_SOURCE="api",
+        CI_COMMIT_BRANCH="main",
+        CI_COMMIT_REF_PROTECTED="true",
+        PROJECT_CI_PROFILE="protected",
+    ))
+
+    assert set(PROJECT_SERVICE_JOBS) <= selected
+
+
+def test_unknown_project_ci_profile_fails_closed_on_protected_main() -> None:
+    """A selector typo cannot expose the protected project-service DAG."""
+    for profile in ("protectd", "unknown", "FULL"):
+        selected = set(_selected_jobs(
+            CI_PIPELINE_SOURCE="api",
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
+            PROJECT_CI_PROFILE=profile,
+        ))
+        assert selected.isdisjoint(PROJECT_SERVICE_JOBS), profile
 
 
 def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:
@@ -674,6 +715,8 @@ def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:
     for source in ("api", "web"):
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,
+            CI_COMMIT_BRANCH="main",
+            CI_COMMIT_REF_PROTECTED="true",
             FOCUSED_GATE=None,
             MERGE_PROFILE="merge",
         )

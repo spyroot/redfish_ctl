@@ -73,11 +73,25 @@ variables:
         ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
         $MERGE_PROFILE == "merge"
 
+.project-ci-selector-deny:
+  rules:
+    - &project-ci-selector-deny
+      if: >-
+        ($FOCUSED_GATE != null && $FOCUSED_GATE != "") ||
+        $MERGE_PROFILE == "merge" ||
+        (($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") &&
+        $PROJECT_CI_PROFILE != "protected") ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+      when: never
+
 gate-merge:
   stage: validate
   tags: [homelab-k8s]
   rules:
-    - if: '$PROJECT_CI_PROFILE == "focused" || $PROJECT_CI_PROFILE == "full"'
+    - if: >-
+        $PROJECT_CI_PROFILE == "focused" ||
+        $PROJECT_CI_PROFILE == "full" ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
       when: never
     - <<: *focused-dispatch
       when: never
@@ -160,6 +174,7 @@ project-service-image-publish:
       git lfs pull
       --include='spec/dmtf/redfish/2026.1/mockups/DSP2043_2026.1.zip'
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -174,6 +189,7 @@ project-service-chart-publish:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -188,6 +204,7 @@ project-service-deploy-plan:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -202,6 +219,7 @@ project-service-deploy:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -216,6 +234,7 @@ project-service-verify:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -229,6 +248,7 @@ project-service-live-test:
   tags: [homelab-k8s, homelab-k8s-validation]
   allow_failure: false
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -243,6 +263,7 @@ project-service-rollback:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'
@@ -257,6 +278,7 @@ project-service-release-evidence:
   allow_failure: false
   before_script: []
   rules:
+    - *project-ci-selector-deny
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true"'

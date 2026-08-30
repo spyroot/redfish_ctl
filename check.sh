@@ -27,7 +27,7 @@ spec:
     - job: project-ci-cpu-validation
       class: wiring
       command: 'bash -lc "$PROJECT_CI_CPU_COMMAND"'
-      requiredTools: [bash, conda, git, git-lfs, python3]
+      requiredTools: [bash, conda, git, git-lfs, jq, python3, setsid]
       artifactUnderTest:
         type: repository-and-provider-resource-job
         digestSource: git-commit-and-builder-revision
