@@ -289,7 +289,8 @@ def test_observe_gate_streams_output_before_the_command_finishes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Gate progress is visible while the bounded command is still running."""
-    command = tmp_path / "stream.sh"
+    root = _root(tmp_path)
+    command = root / "stream.sh"
     command.write_text(
         "#!/bin/sh\nprintf 'first line\\n'\nsleep 1\nprintf 'second line\\n'\n",
         encoding="utf-8",
@@ -311,7 +312,7 @@ def test_observe_gate_streams_output_before_the_command_finishes(
     worker = threading.Thread(
         target=lambda: observed.setdefault(
             "result",
-            observe_gate(command=str(command), root=tmp_path, timeout_seconds=5),
+            observe_gate(command=str(command), root=root, timeout_seconds=5),
         ),
         daemon=True,
     )
@@ -329,7 +330,8 @@ def test_observe_gate_streams_output_before_the_command_finishes(
 
 def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
     """A timed-out gate returns bounded evidence without a surviving child."""
-    command = tmp_path / "timeout.sh"
+    root = _root(tmp_path)
+    command = root / "timeout.sh"
     command.write_text(
         "#!/bin/sh\nprintf 'started\\n'\nsleep 5\n",
         encoding="utf-8",
@@ -338,7 +340,7 @@ def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
 
     observations = observe_gate(
         command=str(command),
-        root=tmp_path,
+        root=root,
         timeout_seconds=0.1,
     )
 
