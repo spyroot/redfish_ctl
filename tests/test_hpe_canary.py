@@ -18,7 +18,7 @@ from redfish_ctl.redfish_api_common import ApiRequestType
 _IP = os.environ.get("HPE_EMULATOR_IP")
 
 pytestmark = [
-    pytest.mark.live,
+    pytest.mark.emulator_live,
     pytest.mark.skipif(
         not _IP,
         reason="set HPE_EMULATOR_IP (and run the iLO emulator) to enable",

@@ -10,13 +10,14 @@ the offline suite:
 
 ```bash
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest -q -m "not live and not dmtf_sim_live"
+  pytest -q -m "not live and not emulator_live and not dmtf_sim_live"
 ruff check <changed>
 ```
 
 The CLI reads only the canonical `REDFISH_*` connection variables. The explicit
-marker selector keeps both live lanes out of the default suite; clearing the
-canonical variables also prevents accidental CLI or simulator connections.
+marker selector keeps hardware, emulator, and DMTF simulator lanes out of the
+default suite; clearing the canonical variables also prevents accidental CLI
+or simulator connections.
 
 ## Which Lane To Use
 
@@ -82,7 +83,8 @@ variables unset:
 ```bash
 python -m pip install pytest-cov
 env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest --cov=redfish_ctl -m "not live and not dmtf_sim_live"
+  pytest --cov=redfish_ctl \
+    -m "not live and not emulator_live and not dmtf_sim_live"
 ```
 
 ## Fleet And Concurrency Tests

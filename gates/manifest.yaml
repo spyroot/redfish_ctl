@@ -326,7 +326,7 @@ spec:
       phase: repository
       profiles: [merge]
       output: reports/gates/repo.format.json
-      description: Run changed-file Python and shell formatting checks.
+      description: Run Ruff over Python files changed from the refreshed merge base.
     - required: true
       status: active
       isolation: offline

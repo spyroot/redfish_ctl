@@ -149,9 +149,10 @@ Triggers on pushes to `main` and on every pull request.
 - Runs blocking docstring checks with `python tools/docstring_gate.py --base FETCH_HEAD`
   for pull-request changes and `python tools/docstring_gate.py --all` for the
   whole tree.
-- Uses **no secrets** and never contacts a BMC; the offline selector excludes
-  both `live` and `dmtf_sim_live` tests. Checkout enables Git LFS for the committed
-  offline corpus and specification artifacts used by the suite.
+- Uses **no secrets** and never contacts a BMC. Hardware-backed `live` tests
+  skip without the private binding, emulator tests skip without their endpoint
+  variables, and `dmtf_sim_live` is excluded. Checkout enables Git LFS for the
+  committed offline corpus and specification artifacts used by the suite.
 
 Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls
 in `pytest`, `requests-mock`, `ruff`, `mypy`, and `numpy`, the last needed for the discovery

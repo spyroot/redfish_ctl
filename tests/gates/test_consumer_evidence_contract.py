@@ -798,12 +798,23 @@ def test_project_ci_entrypoint_rejects_unknown_flags_without_reflection() -> Non
 
 
 def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:
-    """Required unit evidence deselects live and vendored-schema-only tests."""
+    """Required unit evidence deselects hardware, emulator, and schema lanes."""
     source = (REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh").read_text(
         encoding="utf-8"
     )
-    assert '-m "not live and not dmtf_sim_live"' in source
+    assert '-m "not live and not emulator_live and not dmtf_sim_live"' in source
     assert "--ignore=tests/gates/test_redfish_schema.py" in source
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["tests/test_emulator_smoke.py", "tests/test_hpe_canary.py"],
+)
+def test_emulator_lanes_use_their_endpoint_specific_marker(path: str) -> None:
+    """Emulator commands must not depend on the hardware fixture marker."""
+    source = (REPO_ROOT / path).read_text(encoding="utf-8")
+    assert "pytest.mark.emulator_live" in source
+    assert "pytest.mark.live" not in source
 
 
 def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:

@@ -20,7 +20,6 @@ tests/gates/test_redfish_schema.py:1
 tests/manager/test_manager_reset_dualmode.py:1
 tests/test_cmd_utils.py:1
 tests/test_cmd_utils_save.py:1
-tests/test_emulator_smoke.py:1
 tests/test_hpe_vendor.py:1
 tests/test_package_imports.py:1
 tests/test_query.py:1
