@@ -6,8 +6,8 @@ This reference is generated from the Supermicro GB300 fixture files packed in
 `tests/supermicro_gb300_corpus.tar.gz`, the captured Redfish JSON corpus used by
 the offline tests, so this page does not require a live BMC or private endpoint.
 
-Regenerate it with `python tools/generate_telemetry_metrics_doc.py`; use
-`python tools/generate_telemetry_metrics_doc.py --check` in gates to verify
+Regenerate it with `python tools/generate_telemetry_metrics_doc.py`; run
+`python tools/generate_telemetry_metrics_doc.py --check` manually to verify
 that the checked-in copy matches the Supermicro/NV72 reader catalog.
 
 ## How To Read This

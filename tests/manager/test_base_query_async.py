@@ -125,6 +125,32 @@ def test_event_loop_helper_reuses_installed_loop_without_deprecation_warning():
         asyncio.set_event_loop(None)
 
 
+def test_sync_coroutine_helper_closes_only_the_loop_it_creates():
+    """The synchronous adapter owns and closes only its fallback event loop."""
+    asyncio.set_event_loop(None)
+
+    assert RedfishManager._run_coroutine_sync(asyncio.sleep(0, result="done")) == (
+        "done"
+    )
+    with pytest.raises(RuntimeError, match="There is no current event loop"):
+        asyncio.get_event_loop()
+
+
+def test_sync_coroutine_helper_preserves_an_installed_loop():
+    """An embedding application's installed event loop remains caller-owned."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        assert RedfishManager._run_coroutine_sync(
+            asyncio.sleep(0, result="done")
+        ) == "done"
+        assert asyncio.get_event_loop() is loop
+        assert not loop.is_closed()
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
 def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     monkeypatch,
 ):

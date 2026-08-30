@@ -249,7 +249,12 @@
         "requiredCredentialNames": {
           "type": "array",
           "items": {
-            "enum": ["CI_JOB_TOKEN", "KUBECONFIG"]
+            "enum": [
+              "CI_JOB_TOKEN",
+              "KUBECONFIG",
+              "SPLUNK_API_TOKEN",
+              "SPLUNK_O11Y_REALM"
+            ]
           },
           "uniqueItems": true
         },

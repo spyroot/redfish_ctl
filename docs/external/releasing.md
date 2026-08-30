@@ -24,7 +24,8 @@ redfish_ctl --version
 
 ## Automated release (recommended)
 
-The going-forward release path is tag-triggered. PyPI publishing needs no PyPI
+The release path starts from a change merged through Internal GitLab, followed
+by its gated GitHub mirror, and is tag-triggered. PyPI publishing needs no PyPI
 token on anyone's machine: `.github/workflows/release.yml` uses **Trusted
 Publishing** (OIDC), which also makes PyPI show *verified* project details
 instead of "unverified".
@@ -33,11 +34,17 @@ instead of "unverified".
 python tools/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
 git add redfish_ctl/version.py
 git commit -m "Release 1.1.2"
-git push origin main
-git tag v1.1.2 && git push origin v1.1.2   # <- this is what publishes
+# Push a release branch and merge it only after exact-head Internal GitLab gates pass.
+# Wait for publish-github to mirror that protected internal main commit, then:
+git fetch <github-remote> main
+test "$(git rev-parse <github-remote>/main)" = "<validated-internal-main-sha>"
+git tag v1.1.2 <validated-internal-main-sha>
+git push <github-remote> refs/tags/v1.1.2   # this is what publishes
 ```
 
-The tag push publishes the package, GitHub release, and available container
+`publish-github`, the protected default-branch job defined in `.gitlab-ci.yml`,
+is the only path that updates public GitHub `main`. The tag push publishes the
+package, GitHub release, and available container
 images as described in [CI/CD Pipeline](ci.md#releaseyml--publish-on-a-version-tag).
 `tools/bump_version.py` never runs git, so tagging remains a deliberate human
 action.
@@ -63,12 +70,13 @@ Use this order so a broken package does not reach PyPI:
 
 ## Verify
 
-Run the offline tests with live BMC variables unset:
+Obtain a successful `gate-merge` result for the exact release commit through
+the Internal GitLab path documented in [CI/CD Pipeline](ci.md#internal-validation-paths).
+The merge profile runs the offline suite and changed-file Ruff gate in the
+configured Kubernetes runner; workstation output is not release evidence.
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest -q
-ruff check <changed files>
+./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
 ```
 
 The single source of truth for the version is `redfish_ctl/version.py` (imported by the CLI for

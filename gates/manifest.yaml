@@ -347,16 +347,16 @@ spec:
       description: Parse and lint tracked YAML configuration.
     - required: true
       status: active
-      isolation: offline
+      isolation: network
       permissions: read-only
-      executionSurface: github
-      requiredCredentialNames: []
-      platform: portable
-      workload: cpu
+      executionSurface: internal-gitlab
+      requiredCredentialNames: [CI_JOB_TOKEN]
+      platform: linux/amd64
+      workload: project-integration
       expectedCost: low
       timeoutSeconds: 600
       mutation: false
-      offlineFixture: gates/manifest.yaml
+      offlineFixture: null
       id: repo.schemas
       category: repo
       phase: repository
@@ -689,28 +689,28 @@ spec:
       description: Enforce static Kubernetes workload safety policy.
     - required: true
       status: active
-      isolation: cluster
-      permissions: namespace-scoped
-      executionSurface: protected-kubernetes
-      requiredCredentialNames: [KUBECONFIG]
-      platform: linux/amd64
-      workload: project-integration
-      expectedCost: medium
-      timeoutSeconds: 1800
+      isolation: offline
+      permissions: read-only
+      executionSurface: github
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
+      expectedCost: low
+      timeoutSeconds: 600
       mutation: false
-      offlineFixture: null
+      offlineFixture: scripts/gates/integration/namespace-test.sh
       id: integration.namespace
       category: integration
       phase: integration
       profiles: [integration]
       output: reports/gates/integration.namespace.json
-      description: Exercise the disposable integration namespace and clean it up.
+      description: Render and validate the disposable integration namespace manifest.
     - required: true
       status: active
       isolation: network
       permissions: read-only
       executionSurface: internal-gitlab
-      requiredCredentialNames: []
+      requiredCredentialNames: [SPLUNK_O11Y_REALM, SPLUNK_API_TOKEN]
       platform: linux/amd64
       workload: project-integration
       expectedCost: medium
