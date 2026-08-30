@@ -70,6 +70,45 @@ def test_registry_commands_exist_and_are_executable() -> None:
     assert not not_executable, f"registry commands are not executable: {not_executable}"
 
 
+def test_no_secrets_suppresses_success_progress_stderr(tmp_path: Path) -> None:
+    """The secret gate keeps successful gitleaks progress off stderr."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    args_path = tmp_path / "gitleaks.args"
+    fake_gitleaks = command_dir / "gitleaks"
+    fake_gitleaks.write_text(
+        "#!/bin/bash\n"
+        "printf '%s\\n' \"$@\" >\"$GITLEAKS_ARGS_PATH\"\n",
+        encoding="utf-8",
+    )
+    fake_gitleaks.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "no-secrets.sh"
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "GITLEAKS_ARGS_PATH": str(args_path),
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+        },
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stderr == ""
+    args = args_path.read_text(encoding="utf-8").splitlines()
+    assert args == [
+        "detect",
+        "--no-banner",
+        "--redact",
+        "--log-level",
+        "error",
+        "--source",
+        ".",
+    ]
+
+
 def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     """run.sh reads the real registry, and an unregistered profile is an error, not a silent pass.
 
