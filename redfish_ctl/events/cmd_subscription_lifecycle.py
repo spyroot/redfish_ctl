@@ -90,7 +90,7 @@ class _SubscriptionBase(RedfishManager):
 
         :param subscription: a subscription id or a full member URI.
         :param subscriptions_uri: the Subscriptions collection URI.
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport while resolving members when True.
         :return: the resolved subscription member URI.
         :raises InvalidArgument: when empty, when the value is the collection URI
             itself, when it falls outside the collection, or when it is not found.
