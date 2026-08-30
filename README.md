@@ -326,6 +326,6 @@ First-run problems are almost always the connection, not the command:
 - [Architecture](docs/external/architecture.md) - Redfish core, iDRAC layer, command registration, and known debt.
 - [Telemetry metrics](docs/external/telemetry-metrics.md) - GB300 MetricReport/MetricReportDefinition reference catalog.
 - [Changelog](CHANGELOG.md) - what each release adds, changes, and fixes; watch **Unreleased** for what the next tag will contain.
-- [Releasing](docs/external/releasing.md) - local verification, package build, PyPI upload, and tagging.
+- [Releasing](docs/external/releasing.md) - validated mirroring, artifact checks, Trusted Publishing, and release tagging.
 - [Fleet proxy design](docs/external/redfish-proxy.md) - planned service/controller shape for fleet management.
 - [Scaling and benchmarks](docs/external/scaling-and-benchmarks.md) - planned concurrency engine and benchmark goals.
