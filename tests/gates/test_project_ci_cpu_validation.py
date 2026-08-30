@@ -375,6 +375,32 @@ def test_gate_dependency_success_returns_terminal_result() -> None:
     assert "evidence_path= error_class=none" in result.stdout
 
 
+def test_successful_dependency_yq_warning_is_sanitized(tmp_path: Path) -> None:
+    dependency = tmp_path / "dependency.sh"
+    dependency.write_text(
+        "#!/bin/bash\n"
+        "printf 'level=WARN msg=\"yq wrote advisory warning\"\\n' >&2\n",
+        encoding="utf-8",
+    )
+    dependency.chmod(0o755)
+
+    result = _run_gate_dependency(str(dependency), mode="full")
+    combined = result.stdout + result.stderr
+
+    assert result.returncode == 0
+    assert "status=passed" in result.stdout
+    assert "warning_count=1" in result.stdout
+    assert "cleanup_status=passed" in result.stdout
+    assert "error_class=none" in result.stdout
+    assert "level=warning" in result.stderr
+    assert "result=passed" in result.stderr
+    assert "stderr-lines=1" in result.stderr
+    assert "classes=auth:0,network:0,warning:1,error:0,other:0" in result.stderr
+    assert "redaction=full" in result.stderr
+    assert "level=WARN" not in combined
+    assert "yq wrote advisory warning" not in combined
+
+
 def test_dependency_stderr_is_counted_but_not_replayed(tmp_path: Path) -> None:
     dependency = tmp_path / "dependency.sh"
     dependency.write_text(
@@ -384,10 +410,12 @@ def test_dependency_stderr_is_counted_but_not_replayed(tmp_path: Path) -> None:
     dependency.chmod(0o755)
 
     result = _run_gate_dependency(str(dependency), mode="full")
+    combined = result.stdout + result.stderr
 
     assert result.returncode == 2
-    assert "private dependency detail" not in result.stderr
+    assert "private dependency detail" not in combined
     assert "stderr-lines=1" in result.stderr
+    assert "classes=auth:0,network:0,warning:0,error:0,other:1" in result.stderr
     assert "redaction=full" in result.stderr
     assert "warning_count=1" in result.stdout
     assert "status=failed" in result.stdout
