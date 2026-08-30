@@ -16,6 +16,7 @@ import jsonschema
 import pytest
 import yaml
 
+from tools import schema_gate
 from tools.ci_evidence import (
     EvidenceError,
     build_evidence,
@@ -49,6 +50,40 @@ def _yaml(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     return data
+
+
+def _commit_local_authority(path: Path) -> str:
+    """Create one local authority with committed and dirty working-tree states."""
+    path.mkdir()
+    commands = (
+        ("git", "init", "--quiet", str(path)),
+        ("git", "-C", str(path), "config", "user.email", "test@example.invalid"),
+        ("git", "-C", str(path), "config", "user.name", "Schema Gate Test"),
+    )
+    for command in commands:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    contract = path / "contract.txt"
+    contract.write_text("pinned\n", encoding="utf-8")
+    subprocess.run(
+        ("git", "-C", str(path), "add", "contract.txt"),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ("git", "-C", str(path), "commit", "--quiet", "-m", "Pin contract"),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    revision = subprocess.run(
+        ("git", "-C", str(path), "rev-parse", "HEAD"),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    contract.write_text("uncommitted drift\n", encoding="utf-8")
+    return revision
 
 
 def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
@@ -1117,6 +1152,22 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert ci["variables"]["PROJECT_CI_CPU_COMMAND"] == (
         "./tools/project-ci-cpu-validation.sh"
     )
+
+
+def test_schema_gate_checks_out_the_binding_local_path_at_the_exact_revision(
+    tmp_path: Path,
+) -> None:
+    """Local authority resolution ignores working-tree drift and uses the pin."""
+    authority = tmp_path / "standards"
+    revision = _commit_local_authority(authority)
+
+    workspace = schema_gate._checkout_exact_local(str(authority), revision)
+    try:
+        assert (Path(workspace.name) / "contract.txt").read_text(
+            encoding="utf-8"
+        ) == "pinned\n"
+    finally:
+        workspace.cleanup()
 
 
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:
