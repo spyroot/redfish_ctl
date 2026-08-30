@@ -128,9 +128,15 @@ gate-integration:
       - reports/gates/
       - reports/smoke/gate-integration.json
 
-# The exact-revision Builder include owns this job's runner, rules, and
-# command. This local overlay owns only redfish_ctl evidence publication.
+# The exact-revision Builder include owns this job's runner and command. This
+# overlay prevents FOCUSED_GATE from also selecting the imported job: the local
+# focused-gate job is the single focused-gate contract. Builder focused/full
+# profile dispatches continue to use this imported job.
 project-ci-cpu-validation:
+  rules:
+    - if: '$PROJECT_CI_PROFILE == "focused"'
+    - if: '$PROJECT_CI_PROFILE == "full"'
+    - when: never
   artifacts:
     when: always
     paths:

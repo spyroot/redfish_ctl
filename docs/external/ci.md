@@ -22,20 +22,26 @@ For gate semantics see [Gates](gates.md); for the release procedure, see
 The tracked `builder-binding.yaml` file pins the Builder provider revision and
 dispatch authority. The `PROJECT_CI_CPU_COMMAND` variable, defined in
 `.gitlab-ci.yml`, selects the tracked `scripts/project_ci_entrypoint.sh` adapter;
-no operator-created command variable is required.
+no operator-created command variable is required. The adapter supports
+dependency-free `--help`, non-executing `--dry-run`, and sanitized logging
+controls; unknown arguments fail before a gate is selected.
 
 ### Wrapper dispatch from the current branch
 
-Install `yq` and `jq`; the wrapper verifies `builder-binding.yaml`, the exact
-Builder revision, and required capabilities before dispatch. The current named
-branch must already exist in Internal GitLab at the same exact HEAD commit. The
-wrapper is dry-run by default, so these commands resolve the exact
-project/ref/commit and print Builder plans without creating a pipeline:
+Install `yq` and `jq`. The `spec.source.localPath` and `spec.source.revision`
+fields in `builder-binding.yaml` identify the required clean Builder checkout
+and exact commit. The current named branch must already exist in Internal
+GitLab at the same exact HEAD commit. The wrapper verifies these prerequisites;
+its dry-run default prints the resolved plan without creating a pipeline:
 
 ```bash
 ./scripts/check.sh --profile merge --gate unit.all --dispatch
 ./scripts/check.sh --profile merge --dispatch
 ```
+
+If the Builder checkout is not exact and clean, use a separate checkout at the
+pinned revision or repair Builder through its pull-request flow. Do not
+overwrite a dirty shared checkout.
 
 The first selects one diagnostic gate; the second maps the project `merge`
 profile to Builder's complete `full` validation profile. After reviewing that
@@ -59,26 +65,29 @@ The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
 Internal GitLab API or web pipelines. The dispatcher sets `FOCUSED_GATE` to a
 merge-profile gate ID from `gates/manifest.yaml`, such as `unit.all` or
 `repo.format`; the job runs that one gate through the Kubernetes-guarded
-`scripts/check.sh` entrypoint. The exact Builder include also selects
-`project-ci-cpu-validation`; both diagnostic jobs must pass, but the narrowed
-Builder job omits release-blocking smoke evidence. Merge evidence requires the
-complete profile: direct Internal GitLab pipelines run `gate-merge`, while
-Builder `full` dispatch runs the imported `project-ci-cpu-validation` job. Both
-full paths execute every merge gate and publish required smoke; a focused result
-cannot replace them. Merge-request and default-branch pipelines continue to
-select `gate-merge` through their normal GitLab rules.
+`scripts/check.sh` entrypoint. The local overlay disables the imported
+`project-ci-cpu-validation` job for this selector, so a focused pipeline has
+exactly one job. Builder profile dispatch selects only the imported job:
+`focused` runs its `unit.all` default, while `full` executes every merge gate
+and publishes required smoke. A focused result cannot replace complete merge
+evidence. Merge-request and default-branch pipelines continue to select
+`gate-merge` through their normal GitLab rules.
+
+The `k8s-live-check` job, defined in `.gitlab-ci.yml`, is a separate status
+probe. An unavailable Kubernetes API is reported as `UNAVAILABLE` and does not
+fail that job, so it is not merge evidence or proof of live cluster
+availability.
 
 ### Manual Internal GitLab API or web dispatch
 
 1. Select the project pipeline on Internal GitLab with the immutable
    `sync/pr-<number>/<40-character-head-sha>` ref produced by the configured
    Sync Now path. The pipeline commit must resolve to that exact head SHA.
-2. For diagnostic feedback, set `FOCUSED_GATE=unit.all` (or another
-   merge-profile gate ID) and leave `MERGE_PROFILE` unset. The pipeline creates
-   `focused-gate` and the imported `project-ci-cpu-validation` job; both are
-   diagnostic-only and must pass.
-3. For merge evidence, unset `FOCUSED_GATE` and set `MERGE_PROFILE=merge`. The
-   pipeline must create only `gate-merge`.
+2. For diagnostic feedback, unset `PROJECT_CI_PROFILE` and `MERGE_PROFILE`, then
+   set `FOCUSED_GATE=unit.all` (or another merge-profile gate ID). The pipeline
+   creates only `focused-gate`; the result is diagnostic-only and must pass.
+3. For merge evidence, unset `PROJECT_CI_PROFILE` and `FOCUSED_GATE`, then set
+   `MERGE_PROFILE=merge`. The pipeline must create only `gate-merge`.
 4. Verify the terminal job is successful, its commit SHA equals the requested
    head SHA, and its sanitized gate artifacts are available. A focused run ends
    with `run.sh: gate <id> passed`; the authoritative run ends with
@@ -93,7 +102,8 @@ to the exact project commit, Standards revision, pipeline/job IDs, and immutable
 runner digest. Warning/skip counts come from captured gate output; cleanup comes
 from tracked-state comparison; exact identity comes from independent Git
 read-back; and sanitization is recorded only after a quiet content scan and
-atomic file read-back.
+atomic file read-back. See [Gates](gates.md#failure-behavior) for execution and
+timeout policy.
 
 The upstream access prerequisite for `repo.schemas` is documented in
 [Gates](gates.md#selected-gate-summary).

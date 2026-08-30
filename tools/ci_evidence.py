@@ -23,11 +23,6 @@ _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _WARNING_SUMMARY_RE = re.compile(r"\b(\d+) warnings?\b", re.IGNORECASE)
 _SKIP_REASON_RE = re.compile(r"^SKIPPED \[(\d+)\].*?: (.+)$", re.MULTILINE)
-_OPTIONAL_SKIP_RE = re.compile(
-    r"skipping live iDRAC test|REDFISH_EMULATOR|HPE_EMULATOR|LFS pointer|"
-    r"no @odata\.type|OEM type / no standard schema",
-    re.IGNORECASE,
-)
 _CREDENTIAL_RE = re.compile(
     r"BEGIN [A-Z ]*PRIVATE KEY|X-SF-Token:|"
     r"[Bb]earer [A-Za-z0-9._-]{20,}|glpat-[A-Za-z0-9_-]{20,}|"
@@ -188,7 +183,11 @@ def build_evidence(
         raise EvidenceError("observed warning count is invalid")
     if not isinstance(skipped, int) or isinstance(skipped, bool) or skipped < 0:
         raise EvidenceError("observed required-skip count is invalid")
-    if not isinstance(optional_skips, int) or isinstance(optional_skips, bool) or optional_skips < 0:
+    if (
+        not isinstance(optional_skips, int)
+        or isinstance(optional_skips, bool)
+        or optional_skips < 0
+    ):
         raise EvidenceError("observed optional-skip count is invalid")
     if cleanup_status not in {"passed", "failed"}:
         raise EvidenceError("observed cleanup status is invalid")
@@ -201,7 +200,7 @@ def build_evidence(
         raise EvidenceError("evidence observation sources are incomplete")
     effective_status = status
     effective_code = return_code
-    if warnings or skipped or cleanup_status != "passed" or remaining:
+    if warnings or skipped or optional_skips or cleanup_status != "passed" or remaining:
         effective_status = "failed"
         effective_code = effective_code or 1
     evidence = {
@@ -225,6 +224,19 @@ def build_evidence(
 def _required_tools(tools: Sequence[str]) -> list[str]:
     """Return required commands that are absent from ``PATH``."""
     return [tool for tool in tools if shutil.which(tool) is None]
+
+
+def smoke_timeout_seconds(record: Mapping[str, object]) -> int:
+    """Return one positive closed-world smoke timeout.
+
+    :param record: one smoke inventory record.
+    :return: positive timeout in seconds.
+    :raises EvidenceError: when the record omits or corrupts the timeout.
+    """
+    timeout = record.get("timeoutSeconds")
+    if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+        raise EvidenceError("smoke inventory timeoutSeconds must be a positive integer")
+    return timeout
 
 
 def select_release_blocking_smoke(
@@ -259,10 +271,13 @@ def observe_gate(
     *,
     command: str,
     root: Path = REPO_ROOT,
-    timeout_seconds: int = 3600,
+    timeout_seconds: float = 3600,
 ) -> dict:
     """Run one real gate and return output-derived policy observations."""
+    if isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+        raise EvidenceError("gate timeout must be positive")
     before = _tracked_state(root)
+    timed_out = False
     try:
         completed = subprocess.run(
             [command],
@@ -279,6 +294,7 @@ def observe_gate(
         stdout = exc.stdout if isinstance(exc.stdout, str) else ""
         stderr = exc.stderr if isinstance(exc.stderr, str) else ""
         return_code = 124
+        timed_out = True
     if stdout:
         print(stdout, end="")
     if stderr:
@@ -286,26 +302,25 @@ def observe_gate(
     combined = f"{stdout}\n{stderr}"
     warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(combined)]
     warnings = max(warning_counts, default=0)
-    required_skips = 0
-    optional_skips = 0
-    for count_text, reason in _SKIP_REASON_RE.findall(combined):
-        count = int(count_text)
-        if _OPTIONAL_SKIP_RE.search(reason):
-            optional_skips += count
-        else:
-            required_skips += count
+    required_skips = sum(
+        int(count_text)
+        for count_text, _reason in _SKIP_REASON_RE.findall(combined)
+    )
     after = _tracked_state(root)
     remaining = sorted(set(after) - set(before))
     return {
         "return_code": return_code,
+        "timed_out": timed_out,
+        "timeout_seconds": timeout_seconds,
         "warnings": warnings,
         "skipped_required_tests": required_skips,
-        "skipped_optional_tests": optional_skips,
+        "skipped_optional_tests": 0,
         "cleanup_status": "passed" if not remaining else "failed",
         "remaining": remaining,
         "sources": {
             "warnings": "captured gate output",
-            "skips": "pytest -ra skip reasons; only declared optional reasons excluded",
+            "skips": "pytest -ra skip reasons; every runtime skip is required",
+            "timeout": "subprocess timeout applied to the registered gate command",
             "cleanup": "git status tracked-state comparison",
             "sanitization": "quiet credential-pattern scan before atomic write",
         },
@@ -408,6 +423,15 @@ def observe_smoke(
     after = _tracked_state(root)
     remaining = sorted(set(after) - set(before))
     smoke_class = str(record.get("class", ""))
+    inventory_timeout = smoke_timeout_seconds(record)
+    observed_timeout = gate_observations.get("timeout_seconds")
+    timed_out = gate_observations.get("timed_out")
+    bounded_timeout = (
+        isinstance(observed_timeout, (int, float))
+        and not isinstance(observed_timeout, bool)
+        and observed_timeout == inventory_timeout
+        and timed_out is False
+    )
     protected_surface = smoke_class != "protected-live" or (
         selected_env.get("CI_SERVER_HOST") == "gitlab.rnd.embedings.ai"
         and bool(selected_env.get("CI_COMMIT_REF_PROTECTED") == "true")
@@ -419,7 +443,7 @@ def observe_smoke(
         "negative_path": negative.returncode != 0 and "python3" in negative.stderr,
         "read_back": read_back.returncode == 0
         and read_back.stdout.strip() == identity["commit"],
-        "bounded_timeout": True,
+        "bounded_timeout": bounded_timeout,
         "idempotent_noop": first.returncode == 0
         and second.returncode == 0
         and first.stdout == second.stdout,
@@ -433,7 +457,10 @@ def observe_smoke(
             "entrypoint": "observed registered gate command exit status",
             "negative_path": "real scripts/check.sh --list with python3 removed from PATH",
             "read_back": "independent git rev-parse HEAD",
-            "bounded_timeout": "30-second subprocess timeouts",
+            "bounded_timeout": (
+                f"inventory timeoutSeconds={inventory_timeout} applied to the "
+                f"registered gate profile; timed_out={timed_out!r}"
+            ),
             "idempotent_noop": "two identical scripts/check.sh --list executions",
             "protected_surface": "Internal GitLab protected-ref environment assertion",
             "cleanup": "git status tracked-state comparison after temporary-directory cleanup",
@@ -521,6 +548,7 @@ def build_smoke_evidence(
         return_code == 0
         and warnings == 0
         and required_skips == 0
+        and optional_skips == 0
         and cleanup_status == "passed"
         and not remaining
         and checks_passed

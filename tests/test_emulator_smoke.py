@@ -22,6 +22,8 @@ import os
 
 import pytest
 
+pytestmark = pytest.mark.live
+
 _EMU = os.environ.get("REDFISH_EMULATOR_URL", "").rstrip("/")
 _skip = pytest.mark.skipif(
     not _EMU,

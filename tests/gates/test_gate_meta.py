@@ -546,7 +546,7 @@ def test_gitlab_uses_full_history_checkout_for_exact_ref_dispatches() -> None:
 
 
 def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
-    """Only one job may consume FOCUSED_GATE and it must go through check.sh."""
+    """Only the local job consumes FOCUSED_GATE; the imported overlay excludes it."""
     jobs = _gitlab_jobs()
     focused_jobs = [
         name
@@ -568,9 +568,14 @@ def test_gitlab_declares_exactly_one_focused_gate_job() -> None:
     assert './scripts/check.sh --profile merge --gate "${FOCUSED_GATE:-unit.all}"' in script
     assert "scripts/gates/run.sh" not in script
 
+    provider_rules = repr(jobs["project-ci-cpu-validation"].get("rules"))
+    assert "FOCUSED_GATE" not in provider_rules
+    assert '$PROJECT_CI_PROFILE == "focused"' in provider_rules
+    assert '$PROJECT_CI_PROFILE == "full"' in provider_rules
+
 
 def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> None:
-    """Local rules select focused-gate; the exact include adds its imported job."""
+    """FOCUSED_GATE selects one local job after the imported-rule override."""
     for source in ("api", "web"):
         selected = _selected_jobs(
             CI_PIPELINE_SOURCE=source,
@@ -578,6 +583,18 @@ def test_internal_api_web_focused_dispatch_selects_only_local_focused_job() -> N
             MERGE_PROFILE=None,
         )
         assert selected == ["focused-gate"]
+
+
+def test_builder_focused_profile_selects_only_provider_cpu_job() -> None:
+    """Builder's focused profile selects one provider job with the unit default."""
+    for source in ("api", "web"):
+        selected = _selected_jobs(
+            CI_PIPELINE_SOURCE=source,
+            FOCUSED_GATE=None,
+            MERGE_PROFILE=None,
+            PROJECT_CI_PROFILE="focused",
+        )
+        assert selected == ["project-ci-cpu-validation"]
 
 
 def test_internal_api_web_merge_dispatch_selects_only_gate_merge() -> None:

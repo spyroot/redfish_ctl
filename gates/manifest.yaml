@@ -125,7 +125,7 @@ gates:
   - {id: kubernetes.render,    profile: merge, command: scripts/gates/kubernetes/render.sh,      required: true, mutates: false}
   - {id: kubernetes.schema,    profile: merge, command: scripts/gates/kubernetes/schema.sh,      required: true, mutates: false}
   - {id: kubernetes.policy,    profile: merge, command: scripts/gates/kubernetes/policy.sh,      required: true, mutates: false}
-  # --- integration: needs the cluster, no BMC mutation ---
+  # --- integration: render-only namespace plus live GitLab token checks; no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
   # --- scheduled: read-only production canaries ---
   - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}

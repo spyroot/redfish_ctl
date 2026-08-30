@@ -120,6 +120,7 @@
           "return_code": {"const": 0},
           "warnings": {"const": 0},
           "skipped_required_tests": {"const": 0},
+          "skipped_optional_tests": {"const": 0},
           "evidence_sanitized": {"const": true},
           "checks": {
             "properties": {

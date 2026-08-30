@@ -24,7 +24,8 @@ See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
-- **integration** — needs the cluster; smoke/namespace checks. No BMC mutation.
+- **integration** — render-only namespace validation plus live GitLab token
+  checks. No cluster or BMC mutation.
 - **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
@@ -54,14 +55,14 @@ it without executing a gate.
 | `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
-| `repo.schemas` | merge | no | the registry and tracked bindings validate against pinned Standards schemas and the pinned Builder provider tree/template fetched with the project job token | a schema, revision, provider-include, or upstream job-token allow-list mismatch |
+| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a schema, revision, provider-include, or upstream job-token allow-list mismatch |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
-| `unit.all` | merge | no | the offline unit suite | any test fails |
+| `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | the home cluster is reachable (fail-closed smoke) | cluster unreachable |
+| `integration.namespace` | integration | no | a temporary Namespace manifest renders with a valid name and ownership label | the manifest is malformed or required fields are missing |
 | `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
@@ -118,6 +119,11 @@ Every gate exits non-zero on failure; `scripts/gates/run.sh` stops at the first 
 required tool is absent **fails** (a skipped gate is never an implicit pass). Required CI jobs never use
 `allow_failure`, so a red gate blocks the pipeline. Do not claim a gate passed without terminal or
 GitLab pipeline evidence.
+
+A runtime test skip in `unit.all` also makes its evidence non-green; live and
+vendored-schema-only lanes are excluded before execution. The `timeoutSeconds`
+field, defined for each required job in `inventory/ci/smoke-tests.yaml`, bounds
+the complete gate sequence.
 
 The gate runner writes exact-identity JSON under `reports/gates/`. Required job
 and smoke artifacts are defined in

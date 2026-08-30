@@ -53,6 +53,7 @@ exec python3 - "$profile" "$gate" <<'PY'
 import os
 import pathlib
 import sys
+import time
 
 import yaml
 
@@ -63,6 +64,7 @@ from tools.ci_evidence import (
     observe_gate,
     observe_smoke,
     select_release_blocking_smoke,
+    smoke_timeout_seconds,
     write_evidence,
 )
 
@@ -110,11 +112,21 @@ if selected_gate:
         "run.sh: focused execution omits release-blocking smoke evidence "
         f"for {job_name}"
     )
+try:
+    profile_timeout_seconds = (
+        smoke_timeout_seconds(smoke_record) if smoke_record else 3600
+    )
+except EvidenceError as exc:
+    print(f"EVIDENCE FAILED: {exc}", file=sys.stderr)
+    sys.exit(1)
+profile_deadline = time.monotonic() + profile_timeout_seconds
 pathlib.Path("reports").mkdir(parents=True, exist_ok=True)
 run_status = "passed"
 run_return_code = 0
 job_observations = {
     "return_code": 0,
+    "timed_out": False,
+    "timeout_seconds": profile_timeout_seconds,
     "warnings": 0,
     "skipped_required_tests": 0,
     "skipped_optional_tests": 0,
@@ -123,13 +135,18 @@ job_observations = {
     "sources": {
         "warnings": "captured output from every executed gate",
         "skips": "pytest -ra reasons from every executed gate",
+        "timeout": "inventory timeoutSeconds applied across registered gates",
         "cleanup": "per-gate git status tracked-state comparisons",
         "sanitization": "quiet credential-pattern scan before atomic write",
     },
 }
 for gate in gates:
     print(f"=== gate {gate['id']} ({gate['command']}) ===")
-    observations = observe_gate(command=gate["command"])
+    remaining_seconds = max(profile_deadline - time.monotonic(), 0.001)
+    observations = observe_gate(
+        command=gate["command"],
+        timeout_seconds=remaining_seconds,
+    )
     return_code = observations["return_code"]
     status = "passed" if return_code == 0 else "failed"
     job_observations["warnings"] += observations["warnings"]
@@ -139,6 +156,8 @@ for gate in gates:
     job_observations["skipped_optional_tests"] += observations[
         "skipped_optional_tests"
     ]
+    if observations["timed_out"]:
+        job_observations["timed_out"] = True
     if observations["cleanup_status"] != "passed":
         job_observations["cleanup_status"] = "failed"
     job_observations["remaining"].extend(observations["remaining"])
@@ -167,6 +186,11 @@ for gate in gates:
         break
 
 job_observations["return_code"] = run_return_code
+if time.monotonic() > profile_deadline:
+    job_observations["timed_out"] = True
+    run_status = "failed"
+    run_return_code = run_return_code or 124
+    job_observations["return_code"] = run_return_code
 
 if smoke_record:
     try:

@@ -16,7 +16,10 @@ from tools.ci_evidence import (
     EvidenceError,
     build_evidence,
     build_smoke_evidence,
+    observe_gate,
+    observe_smoke,
     select_release_blocking_smoke,
+    smoke_timeout_seconds,
     write_evidence,
 )
 
@@ -97,14 +100,17 @@ def _gate_observations(return_code: int = 0) -> dict:
     """Return explicit observed policy inputs for evidence rendering tests."""
     return {
         "return_code": return_code,
+        "timed_out": False,
+        "timeout_seconds": 3600,
         "warnings": 0,
         "skipped_required_tests": 0,
-        "skipped_optional_tests": 2,
+        "skipped_optional_tests": 0,
         "cleanup_status": "passed",
         "remaining": [],
         "sources": {
             "warnings": "captured gate output",
             "skips": "pytest -ra skip reasons",
+            "timeout": "inventory timeout applied to gate profile",
             "cleanup": "tracked-state comparison",
             "sanitization": "quiet scan before atomic write",
         },
@@ -190,7 +196,102 @@ def test_gate_and_job_evidence_validate_and_read_back(tmp_path: Path) -> None:
         jsonschema.validate(finalized, schema)
         assert json.loads(output.read_text(encoding="utf-8")) == finalized
         assert finalized["observation_sources"]["warnings"] == "captured gate output"
-        assert finalized["skipped_optional_tests"] == 2
+        assert finalized["skipped_optional_tests"] == 0
+
+
+def test_runtime_skips_are_required_and_make_evidence_non_green(
+    tmp_path: Path,
+) -> None:
+    """A runtime skip cannot be reclassified as optional required evidence."""
+    root = _root(tmp_path)
+    command = root / "skip-result.sh"
+    command.write_text(
+        "#!/bin/sh\nprintf 'SKIPPED [1] test_live.py: emulator unavailable\\n'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+
+    observations = observe_gate(
+        command=str(command),
+        root=root,
+        timeout_seconds=30,
+    )
+    evidence = build_evidence(
+        kind="gate",
+        name="unit.all",
+        command=str(command),
+        status="passed",
+        return_code=0,
+        observations=observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+
+    assert observations["skipped_required_tests"] == 1
+    assert observations["skipped_optional_tests"] == 0
+    assert evidence["status"] == "failed"
+    assert evidence["return_code"] == 1
+
+    tampered = _gate_observations()
+    tampered["skipped_optional_tests"] = 1
+    tampered_evidence = build_evidence(
+        kind="gate",
+        name="unit.all",
+        command=str(command),
+        status="passed",
+        return_code=0,
+        observations=tampered,
+        env=_ci_env_for(root),
+        root=root,
+    )
+    assert tampered_evidence["status"] == "failed"
+
+
+def test_smoke_timeout_comes_from_inventory_and_is_observed(
+    tmp_path: Path,
+) -> None:
+    """The smoke timeout is validated and bound to the registered gate profile."""
+    root = _root(tmp_path)
+    scripts = root / "scripts"
+    scripts.mkdir()
+    check = scripts / "check.sh"
+    check.write_text(
+        "#!/bin/sh\n"
+        "command -v python3 >/dev/null 2>&1 || { "
+        "printf 'python3 missing\\n' >&2; exit 1; }\n"
+        "printf 'unit.all\\n'\n",
+        encoding="utf-8",
+    )
+    check.chmod(0o755)
+    record = {
+        "job": "gate-merge",
+        "class": "wiring",
+        "command": "./scripts/check.sh --profile merge",
+        "requiredTools": ["sh"],
+        "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
+        "timeoutSeconds": 1800,
+    }
+    gate_observations = _gate_observations()
+    gate_observations["timeout_seconds"] = 1800
+    smoke_observations = observe_smoke(
+        record=record,
+        gate_observations=gate_observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+
+    assert smoke_timeout_seconds(record) == 1800
+    assert smoke_observations["bounded_timeout"] is True
+    gate_observations["timeout_seconds"] = 3600
+    mismatched = observe_smoke(
+        record=record,
+        gate_observations=gate_observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+    assert mismatched["bounded_timeout"] is False
+    with pytest.raises(EvidenceError, match="timeoutSeconds"):
+        smoke_timeout_seconds({**record, "timeoutSeconds": 0})
 
 
 def test_evidence_rejects_missing_or_mutable_runner_identity(tmp_path: Path) -> None:
@@ -461,7 +562,7 @@ def test_dispatch_consumes_builder_full_profile_and_provider_credentials() -> No
 
 
 def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
-    """The imported Builder job cannot run a focused gate and full profile together."""
+    """The imported Builder job cannot accept two independent selectors."""
     proc = subprocess.run(
         [str(PROJECT_CI_ENTRYPOINT)],
         cwd=REPO_ROOT,
@@ -480,7 +581,7 @@ def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
 
 
 def test_project_ci_entrypoint_accepts_focused_builder_profile(tmp_path: Path) -> None:
-    """The Builder focused profile delegates exactly one selected merge gate."""
+    """The Builder focused profile delegates the unit.all default gate."""
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     adapter = scripts / PROJECT_CI_ENTRYPOINT.name
@@ -494,7 +595,6 @@ def test_project_ci_entrypoint_accepts_focused_builder_profile(tmp_path: Path) -
         cwd=tmp_path,
         env={
             **_off_cluster_env(),
-            "FOCUSED_GATE": "unit.all",
             "PROJECT_CI_PROFILE": "focused",
         },
         capture_output=True,
@@ -504,6 +604,90 @@ def test_project_ci_entrypoint_accepts_focused_builder_profile(tmp_path: Path) -
     )
     assert proc.returncode == 0
     assert proc.stdout.splitlines() == ["--profile", "merge", "--gate", "unit.all"]
+
+
+def test_project_ci_entrypoint_help_needs_no_external_commands() -> None:
+    """Help is a dependency-free contract inspection, never a gate execution."""
+    proc = subprocess.run(
+        ["/bin/bash", str(PROJECT_CI_ENTRYPOINT), "--help"],
+        cwd=REPO_ROOT,
+        env={"PATH": ""},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0
+    assert "usage: project_ci_entrypoint.sh" in proc.stdout
+    assert proc.stderr == ""
+
+
+def test_project_ci_entrypoint_dry_run_supports_sanitized_logging(
+    tmp_path: Path,
+) -> None:
+    """Dry-run emits a machine result and secures optional diagnostics."""
+    log_file = tmp_path / "selector.jsonl"
+    proc = subprocess.run(
+        [
+            str(PROJECT_CI_ENTRYPOINT),
+            "--dry-run",
+            "--log-format",
+            "json",
+            "--log-level",
+            "info",
+            "--log-file",
+            str(log_file),
+            "--run-id",
+            "ci-17",
+        ],
+        cwd=REPO_ROOT,
+        env={**_off_cluster_env(), "PROJECT_CI_PROFILE": "focused"},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0
+    assert json.loads(proc.stdout) == {
+        "status": "dry-run",
+        "profile": "merge",
+        "gate": "unit.all",
+        "run_id": "ci-17",
+    }
+    diagnostic = json.loads(proc.stderr)
+    assert diagnostic["component"] == "project-ci-entrypoint"
+    assert diagnostic["result"] == "unit.all"
+    assert json.loads(log_file.read_text(encoding="utf-8")) == diagnostic
+    assert log_file.stat().st_mode & 0o777 == 0o600
+
+
+def test_project_ci_entrypoint_rejects_unknown_flags_without_reflection() -> None:
+    """Unknown input fails before selection and is not copied into diagnostics."""
+    unsafe = "gl" + "pat-" + ("A" * 24)
+    proc = subprocess.run(
+        [str(PROJECT_CI_ENTRYPOINT), unsafe],
+        cwd=REPO_ROOT,
+        env=_off_cluster_env(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert unsafe not in (proc.stdout + proc.stderr)
+    assert "unexpected argument" in proc.stderr
+
+
+def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:
+    """Required unit evidence deselects live and vendored-schema-only tests."""
+    source = (REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh").read_text(
+        encoding="utf-8"
+    )
+    assert '-m "not live and not dmtf_sim_live"' in source
+    assert "--ignore=tests/gates/test_redfish_schema.py" in source
 
 
 def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
