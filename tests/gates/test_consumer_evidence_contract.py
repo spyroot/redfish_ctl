@@ -45,6 +45,24 @@ def _yaml(path: Path) -> dict:
     return data
 
 
+def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
+    """Release and merge evidence must run with every required dependency."""
+    ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
+    assert "before_script" not in ci["publish-github"]
+    assert any(
+        "conda activate redfish_ctl" in command
+        for command in ci["default"]["before_script"]
+    )
+
+    inventory = _yaml(REPO_ROOT / "inventory" / "ci" / "smoke-tests.yaml")
+    records = {
+        record["job"]: record
+        for record in inventory["spec"]["smokeTests"]
+    }
+    for job in ("project-ci-cpu-validation", "gate-merge"):
+        assert {"helm", "kubeconform"} <= set(records[job]["requiredTools"])
+
+
 def _ci_env(job: str = "gate-merge") -> dict[str, str]:
     """Return complete immutable CI identity for deterministic evidence tests."""
     return {

@@ -6,7 +6,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -26,8 +25,7 @@ def _template(extra_args: list[str] | None = None) -> list[dict]:
     helm = shutil.which("helm")
     if helm is None and Path("/opt/homebrew/bin/helm").exists():
         helm = "/opt/homebrew/bin/helm"
-    if helm is None:
-        pytest.skip("helm binary is not installed")
+    assert helm is not None, "helm binary is required"
 
     cmd = [
         helm,

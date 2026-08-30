@@ -222,7 +222,6 @@ def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
     assert "repo.yaml: OK (python fallback)" in combined
 
 
-@pytest.mark.skipif(shutil.which("kubeconform") is None, reason="kubeconform not in this environment")
 def test_kubernetes_schema_validates_a_non_empty_manifest_set() -> None:
     """kubernetes.schema selects concrete manifests and reports how many it validated.
 

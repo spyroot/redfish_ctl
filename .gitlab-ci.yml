@@ -323,7 +323,6 @@ publish-github:
         $CI_PIPELINE_SOURCE != "schedule" &&
         $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
         $CI_COMMIT_REF_PROTECTED == "true"
-  before_script: []          # boundary gates need no project environment
   script:
     # Run the configured repository-export profile, then the publication
     # boundary scans that cannot share that profile.
