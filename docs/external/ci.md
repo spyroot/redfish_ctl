@@ -140,8 +140,10 @@ contract is [Redfish Simulator Contract](simulator-contract.md).
 
 Triggers on pushes to `main` and on every pull request.
 
-- Runs the **offline** test suite (`pytest -q -m "not dmtf_sim_live"`) on
-  Python **3.10**.
+- Runs the full **offline** test suite (`pytest -q -m "not dmtf_sim_live"`) on
+  Python **3.10** for pushes and PRs with non-documentation changes. Docs-only
+  PRs use the workflow's docs-coupled fast path, which runs only detected
+  docs-coupled tests (or no tests when none are found).
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
 - Runs blocking docstring checks with `python tools/docstring_gate.py --base FETCH_HEAD`

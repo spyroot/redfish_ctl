@@ -35,14 +35,15 @@ is the only path that updates public GitHub `main`.
 
 ```bash
 python tools/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
+NEW_VERSION="$(python tools/bump_version.py --show)"
 git add redfish_ctl/version.py
-git commit -m "Release 1.1.2"
+git commit -m "Release ${NEW_VERSION}"
 # Push a release branch and merge it only after exact-head Internal GitLab gates pass.
 # Wait for that job to mirror the protected internal main commit, then:
 git fetch <github-remote> main
 test "$(git rev-parse <github-remote>/main)" = "<validated-internal-main-sha>"
-git tag v1.1.2 <validated-internal-main-sha>
-git push <github-remote> refs/tags/v1.1.2   # this is what publishes
+git tag "v${NEW_VERSION}" <validated-internal-main-sha>
+git push <github-remote> "refs/tags/v${NEW_VERSION}"   # this is what publishes
 ```
 
 The tag push publishes the package, GitHub release, and available container
