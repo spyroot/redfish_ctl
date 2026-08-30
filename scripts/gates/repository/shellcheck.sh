@@ -9,6 +9,7 @@ fi
 mapfile -t files < <(
   git ls-files \
     'build_dist.sh' \
+    'check.sh' \
     'scripts/*.sh' \
     'scripts/gates/**/*.sh' \
     'scripts/gates/**/*.bash' \

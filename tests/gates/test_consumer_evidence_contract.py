@@ -74,6 +74,7 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
         "python",
         "ruff",
         "shellcheck",
+        "yq",
     }
     for job in ("project-ci-cpu-validation", "gate-merge"):
         assert merge_tools <= set(records[job]["requiredTools"])

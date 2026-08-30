@@ -43,6 +43,7 @@ spec:
         - ruff
         - setsid
         - shellcheck
+        - yq
       artifactUnderTest:
         type: repository-and-provider-resource-job
         digestSource: git-commit-and-builder-revision
@@ -69,6 +70,7 @@ spec:
         - python3
         - ruff
         - shellcheck
+        - yq
       artifactUnderTest:
         type: repository
         digestSource: git-commit
