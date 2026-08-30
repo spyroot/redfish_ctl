@@ -298,7 +298,6 @@
           "type": "array",
           "items": {
             "enum": [
-              "CI_JOB_TOKEN",
               "GITLAB_PROJECT_ID",
               "GITLAB_PROJECT_TOKEN",
               "GITLAB_URL",

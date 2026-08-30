@@ -25,7 +25,7 @@ required_jobs:
 # from the exact immutable includes; floating refs and unknown content fail.
 trusted_includes:
   - project: spyroot/builder
-    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
+    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
     file: /ci/templates/project-service.yml
     templates:
       - {name: .builder-project-image-publish, mutates: true}
@@ -37,7 +37,7 @@ trusted_includes:
       - {name: .builder-project-rollback, mutates: true}
       - {name: .builder-project-release-evidence, mutates: false}
   - project: spyroot/builder
-    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
+    ref: b885b1e3b1b9403c544109cdf3c6bdfe1003db9c
     file: /ci/templates/project-ci-resource-jobs.yml
     jobs:
       - name: project-ci-cpu-validation
@@ -361,16 +361,16 @@ spec:
       description: Parse and lint tracked YAML configuration.
     - required: true
       status: active
-      isolation: network
+      isolation: offline
       permissions: read-only
       executionSurface: internal-gitlab
-      requiredCredentialNames: [CI_JOB_TOKEN]
-      platform: linux/amd64
-      workload: project-integration
+      requiredCredentialNames: []
+      platform: portable
+      workload: cpu
       expectedCost: low
       timeoutSeconds: 600
       mutation: false
-      offlineFixture: null
+      offlineFixture: standards-binding.yaml
       id: repo.schemas
       category: repo
       phase: repository

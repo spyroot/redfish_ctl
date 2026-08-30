@@ -119,8 +119,8 @@ independent Git read-back; and sanitization is recorded only after a quiet
 content scan and atomic file read-back. See [Gates](gates.md#failure-behavior)
 for execution and timeout policy.
 
-The upstream access prerequisite for `repo.schemas` is documented in
-[Gates](gates.md#selected-gate-summary).
+The local exact-authority prerequisite for `repo.schemas` is documented in
+[Gates](gates.md#selected-gate-summary); the gate requires no network token.
 
 ## Protected DMTF simulator deployment
 

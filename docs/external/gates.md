@@ -55,7 +55,7 @@ it without executing a gate.
 | `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
-| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a schema, revision, provider-include, or upstream job-token allow-list mismatch |
+| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a local authority checkout, exact revision, schema, or provider include does not match |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
 | `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |
@@ -76,10 +76,10 @@ it without executing a gate.
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
 | `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
 
-The `repo.schemas` gate uses the current Internal GitLab project job token to
-fetch the pinned Standards schemas and Builder provider tree/template. The
-Standards and Builder projects must allow `redfish_ctl` job-token read access; a
-missing allow-list entry fails without prompting for credentials.
+The `repo.schemas` gate reads `spec.source.localPath`, defined in
+`standards-binding.yaml` and `builder-binding.yaml`, and checks out each
+authority's pinned `spec.source.revision` in a temporary local clone. It uses no
+network credential; a missing local checkout or exact commit fails closed.
 
 ## Telemetry liveness checks
 

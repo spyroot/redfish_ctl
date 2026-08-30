@@ -11,7 +11,7 @@ from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
-EXPECTED_BUILDER_REF = "d3234c26f71f5a229bba28971d37ff38085c1da3"
+EXPECTED_BUILDER_REF = "b885b1e3b1b9403c544109cdf3c6bdfe1003db9c"
 BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
 BUILDER_RESOURCE_JOBS_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
 PROJECT_CI_CPU_JOB = "project-ci-cpu-validation"
