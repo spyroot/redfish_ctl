@@ -442,10 +442,11 @@ project_ci_terminal_result() {
   fi
 }
 
-# Classify captured dependency stderr without replaying raw content.
-# Arguments: capture path. Environment inputs: none. Stdout: one sanitized
-# summary. Stderr: none. Exit classes: 0. Side effects and cleanup: none.
-project_ci_stderr_summary() {
+# Count captured dependency stderr classes without replaying raw content.
+# Arguments: capture path. Environment inputs: none. Stdout: tab-separated
+# total/auth/network/warning/error/other counts. Stderr: none. Exit classes: 0.
+# Side effects and cleanup: none.
+project_ci_stderr_counts() {
   local stderr_file="$1"
 
   awk '
@@ -457,7 +458,7 @@ project_ci_stderr_summary() {
         auth++
       } else if (text ~ /(timeout|connection|network|dns|unreachable|reset)/) {
         network++
-      } else if (text ~ /(warning|deprecated)/) {
+      } else if (text ~ /(warning|deprecated|level=warn)/) {
         warning++
       } else if (text ~ /(error|failed|failure|fatal)/) {
         error++
@@ -466,12 +467,25 @@ project_ci_stderr_summary() {
       }
     }
     END {
-      printf "stderr-lines=%d classes=auth:%d,network:%d,", \
-        total, auth, network
-      printf "warning:%d,error:%d,other:%d redaction=full", \
-        warning, error, other
+      printf "%d\t%d\t%d\t%d\t%d\t%d\n", \
+        total, auth, network, warning, error, other
     }
   ' "$stderr_file"
+}
+
+# Render one sanitized stderr classification from the shared count helper.
+# Arguments: capture path. Environment inputs: none. Stdout: one summary.
+# Stderr: none. Exit classes: 0. Side effects and cleanup: none.
+project_ci_stderr_summary() {
+  local stderr_file="$1"
+  local total auth network warning error other
+
+  IFS=$'\t' read -r total auth network warning error other \
+    < <(project_ci_stderr_counts "$stderr_file")
+  printf 'stderr-lines=%d classes=auth:%d,network:%d,' \
+    "$total" "$auth" "$network"
+  printf 'warning:%d,error:%d,other:%d redaction=full' \
+    "$warning" "$error" "$other"
 }
 
 # Execute one selected gate invocation without replaying dependency stderr.
@@ -488,6 +502,7 @@ project_ci_run_gate() {
   local evidence_path=""
   local stderr_file="" cleanup_status=passed
   local elapsed_ms status=0 stderr_lines=0 warning_count=0
+  local auth_lines=0 network_lines=0 warning_lines=0 error_lines=0 other_lines=0
   local diagnostic_summary="stderr-lines=0 redaction=full"
   local result_status=passed error_class=none event_level=info
   local resource=profile:merge
@@ -662,7 +677,9 @@ project_ci_run_gate() {
   child_running=false
   child_pid=""
   diagnostic_summary="$(project_ci_stderr_summary "$stderr_file")"
-  stderr_lines="$(awk 'END { print NR + 0 }' "$stderr_file")"
+  IFS=$'\t' read -r \
+    stderr_lines auth_lines network_lines warning_lines error_lines other_lines \
+    < <(project_ci_stderr_counts "$stderr_file")
   if (( stderr_lines > 0 )); then
     warning_count=1
   fi
@@ -670,18 +687,20 @@ project_ci_run_gate() {
 
   if (( status != 0 )); then
     result_status=failed
-    error_class=gate-failed
+    error_class="gate-failed"
     event_level=error
-  elif (( stderr_lines > 0 )); then
+  elif (( auth_lines + network_lines + error_lines + other_lines > 0 )); then
     status=2
     result_status=failed
-    error_class=dependency-stderr
+    error_class="dependency-stderr"
     event_level=error
   elif [[ "$cleanup_status" != "passed" ]]; then
     status=2
     result_status=failed
-    error_class=cleanup-failed
+    error_class="cleanup-failed"
     event_level=error
+  elif (( warning_lines > 0 )); then
+    event_level=warning
   fi
 
   elapsed_ms=$(( (SECONDS - start_seconds) * 1000 ))
