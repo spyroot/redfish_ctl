@@ -54,7 +54,7 @@ it without executing a gate.
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
 | `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
-| `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
+| `repo.yaml` | merge | no | YAML syntax and duplicate-key policy from `.yamllint` | yamllint is absent, or a configured error or parse failure occurs |
 | `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a local authority checkout, exact revision, schema, or provider include does not match |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
@@ -75,6 +75,11 @@ it without executing a gate.
 | `mutation.verify-required` | deploy | no | the applied module exposes a verify step | module has no `verify.sh` |
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
 | `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; gate output is scanned before publication, and later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
+
+The `.yamllint` file defines the structural policy consumed by `repo.yaml`.
+Formatting-only rules are explicitly not applicable to this syntax and data
+integrity gate. Duplicate keys are an explicit error, `yamllint` is required,
+and the gate uses no runtime warning suppression or parse-only fallback.
 
 The `repo.schemas` gate reads `spec.source.localPath`, defined in
 `standards-binding.yaml` and `builder-binding.yaml`, and checks out each

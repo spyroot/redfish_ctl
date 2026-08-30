@@ -191,24 +191,13 @@ def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
-    """The Python fallback selects the same non-template YAML as yamllint.
-
-    Helm templates contain Go template expressions rather than parseable raw
-    YAML. The primary yamllint path excludes those files, so the fallback must
-    preserve that selection while concrete chart output remains covered by the
-    required Kubernetes render and schema gates.
-    """
+def test_yaml_gate_fails_when_yamllint_is_missing(tmp_path) -> None:
+    """The required YAML policy cannot fall back to weaker parse-only evidence."""
     command_dir = tmp_path / "bin"
     command_dir.mkdir()
-    commands = {
-        "dirname": shutil.which("dirname"),
-        "git": shutil.which("git"),
-        "python": sys.executable,
-    }
-    assert all(commands.values()), commands
-    for name, target in commands.items():
-        (command_dir / name).symlink_to(target)
+    dirname = shutil.which("dirname")
+    assert dirname is not None
+    (command_dir / "dirname").symlink_to(dirname)
 
     script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
     proc = subprocess.run(
@@ -218,12 +207,12 @@ def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
         env={**os.environ, "PATH": str(command_dir)},
     )
     combined = proc.stdout + proc.stderr
-    assert proc.returncode == 0, combined
-    assert "repo.yaml: OK (python fallback)" in combined
+    assert proc.returncode != 0
+    assert "required command is unavailable: yamllint" in combined
 
 
-def test_yaml_gate_publishes_only_blocking_linter_diagnostics(tmp_path) -> None:
-    """Accepted yamllint style notices never contaminate exact CI evidence."""
+def test_yaml_gate_uses_explicit_error_only_policy(tmp_path) -> None:
+    """The YAML gate runs its tracked policy without hiding diagnostics."""
     command_dir = tmp_path / "bin"
     command_dir.mkdir()
     arguments = tmp_path / "yamllint.args"
@@ -232,8 +221,9 @@ def test_yaml_gate_publishes_only_blocking_linter_diagnostics(tmp_path) -> None:
         "#!/bin/sh\n"
         "printf '%s\\n' \"$@\" >\"$YAMLLINT_ARGS\"\n"
         "case \" $* \" in\n"
-        "  *' --no-warnings '*) ;;\n"
-        "  *) printf 'warning: accepted style notice\\n' ;;\n"
+        "  *' --no-warnings '*) exit 91 ;;\n"
+        "  *' -c .yamllint '*) exit 0 ;;\n"
+        "  *) exit 92 ;;\n"
         "esac\n",
         encoding="utf-8",
     )
@@ -252,9 +242,16 @@ def test_yaml_gate_publishes_only_blocking_linter_diagnostics(tmp_path) -> None:
     )
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
-    assert "warning" not in combined.lower()
     linter_arguments = arguments.read_text(encoding="utf-8").splitlines()
-    assert "--no-warnings" in linter_arguments
+    assert "--no-warnings" not in linter_arguments
+    assert linter_arguments[:2] == ["-c", ".yamllint"]
+    assert not any("/templates/" in value for value in linter_arguments[2:])
+    policy = yaml.safe_load((REPO_ROOT / ".yamllint").read_text(encoding="utf-8"))
+    assert policy == {
+        "rules": {
+            "key-duplicates": {"level": "error"},
+        }
+    }
     assert "repo.yaml: OK (yamllint)" in combined
 
 
