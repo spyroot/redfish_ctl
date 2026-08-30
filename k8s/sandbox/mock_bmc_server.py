@@ -35,7 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class MockBMCServer(ThreadingHTTPServer):
-    request_queue_size = 128
+    request_queue_size = 256
     daemon_threads = True
 
 

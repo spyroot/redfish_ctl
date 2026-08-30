@@ -20,7 +20,10 @@ NETWORK_PROTOCOL = "/redfish/v1/Managers/BMC_0/NetworkProtocol"
 CHASSIS = "/redfish/v1/Chassis/Chassis_0"
 
 MAX_CONCURRENT_SECONDS = 20.0
-MIN_REQUEST_QUEUE_SIZE = 64
+# Keep this aligned with the 200-client hammer contract in
+# test_mock_bmc_get_hammer.py so the server backlog cannot sit below the
+# declared concurrent client count.
+MIN_REQUEST_QUEUE_SIZE = 200
 
 
 def _load_server_module() -> Any:
