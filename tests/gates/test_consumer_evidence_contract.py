@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import textwrap
 import threading
 from pathlib import Path
 
@@ -807,20 +808,76 @@ def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:
     assert "--ignore=tests/gates/test_redfish_schema.py" in source
 
 
-def test_unit_profile_clears_fixture_connection_inputs() -> None:
-    """The offline gate clears every connection input read by the dual fixture."""
+def test_unit_profile_clears_fixture_connection_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The offline gate clears connection inputs before it invokes pytest."""
     fixture_source = (REPO_ROOT / "tests" / "conftest.py").read_text(
         encoding="utf-8"
     )
     fixture_names = set(
         re.findall(r'os\.environ(?:\.get\(|\[)["\']([A-Z0-9_]+)', fixture_source)
     )
-    gate_source = (REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh").read_text(
-        encoding="utf-8"
+    connection_names = fixture_names | {
+        "REDFISH_IP",
+        "REDFISH_USERNAME",
+        "REDFISH_PASSWORD",
+        "REDFISH_PORT",
+    }
+    capture = tmp_path / "pytest-invocation.json"
+    shim = tmp_path / "pytest"
+    shim.write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env python3
+            import json
+            import os
+            from pathlib import Path
+            import sys
+
+            names = os.environ["UNIT_GATE_CONNECTION_NAMES"].split(",")
+            present = sorted(name for name in names if name in os.environ)
+            Path(os.environ["UNIT_GATE_CAPTURE"]).write_text(
+                json.dumps({"args": sys.argv[1:], "present": present}),
+                encoding="utf-8",
+            )
+            raise SystemExit(91 if present else 0)
+            """
+        ),
+        encoding="utf-8",
     )
+    shim.chmod(0o755)
 
     assert fixture_names
-    assert fixture_names <= set(gate_source.split())
+    for name in connection_names:
+        monkeypatch.setenv(name, "must-be-cleared")
+    monkeypatch.setenv("UNIT_GATE_CONNECTION_NAMES", ",".join(connection_names))
+    monkeypatch.setenv("UNIT_GATE_CAPTURE", str(capture))
+    monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
+
+    proc = subprocess.run(
+        [str(REPO_ROOT / "scripts" / "gates" / "unit" / "all.sh")],
+        cwd=REPO_ROOT,
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    observed = json.loads(capture.read_text(encoding="utf-8"))
+    assert observed["present"] == []
+    assert observed["args"] == [
+        "-q",
+        "-ra",
+        "-W",
+        "error",
+        "-m",
+        "not live and not emulator_live and not dmtf_sim_live",
+        "--ignore=tests/gates/test_redfish_schema.py",
+    ]
 
 
 @pytest.mark.parametrize(
