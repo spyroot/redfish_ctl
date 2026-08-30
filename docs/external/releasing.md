@@ -125,13 +125,9 @@ working-tree `HEAD` or push unrelated local tags.
 
 ## Helper Scripts
 
-These legacy helpers are not part of the tagged release path. Two upload
-directly, so do not run them for a release managed by Trusted Publishing.
+These helpers are not part of the tagged release path and do not publish.
 
-- `build_dist.sh`, defined in the repo root, builds `sdist`, installs `check-manifest`, builds wheel
-  plus `sdist` again, then uploads `dist/*` with `twine`. It installs `check-manifest` but does not
-  run it.
-- `build_push.sh`, defined in the repo root, removes `dist/*`, builds `sdist` and wheel, then uploads
-  `dist/*` with `twine`.
+- `build_dist.sh`, defined in the repo root, builds `sdist` and wheel artifacts,
+  then checks them with `twine`. Its retired `--upload` option fails closed.
 - `local_install.sh`, defined in the repo root, creates `test1`, builds distributions, and runs
   `python setup.py install`.
