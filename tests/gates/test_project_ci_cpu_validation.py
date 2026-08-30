@@ -15,6 +15,8 @@ ADAPTER = REPO_ROOT / "tools" / "project-ci-cpu-validation.sh"
 YQ_MERGE_ANCHOR_WARNING = (
     'time=2026-08-30T00:00:00Z level=WARN '
     'msg="--yaml-fix-merge-anchor-to-spec is false; '
+    "causing merge anchors to override the existing values which isn't "
+    "to the yaml spec. "
     'this flag will default to true in late 2025."'
 )
 
