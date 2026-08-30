@@ -150,7 +150,7 @@ Triggers on pushes to `main` and on every pull request.
   for pull-request changes and `python tools/docstring_gate.py --all` for the
   whole tree.
 - Uses **no secrets** and never contacts a BMC (live `@pytest.mark.live` tests
-  auto-skip with no `REDFISH_IP`). Checkout enables Git LFS for the committed
+  auto-skip with no `IDRAC_IP`). Checkout enables Git LFS for the committed
   offline corpus and specification artifacts used by the suite.
 
 Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls

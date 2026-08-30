@@ -9,14 +9,15 @@ Inside that approved CI environment, clear live connection variables before
 the offline suite:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
+  -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest -q
 ruff check <changed>
 ```
 
 The CLI reads only the canonical `REDFISH_*` connection variables. The
-dual-mode fixture switches to live mode when `REDFISH_IP` is present, so unset
-the canonical connection variables for the default suite.
+dual-mode fixture switches to live mode when `IDRAC_IP` is present, so unset
+both connection-variable families for the default suite.
 
 ## Which Lane To Use
 
@@ -29,15 +30,15 @@ Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock
 `redfish_service` when you need to inspect requests or state changes.
 
 **Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
-by default and against approved hardware when `REDFISH_IP` is set. Tests that require hardware are
+by default and against approved hardware when `IDRAC_IP` is set. Tests that require hardware are
 marked `@pytest.mark.live` and skip without that variable.
 
 For approved live hardware from an authorized Kubernetes job only:
 
 ```bash
-REDFISH_IP=<idrac> \
-REDFISH_USERNAME=root \
-REDFISH_PASSWORD=<password> \
+IDRAC_IP=<idrac> \
+IDRAC_USERNAME=root \
+IDRAC_PASSWORD=<password> \
 pytest -q -m live
 ```
 
@@ -92,7 +93,8 @@ variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
+env -u IDRAC_IP -u IDRAC_USERNAME -u IDRAC_PASSWORD \
+  -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
   pytest --cov=redfish_ctl
 ```
 
