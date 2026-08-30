@@ -441,7 +441,9 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     if not path.is_file():
         return [], False
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    runner_tag = registry.get("runner_tag", "homelab-k8s")
+    runner_tag = registry.get("runner_tag")
+    if not isinstance(runner_tag, str) or not runner_tag:
+        return ["gate registry runner_tag is missing"], True
     failures, trusted_templates = _check_trusted_includes(ci, registry)
     trusted_external_jobs = _trusted_external_jobs(registry)
     default_tags = (ci.get("default") or {}).get("tags") or []

@@ -14,10 +14,24 @@ from pathlib import Path
 import jsonschema
 import yaml
 
+try:
+    from tools.provider_contract import (
+        ProviderContractError,
+        normalized_base_url,
+        provider_base_url,
+        require_provider_repository,
+    )
+except ModuleNotFoundError:  # Direct ``python tools/schema_gate.py`` execution.
+    from provider_contract import (  # type: ignore[no-redef]
+        ProviderContractError,
+        normalized_base_url,
+        provider_base_url,
+        require_provider_repository,
+    )
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXACT_SHA = re.compile(r"^[0-9a-f]{40}$")
 IMMUTABLE_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
-APPROVED_GITLAB_PREFIX = "https://gitlab.rnd.embedings.ai/"
 
 
 class SchemaGateError(ValueError):
@@ -32,17 +46,40 @@ def _load_yaml(path: Path) -> dict:
     return value
 
 
-def _fetch_exact(repository: str, revision: str) -> tempfile.TemporaryDirectory:
+def _runtime_provider_base_url(root: Path, env: dict[str, str]) -> str:
+    """Resolve the provider route and bind token use to the current CI server."""
+    configured = provider_base_url(root)
+    if not env.get("CI_JOB_TOKEN", "").strip():
+        return configured
+    runtime_value = env.get("CI_SERVER_URL", "").strip()
+    if not runtime_value:
+        raise SchemaGateError("CI_SERVER_URL is required when CI_JOB_TOKEN is present")
+    runtime = normalized_base_url(runtime_value, label="CI_SERVER_URL")
+    if runtime != configured:
+        raise SchemaGateError("CI_SERVER_URL disagrees with the bound provider route")
+    return runtime
+
+
+def _fetch_exact(
+    repository: str,
+    revision: str,
+    *,
+    approved_base_url: str,
+    env: dict[str, str] | None = None,
+) -> tempfile.TemporaryDirectory:
     """Fetch one exact protected source tree without persisting credentials."""
-    if not repository.startswith(APPROVED_GITLAB_PREFIX):
-        raise SchemaGateError("contract repository is outside approved Internal GitLab")
+    try:
+        repository = require_provider_repository(repository, approved_base_url)
+    except ProviderContractError as exc:
+        raise SchemaGateError(str(exc)) from exc
     if not EXACT_SHA.fullmatch(revision):
         raise SchemaGateError("contract revision is not an exact commit")
     workspace = tempfile.TemporaryDirectory(prefix="redfish_ctl-schema-")
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
-    job_token = env.get("CI_JOB_TOKEN", "").strip()
+    selected_env = os.environ if env is None else env
+    fetch_env = {**selected_env, "GIT_TERMINAL_PROMPT": "0"}
+    job_token = fetch_env.get("CI_JOB_TOKEN", "").strip()
     if job_token:
-        env.update(
+        fetch_env.update(
             {
                 "GIT_CONFIG_COUNT": "2",
                 "GIT_CONFIG_KEY_0": f"http.{repository}.extraHeader",
@@ -76,7 +113,7 @@ def _fetch_exact(repository: str, revision: str) -> tempfile.TemporaryDirectory:
                 text=True,
                 check=False,
                 timeout=120,
-                env=env,
+                env=fetch_env,
             )
             if proc.returncode != 0:
                 repository_name = repository.rstrip("/").rsplit("/", 1)[-1]
@@ -90,7 +127,7 @@ def _fetch_exact(repository: str, revision: str) -> tempfile.TemporaryDirectory:
             text=True,
             check=False,
             timeout=30,
-            env=env,
+            env=fetch_env,
         )
         if head.returncode != 0 or head.stdout.strip() != revision:
             raise SchemaGateError("fetched contract identity does not match its binding")
@@ -123,6 +160,17 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
         }
         for record in manifest.get("trusted_includes", [])
     ]
+    expected_jobs = [
+        job
+        for record in manifest.get("trusted_includes", [])
+        for job in record.get("jobs", [])
+        if job.get("name") == "project-ci-cpu-validation"
+    ]
+    if len(expected_jobs) != 1:
+        raise SchemaGateError(
+            "gates/manifest.yaml must declare project-ci-cpu-validation once"
+        )
+    expected_job = expected_jobs[0]
     observed_includes = ci.get("include") or []
     if isinstance(observed_includes, dict):
         observed_includes = [observed_includes]
@@ -164,7 +212,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
     imported = include.get("project-ci-cpu-validation")
     if not isinstance(imported, dict):
         raise SchemaGateError("bound Builder include lacks project-ci-cpu-validation")
-    if imported.get("allow_failure") is not False:
+    if imported.get("allow_failure") is not expected_job.get("allowFailure"):
         raise SchemaGateError("Builder project-ci-cpu-validation is not required")
     if not IMMUTABLE_IMAGE.fullmatch(str(imported.get("image", ""))):
         raise SchemaGateError("Builder project-ci-cpu-validation image is not immutable")
@@ -172,9 +220,18 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
         raise SchemaGateError(
             "Builder project-ci-cpu-validation image disagrees with the tracked default"
         )
-    tags = imported.get("tags") or []
-    if "homelab-k8s" not in tags or "homelab-k8s-validation" not in tags:
-        raise SchemaGateError("Builder project-ci-cpu-validation runner tags are incomplete")
+    if imported.get("stage") != expected_job.get("stage"):
+        raise SchemaGateError(
+            "Builder project-ci-cpu-validation stage disagrees with the trusted contract"
+        )
+    if imported.get("tags") != expected_job.get("tags"):
+        raise SchemaGateError(
+            "Builder project-ci-cpu-validation tags disagree with the trusted contract"
+        )
+    if imported.get("script") != expected_job.get("script"):
+        raise SchemaGateError(
+            "Builder project-ci-cpu-validation script disagrees with the trusted contract"
+        )
     rules_text = repr(imported.get("rules") or [])
     required_selectors = (
         '$FOCUSED_GATE != null && $FOCUSED_GATE != ""',
@@ -194,13 +251,20 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
         raise SchemaGateError("Builder imported job and smoke command do not match")
 
 
-def run() -> None:
+def run(env: dict[str, str] | None = None) -> None:
     """Execute the exact-schema validation contract."""
+    selected_env = dict(os.environ if env is None else env)
     binding = _load_yaml(REPO_ROOT / "standards-binding.yaml")
+    try:
+        approved_base_url = _runtime_provider_base_url(REPO_ROOT, selected_env)
+    except ProviderContractError as exc:
+        raise SchemaGateError(str(exc)) from exc
     standards_source = binding.get("spec", {}).get("source", {})
     standards_workspace = _fetch_exact(
         str(standards_source.get("repository", "")),
         str(standards_source.get("revision", "")),
+        approved_base_url=approved_base_url,
+        env=selected_env,
     )
     try:
         standards_root = Path(standards_workspace.name)
@@ -224,7 +288,10 @@ def run() -> None:
                 )
             provider_source = provider["spec"]["source"]
             provider_workspace = _fetch_exact(
-                provider_source["repository"], provider_source["revision"]
+                provider_source["repository"],
+                provider_source["revision"],
+                approved_base_url=approved_base_url,
+                env=selected_env,
             )
             try:
                 provider_root = Path(provider_workspace.name)
@@ -254,6 +321,7 @@ def main() -> int:
     except (
         KeyError,
         OSError,
+        ProviderContractError,
         SchemaGateError,
         subprocess.SubprocessError,
         TypeError,

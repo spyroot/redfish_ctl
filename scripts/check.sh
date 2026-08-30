@@ -67,6 +67,33 @@ _safe_dispatch_ref() {
   git check-ref-format "refs/heads/$1" >/dev/null 2>&1
 }
 
+# Summary: Resolve the consumer project name from the current CI or Git remote.
+# Arguments: none. Environment: CI_PROJECT_NAME when GitLab supplies it.
+# Stdout: one validated project name. Stderr: classified blocker text.
+# Exit classes: 0 resolved, 78 unavailable. Side effects: read-only Git queries.
+# Idempotency: deterministic for one checkout. Cleanup: none.
+_project_ci_consumer() {
+  local project remote_url
+  if [ -n "${CI_PROJECT_NAME:-}" ]; then
+    project="$CI_PROJECT_NAME"
+  elif remote_url="$(git remote get-url github 2>/dev/null)"; then
+    project="${remote_url##*/}"
+  elif remote_url="$(git remote get-url origin 2>/dev/null)"; then
+    project="${remote_url##*/}"
+  else
+    echo "BLOCKER: dispatch cannot derive the consumer project from CI or Git" >&2
+    return 78
+  fi
+  project="${project%.git}"
+  case "$project" in
+    ""|*[!A-Za-z0-9._-]*)
+      echo "BLOCKER: derived consumer project name is invalid" >&2
+      return 78
+      ;;
+  esac
+  printf '%s\n' "$project"
+}
+
 # Summary: Resolve the exact Builder-owned project CI entrypoint.
 # Arguments: none. Environment: none. Stdout: executable path.
 # Stderr: classified blocker text. Exit classes: 0 resolved, 78 blocked.
@@ -140,7 +167,7 @@ _builder_project_ci() {
 # Idempotency: exact project, ref, commit, and selection. Cleanup: provider-owned.
 _dispatch() {
   local selected_profile="$1" selected_gate="$2" selected_ref="$3"
-  local project_ci ref commit
+  local project_ci project ref commit
   local -a args
   if [ "$selected_profile" != "merge" ]; then
     echo "check.sh: --dispatch supports only the merge profile" >&2
@@ -158,10 +185,10 @@ _dispatch() {
   fi
   commit="$(git rev-parse HEAD)"
   project_ci="$(_builder_project_ci)" || return "$?"
+  project="$(_project_ci_consumer)" || return "$?"
   args=(
     run
-    --project redfish_ctl
-    --host internal-gitlab
+    --project "$project"
     --ref "$ref"
     --requested-commit "$commit"
   )
@@ -338,7 +365,7 @@ echo "  Plan the exact branch through Builder:" >&2
 echo "  ./scripts/check.sh --profile merge --dispatch" >&2
 echo "  Apply after review:" >&2
 echo "  ./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run" >&2
-echo "  The protected pipeline then runs on the homelab-k8s runner for $ref." >&2
-echo "  (or run inside a homelab-k8s runner/Job — a pod is detected from the kubelet's own" >&2
+echo "  The protected pipeline then runs on the provider-selected runner for $ref." >&2
+echo "  (or run inside the selected runner/Job — a pod is detected from the kubelet's own" >&2
 echo "   evidence, not from an environment variable, so exporting one cannot bypass this)" >&2
 exit 3

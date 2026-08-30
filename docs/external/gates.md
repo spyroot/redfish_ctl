@@ -24,7 +24,7 @@ See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
-- **integration** — render-only namespace validation plus live GitLab token
+- **integration** — read-only Builder namespace and service binding validation plus live GitLab token
   checks. No cluster or BMC mutation.
 - **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
@@ -62,7 +62,7 @@ it without executing a gate.
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | a temporary Namespace manifest renders with a valid name and ownership label | the manifest is malformed or required fields are missing |
+| `integration.namespace` | integration | no | Builder resolves a valid owned namespace and service endpoint for the runtime project | the provider binding is unavailable, incomplete, or invalid; the consumer never creates either resource |
 | `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |

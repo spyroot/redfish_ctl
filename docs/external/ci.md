@@ -127,9 +127,9 @@ Run the simulator deployment only from the protected default-branch pipeline
 in Internal GitLab. The exact provider template is allow-listed by
 `trusted_includes` in `gates/manifest.yaml`; see [Trusted provider
 includes](gates.md#trusted-provider-includes). The pipeline supplies
-`BUILDER_PROJECT_CONSUMER=redfish_ctl`, `DMTF_RELEASE`, and
-`PROJECT_LIVE_TEST_COMMAND`. The provider binding supplies `REDFISH_IP` and
-`REDFISH_PORT` to the live test.
+`DMTF_RELEASE` and `PROJECT_LIVE_TEST_COMMAND`. The exact Builder template
+resolves the registered consumer binding at runtime; that binding supplies
+`REDFISH_IP` and `REDFISH_PORT` to the live test.
 
 1. Play `project-service-image-publish` and
    `project-service-chart-publish`. Their exact-commit receipts supply the

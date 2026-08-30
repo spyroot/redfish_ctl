@@ -25,7 +25,7 @@ required_jobs:
 # from the exact immutable includes; floating refs and unknown content fail.
 trusted_includes:
   - project: spyroot/builder
-    ref: 1511171608f913833004e29558468d8e481fd947
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-service.yml
     templates:
       - {name: .builder-project-image-publish, mutates: true}
@@ -37,7 +37,7 @@ trusted_includes:
       - {name: .builder-project-rollback, mutates: true}
       - {name: .builder-project-release-evidence, mutates: false}
   - project: spyroot/builder
-    ref: 1511171608f913833004e29558468d8e481fd947
+    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
     file: /ci/templates/project-ci-resource-jobs.yml
     jobs:
       - name: project-ci-cpu-validation
@@ -138,7 +138,7 @@ gates:
   - {id: kubernetes.render, profile: merge, command: scripts/gates/kubernetes/render.sh, required: true, mutates: false}
   - {id: kubernetes.schema, profile: merge, command: scripts/gates/kubernetes/schema.sh, required: true, mutates: false}
   - {id: kubernetes.policy, profile: merge, command: scripts/gates/kubernetes/policy.sh, required: true, mutates: false}
-  # --- integration: render-only namespace plus live GitLab token checks; no BMC mutation ---
+  # --- integration: read-only Builder service binding plus live GitLab token checks; no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
   # --- scheduled: read-only production canaries ---
   - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}
@@ -718,7 +718,7 @@ spec:
       phase: integration
       profiles: [integration]
       output: reports/gates/integration.namespace.json
-      description: Render and validate the disposable integration namespace manifest.
+      description: Resolve and validate the Builder-owned namespace and service endpoint for the runtime project.
     - required: true
       status: active
       isolation: network

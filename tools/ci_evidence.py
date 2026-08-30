@@ -20,6 +20,8 @@ from typing import Mapping, Sequence
 import jsonschema
 import yaml
 
+from tools.provider_contract import ProviderContractError, provider_host
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -510,10 +512,16 @@ def observe_smoke(
         )
         and timed_out is False
     )
-    protected_surface = smoke_class != "protected-live" or (
-        selected_env.get("CI_SERVER_HOST") == "gitlab.rnd.embedings.ai"
-        and bool(selected_env.get("CI_COMMIT_REF_PROTECTED") == "true")
-    )
+    protected_surface = smoke_class != "protected-live"
+    if not protected_surface:
+        try:
+            expected_provider_host = provider_host(root)
+        except (OSError, ProviderContractError, yaml.YAMLError):
+            expected_provider_host = ""
+        protected_surface = (
+            selected_env.get("CI_SERVER_HOST") == expected_provider_host
+            and selected_env.get("CI_COMMIT_REF_PROTECTED") == "true"
+        )
     return {
         "startup": True,
         "tools": not missing,

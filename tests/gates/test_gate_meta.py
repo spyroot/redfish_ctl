@@ -11,7 +11,7 @@ from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
-EXPECTED_BUILDER_REF = "1511171608f913833004e29558468d8e481fd947"
+EXPECTED_BUILDER_REF = "d3234c26f71f5a229bba28971d37ff38085c1da3"
 BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
 BUILDER_RESOURCE_JOBS_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
 PROJECT_CI_CPU_JOB = "project-ci-cpu-validation"
@@ -581,7 +581,7 @@ def test_gitlab_project_service_variables_bind_builder_revision_and_live_suite()
     assert variables.get("PROJECT_CI_CPU_COMMAND") == (
         "./tools/project-ci-cpu-validation.sh"
     )
-    assert variables.get("BUILDER_PROJECT_CONSUMER") == "redfish_ctl"
+    assert "BUILDER_PROJECT_CONSUMER" not in variables
     assert variables.get("DMTF_RELEASE") == "2026.1"
     assert variables.get("PROJECT_LIVE_TEST_COMMAND") == (
         "pytest -q -m dmtf_sim_live "

@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 source scripts/gates/kubernetes/dmtf_sim_values.bash
+source scripts/gates/kubernetes/chart_coordinates.bash
 if ! command -v kubeconform >/dev/null 2>&1; then
   echo "kubernetes.schema: kubeconform not installed in this gate environment" >&2
   exit 1
@@ -21,6 +22,10 @@ if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 dmtf_sim_set_helm_values "$source_commit"
+controller_release="$(helm_chart_name charts/redfish-controller)"
+controller_namespace="$(helm_render_namespace "$controller_release")"
+simulator_release="$(helm_chart_name charts/dmtf-sim)"
+simulator_namespace="$(helm_render_namespace "$simulator_release")"
 # Validate concrete manifests first. Skip Helm templates and placeholder
 # manifests here; rendered chart output is validated separately below.
 files="$(git ls-files 'k8s/**/*.yaml' 'charts/**/*.yaml' | while read -r f; do
@@ -32,16 +37,16 @@ if [ -z "$files" ]; then
   exit 1
 fi
 echo "$files" | xargs kubeconform -ignore-missing-schemas -summary
-helm template redfish-controller charts/redfish-controller \
-  --namespace redfish-system |
+helm template "$controller_release" charts/redfish-controller \
+  --namespace "$controller_namespace" |
   kubeconform -ignore-missing-schemas -summary
-helm template dmtf-sim charts/dmtf-sim \
-  --namespace dmtf-bmc \
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
   --skip-tests \
   "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary
-helm template dmtf-sim charts/dmtf-sim \
-  --namespace dmtf-bmc \
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
   --show-only templates/tests/test-connection.yaml \
   "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary

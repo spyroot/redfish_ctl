@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 source scripts/gates/kubernetes/dmtf_sim_values.bash
+source scripts/gates/kubernetes/chart_coordinates.bash
 if ! command -v kube-linter >/dev/null 2>&1; then
   echo "kubernetes.policy: kube-linter not installed in this gate environment" >&2
   exit 1
@@ -21,10 +22,12 @@ if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 dmtf_sim_set_helm_values "$source_commit"
+simulator_release="$(helm_chart_name charts/dmtf-sim)"
+simulator_namespace="$(helm_render_namespace "$simulator_release")"
 rendered_dmtf="$(mktemp)"
 trap 'rm -f -- "$rendered_dmtf"' EXIT
-helm template dmtf-sim charts/dmtf-sim \
-  --namespace dmtf-bmc \
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
   "${DMTF_SIM_HELM_VALUES[@]}" >"$rendered_dmtf"
 kube-linter lint \
   k8s/ \

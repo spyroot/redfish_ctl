@@ -27,6 +27,12 @@ from tools.ci_evidence import (
     smoke_timeout_seconds,
     write_evidence,
 )
+from tools.provider_contract import (
+    ProviderContractError,
+    provider_host,
+    require_provider_repository,
+)
+from tools.schema_gate import SchemaGateError, _runtime_provider_base_url
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
@@ -62,6 +68,17 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
     for job in ("project-ci-cpu-validation", "gate-merge"):
         assert {"helm", "kubeconform"} <= set(records[job]["requiredTools"])
 
+    for job in ("gate-integration", "gate-scheduled"):
+        rules = repr(ci[job].get("rules") or [])
+        assert 'CI_COMMIT_REF_PROTECTED == "true"' in rules
+        scheduled = [
+            rule["if"]
+            for rule in ci[job].get("rules") or []
+            if isinstance(rule, dict) and "schedule" in str(rule.get("if", ""))
+        ]
+        assert len(scheduled) == 1
+        assert "CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH" in scheduled[0]
+
 
 def _ci_env(job: str = "gate-merge") -> dict[str, str]:
     """Return complete immutable CI identity for deterministic evidence tests."""
@@ -83,7 +100,27 @@ def _root(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (tmp_path / "standards-binding.yaml").write_text(
-        yaml.safe_dump({"spec": {"source": {"revision": STANDARDS_REVISION}}}),
+        yaml.safe_dump(
+            {
+                "spec": {
+                    "source": {"revision": STANDARDS_REVISION},
+                    "providers": [
+                        {"name": "builder", "binding": "builder-binding.yaml"}
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "builder-binding.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "metadata": {"name": "builder"},
+                "spec": {
+                    "dispatch": {"baseUrl": "https://ci.example.invalid"}
+                },
+            }
+        ),
         encoding="utf-8",
     )
     (tmp_path / "schemas").mkdir()
@@ -688,6 +725,8 @@ def test_dispatch_consumes_builder_full_profile_and_provider_credentials() -> No
     assert "--confirm-project-ci-run" in source
     assert "args+=(--dry-run)" in source
     assert 'args+=("${dispatch_args[@]}")' in source
+    assert "--project redfish_ctl" not in source
+    assert "--host internal-gitlab" not in source
     for option in ("--no-wait", "--log-format", "--log-level", "--run-id", "--timeout"):
         assert option in source
 
@@ -810,6 +849,18 @@ def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> Non
     )
     subprocess.run(["git", "-C", str(project), "add", "."], check=True)
     subprocess.run(
+        [
+            "git",
+            "-C",
+            str(project),
+            "remote",
+            "add",
+            "origin",
+            "https://example.invalid/runtime-project.git",
+        ],
+        check=True,
+    )
+    subprocess.run(
         ["git", "-C", str(project), "commit", "-q", "-m", "fixture"],
         check=True,
     )
@@ -836,6 +887,7 @@ def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> Non
     )
     assert proc.returncode == 0, proc.stderr
     output = proc.stdout.splitlines()
+    assert output[output.index("--project") + 1] == "runtime-project"
     assert output[output.index("--ref") + 1] == validation_ref
     assert output[output.index("--requested-commit") + 1] == project_commit
     assert "--profile" in output
@@ -966,3 +1018,40 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert ci["variables"]["PROJECT_CI_CPU_COMMAND"] == (
         "./tools/project-ci-cpu-validation.sh"
     )
+
+
+def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:
+    """Provider host and repository trust follow one tracked runtime route."""
+    root = _root(tmp_path)
+    assert provider_host(root) == "ci.example.invalid"
+    assert require_provider_repository(
+        "https://ci.example.invalid/group/contracts.git",
+        "https://ci.example.invalid",
+    ) == "https://ci.example.invalid/group/contracts.git"
+    with pytest.raises(ProviderContractError, match="outside"):
+        require_provider_repository(
+            "https://elsewhere.example.invalid/group/contracts.git",
+            "https://ci.example.invalid",
+        )
+
+
+def test_job_token_route_must_match_the_bound_ci_server(tmp_path: Path) -> None:
+    """A job token cannot follow a changed binding to another host."""
+    root = _root(tmp_path)
+    assert _runtime_provider_base_url(
+        root,
+        {
+            "CI_JOB_TOKEN": "masked-test-value",
+            "CI_SERVER_URL": "https://ci.example.invalid/",
+        },
+    ) == "https://ci.example.invalid"
+    with pytest.raises(SchemaGateError, match="disagrees"):
+        _runtime_provider_base_url(
+            root,
+            {
+                "CI_JOB_TOKEN": "masked-test-value",
+                "CI_SERVER_URL": "https://other.example.invalid",
+            },
+        )
+    with pytest.raises(SchemaGateError, match="CI_SERVER_URL is required"):
+        _runtime_provider_base_url(root, {"CI_JOB_TOKEN": "masked-test-value"})
