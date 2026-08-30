@@ -480,7 +480,7 @@ project_ci_stderr_summary() {
 # sanitized classified events only. Exit classes: dependency status, or 2 when
 # owned temporary cleanup fails. Side effects: runs the selected read-only gate.
 # Idempotency: delegated to the gate. Cleanup: always removes owned stderr file.
-project_ci_run_gate() (
+project_ci_run_gate() {
   local check_script="$1"
   local mode="$2"
   local gate="$3"
@@ -492,7 +492,29 @@ project_ci_run_gate() (
   local result_status=passed error_class=none event_level=info
   local resource=profile:merge
   local child_pid="" child_running=false
+  local saved_exit_trap saved_hup_trap saved_int_trap saved_term_trap
   local -a gate_args=(--profile merge)
+
+  saved_exit_trap="$(trap -p EXIT)"
+  saved_hup_trap="$(trap -p HUP)"
+  saved_int_trap="$(trap -p INT)"
+  saved_term_trap="$(trap -p TERM)"
+
+  # Restore the caller's trap ownership after normal completion.
+  # Arguments: none. Environment: captured caller traps. Stdout/stderr: none.
+  # Exit classes: 0. Side effects: restores signal/exit handlers.
+  # Idempotency: repeat-safe. Cleanup: releases this function's trap ownership.
+  restore_gate_traps() {
+    local saved_trap
+
+    trap - EXIT HUP INT TERM
+    for saved_trap in \
+      "$saved_exit_trap" "$saved_hup_trap" "$saved_int_trap" "$saved_term_trap"; do
+      if [[ -n "$saved_trap" ]]; then
+        eval "$saved_trap"
+      fi
+    done
+  }
 
   # Remove the function-owned stderr capture and log the action.
   # Arguments: none. Environment: closure state. Stdout: none. Stderr: log.
@@ -562,6 +584,23 @@ project_ci_run_gate() (
     [[ "$termination_result" == "passed" ]]
   }
 
+  # Clean every resource owned by the active gate invocation.
+  # Arguments: none. Environment: closure state. Stdout: none. Stderr: logs.
+  # Exit classes: 0 cleaned, 1 cleanup unproven. Side effects: may terminate the
+  # tracked process group and remove one temp file. Idempotency: safe twice.
+  # Cleanup: this is the aggregate cleanup action.
+  cleanup_gate_runtime() {
+    local runtime_cleanup=passed
+
+    if ! stop_gate_process; then
+      runtime_cleanup=failed
+    fi
+    if ! cleanup_gate_stderr; then
+      runtime_cleanup=failed
+    fi
+    [[ "$runtime_cleanup" == "passed" ]]
+  }
+
   # Convert a received signal into cleanup and a terminal failed result.
   # Arguments: signal name and exit code. Environment: closure state.
   # Stdout: terminal result. Stderr: cleanup/signal logs. Exit: signal class.
@@ -593,13 +632,10 @@ project_ci_run_gate() (
     project_ci_terminal_result \
       "$PROJECT_CI_LOG_FORMAT" "$mode" "$gate" "$PROJECT_CI_RUN_ID" \
       failed "$warning_count" "$cleanup_status" "" "$signal_error"
+    restore_gate_traps
     exit "$signal_exit"
   }
 
-  trap cleanup_gate_stderr EXIT
-  trap 'handle_gate_signal HUP 129' HUP
-  trap 'handle_gate_signal INT 130' INT
-  trap 'handle_gate_signal TERM 143' TERM
   if [[ "$mode" == "focused" ]]; then
     gate_args+=(--gate "$gate")
     resource="gate:$gate"
@@ -610,6 +646,10 @@ project_ci_run_gate() (
       temp-allocation-failed
     return 2
   }
+  trap cleanup_gate_runtime EXIT
+  trap 'handle_gate_signal HUP 129' HUP
+  trap 'handle_gate_signal INT 130' INT
+  trap 'handle_gate_signal TERM 143' TERM
 
   setsid "$check_script" "${gate_args[@]}" 2>"$stderr_file" &
   child_pid=$!
@@ -653,8 +693,9 @@ project_ci_run_gate() (
     "$PROJECT_CI_LOG_FORMAT" "$mode" "$gate" "$PROJECT_CI_RUN_ID" \
     "$result_status" "$warning_count" "$cleanup_status" "$evidence_path" \
     "$error_class"
+  restore_gate_traps
   return "$status"
-)
+}
 
 main() {
   local focused_gate="${FOCUSED_GATE:-}"

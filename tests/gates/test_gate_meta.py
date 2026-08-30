@@ -363,6 +363,13 @@ def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
           tags: [homelab-k8s]
           allow_failure: false
           rules:
+            - if: >-
+                ($FOCUSED_GATE != null && $FOCUSED_GATE != "") ||
+                $MERGE_PROFILE == "merge" ||
+                (($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") &&
+                $PROJECT_CI_PROFILE != "protected") ||
+                ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+              when: never
             - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
               when: never
             - if: '$CI_COMMIT_REF_PROTECTED == "true"'
