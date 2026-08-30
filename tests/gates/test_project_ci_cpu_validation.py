@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import time
@@ -417,7 +418,7 @@ def test_successful_dependency_yq_warning_is_sanitized(tmp_path: Path) -> None:
     dependency = tmp_path / "dependency.sh"
     dependency.write_text(
         "#!/bin/bash\n"
-        f"printf '%s\\n' '{YQ_MERGE_ANCHOR_WARNING}' >&2\n",
+        f"printf '%s\\n' {shlex.quote(YQ_MERGE_ANCHOR_WARNING)} >&2\n",
         encoding="utf-8",
     )
     dependency.chmod(0o755)
