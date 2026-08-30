@@ -453,6 +453,14 @@ project_ci_stderr_counts() {
     BEGIN { auth = network = warning = error = other = total = 0 }
     {
       text = tolower($0)
+      is_yq_merge_warning = 0
+      if (text ~ /^time=[^[:space:]]+ level=warn msg="/) {
+        if (text ~ /--yaml-fix-merge-anchor-to-spec is false;/) {
+          if (text ~ /this flag will default to true in late 2025\."$/) {
+            is_yq_merge_warning = 1
+          }
+        }
+      }
       total++
       if (text ~ /(unauthorized|forbidden|credential|password|token|401|403)/) {
         auth++
@@ -460,11 +468,7 @@ project_ci_stderr_counts() {
         network++
       } else if (text ~ /(error|failed|failure|fatal)/) {
         error++
-      } else if (
-        text ~ /^time=[^[:space:]]+ level=warn msg="/ &&
-        text ~ /--yaml-fix-merge-anchor-to-spec is false;/ &&
-        text ~ /this flag will default to true in late 2025\."$/
-      ) {
+      } else if (is_yq_merge_warning) {
         warning++
       } else {
         other++
