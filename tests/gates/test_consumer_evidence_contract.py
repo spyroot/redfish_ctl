@@ -7,9 +7,11 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import textwrap
 import threading
+import time
 from pathlib import Path
 
 import jsonschema
@@ -232,6 +234,7 @@ def _gate_observations(return_code: int = 0) -> dict:
         "timeout_seconds": 3600,
         "applied_timeout_seconds": [3600],
         "warnings": 0,
+        "output_sanitized": True,
         "skipped_required_tests": 0,
         "skipped_optional_tests": 0,
         "cleanup_status": "passed",
@@ -262,6 +265,7 @@ def _smoke_observations(*, entrypoint: bool = True) -> dict:
     observations["entrypoint"] = entrypoint
     observations.update(
         {
+            "output_sanitized": True,
             "cleanup_status": "passed",
             "remaining": [],
             "candidate_digest": DIGEST,
@@ -408,29 +412,29 @@ def test_runtime_skips_are_required_and_make_evidence_non_green(
     assert tampered_evidence["status"] == "failed"
 
 
-def test_observe_gate_streams_output_before_the_command_finishes(
+def test_observe_gate_buffers_output_and_withholds_secret_until_complete(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Gate progress is visible while the bounded command is still running."""
-    root = _root(tmp_path)
+    """Secret-shaped gate output is scanned as a complete capture before printing."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    root = _root(root)
+    ready = tmp_path / "gate-ready"
+    release = tmp_path / "gate-release"
     command = root / "stream.sh"
     command.write_text(
-        "#!/bin/sh\nprintf 'first line\\n'\nsleep 1\nprintf 'second line\\n'\n",
+        "#!/bin/sh\n"
+        "printf 'first line\\n'\n"
+        "printf 'ready\\n' >\"$GATE_READY_PATH\"\n"
+        "while [ ! -e \"$GATE_RELEASE_PATH\" ]; do sleep 0.05; done\n"
+        "printf 'password: hunter2hunter2\\n'\n",
         encoding="utf-8",
     )
     command.chmod(0o755)
-
-    first_seen = threading.Event()
-
-    class LiveOutput(io.StringIO):
-        def write(self, value: str) -> int:
-            written = super().write(value)
-            if "first line" in self.getvalue():
-                first_seen.set()
-            return written
-
-    output = LiveOutput()
+    monkeypatch.setenv("GATE_READY_PATH", str(ready))
+    monkeypatch.setenv("GATE_RELEASE_PATH", str(release))
+    output = io.StringIO()
     monkeypatch.setattr("tools.ci_evidence.sys.stdout", output)
     observed: dict[str, dict] = {}
     worker = threading.Thread(
@@ -442,14 +446,81 @@ def test_observe_gate_streams_output_before_the_command_finishes(
     )
     worker.start()
     try:
-        assert first_seen.wait(2), "first progress line was buffered"
-        assert worker.is_alive(), "command finished before streaming was observed"
+        for _ in range(40):
+            if ready.exists():
+                break
+            threading.Event().wait(0.05)
+        assert ready.exists(), "gate command did not reach the mid-run marker"
+        assert worker.is_alive(), "command finished before buffering was observed"
+        assert output.getvalue() == ""
+        release.write_text("continue\n", encoding="utf-8")
     finally:
+        if not release.exists():
+            release.write_text("continue\n", encoding="utf-8")
         worker.join(5)
 
     assert not worker.is_alive()
-    assert observed["result"]["return_code"] == 0
-    assert output.getvalue() == "first line\nsecond line\n"
+    observations = observed["result"]
+    assert observations["return_code"] == 0
+    assert observations["output_sanitized"] is False
+    assert output.getvalue() == "gate output withheld: secret-shaped content detected\n"
+    assert "hunter2hunter2" not in output.getvalue()
+    evidence = build_evidence(
+        kind="gate",
+        name="unit.all",
+        command=str(command),
+        status="passed",
+        return_code=0,
+        observations=observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+    assert evidence["status"] == "failed"
+    assert evidence["return_code"] == 1
+    assert evidence["evidence_sanitized"] is False
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        "warning: fallback path used\n",
+        "tests/example.py:1: UserWarning: fallback path used\n",
+    ],
+)
+def test_observe_gate_counts_nonnumeric_warning_forms_as_non_green(
+    tmp_path: Path,
+    diagnostic: str,
+) -> None:
+    """Warning diagnostics without a numeric summary still fail green evidence."""
+    root = _root(tmp_path)
+    command = root / "warning-output.py"
+    command.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        f"sys.stdout.write({diagnostic!r})\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+
+    observations = observe_gate(
+        command=str(command),
+        root=root,
+        timeout_seconds=30,
+    )
+    evidence = build_evidence(
+        kind="gate",
+        name="unit.all",
+        command=str(command),
+        status="passed",
+        return_code=0,
+        observations=observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+
+    assert observations["warnings"] >= 1
+    assert evidence["status"] == "failed"
+    assert evidence["return_code"] == 1
 
 
 def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
@@ -476,7 +547,10 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
     tmp_path: Path,
 ) -> None:
     """The smoke timeout is validated and bound to the registered gate profile."""
-    root = _root(tmp_path)
+    root = tmp_path / "repo"
+    root.mkdir()
+    root = _root(root)
+    probe_log = tmp_path / "probe.log"
     scripts = root / "scripts"
     scripts.mkdir()
     check = scripts / "check.sh"
@@ -484,6 +558,10 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
         "#!/bin/sh\n"
         "command -v python3 >/dev/null 2>&1 || { "
         "printf 'python3 missing\\n' >&2; exit 1; }\n"
+        "if [ -n \"${PROBE_LOG:-}\" ]; then\n"
+        "  printf '%s\\n' \"$CI_JOB_NAME\" >\"$PROBE_LOG\"\n"
+        "  printf '%s\\n' \"$@\" >>\"$PROBE_LOG\"\n"
+        "fi\n"
         "printf 'unit.all\\n'\n",
         encoding="utf-8",
     )
@@ -499,13 +577,20 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
     gate_observations = _gate_observations()
     gate_observations["timeout_seconds"] = 1800
     gate_observations["applied_timeout_seconds"] = [1799.5, 1200]
+    env = _ci_env_for(root)
+    env["PROBE_LOG"] = str(probe_log)
     smoke_observations = observe_smoke(
         record=record,
         gate_observations=gate_observations,
-        env=_ci_env_for(root),
+        env=env,
         root=root,
     )
 
+    assert probe_log.read_text(encoding="utf-8").splitlines() == [
+        "gate-merge-probe",
+        "--profile",
+        "merge",
+    ]
     assert smoke_timeout_seconds(record) == 1800
     assert smoke_observations["bounded_timeout"] is True
     assert smoke_observations["protected_surface"] is True
@@ -544,6 +629,163 @@ def test_smoke_timeout_comes_from_inventory_and_is_observed(
     )
     with pytest.raises(EvidenceError, match="timeoutSeconds"):
         smoke_timeout_seconds({**record, "timeoutSeconds": 0})
+
+
+def test_observe_smoke_ignores_reports_but_fails_new_untracked_residue(
+    tmp_path: Path,
+) -> None:
+    """The idempotency probe permits reports/ output but fails other new residue."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    root = _root(root)
+    scripts = root / "scripts"
+    scripts.mkdir()
+    check = scripts / "check.sh"
+    check.write_text(
+        "#!/bin/sh\n"
+        "command -v python3 >/dev/null 2>&1 || { "
+        "printf 'python3 missing\\n' >&2; exit 1; }\n"
+        "mkdir -p reports/smoke\n"
+        "printf '{}\\n' >reports/smoke/project-ci-cpu-validation.json\n"
+        "if [ \"${CREATE_RESIDUE:-}\" = yes ]; then "
+        "printf 'dirty\\n' >untracked-residue.txt; fi\n"
+        "printf 'unit.all\\n'\n",
+        encoding="utf-8",
+    )
+    check.chmod(0o755)
+    record = {
+        "job": "gate-merge",
+        "class": "wiring",
+        "command": "./scripts/check.sh --profile merge",
+        "requiredTools": ["sh"],
+        "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
+        "timeoutSeconds": 1800,
+    }
+    gate_observations = {
+        **_gate_observations(),
+        "timeout_seconds": 1800,
+        "applied_timeout_seconds": [1800],
+    }
+
+    clean = observe_smoke(
+        record=record,
+        gate_observations=gate_observations,
+        env=_ci_env_for(root),
+        root=root,
+    )
+    assert clean["idempotent_noop"] is True
+    assert clean["cleanup_status"] == "passed"
+    assert clean["remaining"] == []
+
+    dirty_env = _ci_env_for(root)
+    dirty_env["CREATE_RESIDUE"] = "yes"
+    dirty = observe_smoke(
+        record=record,
+        gate_observations=gate_observations,
+        env=dirty_env,
+        root=root,
+    )
+    evidence = build_smoke_evidence(
+        record=record,
+        gate_observations=gate_observations,
+        smoke_observations=dirty,
+        env=dirty_env,
+        root=root,
+    )
+
+    assert dirty["idempotent_noop"] is False
+    assert dirty["cleanup_status"] == "failed"
+    assert dirty["remaining"] == ["?? untracked-residue.txt"]
+    assert evidence["status"] == "failed"
+    assert evidence["checks"]["idempotent_noop"]["status"] == "failed"
+
+
+def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
+    tmp_path: Path,
+) -> None:
+    """A hung exact-command smoke probe is bounded and does not leak children."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    root = _root(root)
+    child_pid_path = tmp_path / "probe-child.pid"
+    child_script = tmp_path / "probe_child.py"
+    child_script.write_text(
+        "import os\n"
+        "import pathlib\n"
+        "import sys\n"
+        "import time\n"
+        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8')\n"
+        "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    scripts = root / "scripts"
+    scripts.mkdir()
+    check = scripts / "check.sh"
+    check.write_text(
+        textwrap.dedent(
+            """\
+            #!/bin/sh
+            command -v python3 >/dev/null 2>&1 || {
+              printf 'python3 missing\n' >&2
+              exit 1
+            }
+            python3 "$PROBE_CHILD_SCRIPT" "$PROBE_CHILD_PID" &
+            sleep 5
+            """
+        ),
+        encoding="utf-8",
+    )
+    check.chmod(0o755)
+    record = {
+        "job": "gate-merge",
+        "class": "wiring",
+        "command": "./scripts/check.sh --profile merge",
+        "requiredTools": ["sh"],
+        "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
+        "timeoutSeconds": 1,
+    }
+    gate_observations = {
+        **_gate_observations(),
+        "timeout_seconds": 1,
+        "applied_timeout_seconds": [1],
+    }
+    env = _ci_env_for(root)
+    env["PROBE_CHILD_PID"] = str(child_pid_path)
+    env["PROBE_CHILD_SCRIPT"] = str(child_script)
+    child_pid: int | None = None
+    child_running = False
+    start = time.monotonic()
+    try:
+        smoke_observations = observe_smoke(
+            record=record,
+            gate_observations=gate_observations,
+            env=env,
+            root=root,
+        )
+        elapsed = time.monotonic() - start
+        if child_pid_path.exists():
+            child_pid = int(child_pid_path.read_text(encoding="utf-8").strip())
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                child_running = False
+            else:
+                child_running = True
+    finally:
+        if child_pid is None and child_pid_path.exists():
+            child_pid = int(child_pid_path.read_text(encoding="utf-8").strip())
+        if child_pid is not None:
+            try:
+                os.kill(child_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    assert elapsed < 3
+    assert smoke_observations["idempotent_noop"] is False
+    assert smoke_observations["cleanup_status"] == "passed"
+    assert smoke_observations["remaining"] == []
+    assert child_pid is not None
+    assert child_running is False
 
 
 @pytest.mark.parametrize("timeout", [59, 3601, True, None])

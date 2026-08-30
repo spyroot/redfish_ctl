@@ -143,6 +143,7 @@ job_observations = {
     "timeout_seconds": profile_timeout_seconds,
     "applied_timeout_seconds": [],
     "warnings": 0,
+    "output_sanitized": True,
     "skipped_required_tests": 0,
     "skipped_optional_tests": 0,
     "cleanup_status": "passed",
@@ -151,8 +152,11 @@ job_observations = {
         "warnings": "captured output from every executed gate",
         "skips": "pytest -ra reasons from every executed gate",
         "timeout": timeout_source,
-        "cleanup": "per-gate git status tracked-state comparisons",
-        "sanitization": "quiet credential-pattern scan before atomic write",
+        "cleanup": "per-gate git status tracked and untracked-state comparisons",
+        "sanitization": (
+            "captured gate output scanned before bounded publication and "
+            "evidence scanned before atomic write"
+        ),
     },
 }
 for gate in gates:
@@ -181,6 +185,8 @@ for gate in gates:
     return_code = observations["return_code"]
     status = "passed" if return_code == 0 else "failed"
     job_observations["warnings"] += observations["warnings"]
+    if not observations["output_sanitized"]:
+        job_observations["output_sanitized"] = False
     job_observations["skipped_required_tests"] += observations[
         "skipped_required_tests"
     ]

@@ -3,17 +3,16 @@
 
 from __future__ import annotations
 
-import codecs
 import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
-import threading
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -27,6 +26,15 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _WARNING_SUMMARY_RE = re.compile(r"\b(\d+) warnings?\b", re.IGNORECASE)
+_ZERO_WARNING_RE = re.compile(
+    r"\b(?:0 warnings?|warnings?\s*[:=]\s*0)\b",
+    re.IGNORECASE,
+)
+_WARNING_DIAGNOSTIC_RE = re.compile(
+    r"(?i)\bwarnings?\b|"
+    r"\b(?:User|Runtime|Deprecation|Future|Resource)Warning\b|"
+    r"\blevel\s*=\s*(?:warn|warning)\b"
+)
 _SKIP_REASON_RE = re.compile(r"^SKIPPED \[(\d+)\].*?: (.+)$", re.MULTILINE)
 _CREDENTIAL_RE = re.compile(
     r"BEGIN [A-Z ]*PRIVATE KEY|X-SF-Token:|"
@@ -175,6 +183,7 @@ def build_evidence(
     if return_code < 0:
         raise EvidenceError("return_code must be non-negative")
     warnings = observations.get("warnings")
+    output_sanitized = observations.get("output_sanitized")
     skipped = observations.get("skipped_required_tests")
     optional_skips = observations.get("skipped_optional_tests")
     cleanup_status = observations.get("cleanup_status")
@@ -182,6 +191,8 @@ def build_evidence(
     sources = observations.get("sources")
     if not isinstance(warnings, int) or isinstance(warnings, bool) or warnings < 0:
         raise EvidenceError("observed warning count is invalid")
+    if not isinstance(output_sanitized, bool):
+        raise EvidenceError("observed output sanitization status is invalid")
     if not isinstance(skipped, int) or isinstance(skipped, bool) or skipped < 0:
         raise EvidenceError("observed required-skip count is invalid")
     if (
@@ -201,7 +212,14 @@ def build_evidence(
         raise EvidenceError("evidence observation sources are incomplete")
     effective_status = status
     effective_code = return_code
-    if warnings or skipped or optional_skips or cleanup_status != "passed" or remaining:
+    if (
+        warnings
+        or not output_sanitized
+        or skipped
+        or optional_skips
+        or cleanup_status != "passed"
+        or remaining
+    ):
         effective_status = "failed"
         effective_code = effective_code or 1
     evidence = {
@@ -217,7 +235,7 @@ def build_evidence(
         "skipped_optional_tests": optional_skips,
         "cleanup": {"status": cleanup_status, "remaining": list(remaining)},
         "observation_sources": dict(sources),
-        "evidence_sanitized": False,
+        "evidence_sanitized": output_sanitized,
     }
     return evidence
 
@@ -297,17 +315,26 @@ def observe_gate(
     if isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
         raise EvidenceError("gate timeout must be positive")
     before = _tracked_state(root)
-    output, return_code, timed_out = _run_streamed_command(
+    output, return_code, timed_out = _run_captured_command(
         command=command,
         root=root,
         timeout_seconds=timeout_seconds,
     )
-    combined = output
-    warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(combined)]
-    warnings = max(warning_counts, default=0)
+    output_sanitized = _CREDENTIAL_RE.search(output) is None
+    if output_sanitized:
+        sys.stdout.write(output)
+    else:
+        sys.stdout.write("gate output withheld: secret-shaped content detected\n")
+    sys.stdout.flush()
+    warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(output)]
+    diagnostic_output = _ZERO_WARNING_RE.sub("", output)
+    warnings = max(
+        max(warning_counts, default=0),
+        len(_WARNING_DIAGNOSTIC_RE.findall(diagnostic_output)),
+    )
     required_skips = sum(
         int(count_text)
-        for count_text, _reason in _SKIP_REASON_RE.findall(combined)
+        for count_text, _reason in _SKIP_REASON_RE.findall(output)
     )
     after = _tracked_state(root)
     remaining = sorted(set(after) - set(before))
@@ -316,6 +343,7 @@ def observe_gate(
         "timed_out": timed_out,
         "timeout_seconds": timeout_seconds,
         "warnings": warnings,
+        "output_sanitized": output_sanitized,
         "skipped_required_tests": required_skips,
         "skipped_optional_tests": 0,
         "cleanup_status": "passed" if not remaining else "failed",
@@ -324,88 +352,73 @@ def observe_gate(
             "warnings": "captured gate output",
             "skips": "pytest -ra skip reasons; every runtime skip is required",
             "timeout": "subprocess timeout applied to the registered gate command",
-            "cleanup": "git status tracked-state comparison",
-            "sanitization": "quiet credential-pattern scan before atomic write",
+            "cleanup": "git status tracked and untracked-state comparison",
+            "sanitization": (
+                "captured gate output scanned before bounded publication and "
+                "evidence scanned before atomic write"
+            ),
         },
     }
 
 
-def _run_streamed_command(
+def _run_captured_command(
     *,
-    command: str,
+    command: str | Sequence[str],
     root: Path,
     timeout_seconds: float,
 ) -> tuple[str, int, bool]:
-    """Run one command while streaming and retaining its ordered output.
+    """Run one command while privately retaining its ordered output.
 
     Stdout and stderr share one pipe so their observed ordering is retained for
-    operators and evidence parsing. A new process group lets a timeout stop the
-    gate and any child processes that inherited the output pipe.
+    evidence parsing. Output is returned only after the complete capture can be
+    scanned for secret-shaped content. A new process group lets a timeout stop
+    the gate and any child processes that inherited the output pipe.
 
-    :param command: executable gate path.
+    :param command: executable path or exact argument vector.
     :param root: working directory for the gate.
     :param timeout_seconds: positive wall-clock limit.
     :return: combined output, effective return code, and timeout flag.
     """
+    command_args = [command] if isinstance(command, str) else list(command)
+    if not command_args or not all(
+        isinstance(value, str) and value for value in command_args
+    ):
+        raise EvidenceError("captured command argument vector is invalid")
     process = subprocess.Popen(
-        [command],
+        command_args,
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
-    if process.stdout is None:  # pragma: no cover - PIPE guarantees this.
-        process.kill()
-        raise EvidenceError("gate output pipe is unavailable")
-
-    chunks: list[str] = []
-
-    def _pump_output() -> None:
-        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-        while raw := os.read(process.stdout.fileno(), 65536):
-            text = decoder.decode(raw)
-            if text:
-                chunks.append(text)
-                sys.stdout.write(text)
-                sys.stdout.flush()
-        tail = decoder.decode(b"", final=True)
-        if tail:
-            chunks.append(tail)
-            sys.stdout.write(tail)
-            sys.stdout.flush()
-
-    reader = threading.Thread(target=_pump_output, name="gate-output", daemon=True)
-    reader.start()
     timed_out = False
     try:
-        process.wait(timeout=timeout_seconds)
+        output, _ = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         timed_out = True
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.wait()
-    finally:
-        reader.join(timeout=1)
-        if reader.is_alive():
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            reader.join(timeout=5)
-        if reader.is_alive():
-            process.stdout.close()
-            raise EvidenceError("gate output pipe did not close after process exit")
-        process.stdout.close()
+        output, _ = process.communicate()
 
-    return "".join(chunks), 124 if timed_out else process.returncode, timed_out
+    return output, 124 if timed_out else process.returncode, timed_out
 
 
 def _tracked_state(root: Path) -> list[str]:
-    """Read tracked working-tree changes for cleanup verification."""
+    """Read tracked and untracked cleanup state outside declared reports."""
     completed = subprocess.run(
-        ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+        [
+            "git",
+            "-C",
+            str(root),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ],
         capture_output=True,
         text=True,
         check=False,
@@ -413,7 +426,11 @@ def _tracked_state(root: Path) -> list[str]:
     )
     if completed.returncode != 0:
         raise EvidenceError("tracked-state read-back failed")
-    return [line for line in completed.stdout.splitlines() if line]
+    return [
+        line
+        for line in completed.stdout.splitlines()
+        if line and not line[3:].startswith("reports/")
+    ]
 
 
 def _source_tree_digest(root: Path) -> str:
@@ -455,24 +472,6 @@ def observe_smoke(
         ]
         raise EvidenceError(f"required smoke tools are missing: {', '.join(missing_all)}")
     before = _tracked_state(root)
-    first = subprocess.run(
-        [str(check_script), "--list"],
-        cwd=root,
-        env=selected_env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-    second = subprocess.run(
-        [str(check_script), "--list"],
-        cwd=root,
-        env=selected_env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
     with tempfile.TemporaryDirectory(prefix="redfish-ctl-smoke-") as temp:
         bin_dir = Path(temp) / "bin"
         bin_dir.mkdir()
@@ -495,10 +494,27 @@ def observe_smoke(
         check=False,
         timeout=30,
     )
-    after = _tracked_state(root)
-    remaining = sorted(set(after) - set(before))
     smoke_class = str(record.get("class", ""))
     inventory_timeout = smoke_timeout_seconds(record)
+    command = str(record.get("command", ""))
+    try:
+        command_args = shlex.split(command)
+    except ValueError as exc:
+        raise EvidenceError("smoke inventory command is not parseable") from exc
+    if not command_args:
+        raise EvidenceError("smoke inventory command is missing")
+    probe_job = f"{selected_env.get('CI_JOB_NAME', 'smoke')}-probe"
+    if not _SAFE_NAME_RE.fullmatch(probe_job):
+        raise EvidenceError("derived smoke probe job name is unsafe")
+    probe_env = {**selected_env, "CI_JOB_NAME": probe_job}
+    probe_output, probe_return_code, probe_timed_out = _run_captured_command(
+        command=command_args,
+        root=root,
+        timeout_seconds=inventory_timeout,
+    )
+    probe_output_sanitized = _CREDENTIAL_RE.search(probe_output) is None
+    after = _tracked_state(root)
+    remaining = sorted(set(after) - set(before))
     applied_timeouts = gate_observations.get("applied_timeout_seconds")
     timed_out = gate_observations.get("timed_out")
     bounded_timeout = (
@@ -536,9 +552,12 @@ def observe_smoke(
         "read_back": read_back.returncode == 0
         and read_back.stdout.strip() == identity["commit"],
         "bounded_timeout": bounded_timeout,
-        "idempotent_noop": first.returncode == 0
-        and second.returncode == 0
-        and first.stdout == second.stdout,
+        "idempotent_noop": gate_observations.get("return_code") == 0
+        and probe_return_code == 0
+        and not probe_timed_out
+        and probe_output_sanitized
+        and not remaining,
+        "output_sanitized": probe_output_sanitized,
         "protected_surface": protected_surface,
         "cleanup_status": "passed" if not remaining else "failed",
         "remaining": remaining,
@@ -554,10 +573,18 @@ def observe_smoke(
                 f"than inventory timeoutSeconds={inventory_timeout}; "
                 f"timed_out={timed_out!r}"
             ),
-            "idempotent_noop": "two identical scripts/check.sh --list executions",
+            "idempotent_noop": (
+                "registered smoke command passed initially and on one exact "
+                "probe re-execution under a non-inventory CI job identity"
+            ),
             "protected_surface": protected_surface_source,
-            "cleanup": "git status tracked-state comparison after temporary-directory cleanup",
-            "sanitization": "quiet credential-pattern scan before atomic write",
+            "cleanup": (
+                "git status tracked and untracked-state comparison after "
+                "temporary-directory cleanup; reports/ is the only exclusion"
+            ),
+            "sanitization": (
+                "captured probe output and evidence scanned for credential patterns"
+            ),
         },
     }
 
@@ -622,12 +649,18 @@ def build_smoke_evidence(
             raise EvidenceError(f"smoke observation source is missing: {check_name}")
     return_code = gate_observations.get("return_code")
     warnings = gate_observations.get("warnings")
+    output_sanitized = gate_observations.get("output_sanitized")
+    probe_output_sanitized = smoke_observations.get("output_sanitized")
     required_skips = gate_observations.get("skipped_required_tests")
     optional_skips = gate_observations.get("skipped_optional_tests")
     if not isinstance(return_code, int) or return_code < 0:
         raise EvidenceError("observed smoke return code is invalid")
     if not isinstance(warnings, int) or warnings < 0:
         raise EvidenceError("observed smoke warning count is invalid")
+    if not isinstance(output_sanitized, bool):
+        raise EvidenceError("observed smoke output sanitization status is invalid")
+    if not isinstance(probe_output_sanitized, bool):
+        raise EvidenceError("observed smoke probe sanitization status is invalid")
     if not isinstance(required_skips, int) or required_skips < 0:
         raise EvidenceError("observed smoke required-skip count is invalid")
     if not isinstance(optional_skips, int) or optional_skips < 0:
@@ -640,6 +673,8 @@ def build_smoke_evidence(
     status = "passed" if (
         return_code == 0
         and warnings == 0
+        and output_sanitized
+        and probe_output_sanitized
         and required_skips == 0
         and optional_skips == 0
         and cleanup_status == "passed"
@@ -676,7 +711,7 @@ def build_smoke_evidence(
         "skipped_optional_tests": optional_skips,
         "cleanup": {"status": cleanup_status, "remaining": list(remaining)},
         "observation_sources": dict(sources),
-        "evidence_sanitized": False,
+        "evidence_sanitized": output_sanitized and probe_output_sanitized,
     }
     return evidence
 
@@ -700,7 +735,6 @@ def write_evidence(
         raise EvidenceError("evidence output must remain under reports/")
     path.parent.mkdir(parents=True, exist_ok=True)
     finalized = dict(evidence)
-    finalized["evidence_sanitized"] = True
     payload = json.dumps(finalized, sort_keys=True, separators=(",", ":")) + "\n"
     if _CREDENTIAL_RE.search(payload):
         raise EvidenceError("evidence contains secret-shaped content")

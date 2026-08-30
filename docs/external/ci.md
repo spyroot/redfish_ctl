@@ -113,11 +113,17 @@ its `reports/smoke/<job>.json` path through the Builder result contract;
 focused diagnostics omit release-blocking smoke evidence. Use the full
 `gate-merge` artifacts for merge evidence. Evidence
 binds the result to the exact project commit, Standards revision, pipeline/job
-IDs, and immutable runner digest. Warning/skip counts come from captured gate
-output; cleanup comes from tracked-state comparison; exact identity comes from
-independent Git read-back; and sanitization is recorded only after a quiet
-content scan and atomic file read-back. See [Gates](gates.md#failure-behavior)
+IDs, and immutable runner digest. Gate output is captured before publication:
+secret-shaped output is withheld, and warnings or required skips make evidence
+non-green. Cleanup compares tracked and untracked state, excluding only declared
+`reports/` output. Exact identity comes from independent Git read-back, and
+evidence is recorded only after a quiet scan and atomic file read-back. See
+[Gates](gates.md#failure-behavior)
 for execution and timeout policy.
+
+Smoke idempotency re-executes the registered `inventory/ci/smoke-tests.yaml`
+command once under a probe CI job identity. A non-zero probe, secret-shaped
+probe output, or new residue outside `reports/` makes smoke evidence non-green.
 
 The local exact-authority prerequisite for `repo.schemas` is documented in
 [Gates](gates.md#selected-gate-summary); the gate requires no network token.

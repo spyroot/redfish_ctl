@@ -74,7 +74,7 @@ it without executing a gate.
 | `mutation.serialized` | deploy | no | a mutation lock is held (no concurrent apply) | no lock held |
 | `mutation.verify-required` | deploy | no | the applied module exposes a verify step | module has no `verify.sh` |
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
-| `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
+| `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; gate output is scanned before publication, and later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
 
 The `repo.schemas` gate reads `spec.source.localPath`, defined in
 `standards-binding.yaml` and `builder-binding.yaml`, and checks out each
