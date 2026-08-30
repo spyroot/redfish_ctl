@@ -61,7 +61,7 @@ project_ci_log_event() {
   local configured_level="${PROJECT_CI_LOG_LEVEL:-info}"
   local format="${PROJECT_CI_LOG_FORMAT:-text}"
   local run_id="${PROJECT_CI_RUN_ID:-}"
-  local timestamp record text_format
+  local timestamp record
 
   project_ci_log_enabled "$level" "$configured_level" || return 0
   timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
