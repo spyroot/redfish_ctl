@@ -336,7 +336,7 @@ project-service-release-evidence:
       when: on_success
     - when: never
 
-# Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
+# Gated outbound mirror for an already-validated internal default-branch commit.
 # Runs exact-commit, agent-artifact, large-artifact, secret, and evidence-sanitization
 # boundary gates first, then pushes on pass. Protected default
 # branch only — never a merge request or scheduled canary pipeline.

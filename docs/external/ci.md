@@ -59,6 +59,17 @@ Optional `--no-wait`, logging, run-ID, and timeout controls pass through to the
 bound Builder command. A `--no-wait` receipt is dispatch confirmation only; it
 is not terminal gate or merge evidence.
 
+For an unmerged pull request, select the immutable ref produced by Sync Now
+instead of the local branch name. The ref suffix must be the exact local HEAD
+commit that Builder receives as `requestedCommit`:
+
+```bash
+PR_NUMBER=<pull-request-number>
+HEAD_SHA="$(git rev-parse HEAD)"
+./scripts/check.sh --profile merge --dispatch \
+  --ref "sync/pr-${PR_NUMBER}/${HEAD_SHA}"
+```
+
 ### Internal validation jobs
 
 The `focused-gate` job, defined in `.gitlab-ci.yml`, is available only to
@@ -141,9 +152,10 @@ contract is [Redfish Simulator Contract](simulator-contract.md).
 Triggers on pushes to `main` and on every pull request.
 
 - Runs the full **offline** test suite (`pytest -q -m "not dmtf_sim_live"`) on
-  Python **3.10** for pushes and PRs with non-documentation changes. Docs-only
-  PRs use the workflow's docs-coupled fast path, which runs only detected
-  docs-coupled tests (or no tests when none are found).
+  Python **3.10** for pushes and PRs with non-documentation changes. For a
+  docs-only PR, the supplemental fast path scans a bounded top-level test set
+  and may run no tests. The Internal GitLab merge profile remains the
+  authoritative gate, including nested test coverage.
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
 - Runs blocking docstring checks with `python tools/docstring_gate.py --base FETCH_HEAD`

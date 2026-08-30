@@ -24,26 +24,35 @@ redfish_ctl --version
 
 ## Automated release (recommended)
 
-The release path starts from a change merged through Internal GitLab, followed
-by its gated GitHub mirror, and is tag-triggered. PyPI publishing needs no PyPI
-token on anyone's machine: `.github/workflows/release.yml` uses **Trusted
-Publishing** (OIDC), which also makes PyPI show *verified* project details
-instead of "unverified".
+The release path starts from a version-bump pull request on GitHub. Its exact
+head is mirrored to immutable validation refs and must pass the Internal
+GitLab merge profile before the pull request is merged. After inbound sync and
+the protected internal default-branch gate validate the merged commit, a tag
+push starts publication. PyPI publishing needs no PyPI token on anyone's
+machine: `.github/workflows/release.yml` uses **Trusted Publishing** (OIDC),
+which also makes PyPI show *verified* project details instead of "unverified".
 
 `publish-github`, the protected default-branch job defined in `.gitlab-ci.yml`,
-is the only path that updates public GitHub `main`.
+is the outbound mirror for an already-gated internal default-branch commit. It
+does not replace the GitHub pull-request entry path.
 
 ```bash
 python tools/bump_version.py patch      # or minor / major — edits redfish_ctl/version.py only
 NEW_VERSION="$(python tools/bump_version.py --show)"
+git switch -c "release/v${NEW_VERSION}"
 git add redfish_ctl/version.py
 git commit -m "Release ${NEW_VERSION}"
-git push <github-remote> HEAD
+git push <github-remote> "HEAD:refs/heads/release/v${NEW_VERSION}"
 # Open or update the GitHub pull request for this release branch. After the
 # configured Sync Now path makes this exact head available on Internal GitLab:
-./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
+PR_NUMBER=<pull-request-number>
+HEAD_SHA="$(git rev-parse HEAD)"
+VALIDATION_REF="sync/pr-${PR_NUMBER}/${HEAD_SHA}"
+./scripts/check.sh --profile merge --dispatch --ref "${VALIDATION_REF}" \
+  --apply --confirm-project-ci-run
 # Merge the GitHub pull request only after the exact-head merge profile passes.
-# Wait for inbound sync, the protected internal-main gate, and publish-github.
+# Wait for inbound sync and the protected internal-main gate. If the project
+# enables publish-github, require its successful exact-commit read-back too.
 git fetch <github-remote> main
 test "$(git rev-parse <github-remote>/main)" = "<validated-internal-main-sha>"
 git tag "v${NEW_VERSION}" <validated-internal-main-sha>
@@ -70,11 +79,12 @@ fallback.
 
 Use this order so a broken package does not reach PyPI:
 
-1. Verify the exact commit through Internal GitLab.
+1. Verify the exact pull-request head through Internal GitLab.
 2. Build source and wheel distributions.
 3. Inspect/install the built artifact locally.
-4. Wait for the gated GitHub mirror of that commit.
-5. Tag the exact mirrored commit; the release workflow publishes it.
+4. Merge the GitHub pull request, then wait for inbound sync and the protected
+   internal default-branch gate.
+5. Tag the exact GitHub `main` commit; the release workflow publishes it.
 
 ## Verify
 
@@ -82,10 +92,9 @@ Obtain a successful `gate-merge` result for the exact release commit through
 the Internal GitLab path documented in [CI/CD Pipeline](ci.md#internal-validation-paths).
 The merge profile runs the offline suite and changed-file Ruff gate in the
 configured Kubernetes runner; workstation output is not release evidence.
-
-```bash
-./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
-```
+Use the immutable-ref dispatch command in
+[Automated release](#automated-release-recommended); do not replace its
+`--ref` value with the mutable local release branch.
 
 The single source of truth for the version is `redfish_ctl/version.py` (imported by the CLI for
 `--version`); `setup.py` reads that file so the wheel name and the CLI version can never drift.

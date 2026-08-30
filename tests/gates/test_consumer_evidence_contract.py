@@ -690,6 +690,132 @@ def test_dispatch_consumes_builder_full_profile_and_provider_credentials() -> No
     assert "cannot be combined" in (proc.stdout + proc.stderr)
 
 
+def test_dispatch_ref_is_explicit_safe_and_dispatch_only() -> None:
+    """An immutable validation ref is bounded before Builder receives it."""
+    source = CHECK_SH.read_text(encoding="utf-8")
+    assert '--ref "$ref"' in source
+    assert '--requested-commit "$commit"' in source
+
+    proc = _run_check(
+        ["--profile", "merge", "--ref", f"sync/pr-445/{COMMIT}"]
+    )
+    assert proc.returncode == 2
+    assert "require --dispatch" in (proc.stdout + proc.stderr)
+
+    unsafe = "sync/pr-445/bad ref\n" + ("x" * 260)
+    proc = _run_check(
+        ["--profile", "merge", "--dispatch", "--ref", unsafe]
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 2
+    assert unsafe not in combined
+    assert "safe branch ref" in combined
+
+
+def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> None:
+    """The Builder adapter receives the selected ref and current exact HEAD."""
+    builder = tmp_path / "builder"
+    builder_scripts = builder / "scripts"
+    builder_scripts.mkdir(parents=True)
+    project_ci = builder_scripts / "project-ci"
+    project_ci.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$@"\n', encoding="utf-8"
+    )
+    project_ci.chmod(0o755)
+    discovery = builder_scripts / "shared_inventory_map.sh"
+    discovery.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' "
+        "'{\"spec\":{\"providerCapabilities\":{\"capabilities\":["
+        "{\"id\":\"ci.focused-gate\"},{\"id\":\"ci.merge-profile\"}]}}}'\n",
+        encoding="utf-8",
+    )
+    discovery.chmod(0o755)
+    subprocess.run(["git", "init", "-q", str(builder)], check=True)
+    subprocess.run(
+        ["git", "-C", str(builder), "config", "user.email", "ci@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(builder), "config", "user.name", "CI Fixture"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(builder), "add", "scripts"], check=True)
+    subprocess.run(
+        ["git", "-C", str(builder), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+    builder_revision = subprocess.check_output(
+        ["git", "-C", str(builder), "rev-parse", "HEAD"], text=True
+    ).strip()
+
+    project = tmp_path / "project"
+    (project / "scripts").mkdir(parents=True)
+    shutil.copyfile(CHECK_SH, project / "scripts" / "check.sh")
+    (project / "scripts" / "check.sh").chmod(0o755)
+    (project / "builder-binding.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "spec": {
+                    "source": {
+                        "localPath": str(builder),
+                        "revision": builder_revision,
+                    },
+                    "discovery": {
+                        "command": [
+                            "./scripts/shared_inventory_map.sh",
+                            "--validate",
+                        ]
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "config", "user.email", "ci@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(project), "config", "user.name", "CI Fixture"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(project), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+    project_commit = subprocess.check_output(
+        ["git", "-C", str(project), "rev-parse", "HEAD"], text=True
+    ).strip()
+    validation_ref = f"sync/pr-445/{project_commit}"
+
+    proc = subprocess.run(
+        [
+            str(project / "scripts" / "check.sh"),
+            "--profile",
+            "merge",
+            "--dispatch",
+            "--ref",
+            validation_ref,
+        ],
+        cwd=project,
+        env=_off_cluster_env(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    output = proc.stdout.splitlines()
+    assert output[output.index("--ref") + 1] == validation_ref
+    assert output[output.index("--requested-commit") + 1] == project_commit
+    assert "--profile" in output
+    assert "full" in output
+    assert "--dry-run" in output
+
+
 def test_project_ci_entrypoint_rejects_conflicting_selectors() -> None:
     """The imported Builder job cannot accept two independent selectors."""
     proc = subprocess.run(

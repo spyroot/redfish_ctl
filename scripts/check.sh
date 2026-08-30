@@ -4,7 +4,7 @@
 #   check.sh --list                         enumerate every registered gate
 #   check.sh --profile <name>               run all gates in a profile
 #   check.sh --profile <name> --gate <id>   run one gate in that profile
-#   check.sh --profile merge [--gate <id>] --dispatch [--dry-run]
+#   check.sh --profile merge [--gate <id>] --dispatch [--ref <branch>] [--dry-run]
 #   check.sh --profile merge [--gate <id>] --dispatch --apply \
 #            --confirm-project-ci-run [Builder controls]
 #                                   (merge|integration|scheduled|deploy|repository-export)
@@ -52,6 +52,19 @@ _safe_gate_id() {
     [A-Za-z0-9]*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Summary: Validate one bounded Builder branch ref without reflection.
+# Arguments: candidate branch ref without refs/heads/. Environment: none.
+# Stdout/stderr: none. Exit classes: zero safe, one unsafe. Side effects: none.
+_safe_dispatch_ref() {
+  [ "$#" -eq 1 ] || return 1
+  [ -n "$1" ] || return 1
+  [ "${#1}" -le 256 ] || return 1
+  case "$1" in
+    -*|refs/*) return 1 ;;
+  esac
+  git check-ref-format "refs/heads/$1" >/dev/null 2>&1
 }
 
 # Summary: Resolve the exact Builder-owned project CI entrypoint.
@@ -119,13 +132,14 @@ _builder_project_ci() {
 }
 
 # Summary: Dispatch one exact-ref focused gate or the full merge profile.
-# Arguments: profile and optional gate id. Environment: provider credential binding.
+# Arguments: profile, optional gate id, and optional branch ref.
+# Environment: provider credential binding.
 # Stdout: Builder's sanitized JSON result. Stderr: bounded diagnostics.
 # Exit classes: Builder project-ci result. Side effects: none in dry-run; apply
 # creates one Internal GitLab pipeline.
 # Idempotency: exact project, ref, commit, and selection. Cleanup: provider-owned.
 _dispatch() {
-  local selected_profile="$1" selected_gate="$2"
+  local selected_profile="$1" selected_gate="$2" selected_ref="$3"
   local project_ci ref commit
   local -a args
   if [ "$selected_profile" != "merge" ]; then
@@ -136,8 +150,10 @@ _dispatch() {
     echo "check.sh: --dispatch is an off-cluster provider action" >&2
     return 2
   fi
-  if ! ref="$(git symbolic-ref --quiet --short HEAD)"; then
-    echo "BLOCKER: dispatch requires a named branch, not detached HEAD" >&2
+  if [ -n "$selected_ref" ]; then
+    ref="$selected_ref"
+  elif ! ref="$(git symbolic-ref --quiet --short HEAD)"; then
+    echo "BLOCKER: dispatch requires a named branch or explicit --ref" >&2
     return 78
   fi
   commit="$(git rev-parse HEAD)"
@@ -183,7 +199,7 @@ usage() {
   cat <<'USAGE'
 usage: check.sh --list
        check.sh --profile <merge|integration|scheduled|deploy|repository-export>
-                [--gate <id>] [--dispatch [--dry-run]]
+                [--gate <id>] [--dispatch [--ref BRANCH] [--dry-run]]
                 [--dispatch --apply --confirm-project-ci-run]
                 [--no-wait] [--log-format text|json]
                 [--log-level debug|info|warning|error] [--log-file PATH]
@@ -201,6 +217,7 @@ dispatch=false
 dispatch_apply=false
 dispatch_confirm=false
 dispatch_dry_run=false
+dispatch_ref=""
 dispatch_args=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -232,6 +249,10 @@ while [ "$#" -gt 0 ]; do
       dispatch_confirm=true
       shift
       ;;
+    --ref)
+      dispatch_ref="${2:?check.sh: --ref requires a value}"
+      shift 2
+      ;;
     --no-wait)
       dispatch_args+=(--no-wait)
       shift
@@ -257,10 +278,15 @@ if [ -n "$gate" ] && ! _safe_gate_id "$gate"; then
   exit 2
 fi
 
+if [ -n "$dispatch_ref" ] && ! _safe_dispatch_ref "$dispatch_ref"; then
+  echo "check.sh: --ref must be a safe branch ref without refs/heads/" >&2
+  exit 2
+fi
+
 if $list; then
   if [ -n "$profile" ] || [ -n "$gate" ] || $dispatch || \
     [ "${#dispatch_args[@]}" -gt 0 ] || $dispatch_apply || \
-    $dispatch_confirm || $dispatch_dry_run; then
+    $dispatch_confirm || $dispatch_dry_run || [ -n "$dispatch_ref" ]; then
     echo "check.sh: --list cannot be combined with gate or Builder controls" >&2
     exit 2
   fi
@@ -275,7 +301,7 @@ if [ -z "$profile" ]; then
 fi
 
 if { [ "${#dispatch_args[@]}" -gt 0 ] || $dispatch_apply || \
-  $dispatch_confirm || $dispatch_dry_run; } && ! $dispatch; then
+  $dispatch_confirm || $dispatch_dry_run || [ -n "$dispatch_ref" ]; } && ! $dispatch; then
   echo "check.sh: Builder controls require --dispatch" >&2
   exit 2
 fi
@@ -294,7 +320,7 @@ if $dispatch_apply && $dispatch_dry_run; then
 fi
 
 if $dispatch; then
-  _dispatch "$profile" "$gate"
+  _dispatch "$profile" "$gate" "$dispatch_ref"
 fi
 
 runner_args=(--profile "$profile")

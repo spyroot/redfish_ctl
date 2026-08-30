@@ -14,8 +14,8 @@ Design (deliberately conservative so release automation never surprises anyone):
 * It edits ONLY ``redfish_ctl/version.py`` — the single source of truth that
   ``setup.py`` reads and the CLI reports via ``--version``. There is nowhere else
   to keep in sync.
-* It does NOT run git. It prints the guarded branch, mirror, and exact-SHA tag
-  steps so a human performs the release deliberately.
+* It does NOT run git. It prints the computed release identifiers and points to
+  the canonical guarded workflow so a human performs the release deliberately.
 * The CI release workflow refuses to publish unless the pushed ``vX.Y.Z`` tag
   matches this file, so a forgotten bump fails before upload. PyPI rejects a
   duplicate version during the publish step.
@@ -68,27 +68,15 @@ def write_version(new: str) -> None:
 
 
 def release_next_steps(new: str) -> tuple[str, ...]:
-    """Return the guarded human steps for releasing ``new``.
+    """Return canonical guidance and computed identifiers for ``new``.
 
     :param new: validated semantic version without the ``v`` tag prefix.
-    :return: ordered instructions that preserve internal validation and mirror
-        identity before the public tag push.
+    :return: the canonical guide pointer, release branch, and version tag.
     """
     return (
-        "git add redfish_ctl/version.py",
-        f"git commit -m 'Release {new}'",
-        "git push <github-remote> HEAD",
-        "Open or update the GitHub pull request for this release branch.",
-        "Wait for the configured Sync Now path to mirror this exact head.",
-        "./scripts/check.sh --profile merge --dispatch --apply "
-        "--confirm-project-ci-run",
-        "Merge the GitHub pull request only after the exact-head merge profile passes.",
-        "Wait for inbound sync, the protected internal-main gate, and publish-github.",
-        "git fetch <github-remote> main",
-        'test "$(git rev-parse <github-remote>/main)" = '
-        '"<validated-internal-main-sha>"',
-        f"git tag v{new} <validated-internal-main-sha>",
-        f"git push <github-remote> refs/tags/v{new}",
+        "Follow docs/external/releasing.md#automated-release-recommended.",
+        f"Release branch: release/v{new}",
+        f"Version tag: v{new}",
     )
 
 
