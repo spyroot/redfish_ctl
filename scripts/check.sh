@@ -67,30 +67,32 @@ _safe_dispatch_ref() {
   git check-ref-format "refs/heads/$1" >/dev/null 2>&1
 }
 
-# Summary: Resolve the consumer project name from the current CI or Git remote.
+# Summary: Resolve the consumer project name from its tracked binding and CI.
 # Arguments: none. Environment: CI_PROJECT_NAME when GitLab supplies it.
 # Stdout: one validated project name. Stderr: classified blocker text.
-# Exit classes: 0 resolved, 78 unavailable. Side effects: read-only Git queries.
+# Exit classes: 0 resolved, 78 unavailable. Side effects: reads tracked config.
 # Idempotency: deterministic for one checkout. Cleanup: none.
 _project_ci_consumer() {
-  local project remote_url
-  if [ -n "${CI_PROJECT_NAME:-}" ]; then
-    project="$CI_PROJECT_NAME"
-  elif remote_url="$(git remote get-url github 2>/dev/null)"; then
-    project="${remote_url##*/}"
-  elif remote_url="$(git remote get-url origin 2>/dev/null)"; then
-    project="${remote_url##*/}"
-  else
-    echo "BLOCKER: dispatch cannot derive the consumer project from CI or Git" >&2
+  local bound_project project
+  if [ ! -r standards-binding.yaml ]; then
+    echo "BLOCKER: dispatch requires tracked standards-binding.yaml" >&2
     return 78
   fi
-  project="${project%.git}"
+  if ! bound_project="$(yq -er '.metadata.name' standards-binding.yaml)"; then
+    echo "BLOCKER: standards-binding.yaml has no consumer project identity" >&2
+    return 78
+  fi
+  project="${CI_PROJECT_NAME:-$bound_project}"
   case "$project" in
     ""|*[!A-Za-z0-9._-]*)
       echo "BLOCKER: derived consumer project name is invalid" >&2
       return 78
       ;;
   esac
+  if [ "$project" != "$bound_project" ]; then
+    echo "BLOCKER: runtime consumer project disagrees with standards-binding.yaml" >&2
+    return 78
+  fi
   printf '%s\n' "$project"
 }
 

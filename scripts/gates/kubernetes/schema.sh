@@ -28,7 +28,9 @@ simulator_release="$(helm_chart_name charts/dmtf-sim)"
 simulator_namespace="$(helm_render_namespace "$simulator_release")"
 # Validate concrete manifests first. Skip Helm templates and placeholder
 # manifests here; rendered chart output is validated separately below.
-files="$(git ls-files 'k8s/**/*.yaml' 'charts/**/*.yaml' | while read -r f; do
+files="$(git ls-files \
+  'k8s/*.yaml' 'k8s/**/*.yaml' \
+  'charts/*.yaml' 'charts/**/*.yaml' | while read -r f; do
   case "$(basename "$f")" in Chart.yaml | values.yaml) continue ;; esac
   grep -qE '\{\{|__[A-Z0-9_]+__' "$f" || echo "$f"
 done)"

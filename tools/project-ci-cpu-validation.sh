@@ -682,6 +682,22 @@ project_ci_run_gate() {
     result_status=failed
     error_class=cleanup-failed
     event_level=error
+  elif [[ "$mode" != "focused" ]]; then
+    if [[ ! "${CI_JOB_NAME:-}" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
+      status=2
+      result_status=failed
+      error_class=evidence-identity-missing
+      event_level=error
+    else
+      evidence_path="reports/smoke/${CI_JOB_NAME}.json"
+      if [[ ! -s "$evidence_path" ]]; then
+        status=2
+        result_status=failed
+        error_class=evidence-missing
+        event_level=error
+        evidence_path=""
+      fi
+    fi
   fi
 
   elapsed_ms=$(( (SECONDS - start_seconds) * 1000 ))

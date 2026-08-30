@@ -142,7 +142,7 @@ gates:
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
   # --- scheduled: read-only production canaries ---
   - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}
-  # --- gitlab.project-token: the CI token is least-privilege and usable (shared, needs live GitLab) ---
+  # --- gitlab.project-token: the project token is least-privilege and usable (needs live GitLab) ---
   - {id: gitlab.project-token.exists, profile: integration, command: scripts/gates/gitlab/project-token-exists.sh, required: true, mutates: false}
   - {id: gitlab.project-token.project-bound, profile: integration, command: scripts/gates/gitlab/project-token-project-bound.sh, required: true, mutates: false}
   - {id: gitlab.project-token.api-access, profile: integration, command: scripts/gates/gitlab/project-token-api-access.sh, required: true, mutates: false}
@@ -751,10 +751,10 @@ spec:
       id: gitlab.project-token.exists
       category: integration
       phase: integration
-      requiredCredentialNames: [CI_JOB_TOKEN]
+      requiredCredentialNames: [GITLAB_URL, GITLAB_PROJECT_TOKEN, GITLAB_PROJECT_ID]
       profiles: [integration]
       output: reports/gates/gitlab.project-token.exists.json
-      description: Verify the project-scoped CI job token is available.
+      description: Verify the project access token is available.
     - required: true
       status: active
       isolation: network
@@ -769,10 +769,10 @@ spec:
       id: gitlab.project-token.project-bound
       category: integration
       phase: integration
-      requiredCredentialNames: [CI_JOB_TOKEN]
+      requiredCredentialNames: [GITLAB_URL, GITLAB_PROJECT_TOKEN, GITLAB_PROJECT_ID]
       profiles: [integration]
       output: reports/gates/gitlab.project-token.project-bound.json
-      description: Verify the CI job token remains bound to this project.
+      description: Verify the project access token remains bound to this project.
     - required: true
       status: active
       isolation: network
@@ -787,10 +787,10 @@ spec:
       id: gitlab.project-token.api-access
       category: integration
       phase: integration
-      requiredCredentialNames: [CI_JOB_TOKEN]
+      requiredCredentialNames: [GITLAB_URL, GITLAB_PROJECT_TOKEN, GITLAB_PROJECT_ID]
       profiles: [integration]
       output: reports/gates/gitlab.project-token.api-access.json
-      description: Verify the CI job token has the declared read-only API access.
+      description: Verify the project access token has the declared read-only API access.
     - required: true
       status: active
       isolation: network
@@ -805,10 +805,10 @@ spec:
       id: gitlab.project-token.no-cross-project-access
       category: integration
       phase: integration
-      requiredCredentialNames: [CI_JOB_TOKEN]
+      requiredCredentialNames: [GITLAB_URL, GITLAB_PROJECT_TOKEN, GITLAB_PROJECT_ID]
       profiles: [integration]
       output: reports/gates/gitlab.project-token.no-cross-project-access.json
-      description: Reject undeclared cross-project CI job token access.
+      description: Reject undeclared cross-project access by the project token.
     - required: true
       status: active
       isolation: offline

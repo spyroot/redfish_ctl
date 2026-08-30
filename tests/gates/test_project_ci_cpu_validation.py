@@ -331,6 +331,7 @@ def _run_gate_dependency(
     mode: str = "smoke",
     gate: str = "",
     log_format: str = "text",
+    cwd: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     command = (
         'source "$1"; '
@@ -352,6 +353,8 @@ def _run_gate_dependency(
         check=False,
         capture_output=True,
         text=True,
+        cwd=cwd,
+        env={**os.environ, "CI_JOB_NAME": "project-ci-cpu-validation"},
     )
 
 
@@ -365,14 +368,33 @@ def test_gate_dependency_failure_returns_terminal_result() -> None:
     assert "cleanup_status=passed" in result.stdout
 
 
-def test_gate_dependency_success_returns_terminal_result() -> None:
-    result = _run_gate_dependency("/bin/true", mode="smoke")
+def test_gate_dependency_success_returns_terminal_result(tmp_path: Path) -> None:
+    dependency = tmp_path / "dependency.sh"
+    dependency.write_text(
+        "#!/bin/bash\n"
+        "mkdir -p reports/smoke\n"
+        "printf '{}\\n' >reports/smoke/project-ci-cpu-validation.json\n",
+        encoding="utf-8",
+    )
+    dependency.chmod(0o755)
+    result = _run_gate_dependency(str(dependency), mode="smoke", cwd=tmp_path)
 
     assert result.returncode == 0
     assert "mode=smoke" in result.stdout
     assert "status=passed" in result.stdout
     assert "cleanup_status=passed" in result.stdout
-    assert "evidence_path= error_class=none" in result.stdout
+    assert (
+        "evidence_path=reports/smoke/project-ci-cpu-validation.json "
+        "error_class=none"
+    ) in result.stdout
+
+
+def test_gate_dependency_success_without_evidence_fails_closed(tmp_path: Path) -> None:
+    result = _run_gate_dependency("/bin/true", mode="full", cwd=tmp_path)
+
+    assert result.returncode == 2
+    assert "status=failed" in result.stdout
+    assert "evidence_path= error_class=evidence-missing" in result.stdout
 
 
 def test_dependency_stderr_is_counted_but_not_replayed(tmp_path: Path) -> None:

@@ -94,6 +94,27 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
         assert "CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH" in scheduled[0]
 
 
+def test_project_token_gates_declare_the_credentials_they_consume() -> None:
+    """Provider envelopes provision the exact project-token inputs used by gates."""
+    manifest = _yaml(REPO_ROOT / "gates" / "manifest.yaml")
+    expected = {"GITLAB_URL", "GITLAB_PROJECT_TOKEN", "GITLAB_PROJECT_ID"}
+    records = {
+        record["id"]: record
+        for record in manifest["spec"]["gates"]
+        if record["id"].startswith("gitlab.project-token.")
+    }
+    assert set(records) == {
+        "gitlab.project-token.exists",
+        "gitlab.project-token.project-bound",
+        "gitlab.project-token.api-access",
+        "gitlab.project-token.no-cross-project-access",
+    }
+    assert all(
+        set(record["requiredCredentialNames"]) == expected
+        for record in records.values()
+    )
+
+
 def _ci_env(job: str = "gate-merge") -> dict[str, str]:
     """Return complete immutable CI identity for deterministic evidence tests."""
     return {
@@ -893,6 +914,10 @@ def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> Non
         ),
         encoding="utf-8",
     )
+    (project / "standards-binding.yaml").write_text(
+        yaml.safe_dump({"metadata": {"name": "bound-project"}}),
+        encoding="utf-8",
+    )
     subprocess.run(["git", "init", "-q", str(project)], check=True)
     subprocess.run(
         ["git", "-C", str(project), "config", "user.email", "ci@example.invalid"],
@@ -942,12 +967,31 @@ def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> Non
     )
     assert proc.returncode == 0, proc.stderr
     output = proc.stdout.splitlines()
-    assert output[output.index("--project") + 1] == "runtime-project"
+    assert output[output.index("--project") + 1] == "bound-project"
     assert output[output.index("--ref") + 1] == validation_ref
     assert output[output.index("--requested-commit") + 1] == project_commit
     assert "--profile" in output
     assert "full" in output
     assert "--dry-run" in output
+
+    mismatch = subprocess.run(
+        [
+            str(project / "scripts" / "check.sh"),
+            "--profile",
+            "merge",
+            "--dispatch",
+            "--ref",
+            validation_ref,
+        ],
+        cwd=project,
+        env={**_off_cluster_env(), "CI_PROJECT_NAME": "runtime-project"},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert mismatch.returncode == 78
+    assert "disagrees with standards-binding.yaml" in mismatch.stderr
 
 
 def test_unit_profile_excludes_inapplicable_lanes_instead_of_skipping() -> None:

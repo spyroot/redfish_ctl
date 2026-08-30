@@ -70,6 +70,24 @@ def _script_lines(job: dict) -> list[str]:
     return [str(line) for line in script]
 
 
+def test_provider_gate_view_matches_executable_registry_and_rejects_drift() -> None:
+    """The Builder-facing envelope cannot omit or disagree with a real gate."""
+    registry = gate_meta._load_registry()
+    assert gate_meta._check_provider_gate_view(registry) == []
+
+    missing = yaml.safe_load(yaml.safe_dump(registry))
+    missing["spec"]["gates"] = missing["spec"]["gates"][1:]
+    failures = gate_meta._check_provider_gate_view(missing)
+    assert any("missing provider records" in failure for failure in failures)
+
+    mismatch = yaml.safe_load(yaml.safe_dump(registry))
+    mismatch["spec"]["gates"][0]["mutation"] = not mismatch["spec"]["gates"][0][
+        "mutation"
+    ]
+    failures = gate_meta._check_provider_gate_view(mismatch)
+    assert any("mutation flag disagrees" in failure for failure in failures)
+
+
 def _trusted_project_service_registry(
     *,
     required_jobs: list[str] | None = None,

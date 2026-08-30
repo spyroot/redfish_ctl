@@ -14,8 +14,8 @@ For gate semantics see [Gates](gates.md); for the release procedure, see
 | GitHub | pull request or push to `main` | offline test workflow |
 | GitHub | `v*` tag | release workflow |
 | GitLab | merge request | `merge` profile |
-| GitLab | default branch | `merge` plus `integration` profiles |
-| GitLab | schedule on the default branch | `merge`, `integration`, and `scheduled` profiles |
+| GitLab | protected default branch | `merge` plus `integration` profiles |
+| GitLab | schedule on the protected default branch | `merge`, `integration`, and `scheduled` profiles |
 
 ## Internal validation paths
 
@@ -108,9 +108,10 @@ availability.
 
 Local required jobs publish `reports/ci/<job>.json`, executed gates write
 `reports/gates/<gate-id>.json`, and required local smokes publish
-`reports/smoke/<job>.json`. The provider-owned CPU job emits terminal status
-through the Builder result contract; its current result does not carry an
-artifact path. Use the full `gate-merge` artifacts for merge evidence. Evidence
+`reports/smoke/<job>.json`. A successful full provider-owned CPU job returns
+its `reports/smoke/<job>.json` path through the Builder result contract;
+focused diagnostics omit release-blocking smoke evidence. Use the full
+`gate-merge` artifacts for merge evidence. Evidence
 binds the result to the exact project commit, Standards revision, pipeline/job
 IDs, and immutable runner digest. Warning/skip counts come from captured gate
 output; cleanup comes from tracked-state comparison; exact identity comes from
