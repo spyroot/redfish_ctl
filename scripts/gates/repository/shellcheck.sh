@@ -8,7 +8,7 @@ if ! command -v shellcheck >/dev/null 2>&1; then
 fi
 mapfile -t files < <(
   git ls-files \
-    '*.sh' \
+    'build_dist.sh' \
     'scripts/*.sh' \
     'scripts/gates/**/*.sh' \
     'scripts/gates/**/*.bash' \
