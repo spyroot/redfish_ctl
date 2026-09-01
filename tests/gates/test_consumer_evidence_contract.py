@@ -1369,6 +1369,7 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert "CI_JOB_TOKEN" in source
     assert "gitlab-ci-token" in source
     assert "Authorization: Basic" in source
+    assert 'repository = f"{repository}.git"' in source
     assert "JOB-TOKEN:" not in source
 
     binding = _yaml(REPO_ROOT / "standards-binding.yaml")

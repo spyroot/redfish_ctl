@@ -73,6 +73,8 @@ def _fetch_exact(
         repository = require_provider_repository(repository, approved_base_url)
     except ProviderContractError as exc:
         raise SchemaGateError(str(exc)) from exc
+    if not repository.endswith(".git"):
+        repository = f"{repository}.git"
     if not EXACT_SHA.fullmatch(revision):
         raise SchemaGateError("contract revision is not an exact commit")
     workspace = tempfile.TemporaryDirectory(prefix="redfish_ctl-schema-")
