@@ -1359,13 +1359,14 @@ def test_emulator_lanes_use_their_endpoint_specific_marker(path: str) -> None:
 
 
 def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
-    """The schema gate opens exact local authorities and validates both bindings."""
+    """The schema gate uses local authorities or exact protected CI fetches."""
     source = (REPO_ROOT / "tools" / "schema_gate.py").read_text(encoding="utf-8")
     assert "project-standards-binding.schema.json" in source
     assert "project-provider-binding.schema.json" in source
-    assert 'standards_source.get("localPath"' in source
-    assert 'provider_source["localPath"]' in source
-    assert "CI_JOB_TOKEN" not in source
+    assert "_checkout_exact_authority" in source
+    assert 'source.get("localPath"' in source
+    assert 'source.get("repository"' in source
+    assert "CI_JOB_TOKEN" in source
 
     binding = _yaml(REPO_ROOT / "standards-binding.yaml")
     provider = _yaml(REPO_ROOT / binding["spec"]["providers"][0]["binding"])
