@@ -111,6 +111,42 @@ def _check_mandatory_ids(registry: dict) -> list[str]:
     return failures
 
 
+def _check_provider_gate_view(registry: dict) -> list[str]:
+    """Require the provider envelope to match the executable gate registry.
+
+    :param registry: the parsed gate registry and provider-facing ``spec`` view.
+    :return: drift diagnostics; empty means every gate has one agreeing record.
+    """
+    executable = {gate["id"]: gate for gate in registry["gates"]}
+    records = (registry.get("spec") or {}).get("gates") or []
+    record_ids = [record.get("id") for record in records]
+    failures: list[str] = []
+    duplicates = sorted(
+        {gate_id for gate_id in record_ids if record_ids.count(gate_id) > 1}
+    )
+    if duplicates:
+        failures.append(f"duplicate provider gate records: {duplicates}")
+    provider = {record.get("id"): record for record in records}
+    missing = sorted(set(executable) - set(provider))
+    stale = sorted(set(provider) - set(executable))
+    if missing:
+        failures.append(f"executable gates missing provider records: {missing}")
+    if stale:
+        failures.append(f"provider records reference missing executable gates: {stale}")
+    for gate_id in sorted(set(executable) & set(provider)):
+        gate = executable[gate_id]
+        record = provider[gate_id]
+        if record.get("required") is not gate.get("required"):
+            failures.append(f"gate {gate_id}: provider required flag disagrees")
+        if record.get("mutation") is not gate.get("mutates"):
+            failures.append(f"gate {gate_id}: provider mutation flag disagrees")
+        if gate.get("profile") not in (record.get("profiles") or []):
+            failures.append(
+                f"gate {gate_id}: executable profile missing from provider profiles"
+            )
+    return failures
+
+
 def _check_no_unregistered_scripts(registry: dict) -> list[str]:
     """Every gate script under scripts/gates/ must be registered (no orphan/unregistered gate).
 
@@ -322,7 +358,10 @@ def _protected_template_rules_match(job: dict, protected_when: str) -> bool:
             "when": "never",
         },
         {
-            "if": '$CI_COMMIT_REF_PROTECTED == "true"',
+            "if": (
+                '$CI_COMMIT_REF_PROTECTED == "true" && '
+                "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+            ),
             "when": protected_when,
         },
         {"when": "never"},
@@ -438,7 +477,9 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     if not path.is_file():
         return [], False
     ci = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    runner_tag = registry.get("runner_tag", "homelab-k8s")
+    runner_tag = registry.get("runner_tag")
+    if not isinstance(runner_tag, str) or not runner_tag:
+        return ["gate registry runner_tag is missing"], True
     failures, trusted_templates = _check_trusted_includes(ci, registry)
     trusted_external_jobs = _trusted_external_jobs(registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
@@ -558,6 +599,7 @@ def run() -> tuple[bool, list[str], list[str]]:
     """
     registry = _load_registry()
     failures = (_check_commands(registry) + _check_mandatory_ids(registry)
+                + _check_provider_gate_view(registry)
                 + _check_no_unregistered_scripts(registry)
                 + _check_smoke_inventory(registry))
     skipped: list[str] = []

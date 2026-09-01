@@ -175,6 +175,7 @@ def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
     )
     assert proc.returncode == 1, f"planted secret was not detected: {proc.stdout}{proc.stderr}"
     assert "sanitize before upload" in proc.stdout + proc.stderr
+    assert "hunter2hunter2" not in proc.stdout + proc.stderr
 
 
 def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
@@ -190,24 +191,13 @@ def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
-    """The Python fallback selects the same non-template YAML as yamllint.
-
-    Helm templates contain Go template expressions rather than parseable raw
-    YAML. The primary yamllint path excludes those files, so the fallback must
-    preserve that selection while concrete chart output remains covered by the
-    required Kubernetes render and schema gates.
-    """
+def test_yaml_gate_fails_when_yamllint_is_missing(tmp_path) -> None:
+    """The required YAML policy cannot fall back to weaker parse-only evidence."""
     command_dir = tmp_path / "bin"
     command_dir.mkdir()
-    commands = {
-        "dirname": shutil.which("dirname"),
-        "git": shutil.which("git"),
-        "python": sys.executable,
-    }
-    assert all(commands.values()), commands
-    for name, target in commands.items():
-        (command_dir / name).symlink_to(target)
+    dirname = shutil.which("dirname")
+    assert dirname is not None
+    (command_dir / "dirname").symlink_to(dirname)
 
     script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
     proc = subprocess.run(
@@ -217,26 +207,153 @@ def test_yaml_gate_fallback_skips_helm_templates(tmp_path) -> None:
         env={**os.environ, "PATH": str(command_dir)},
     )
     combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0
+    assert "required command is unavailable: yamllint" in combined
+
+
+def test_yaml_gate_uses_explicit_error_only_policy(tmp_path) -> None:
+    """The YAML gate runs its tracked policy without hiding diagnostics."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    arguments = tmp_path / "yamllint.args"
+    yamllint = command_dir / "yamllint"
+    yamllint.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$@\" >\"$YAMLLINT_ARGS\"\n"
+        "case \" $* \" in\n"
+        "  *' --no-warnings '*) exit 91 ;;\n"
+        "  *' -c .yamllint '*) exit 0 ;;\n"
+        "  *) exit 92 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    yamllint.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+            "YAMLLINT_ARGS": str(arguments),
+        },
+    )
+    combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
-    assert "repo.yaml: OK (python fallback)" in combined
+    linter_arguments = arguments.read_text(encoding="utf-8").splitlines()
+    assert "--no-warnings" not in linter_arguments
+    assert linter_arguments[:2] == ["-c", ".yamllint"]
+    assert not any("/templates/" in value for value in linter_arguments[2:])
+    policy = yaml.safe_load((REPO_ROOT / ".yamllint").read_text(encoding="utf-8"))
+    assert policy == {
+        "rules": {
+            "key-duplicates": {"level": "error"},
+        }
+    }
+    assert "repo.yaml: OK (yamllint)" in combined
 
 
-@pytest.mark.skipif(shutil.which("kubeconform") is None, reason="kubeconform not in this environment")
-def test_kubernetes_schema_validates_a_non_empty_manifest_set() -> None:
+def test_kubernetes_schema_validates_a_non_empty_manifest_set(tmp_path) -> None:
     """kubernetes.schema selects concrete manifests and reports how many it validated.
 
     The selection previously inverted: ``grep -qL`` silently behaves as ``grep -q`` (the -q wins), so the
     gate validated exactly the Helm templates it meant to skip and zero real manifests. An empty
     selection now fails the gate rather than printing OK, so the count in the output is the assertion.
     """
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    selected_path = os.environ["PATH"]
+    if shutil.which("kubeconform") is None:
+        kubeconform = command_dir / "kubeconform"
+        kubeconform.write_text(
+            "#!/bin/sh\ncat >/dev/null || exit $?\nexit 0\n",
+            encoding="utf-8",
+        )
+        kubeconform.chmod(0o755)
+        selected_path = f"{command_dir}:{selected_path}"
+
     proc = subprocess.run(
         [str(REPO_ROOT / "scripts" / "gates" / "kubernetes" / "schema.sh")],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": selected_path},
     )
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
     assert "no concrete manifests selected" not in combined, combined
     assert "kubernetes.schema: OK" in combined, combined
+
+
+def test_namespace_gate_resolves_builder_owned_namespace_and_service(
+    tmp_path: Path,
+) -> None:
+    """The consumer validates Builder's binding without naming or creating resources."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    arguments = tmp_path / "resolver.args"
+    resolver = command_dir / "builder-project-resolve-binding"
+    resolver.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$@\" >\"$RESOLVER_ARGS\"\n"
+        "printf '%s\\n' "
+        "'{\"kubernetes\":{\"namespace\":\"runtime-owned\"},"
+        "\"endpoint\":{\"host\":\"runtime-service.runtime-owned.svc.cluster.local\","
+        "\"port\":8080,\"transport\":\"http\"}}'\n",
+        encoding="utf-8",
+    )
+    resolver.chmod(0o755)
+    jq = command_dir / "jq"
+    jq.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "value = json.load(sys.stdin)\n"
+        "print('\\t'.join(str(item) for item in ("
+        "value['kubernetes']['namespace'], value['endpoint']['host'], "
+        "value['endpoint']['port'], value['endpoint']['transport'])))\n",
+        encoding="utf-8",
+    )
+    jq.chmod(0o755)
+    script = REPO_ROOT / "scripts" / "gates" / "integration" / "namespace-test.sh"
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "CI_PROJECT_NAME": "runtime-project",
+            "PROJECT_SERVICE_NAME": "redfish-ctl-dmtf-sim",
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+            "RESOLVER_ARGS": str(arguments),
+        },
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    assert "Builder-owned runtime-owned" in combined
+    assert "service http://runtime-service.runtime-owned.svc.cluster.local:8080" in combined
+    assert arguments.read_text(encoding="utf-8").splitlines() == [
+        "--consumer",
+        "runtime-project",
+        "--service",
+        "redfish-ctl-dmtf-sim",
+        "--format",
+        "json",
+    ]
+
+
+def test_namespace_gate_requires_the_runtime_project_identity() -> None:
+    """A consumer project is never inferred from a hardcoded repository name."""
+    script = REPO_ROOT / "scripts" / "gates" / "integration" / "namespace-test.sh"
+    env = {key: value for key, value in os.environ.items() if key != "CI_PROJECT_NAME"}
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert proc.returncode == 78
+    assert "requires CI_PROJECT_NAME" in proc.stderr
 
 
 def test_kubernetes_render_fails_when_helm_is_missing(tmp_path) -> None:
@@ -305,6 +422,23 @@ def test_check_sh_accepts_focused_gate_syntax_but_preserves_local_refusal() -> N
     assert "unexpected argument" not in combined, combined
     assert "unknown gate" not in combined, combined
     assert "=== gate" not in combined, f"the guard let a gate start locally: {combined}"
+
+
+def test_check_sh_rejects_unsafe_gate_without_reflecting_it() -> None:
+    """Dispatcher input is bounded before it can reach runner diagnostics."""
+    unsafe = "gl" + "pat-" + ("A" * 24) + "/newline\n"
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", unsafe],
+        capture_output=True,
+        text=True,
+        env=_off_cluster_env(),
+        cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 2
+    assert unsafe not in combined
+    assert "safe registry identifier" in combined
+    assert "=== gate" not in combined
 
 
 @pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")

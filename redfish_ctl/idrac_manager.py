@@ -1297,7 +1297,6 @@ class IDracManager(RedfishManager):
                         ignore_error_code=ignore_error_code
                     )
             else:
-                loop = self._event_loop()
                 # The api_async_*_until_complete helpers return
                 # (Response, RedfishApiRespond) - the same order the sync branch
                 # above binds. Unpacking them the other way round bound the enum
@@ -1306,7 +1305,7 @@ class IDracManager(RedfishManager):
                 # api_success_msg() did a dict lookup with a Response as the key,
                 # raising KeyError AFTER the write had already been sent.
                 if method == HTTPMethod.PATCH:
-                    response, api_resp = loop.run_until_complete(
+                    response, api_resp = self._run_coroutine_sync(
                         self.api_async_patch_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1314,7 +1313,7 @@ class IDracManager(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.POST:
-                    response, api_resp = loop.run_until_complete(
+                    response, api_resp = self._run_coroutine_sync(
                         self.api_async_post_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,
@@ -1322,7 +1321,7 @@ class IDracManager(RedfishManager):
                         )
                     )
                 if method == HTTPMethod.DELETE:
-                    response, api_resp = loop.run_until_complete(
+                    response, api_resp = self._run_coroutine_sync(
                         self.api_async_delete_until_complete(
                             r, json.dumps(pd), headers,
                             expected=expected_status,

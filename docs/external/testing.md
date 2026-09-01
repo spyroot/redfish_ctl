@@ -5,18 +5,19 @@ Author: Mus <spyroot@gmail.com>
 For merge authority, runner placement, and required gate evidence, see
 [CI/CD Pipeline](ci.md). Do not treat laptop commands as merge evidence.
 
-Inside that approved CI environment, clear live connection variables before
-the offline suite:
+Inside that approved CI environment, run `unit.all` and `repo.format`, both
+defined in [`gates/manifest.yaml`](../../gates/manifest.yaml), through the
+registered gate adapter:
 
 ```bash
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest -q
-ruff check <changed>
+./scripts/check.sh --profile merge --gate unit.all
+./scripts/check.sh --profile merge --gate repo.format
 ```
 
-The CLI reads only the canonical `REDFISH_*` connection variables. The
-dual-mode fixture switches to live mode when `REDFISH_IP` is present, so unset
-the canonical connection variables for the default suite.
+The gate adapter clears both canonical and compatibility connection inputs,
+then excludes the hardware, emulator, and DMTF simulator markers. This keeps
+the required unit evidence offline even when its CI environment inherited a
+live binding.
 
 ## Which Lane To Use
 
@@ -28,21 +29,10 @@ offline.
 Use the `redfish_mock` fixture when you need an `IDracManager` wired to the mock, and
 `redfish_service` when you need to inspect requests or state changes.
 
-**Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs the same test against the mock
-by default and against approved hardware when `REDFISH_IP` is set. Tests that require hardware are
-marked `@pytest.mark.live` and skip without that variable.
-
-For approved live hardware from an authorized Kubernetes job only:
-
-```bash
-REDFISH_IP=<idrac> \
-REDFISH_USERNAME=root \
-REDFISH_PASSWORD=<password> \
-pytest -q -m live
-```
-
-That keeps the variables scoped to one command. If you exported them earlier, unset them before
-returning to the default suite.
+**Dual-mode lane.** `redfish_api`, defined in `tests/conftest.py`, runs against
+the mock by default. Tests that require hardware carry `@pytest.mark.live` and
+run only through the approved private CI job with its project-bound endpoint
+and credentials. This guide does not define a laptop activation path.
 
 **Vendor-aware mock lane.** `redfish_mock_factory`, defined in `tests/conftest.py`, overlays
 `tests/<vendor>_fixtures/` on the DMTF base. The repo has four corpora now: Dell
@@ -92,8 +82,9 @@ variables unset:
 
 ```bash
 python -m pip install pytest-cov
-env -u REDFISH_IP -u REDFISH_USERNAME -u REDFISH_PASSWORD \
-  pytest --cov=redfish_ctl
+env -i PATH="$PATH" HOME="$HOME" \
+  pytest --cov=redfish_ctl \
+    -m "not live and not emulator_live and not dmtf_sim_live"
 ```
 
 ## Fleet And Concurrency Tests

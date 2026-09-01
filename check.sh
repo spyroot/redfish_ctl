@@ -27,7 +27,23 @@ spec:
     - job: project-ci-cpu-validation
       class: wiring
       command: 'bash -lc "$PROJECT_CI_CPU_COMMAND"'
-      requiredTools: [bash, conda, git, git-lfs, jq, python3, setsid]
+      requiredTools:
+        - bash
+        - conda
+        - git
+        - git-lfs
+        - gitleaks
+        - helm
+        - jq
+        - kubeconform
+        - kube-linter
+        - pytest
+        - python
+        - python3
+        - ruff
+        - setsid
+        - shellcheck
+        - yq
       artifactUnderTest:
         type: repository-and-provider-resource-job
         digestSource: git-commit-and-builder-revision
@@ -39,8 +55,22 @@ spec:
 
     - job: gate-merge
       class: wiring
-      command: './scripts/check.sh --profile "${MERGE_PROFILE:-merge}"'
-      requiredTools: [bash, conda, git, git-lfs, python3]
+      command: ./scripts/check.sh --profile merge
+      requiredTools:
+        - bash
+        - conda
+        - git
+        - git-lfs
+        - gitleaks
+        - helm
+        - kubeconform
+        - kube-linter
+        - pytest
+        - python
+        - python3
+        - ruff
+        - shellcheck
+        - yq
       artifactUnderTest:
         type: repository
         digestSource: git-commit
@@ -53,7 +83,15 @@ spec:
     - job: gate-integration
       class: protected-live
       command: ./scripts/check.sh --profile integration
-      requiredTools: [bash, conda, git, git-lfs, jq, python3, yq]
+      requiredTools:
+        - bash
+        - builder-project-resolve-binding
+        - conda
+        - git
+        - git-lfs
+        - jq
+        - python3
+        - yq
       artifactUnderTest:
         type: repository-and-gitlab-integration
         digestSource: git-commit-and-pipeline
@@ -66,7 +104,13 @@ spec:
     - job: gate-scheduled
       class: protected-live
       command: ./scripts/check.sh --profile scheduled
-      requiredTools: [bash, conda, git, git-lfs, python3]
+      requiredTools:
+        - bash
+        - conda
+        - git
+        - git-lfs
+        - python
+        - python3
       artifactUnderTest:
         type: repository-and-splunk-liveness
         digestSource: git-commit-and-metric-catalogs
@@ -125,6 +169,7 @@ write_smoke_inventory() (
   mkdir -p "$output_dir"
   temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
 
+  # shellcheck disable=SC2329 # trap invokes this function by name.
   cleanup_smoke_inventory_temp() {
     if [[ -n "$temporary_path" && -e "$temporary_path" ]]; then
       rm -f -- "$temporary_path"

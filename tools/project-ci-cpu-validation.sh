@@ -61,7 +61,7 @@ project_ci_log_event() {
   local configured_level="${PROJECT_CI_LOG_LEVEL:-info}"
   local format="${PROJECT_CI_LOG_FORMAT:-text}"
   local run_id="${PROJECT_CI_RUN_ID:-}"
-  local timestamp record text_format
+  local timestamp record
 
   project_ci_log_enabled "$level" "$configured_level" || return 0
   timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -116,11 +116,8 @@ project_ci_log_event() {
           risk: $risk
         } end)')"
   else
-    printf -v text_format '%s' \
-      'level=%s run_id=%s component=project-ci-cpu-validation' \
-      ' operation=validate mode=%s event=%s attempt=1 resource=%s' \
-      ' result=%s elapsed_ms=%s error_class=%s'
-    printf -v record "$text_format" \
+    printf -v record \
+      'level=%s run_id=%s component=project-ci-cpu-validation operation=validate mode=%s event=%s attempt=1 resource=%s result=%s elapsed_ms=%s error_class=%s' \
       "$level" "$run_id" "$mode" "$event" "$resource" "$result" \
       "$elapsed_ms" "$error_class"
     if [[ -n "$message" ]]; then
@@ -485,7 +482,7 @@ project_ci_run_gate() {
   local mode="$2"
   local gate="$3"
   local start_seconds="$4"
-  local evidence_path=""
+  local evidence_path="" evidence_record_count=""
   local stderr_file="" cleanup_status=passed
   local elapsed_ms status=0 stderr_lines=0 warning_count=0
   local diagnostic_summary="stderr-lines=0 redaction=full"
@@ -670,18 +667,69 @@ project_ci_run_gate() {
 
   if (( status != 0 )); then
     result_status=failed
-    error_class=gate-failed
+    error_class="gate-failed"
     event_level=error
   elif (( stderr_lines > 0 )); then
     status=2
     result_status=failed
-    error_class=dependency-stderr
+    error_class="dependency-stderr"
     event_level=error
   elif [[ "$cleanup_status" != "passed" ]]; then
     status=2
     result_status=failed
-    error_class=cleanup-failed
+    error_class="cleanup-failed"
     event_level=error
+  elif [[ "$mode" != "focused" ]]; then
+    if [[ ! "${CI_JOB_NAME:-}" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-identity-missing"
+      event_level=error
+    elif ! evidence_record_count="$(
+      SMOKE_JOB_NAME="$CI_JOB_NAME" yq -r '
+        [.spec.smokeTests[] | select(
+          .job == strenv(SMOKE_JOB_NAME) and .releaseBlocking == true
+        )] | length
+      ' inventory/ci/smoke-tests.yaml
+    )"; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ "$evidence_record_count" == "0" ]]; then
+      evidence_path=""
+    elif [[ "$evidence_record_count" != "1" ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif ! evidence_path="$(
+      SMOKE_JOB_NAME="$CI_JOB_NAME" yq -r '
+        .spec.smokeTests[] | select(
+          .job == strenv(SMOKE_JOB_NAME) and .releaseBlocking == true
+        ) | .evidencePath
+      ' inventory/ci/smoke-tests.yaml
+    )"; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ "$evidence_path" != "reports/smoke/${CI_JOB_NAME}.json" ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ ! -s "$evidence_path" ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-missing"
+      event_level=error
+      evidence_path=""
+    fi
   fi
 
   elapsed_ms=$(( (SECONDS - start_seconds) * 1000 ))

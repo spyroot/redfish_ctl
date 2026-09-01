@@ -4,10 +4,13 @@
 #   check.sh --list                         enumerate every registered gate
 #   check.sh --profile <name>               run all gates in a profile
 #   check.sh --profile <name> --gate <id>   run one gate in that profile
+#   check.sh --profile merge [--gate <id>] --dispatch [--ref <branch>] [--dry-run]
+#   check.sh --profile merge [--gate <id>] --dispatch --apply \
+#            --confirm-project-ci-run [Builder controls]
 #                                   (merge|integration|scheduled|deploy|repository-export)
 #
 # EXECUTION AUTHORITY = Kubernetes. Outside a cluster pod, check.sh REFUSES to run tests locally and
-# prints the exact in-cluster dispatch command instead — it never runs a gate on the operator's laptop.
+# prints guarded Builder plan/apply commands — it never runs a gate on the operator's laptop.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -37,6 +40,179 @@ _in_cluster() {
     _kubelet_evidence
 }
 
+# Summary: Validate one bounded registry gate identifier without reflection.
+# Arguments: candidate gate id. Environment: none. Stdout/stderr: none.
+# Exit classes: zero safe, one unsafe. Side effects: none.
+_safe_gate_id() {
+  [ "$#" -eq 1 ] || return 1
+  [ -n "$1" ] || return 1
+  [ "${#1}" -le 128 ] || return 1
+  case "$1" in
+    [A-Za-z0-9]*[!A-Za-z0-9._-]*) return 1 ;;
+    [A-Za-z0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Summary: Validate one bounded Builder branch ref without reflection.
+# Arguments: candidate branch ref without refs/heads/. Environment: none.
+# Stdout/stderr: none. Exit classes: zero safe, one unsafe. Side effects: none.
+_safe_dispatch_ref() {
+  [ "$#" -eq 1 ] || return 1
+  [ -n "$1" ] || return 1
+  [ "${#1}" -le 256 ] || return 1
+  case "$1" in
+    -*|refs/*) return 1 ;;
+  esac
+  git check-ref-format "refs/heads/$1" >/dev/null 2>&1
+}
+
+# Summary: Resolve the consumer project name from its tracked binding and CI.
+# Arguments: none. Environment: CI_PROJECT_NAME when GitLab supplies it.
+# Stdout: one validated project name. Stderr: classified blocker text.
+# Exit classes: 0 resolved, 78 unavailable. Side effects: reads tracked config.
+# Idempotency: deterministic for one checkout. Cleanup: none.
+_project_ci_consumer() {
+  local bound_project project
+  if [ ! -r standards-binding.yaml ]; then
+    echo "BLOCKER: dispatch requires tracked standards-binding.yaml" >&2
+    return 78
+  fi
+  if ! bound_project="$(yq -er '.metadata.name' standards-binding.yaml)"; then
+    echo "BLOCKER: standards-binding.yaml has no consumer project identity" >&2
+    return 78
+  fi
+  project="${CI_PROJECT_NAME:-$bound_project}"
+  case "$project" in
+    ""|*[!A-Za-z0-9._-]*)
+      echo "BLOCKER: derived consumer project name is invalid" >&2
+      return 78
+      ;;
+  esac
+  if [ "$project" != "$bound_project" ]; then
+    echo "BLOCKER: runtime consumer project disagrees with standards-binding.yaml" >&2
+    return 78
+  fi
+  printf '%s\n' "$project"
+}
+
+# Summary: Resolve the exact Builder-owned project CI entrypoint.
+# Arguments: none. Environment: none. Stdout: executable path.
+# Stderr: classified blocker text. Exit classes: 0 resolved, 78 blocked.
+# Side effects: read-only binding and Git inspection. Idempotency: deterministic.
+# Cleanup: none.
+_builder_project_ci() {
+  local provider_root provider_revision provider_head project_ci
+  local discovery_program discovery_argument provider_map
+  local required_command
+  for required_command in yq jq; do
+    if ! command -v "$required_command" >/dev/null 2>&1; then
+      echo "BLOCKER: Builder dispatch requires $required_command from the approved toolbox" >&2
+      return 78
+    fi
+  done
+  if [ ! -r builder-binding.yaml ]; then
+    echo "BLOCKER: tracked builder-binding.yaml is required for dispatch" >&2
+    return 78
+  fi
+  provider_root="$(yq -er '.spec.source.localPath' builder-binding.yaml)" || return 78
+  provider_revision="$(yq -er '.spec.source.revision' builder-binding.yaml)" || return 78
+  if ! provider_head="$(git -C "$provider_root" rev-parse HEAD 2>/dev/null)"; then
+    echo "BLOCKER: Builder checkout from builder-binding.yaml is unavailable" >&2
+    return 78
+  fi
+  if [ "$provider_head" != "$provider_revision" ]; then
+    echo "BLOCKER: Builder checkout HEAD does not match the bound provider revision" >&2
+    return 78
+  fi
+  if ! git -C "$provider_root" diff --quiet "$provider_revision" -- \
+    scripts inventory builder-binding.yaml schemas ci/templates; then
+    echo "BLOCKER: Builder dispatch surfaces differ from the bound provider revision" >&2
+    return 78
+  fi
+  project_ci="$provider_root/scripts/project-ci"
+  if [ ! -x "$project_ci" ]; then
+    echo "BLOCKER: bound Builder revision has no executable scripts/project-ci" >&2
+    return 78
+  fi
+  if [ "$(yq -er '.spec.discovery.command | length' builder-binding.yaml)" -ne 2 ]; then
+    echo "BLOCKER: Builder discovery binding must contain exactly two arguments" >&2
+    return 78
+  fi
+  discovery_program="$(yq -er '.spec.discovery.command[0]' builder-binding.yaml)" || return 78
+  discovery_argument="$(yq -er '.spec.discovery.command[1]' builder-binding.yaml)" || return 78
+  if [ "$discovery_program" != "./scripts/shared_inventory_map.sh" ] || \
+    [ "$discovery_argument" != "--validate" ]; then
+    echo "BLOCKER: Builder discovery binding is not the approved validation command" >&2
+    return 78
+  fi
+  provider_map="$(
+    "$provider_root/${discovery_program#./}" "$discovery_argument"
+  )" || return 78
+  if ! jq -e '
+    [.spec.providerCapabilities.capabilities[].id] as $ids |
+    ($ids | index("ci.focused-gate")) != null and
+    ($ids | index("ci.merge-profile")) != null
+  ' >/dev/null <<<"$provider_map"; then
+    echo "BLOCKER: bound Builder lacks focused and merge-profile capabilities" >&2
+    return 78
+  fi
+  printf '%s\n' "$project_ci"
+}
+
+# Summary: Dispatch one exact-ref focused gate or the full merge profile.
+# Arguments: profile, optional gate id, and optional branch ref.
+# Environment: provider credential binding.
+# Stdout: Builder's sanitized JSON result. Stderr: bounded diagnostics.
+# Exit classes: Builder project-ci result. Side effects: none in dry-run; apply
+# creates one Internal GitLab pipeline.
+# Idempotency: exact project, ref, commit, and selection. Cleanup: provider-owned.
+_dispatch() {
+  local selected_profile="$1" selected_gate="$2" selected_ref="$3"
+  local project_ci project ref commit
+  local -a args
+  if [ "$selected_profile" != "merge" ]; then
+    echo "check.sh: --dispatch supports only the merge profile" >&2
+    return 2
+  fi
+  if _in_cluster; then
+    echo "check.sh: --dispatch is an off-cluster provider action" >&2
+    return 2
+  fi
+  if [ -n "$selected_ref" ]; then
+    ref="$selected_ref"
+  elif ! ref="$(git symbolic-ref --quiet --short HEAD)"; then
+    echo "BLOCKER: dispatch requires a named branch or explicit --ref" >&2
+    return 78
+  fi
+  commit="$(git rev-parse HEAD)"
+  project_ci="$(_builder_project_ci)" || return "$?"
+  project="$(_project_ci_consumer)" || return "$?"
+  args=(
+    run
+    --project "$project"
+    --ref "$ref"
+    --requested-commit "$commit"
+  )
+  if [ -n "$selected_gate" ]; then
+    args+=(--gate "$selected_gate")
+  else
+    # Builder calls the protected exact-head merge surface its full profile.
+    # The selected project command remains scripts/check.sh --profile merge.
+    args+=(--profile full)
+  fi
+  if $dispatch_apply; then
+    args+=(--apply --confirm-project-ci-run)
+  else
+    args+=(--dry-run)
+  fi
+  if [ "${#dispatch_args[@]}" -gt 0 ]; then
+    args+=("${dispatch_args[@]}")
+  fi
+  args+=(--json)
+  exec "$project_ci" "${args[@]}"
+}
+
 _list() {
   python3 - <<'PY'
 import pathlib, yaml
@@ -51,7 +227,12 @@ PY
 usage() {
   cat <<'USAGE'
 usage: check.sh --list
-       check.sh --profile <merge|integration|scheduled|deploy|repository-export> [--gate <id>]
+       check.sh --profile <merge|integration|scheduled|deploy|repository-export>
+                [--gate <id>] [--dispatch [--ref BRANCH] [--dry-run]]
+                [--dispatch --apply --confirm-project-ci-run]
+                [--no-wait] [--log-format text|json]
+                [--log-level debug|info|warning|error] [--log-file PATH]
+                [--run-id ID] [--timeout SECONDS]
 
 A focused --gate result proves only that gate at the exact commit. It is not
 merge or release evidence; use the full required pipeline for those decisions.
@@ -61,6 +242,12 @@ USAGE
 list=false
 profile=""
 gate=""
+dispatch=false
+dispatch_apply=false
+dispatch_confirm=false
+dispatch_dry_run=false
+dispatch_ref=""
+dispatch_args=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --list)
@@ -75,21 +262,61 @@ while [ "$#" -gt 0 ]; do
       gate="${2:?check.sh: --gate requires a value}"
       shift 2
       ;;
+    --dispatch)
+      dispatch=true
+      shift
+      ;;
+    --dry-run)
+      dispatch_dry_run=true
+      shift
+      ;;
+    --apply)
+      dispatch_apply=true
+      shift
+      ;;
+    --confirm-project-ci-run)
+      dispatch_confirm=true
+      shift
+      ;;
+    --ref)
+      dispatch_ref="${2:?check.sh: --ref requires a value}"
+      shift 2
+      ;;
+    --no-wait)
+      dispatch_args+=(--no-wait)
+      shift
+      ;;
+    --log-format|--log-level|--log-file|--run-id|--timeout)
+      dispatch_args+=("$1" "${2:?check.sh: $1 requires a value}")
+      shift 2
+      ;;
     --help|-h)
       usage
       exit 0
       ;;
     *)
-      echo "check.sh: unexpected argument: $1" >&2
+      echo "check.sh: unexpected argument" >&2
       usage >&2
       exit 2
       ;;
   esac
 done
 
+if [ -n "$gate" ] && ! _safe_gate_id "$gate"; then
+  echo "check.sh: --gate must be a safe registry identifier" >&2
+  exit 2
+fi
+
+if [ -n "$dispatch_ref" ] && ! _safe_dispatch_ref "$dispatch_ref"; then
+  echo "check.sh: --ref must be a safe branch ref without refs/heads/" >&2
+  exit 2
+fi
+
 if $list; then
-  if [ -n "$profile" ] || [ -n "$gate" ]; then
-    echo "check.sh: --list cannot be combined with --profile or --gate" >&2
+  if [ -n "$profile" ] || [ -n "$gate" ] || $dispatch || \
+    [ "${#dispatch_args[@]}" -gt 0 ] || $dispatch_apply || \
+    $dispatch_confirm || $dispatch_dry_run || [ -n "$dispatch_ref" ]; then
+    echo "check.sh: --list cannot be combined with gate or Builder controls" >&2
     exit 2
   fi
   _list
@@ -100,6 +327,29 @@ if [ -z "$profile" ]; then
   echo "check.sh: --profile is required when running gates" >&2
   usage >&2
   exit 2
+fi
+
+if { [ "${#dispatch_args[@]}" -gt 0 ] || $dispatch_apply || \
+  $dispatch_confirm || $dispatch_dry_run || [ -n "$dispatch_ref" ]; } && ! $dispatch; then
+  echo "check.sh: Builder controls require --dispatch" >&2
+  exit 2
+fi
+
+if $dispatch_apply && ! $dispatch_confirm; then
+  echo "check.sh: --apply requires --confirm-project-ci-run" >&2
+  exit 2
+fi
+if ! $dispatch_apply && $dispatch_confirm; then
+  echo "check.sh: --confirm-project-ci-run requires --apply" >&2
+  exit 2
+fi
+if $dispatch_apply && $dispatch_dry_run; then
+  echo "check.sh: --dry-run and --apply are mutually exclusive" >&2
+  exit 2
+fi
+
+if $dispatch; then
+  _dispatch "$profile" "$gate" "$dispatch_ref"
 fi
 
 runner_args=(--profile "$profile")
@@ -113,8 +363,11 @@ fi
 
 ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
 echo "check.sh: REFUSING to run gates locally — Kubernetes is the execution authority." >&2
-echo "  Dispatch in-cluster instead: push $ref and let the GitLab pipeline run it on the" >&2
-echo "  homelab-k8s runner. There is no workstation dispatch path." >&2
-echo "  (or run inside a homelab-k8s runner/Job — a pod is detected from the kubelet's own" >&2
+echo "  Plan the exact branch through Builder:" >&2
+echo "  ./scripts/check.sh --profile merge --dispatch" >&2
+echo "  Apply after review:" >&2
+echo "  ./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run" >&2
+echo "  The protected pipeline then runs on the provider-selected runner for $ref." >&2
+echo "  (or run inside the selected runner/Job — a pod is detected from the kubelet's own" >&2
 echo "   evidence, not from an environment variable, so exporting one cannot bypass this)" >&2
 exit 3

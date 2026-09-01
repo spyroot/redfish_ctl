@@ -55,12 +55,10 @@ class _SubscriptionBase(RedfishManager):
     def _subscription_collection_uri(self, do_async):
         """Resolve the EventService Subscriptions collection URI.
 
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport when True.
         :return: the Subscriptions collection URI.
         :raises InvalidArgument: when the EventService Subscriptions link is absent.
         """
-        if do_async:
-            self._event_loop()
         service = self.base_query(
             REDFISH_API.EventServiceQuery,
             do_async=do_async,
@@ -74,11 +72,9 @@ class _SubscriptionBase(RedfishManager):
         """List the member URIs in the Subscriptions collection.
 
         :param subscriptions_uri: the Subscriptions collection URI.
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport when True.
         :return: the ``@odata.id`` of each subscription member (possibly empty).
         """
-        if do_async:
-            self._event_loop()
         collection = self.base_query(subscriptions_uri, do_async=do_async).data or {}
         members = collection.get("Members")
         if not isinstance(members, list):
@@ -94,7 +90,7 @@ class _SubscriptionBase(RedfishManager):
 
         :param subscription: a subscription id or a full member URI.
         :param subscriptions_uri: the Subscriptions collection URI.
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport while resolving members when True.
         :return: the resolved subscription member URI.
         :raises InvalidArgument: when empty, when the value is the collection URI
             itself, when it falls outside the collection, or when it is not found.
@@ -187,10 +183,9 @@ class _SubscriptionBase(RedfishManager):
                 return self.api_post_call(request, json.dumps(body), headers)
             if method == HTTPMethod.DELETE:
                 return self.api_delete_call(request, headers)
-        loop = self._event_loop()
         if method == HTTPMethod.POST:
-            return loop.run_until_complete(
-                self._await_async_response(
+            return self._run_coroutine_sync(
+                lambda loop: self._await_async_response(
                     self.api_async_post_call(
                         loop,
                         request,
@@ -200,8 +195,8 @@ class _SubscriptionBase(RedfishManager):
                 )
             )
         if method == HTTPMethod.DELETE:
-            return loop.run_until_complete(
-                self._await_async_response(
+            return self._run_coroutine_sync(
+                lambda loop: self._await_async_response(
                     self.api_async_delete_call(loop, request, "", headers)
                 )
             )

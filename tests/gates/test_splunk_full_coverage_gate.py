@@ -178,7 +178,15 @@ def test_scheduled_gate_is_required_and_uses_the_guarded_runner():
     job = ci["gate-scheduled"]
     assert "homelab-k8s" in job["tags"]
     assert job["script"] == ["./scripts/check.sh --profile scheduled"]
-    assert job["rules"] == [{"if": '$CI_PIPELINE_SOURCE == "schedule"'}]
+    assert job["rules"] == [
+        {
+            "if": (
+                '$CI_COMMIT_REF_PROTECTED == "true" && '
+                "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && "
+                '$CI_PIPELINE_SOURCE == "schedule"'
+            )
+        }
+    ]
 
     publish_rules = ci["publish-github"]["rules"]
     assert any(

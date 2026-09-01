@@ -13,17 +13,19 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 ```
 ./scripts/check.sh --list                 # enumerate every registered gate
 ./scripts/check.sh --profile merge         # run all merge gates (in-cluster only; refuses off-cluster)
-./scripts/gates/run.sh <profile>           # runner invoked by configured CI
 ```
 
-Off-cluster, `check.sh --profile` refuses and directs the operator to push the
-candidate ref so the configured GitLab pipeline runs it. A gate never runs on a workstation.
+Off-cluster, `check.sh --profile` refuses; a gate never runs on a workstation.
+The configured CI invokes `scripts/gates/run.sh` internally; operators must use
+the guarded `scripts/check.sh` entry point.
+See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
 
 ## Profiles
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
-- **integration** — needs the cluster; smoke/namespace checks. No BMC mutation.
+- **integration** — read-only Builder namespace and service binding validation plus live GitLab token
+  checks. No cluster or BMC mutation.
 - **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
@@ -38,25 +40,29 @@ mutation classification. A local wrapper must still declare its stage, runner ta
 unknown template, or merge-request-reachable mutation. The protected simulator
 job sequence is documented in [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
 
-## The gates
+## Selected gate summary
+
+This table summarizes the primary operator-facing gates. The exact complete
+list comes from `gates/manifest.yaml`; run `./scripts/check.sh --list` to render
+it without executing a gate.
 
 | id | profile | mutates | what it checks | fails when |
 | -- | ------- | ------- | -------------- | ---------- |
 | `meta.gate-registry` | merge | no | registry is schema-valid, ids unique, commands exist+executable, mandatory present | any registry inconsistency |
 | `meta.ci-runner-tags` | merge | no | every GitLab job carries the `homelab-k8s` tag | a job missing the tag |
-| `meta.required-jobs` | merge | no | required jobs exist, no `allow_failure`, no live-apply in an MR pipeline | a required job missing/mis-configured |
+| `meta.required-jobs` | merge | no | required jobs and their smoke contracts/evidence paths exist, with no `allow_failure` or MR-reachable live apply | a required job or smoke contract is missing or misconfigured |
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
-| `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
+| `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
-| `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
-| `repo.schemas` | merge | no | schema-backed docs validate (registry vs its JSON schema) | a schema violation |
+| `repo.yaml` | merge | no | YAML syntax and duplicate-key policy from `.yamllint` | yamllint is absent, or a configured error or parse failure occurs |
+| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a local authority checkout, exact revision, schema, or provider include does not match |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
-| `unit.all` | merge | no | the offline unit suite | any test fails |
+| `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | the home cluster is reachable (fail-closed smoke) | cluster unreachable |
+| `integration.namespace` | integration | no | Builder resolves a valid owned namespace and service endpoint for the runtime project | the provider binding is unavailable, incomplete, or invalid; the consumer never creates either resource |
 | `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
@@ -68,7 +74,17 @@ job sequence is documented in [CI/CD Pipeline](ci.md#protected-dmtf-simulator-de
 | `mutation.serialized` | deploy | no | a mutation lock is held (no concurrent apply) | no lock held |
 | `mutation.verify-required` | deploy | no | the applied module exposes a verify step | module has no `verify.sh` |
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
-| `evidence.sanitized` | merge | no | the evidence artifact contains no secret material | a secret-shaped token in the artifact |
+| `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; gate output is scanned before publication, and later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
+
+The `.yamllint` file defines the structural policy consumed by `repo.yaml`.
+Formatting-only rules are explicitly not applicable to this syntax and data
+integrity gate. Duplicate keys are an explicit error, `yamllint` is required,
+and the gate uses no runtime warning suppression or parse-only fallback.
+
+The `repo.schemas` gate reads `spec.source.localPath`, defined in
+`standards-binding.yaml` and `builder-binding.yaml`, and checks out each
+authority's pinned `spec.source.revision` in a temporary local clone. It uses no
+network credential; a missing local checkout or exact commit fails closed.
 
 ## Telemetry liveness checks
 
@@ -108,3 +124,14 @@ Every gate exits non-zero on failure; `scripts/gates/run.sh` stops at the first 
 required tool is absent **fails** (a skipped gate is never an implicit pass). Required CI jobs never use
 `allow_failure`, so a red gate blocks the pipeline. Do not claim a gate passed without terminal or
 GitLab pipeline evidence.
+
+A runtime test skip in `unit.all` also makes its evidence non-green; live and
+vendored-schema-only lanes are excluded before execution. The `timeoutSeconds`
+field, defined for each required job in `inventory/ci/smoke-tests.yaml`, bounds
+the complete gate sequence. Each provider-facing gate record in
+`gates/manifest.yaml` defines its own `timeoutSeconds`; the runner applies the
+lesser of that value and the time remaining for the complete sequence.
+
+The gate runner writes exact-identity JSON under `reports/gates/`. Required job
+and smoke artifacts are defined in
+[CI/CD Pipeline](ci.md#evidence-artifacts).

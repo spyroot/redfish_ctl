@@ -125,6 +125,51 @@ def test_event_loop_helper_reuses_installed_loop_without_deprecation_warning():
         asyncio.set_event_loop(None)
 
 
+def test_sync_coroutine_helper_closes_only_the_loop_it_creates():
+    """The synchronous adapter owns and closes only its fallback event loop."""
+    asyncio.set_event_loop(None)
+
+    assert RedfishManager._run_coroutine_sync(asyncio.sleep(0, result="done")) == (
+        "done"
+    )
+    with pytest.raises(RuntimeError, match="There is no current event loop"):
+        asyncio.get_event_loop()
+
+
+def test_sync_coroutine_helper_preserves_an_installed_loop():
+    """An embedding application's installed event loop remains caller-owned."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        assert RedfishManager._run_coroutine_sync(
+            asyncio.sleep(0, result="done")
+        ) == "done"
+        assert asyncio.get_event_loop() is loop
+        assert not loop.is_closed()
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+def test_sync_coroutine_helper_supplies_and_closes_its_selected_loop():
+    """Loop-dependent transports receive the helper-owned loop before cleanup."""
+    asyncio.set_event_loop(None)
+    selected = []
+
+    async def identify_loop(loop):
+        return asyncio.get_running_loop() is loop
+
+    def coroutine_factory(loop):
+        selected.append(loop)
+        return identify_loop(loop)
+
+    assert RedfishManager._run_coroutine_sync(coroutine_factory) is True
+    assert len(selected) == 1
+    assert selected[0].is_closed()
+    with pytest.raises(RuntimeError, match="There is no current event loop"):
+        asyncio.get_event_loop()
+
+
 def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     monkeypatch,
 ):
@@ -152,10 +197,42 @@ def test_event_loop_helper_suppresses_historical_no_current_loop_warning(
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
-            resolved = RedfishManager._event_loop()
+            resolved, created = RedfishManager._event_loop(include_ownership=True)
         assert resolved is loop
+        assert created is True
     finally:
         loop.close()
+
+
+def test_sync_helper_closes_a_historically_auto_created_loop(monkeypatch):
+    """A warning-signaled policy loop is owned and closed by the sync helper."""
+    loop = asyncio.new_event_loop()
+    installed = []
+
+    def historical_direct_lookup():
+        warnings.warn(
+            "There is no current event loop",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return loop
+
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "get_event_loop",
+        historical_direct_lookup,
+    )
+    monkeypatch.setattr(
+        redfish_manager_module.asyncio,
+        "set_event_loop",
+        installed.append,
+    )
+
+    assert RedfishManager._run_coroutine_sync(
+        asyncio.sleep(0, result="done")
+    ) == "done"
+    assert loop.is_closed()
+    assert installed == [None]
 
 
 def test_event_loop_helper_does_not_hide_unrelated_deprecation(monkeypatch):
@@ -305,13 +382,17 @@ def test_idrac_async_get_call_returns_resolved_response_and_forwards_timeout(mon
     monkeypatch.setattr(idrac_manager_module.requests, "get", fake_get)
 
     loop = manager._event_loop()
-    result = loop.run_until_complete(
-        manager.api_async_get_call(
-            loop,
-            "http://idrac-async-query.test/redfish/v1/",
-            {"Accept": "application/json"},
+    try:
+        result = loop.run_until_complete(
+            manager.api_async_get_call(
+                loop,
+                "http://idrac-async-query.test/redfish/v1/",
+                {"Accept": "application/json"},
+            )
         )
-    )
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
 
     assert result is response
     assert len(calls) == 1

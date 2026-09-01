@@ -6,3 +6,5 @@ tqdm>=4.61
 urllib3>=1.26
 pygments>=2.14
 PyYAML>=6.0
+# Required by the tracked CI evidence and schema validation entrypoints.
+jsonschema>=4.18

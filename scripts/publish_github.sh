@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Publish the GATED internal mainline to the public GitHub mirror. The internal GitLab is the writable
-# source of truth; this is the ONLY path outward. It runs after the boundary gates (no-agent-files /
-# no-agent-names / no-secrets) and pushes the current commit to GitHub. Requires two CI variables:
+# Publish the GATED internal mainline to the public GitHub mirror. This outbound mirror runs after
+# the configured repository-export and publication boundary gates, then pushes the current commit
+# to GitHub. It does not replace the GitHub pull-request entry path. Requires two CI variables:
 #   GITHUB_REPO=owner/name          (e.g. spyroot/redfish_ctl)
 #   GITHUB_PUSH_TOKEN               (a MASKED GitLab CI variable — never printed, kept out of the URL)
 set -euo pipefail

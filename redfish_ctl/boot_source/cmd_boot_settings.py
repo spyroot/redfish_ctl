@@ -78,8 +78,7 @@ class BootSettings(IDracManager,
                 response = self.api_get_call(r, headers)
                 self.default_error_handler(response)
             else:
-                loop = self._event_loop()
-                response = loop.run_until_complete(
+                response = self._run_coroutine_sync(
                     self.api_async_get_until_complete(r, headers)
                 )
             data = response.json()

@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
-# unit.all (merge): the full OFFLINE unit suite. Excludes the dmtf_sim_live lane
-# — an integration lane that needs the deployed DMTF sim plus REDFISH_IP/
-# REDFISH_PORT and FAILS CLOSED when they are absent. That lane runs in private
-# CI with `pytest -m dmtf_sim_live`; here it is deselected so GitHub CI and this
-# offline gate stay green without the sim.
+# unit.all (merge): the full OFFLINE unit suite. Hardware, emulator, and
+# dmtf_sim_live tests are explicit profile exclusions, not runtime skips. The
+# DMTF lane runs separately in private CI and fails closed when its endpoint is
+# absent. The schema-fixture module is also excluded because it performs
+# module-level runtime skips when its separately fetched DMTF bundle is absent.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
-exec pytest -q -m "not dmtf_sim_live"
+
+# The compatibility fixture can select hardware from inherited connection
+# variables even when its caller has no live marker. Keep the required gate
+# hermetic until that fixture is migrated to the canonical lane contract.
+unset \
+  REDFISH_IP REDFISH_USERNAME REDFISH_PASSWORD REDFISH_PORT \
+  IDRAC_IP IDRAC_USERNAME IDRAC_PASSWORD IDRAC_PORT
+
+exec pytest -q -ra -W error \
+  -m "not live and not emulator_live and not dmtf_sim_live" \
+  --ignore=tests/gates/test_redfish_schema.py

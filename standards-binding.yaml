@@ -6,7 +6,7 @@ spec:
   source:
     localPath: /Users/spyroot/dev/standards
     repository: https://gitlab.rnd.embedings.ai/spyroot/standards.git
-    revision: 100612173ab78f3246510b4da28d724335ab99e5
+    revision: 862d88ab1700827fa90f01cb8641950523147e4a
   requiredContracts:
     - ci
     - unit-testing
@@ -16,6 +16,9 @@ spec:
     - automation
     - project-consumer
     - provider-escalation
+  providers:
+    - name: builder
+      binding: builder-binding.yaml
   projectAdditions:
     - TEAM_GUIDE.md
   exceptions: []

@@ -161,29 +161,67 @@ class RedfishManager:
     uses_dell_job_semantics = False
 
     @staticmethod
-    def _event_loop() -> asyncio.AbstractEventLoop:
+    def _event_loop(
+            *, include_ownership: bool = False
+    ) -> asyncio.AbstractEventLoop | tuple[asyncio.AbstractEventLoop, bool]:
         """Return a usable event loop for a synchronous caller.
 
         Reuse an installed thread loop when available; otherwise create and install
         one. Keep all callers off deprecated event-loop policy APIs while shielding
         older supported runtimes from their historical direct-lookup warning.
 
+        :param include_ownership: return ``(loop, created)`` when the caller must
+            know whether it owns the loop lifecycle.
         :return: the current loop when configured, otherwise a new loop installed
-            for this thread.
+            for this thread. When ownership is requested, the second tuple item is
+            true only for a loop created by this call.
         :raises RuntimeError: never — the no-loop case is handled by creating one.
         """
         try:
-            with warnings.catch_warnings():
+            with warnings.catch_warnings(record=True) as caught:
                 warnings.filterwarnings(
-                    "ignore",
+                    "always",
                     message="There is no current event loop",
                     category=DeprecationWarning,
                 )
-                return asyncio.get_event_loop()
+                loop = asyncio.get_event_loop()
+                created = any(
+                    issubclass(item.category, DeprecationWarning)
+                    and "There is no current event loop" in str(item.message)
+                    for item in caught
+                )
+                return (loop, created) if include_ownership else loop
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            return loop
+            return (loop, True) if include_ownership else loop
+
+    @classmethod
+    def _run_coroutine_sync(cls, coroutine_or_factory):
+        """Run one coroutine without leaking a helper-created event loop.
+
+        A loop installed by an embedding application remains owned by that
+        application. When no loop is installed, this helper creates, installs,
+        closes, and clears one around the synchronous operation. A callable may
+        be supplied when constructing the coroutine itself requires the selected
+        loop.
+
+        :param coroutine_or_factory: coroutine object, or callable accepting the
+            selected loop and returning a coroutine.
+        :return: the coroutine result.
+        """
+        loop, created = cls._event_loop(include_ownership=True)
+        try:
+            coroutine = (
+                coroutine_or_factory(loop)
+                if callable(coroutine_or_factory)
+                else coroutine_or_factory
+            )
+            return loop.run_until_complete(coroutine)
+        finally:
+            if created:
+                loop.close()
+                asyncio.set_event_loop(None)
 
     def __init__(self,
                  host: Optional[str] = "",
@@ -1460,8 +1498,7 @@ class RedfishManager:
                 data, allow_header = load_response()
             data = select_payload(data)
         else:
-            loop = self._event_loop()
-            response = loop.run_until_complete(
+            response = self._run_coroutine_sync(
                 self.api_async_get_until_complete(
                     r, headers
                 )

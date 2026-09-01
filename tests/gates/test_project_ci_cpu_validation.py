@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import time
@@ -12,6 +13,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = REPO_ROOT / "tools" / "project-ci-cpu-validation.sh"
+TOOLBOX_DIGEST = "sha256:" + ("a" * 64)
+STANDARDS_REVISION = "c" * 40
 
 
 def _resolve_mode(
@@ -331,7 +334,20 @@ def _run_gate_dependency(
     mode: str = "smoke",
     gate: str = "",
     log_format: str = "text",
+    cwd: Path | None = None,
+    job_name: str = "project-ci-cpu-validation",
 ) -> subprocess.CompletedProcess[str]:
+    if cwd is not None:
+        inventory = cwd / "inventory" / "ci" / "smoke-tests.yaml"
+        inventory.parent.mkdir(parents=True, exist_ok=True)
+        inventory.write_text(
+            "spec:\n"
+            "  smokeTests:\n"
+            "    - job: project-ci-cpu-validation\n"
+            "      releaseBlocking: true\n"
+            "      evidencePath: reports/smoke/project-ci-cpu-validation.json\n",
+            encoding="utf-8",
+        )
     command = (
         'source "$1"; '
         'project_ci_parse_args --log-format "$2" --run-id gate-test; '
@@ -352,7 +368,193 @@ def _run_gate_dependency(
         check=False,
         capture_output=True,
         text=True,
+        cwd=cwd,
+        env={**os.environ, "CI_JOB_NAME": job_name},
     )
+
+
+def _nested_gate_repo(tmp_path: Path, gate_body: str) -> Path:
+    """Create a tiny repo that still uses the real check.sh -> run.sh path."""
+    root = tmp_path / "nested-repo"
+    for path in (
+        "scripts",
+        "scripts/gates",
+        "scripts/gates/unit",
+        "tools",
+        "gates",
+        "inventory/ci",
+        "schemas",
+        "bin",
+    ):
+        (root / path).mkdir(parents=True, exist_ok=True)
+    for source, destination in (
+        (REPO_ROOT / "scripts" / "check.sh", root / "scripts" / "check.sh"),
+        (
+            REPO_ROOT / "scripts" / "gates" / "run.sh",
+            root / "scripts" / "gates" / "run.sh",
+        ),
+        (REPO_ROOT / "tools" / "__init__.py", root / "tools" / "__init__.py"),
+        (REPO_ROOT / "tools" / "ci_evidence.py", root / "tools" / "ci_evidence.py"),
+        (
+            REPO_ROOT / "tools" / "provider_contract.py",
+            root / "tools" / "provider_contract.py",
+        ),
+        (
+            REPO_ROOT / "schemas" / "ci-evidence.schema.json",
+            root / "schemas" / "ci-evidence.schema.json",
+        ),
+        (
+            REPO_ROOT / "schemas" / "smoke-evidence.schema.json",
+            root / "schemas" / "smoke-evidence.schema.json",
+        ),
+    ):
+        shutil.copy2(source, destination)
+    gate = root / "scripts" / "gates" / "unit" / "nested-output.sh"
+    gate.write_text(gate_body, encoding="utf-8")
+    gate.chmod(0o755)
+    (root / ".gitlab-ci.yml").write_text(
+        f"default:\n  image: registry.example/toolbox@{TOOLBOX_DIGEST}\n",
+        encoding="utf-8",
+    )
+    (root / "standards-binding.yaml").write_text(
+        "metadata:\n"
+        "  name: redfish_ctl\n"
+        "spec:\n"
+        "  source:\n"
+        f"    revision: {STANDARDS_REVISION}\n"
+        "  providers:\n"
+        "    - name: builder\n"
+        "      binding: builder-binding.yaml\n",
+        encoding="utf-8",
+    )
+    (root / "builder-binding.yaml").write_text(
+        "metadata:\n"
+        "  name: builder\n"
+        "spec:\n"
+        "  dispatch:\n"
+        "    baseUrl: https://ci.example.invalid\n",
+        encoding="utf-8",
+    )
+    (root / "inventory" / "ci" / "smoke-tests.yaml").write_text(
+        "spec:\n  smokeTests: []\n",
+        encoding="utf-8",
+    )
+    (root / "gates" / "manifest.yaml").write_text(
+        "apiVersion: homelab.embedings.ai/v1alpha1\n"
+        "kind: GateRegistry\n"
+        "runner_tag: homelab-k8s\n"
+        "mandatory_ids:\n"
+        "  - unit.all\n"
+        "required_jobs: []\n"
+        "trusted_includes: []\n"
+        "gates:\n"
+        "  - id: unit.all\n"
+        "    profile: merge\n"
+        "    command: ./scripts/gates/unit/nested-output.sh\n"
+        "    mutates: false\n"
+        "    required: true\n"
+        "spec:\n"
+        "  gates:\n"
+        "    - id: unit.all\n"
+        "      required: true\n"
+        "      mutation: false\n"
+        "      profiles: [merge]\n"
+        "      status: active\n"
+        "      output: reports/gates/unit.all.json\n"
+        "      executionSurface: internal-gitlab\n"
+        "      timeoutSeconds: 60\n",
+        encoding="utf-8",
+    )
+    (root / "bin" / "grep").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (root / "bin" / "grep").chmod(0o755)
+    for executable in (
+        root / "scripts" / "check.sh",
+        root / "scripts" / "gates" / "run.sh",
+    ):
+        executable.chmod(0o755)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "ci@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.name", "CI Fixture"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+    return root
+
+
+def _nested_ci_env(root: Path) -> dict[str, str]:
+    """Return CI identity and synthetic kubelet evidence for the fixture repo."""
+    commit = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    return {
+        **os.environ,
+        "CI_JOB_NAME": "project-ci-cpu-validation",
+        "CI_JOB_ID": "41",
+        "CI_PIPELINE_ID": "17",
+        "CI_COMMIT_SHA": commit,
+        "CI_JOB_IMAGE": f"registry.example/toolbox@{TOOLBOX_DIGEST}",
+        "KUBERNETES_SERVICE_HOST": "10.0.0.1",
+        "KUBERNETES_SERVICE_PORT": "443",
+        "PATH": f"{root / 'bin'}:{os.environ['PATH']}",
+        "PROJECT_CI_PROFILE": "focused",
+        "FOCUSED_GATE": "",
+        "PROJECT_CI_SMOKE": "",
+    }
+
+
+def test_adapter_entrypoint_nested_gate_warning_secret_stderr_is_non_green(
+    tmp_path: Path,
+) -> None:
+    root = _nested_gate_repo(
+        tmp_path,
+        "#!/bin/sh\n"
+        "printf 'warning: nested warning\\n' >&2\n"
+        "printf 'password: hunter2hunter2\\n' >&2\n",
+    )
+
+    result = subprocess.run(
+        [str(ADAPTER), "--run-id", "nested-warning-secret"],
+        cwd=root,
+        env=_nested_ci_env(root),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    combined = result.stdout + result.stderr
+    gate_evidence = json.loads(
+        (root / "reports" / "gates" / "unit.all.json").read_text(encoding="utf-8")
+    )
+    job_evidence = json.loads(
+        (
+            root / "reports" / "ci" / "project-ci-cpu-validation.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert result.returncode == 1
+    assert "hunter2hunter2" not in combined
+    assert "password:" not in combined
+    assert "gate output withheld: secret-shaped content detected" in result.stdout
+    assert "error_class=gate-failed" in result.stdout
+    assert gate_evidence["command"] == "./scripts/gates/unit/nested-output.sh"
+    assert gate_evidence["status"] == "failed"
+    assert gate_evidence["return_code"] == 1
+    assert gate_evidence["warnings"] >= 1
+    assert gate_evidence["evidence_sanitized"] is False
+    assert "hunter2hunter2" not in json.dumps(gate_evidence, sort_keys=True)
+    assert job_evidence["command"] == "./scripts/check.sh --profile merge --gate unit.all"
+    assert job_evidence["status"] == "failed"
+    assert job_evidence["warnings"] >= 1
+    assert job_evidence["evidence_sanitized"] is False
 
 
 def test_gate_dependency_failure_returns_terminal_result() -> None:
@@ -365,33 +567,71 @@ def test_gate_dependency_failure_returns_terminal_result() -> None:
     assert "cleanup_status=passed" in result.stdout
 
 
-def test_gate_dependency_success_returns_terminal_result() -> None:
-    result = _run_gate_dependency("/bin/true", mode="smoke")
+def test_gate_dependency_success_returns_terminal_result(tmp_path: Path) -> None:
+    dependency = tmp_path / "dependency.sh"
+    dependency.write_text(
+        "#!/bin/bash\n"
+        "mkdir -p reports/smoke\n"
+        "printf '{}\\n' >reports/smoke/project-ci-cpu-validation.json\n",
+        encoding="utf-8",
+    )
+    dependency.chmod(0o755)
+    result = _run_gate_dependency(str(dependency), mode="smoke", cwd=tmp_path)
 
     assert result.returncode == 0
     assert "mode=smoke" in result.stdout
     assert "status=passed" in result.stdout
     assert "cleanup_status=passed" in result.stdout
-    assert "evidence_path= error_class=none" in result.stdout
+    assert (
+        "evidence_path=reports/smoke/project-ci-cpu-validation.json "
+        "error_class=none"
+    ) in result.stdout
 
 
-def test_dependency_stderr_is_counted_but_not_replayed(tmp_path: Path) -> None:
-    dependency = tmp_path / "dependency.sh"
-    dependency.write_text(
-        "#!/bin/bash\nprintf 'private dependency detail\\n' >&2\n",
-        encoding="utf-8",
-    )
-    dependency.chmod(0o755)
-
-    result = _run_gate_dependency(str(dependency), mode="full")
+def test_gate_dependency_success_without_evidence_fails_closed(tmp_path: Path) -> None:
+    result = _run_gate_dependency("/bin/true", mode="full", cwd=tmp_path)
 
     assert result.returncode == 2
-    assert "private dependency detail" not in result.stderr
-    assert "stderr-lines=1" in result.stderr
-    assert "redaction=full" in result.stderr
-    assert "warning_count=1" in result.stdout
     assert "status=failed" in result.stdout
-    assert "error_class=dependency-stderr" in result.stdout
+    assert "evidence_path= error_class=evidence-missing" in result.stdout
+
+    probe = _run_gate_dependency(
+        "/bin/true",
+        mode="full",
+        cwd=tmp_path,
+        job_name="project-ci-cpu-validation-probe",
+    )
+    assert probe.returncode == 0
+    assert "status=passed" in probe.stdout
+    assert "evidence_path= error_class=none" in probe.stdout
+
+
+def test_dependency_warning_stderr_is_counted_but_not_replayed(
+    tmp_path: Path,
+) -> None:
+    diagnostics = [
+        "warning: private dependency detail",
+        "tests/example.py:1: UserWarning: private dependency detail",
+    ]
+    for index, diagnostic in enumerate(diagnostics):
+        dependency = tmp_path / f"dependency-{index}.sh"
+        dependency.write_text(
+            f"#!/bin/bash\nprintf '%s\\n' {diagnostic!r} >&2\n",
+            encoding="utf-8",
+        )
+        dependency.chmod(0o755)
+
+        result = _run_gate_dependency(str(dependency), mode="full")
+        combined = result.stdout + result.stderr
+
+        assert result.returncode == 2
+        assert diagnostic not in combined
+        assert "stderr-lines=1" in result.stderr
+        assert "warning:1" in result.stderr
+        assert "redaction=full" in result.stderr
+        assert "warning_count=1" in result.stdout
+        assert "status=failed" in result.stdout
+        assert "error_class=dependency-stderr" in result.stdout
 
 
 def test_json_terminal_result_classifies_dependency_failure() -> None:

@@ -1,0 +1,7 @@
+---
+# repo.yaml publishes fail-closed evidence from this structural policy. YAML
+# formatting rules are not applicable to that gate, and no diagnostic is
+# suppressed at run time.
+rules:
+  key-duplicates:
+    level: error

@@ -5,6 +5,10 @@
   "description": "Canonical registry of every mandatory gate (gates/manifest.yaml).",
   "type": "object",
   "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec",
     "version",
     "runner_tag",
     "required_jobs",
@@ -13,6 +17,37 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "apiVersion": {
+      "const": "homelab.embedings.ai/v1alpha1"
+    },
+    "kind": {
+      "const": "GateRegistry"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["gates"],
+      "additionalProperties": false,
+      "properties": {
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/providerGate"
+          }
+        }
+      }
+    },
     "version": {
       "type": "integer",
       "minimum": 1
@@ -63,7 +98,6 @@
           },
           "templates": {
             "type": "array",
-            "minItems": 1,
             "uniqueItems": true,
             "items": {
               "type": "object",
@@ -173,6 +207,151 @@
           "mutates": {
             "type": "boolean"
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "providerGate": {
+      "type": "object",
+      "required": [
+        "id",
+        "category",
+        "phase",
+        "required",
+        "status",
+        "isolation",
+        "permissions",
+        "executionSurface",
+        "requiredCredentialNames",
+        "platform",
+        "workload",
+        "expectedCost",
+        "timeoutSeconds",
+        "mutation",
+        "offlineFixture",
+        "profiles",
+        "output",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+        },
+        "category": {
+          "enum": [
+            "meta",
+            "toolbox",
+            "scm",
+            "repo",
+            "mutation",
+            "unit",
+            "render",
+            "policy",
+            "integration",
+            "apply-protection",
+            "verification",
+            "rollback",
+            "evidence"
+          ]
+        },
+        "phase": {
+          "enum": [
+            "repository",
+            "unit",
+            "render",
+            "policy",
+            "integration",
+            "plan",
+            "apply",
+            "verify",
+            "rollback",
+            "evidence"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "const": "active"
+        },
+        "isolation": {
+          "enum": ["offline", "network", "cluster"]
+        },
+        "permissions": {
+          "enum": [
+            "read-only",
+            "namespace-scoped",
+            "protected-live-apply"
+          ]
+        },
+        "executionSurface": {
+          "enum": [
+            "github",
+            "internal-gitlab",
+            "protected-kubernetes"
+          ]
+        },
+        "requiredCredentialNames": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "GITLAB_PROJECT_ID",
+              "GITLAB_PROJECT_TOKEN",
+              "GITLAB_URL",
+              "KUBECONFIG",
+              "SPLUNK_API_TOKEN",
+              "SPLUNK_O11Y_REALM"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "platform": {
+          "enum": ["portable", "linux/amd64"]
+        },
+        "workload": {
+          "enum": ["cpu", "project-integration", "protected-mutation"]
+        },
+        "expectedCost": {
+          "enum": ["low", "medium", "high"]
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        },
+        "mutation": {
+          "type": "boolean"
+        },
+        "offlineFixture": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "uniqueItems": true
+        },
+        "output": {
+          "type": "string",
+          "pattern": "^reports/gates/[a-z0-9.-]+\\.json$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

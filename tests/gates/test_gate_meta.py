@@ -11,7 +11,7 @@ from tools import gate_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_FILE = REPO_ROOT / ".gitlab-ci.yml"
-EXPECTED_BUILDER_REF = "1511171608f913833004e29558468d8e481fd947"
+EXPECTED_BUILDER_REF = "d3234c26f71f5a229bba28971d37ff38085c1da3"
 BUILDER_PROJECT_INCLUDE_FILE = "/ci/templates/project-service.yml"
 BUILDER_RESOURCE_JOBS_INCLUDE_FILE = "/ci/templates/project-ci-resource-jobs.yml"
 PROJECT_CI_CPU_JOB = "project-ci-cpu-validation"
@@ -68,6 +68,24 @@ def _script_lines(job: dict) -> list[str]:
     if isinstance(script, str):
         return [script]
     return [str(line) for line in script]
+
+
+def test_provider_gate_view_matches_executable_registry_and_rejects_drift() -> None:
+    """The Builder-facing envelope cannot omit or disagree with a real gate."""
+    registry = gate_meta._load_registry()
+    assert gate_meta._check_provider_gate_view(registry) == []
+
+    missing = yaml.safe_load(yaml.safe_dump(registry))
+    missing["spec"]["gates"] = missing["spec"]["gates"][1:]
+    failures = gate_meta._check_provider_gate_view(missing)
+    assert any("missing provider records" in failure for failure in failures)
+
+    mismatch = yaml.safe_load(yaml.safe_dump(registry))
+    mismatch["spec"]["gates"][0]["mutation"] = not mismatch["spec"]["gates"][0][
+        "mutation"
+    ]
+    failures = gate_meta._check_provider_gate_view(mismatch)
+    assert any("mutation flag disagrees" in failure for failure in failures)
 
 
 def _trusted_project_service_registry(
@@ -331,7 +349,13 @@ def test_registry_requires_the_builder_cpu_resource_job() -> None:
 
 def test_registry_pins_exact_builder_project_service_include() -> None:
     """Both trusted provider includes are registry-declared exact commits."""
-    _registry_trusted_includes()
+    includes = _registry_trusted_includes()
+    binding = yaml.safe_load(
+        (REPO_ROOT / "builder-binding.yaml").read_text(encoding="utf-8")
+    )
+    provider_revision = binding["spec"]["source"]["revision"]
+    assert provider_revision == EXPECTED_BUILDER_REF
+    assert {record["ref"] for record in includes.values()} == {provider_revision}
 
 
 def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
@@ -372,7 +396,9 @@ def test_meta_gate_accepts_registry_trusted_include_and_allowed_template(
               when: never
             - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
               when: never
-            - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+            - if: >-
+                $CI_COMMIT_REF_PROTECTED == "true" &&
+                $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
               when: on_success
             - when: never
           extends: .builder-project-deploy-plan
@@ -573,7 +599,8 @@ def test_gitlab_project_service_variables_bind_builder_revision_and_live_suite()
     assert variables.get("PROJECT_CI_CPU_COMMAND") == (
         "./tools/project-ci-cpu-validation.sh"
     )
-    assert variables.get("BUILDER_PROJECT_CONSUMER") == "redfish_ctl"
+    assert "BUILDER_PROJECT_CONSUMER" not in variables
+    assert variables.get("PROJECT_SERVICE_NAME") == "redfish-ctl-dmtf-sim"
     assert variables.get("DMTF_RELEASE") == "2026.1"
     assert variables.get("PROJECT_LIVE_TEST_COMMAND") == (
         "pytest -q -m dmtf_sim_live "
