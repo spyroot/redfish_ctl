@@ -305,6 +305,21 @@ def select_release_blocking_smoke(
     return matches[0] if matches else None
 
 
+def _output_policy_counts(output: str) -> tuple[int, int]:
+    """Return warning and required-skip counts from captured command output."""
+    warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(output)]
+    diagnostic_output = _ZERO_WARNING_RE.sub("", output)
+    warnings = max(
+        max(warning_counts, default=0),
+        len(_WARNING_DIAGNOSTIC_RE.findall(diagnostic_output)),
+    )
+    required_skips = sum(
+        int(count_text)
+        for count_text, _reason in _SKIP_REASON_RE.findall(output)
+    )
+    return warnings, required_skips
+
+
 def observe_gate(
     *,
     command: str,
@@ -326,16 +341,7 @@ def observe_gate(
     else:
         sys.stdout.write("gate output withheld: secret-shaped content detected\n")
     sys.stdout.flush()
-    warning_counts = [int(value) for value in _WARNING_SUMMARY_RE.findall(output)]
-    diagnostic_output = _ZERO_WARNING_RE.sub("", output)
-    warnings = max(
-        max(warning_counts, default=0),
-        len(_WARNING_DIAGNOSTIC_RE.findall(diagnostic_output)),
-    )
-    required_skips = sum(
-        int(count_text)
-        for count_text, _reason in _SKIP_REASON_RE.findall(output)
-    )
+    warnings, required_skips = _output_policy_counts(output)
     after = _tracked_state(root)
     remaining = sorted(set(after) - set(before))
     return {
@@ -518,6 +524,7 @@ def observe_smoke(
         env=probe_env,
     )
     probe_output_sanitized = _CREDENTIAL_RE.search(probe_output) is None
+    probe_warnings, probe_required_skips = _output_policy_counts(probe_output)
     after = _tracked_state(root)
     remaining = sorted(set(after) - set(before))
     applied_timeouts = gate_observations.get("applied_timeout_seconds")
@@ -561,8 +568,12 @@ def observe_smoke(
         and probe_return_code == 0
         and not probe_timed_out
         and probe_output_sanitized
+        and probe_warnings == 0
+        and probe_required_skips == 0
         and not remaining,
         "output_sanitized": probe_output_sanitized,
+        "warnings": probe_warnings,
+        "skipped_required_tests": probe_required_skips,
         "protected_surface": protected_surface,
         "cleanup_status": "passed" if not remaining else "failed",
         "remaining": remaining,
@@ -580,7 +591,8 @@ def observe_smoke(
             ),
             "idempotent_noop": (
                 "registered smoke command passed initially and on one exact "
-                "probe re-execution under a non-inventory CI job identity"
+                "warning-free and skip-free probe re-execution under a "
+                "non-inventory CI job identity"
             ),
             "protected_surface": protected_surface_source,
             "cleanup": (
@@ -590,6 +602,8 @@ def observe_smoke(
             "sanitization": (
                 "captured probe output and evidence scanned for credential patterns"
             ),
+            "warnings": "initial and probe captured smoke output",
+            "skips": "initial and probe pytest -ra skip reasons",
         },
     }
 
@@ -653,27 +667,35 @@ def build_smoke_evidence(
         if not isinstance(sources.get(check_name), str) or not sources[check_name]:
             raise EvidenceError(f"smoke observation source is missing: {check_name}")
     return_code = gate_observations.get("return_code")
-    warnings = gate_observations.get("warnings")
+    initial_warnings = gate_observations.get("warnings")
+    probe_warnings = smoke_observations.get("warnings")
     output_sanitized = gate_observations.get("output_sanitized")
     probe_output_sanitized = smoke_observations.get("output_sanitized")
-    required_skips = gate_observations.get("skipped_required_tests")
+    initial_required_skips = gate_observations.get("skipped_required_tests")
+    probe_required_skips = smoke_observations.get("skipped_required_tests")
     optional_skips = gate_observations.get("skipped_optional_tests")
     if not isinstance(return_code, int) or return_code < 0:
         raise EvidenceError("observed smoke return code is invalid")
-    if not isinstance(warnings, int) or warnings < 0:
+    if not isinstance(initial_warnings, int) or initial_warnings < 0:
         raise EvidenceError("observed smoke warning count is invalid")
+    if not isinstance(probe_warnings, int) or probe_warnings < 0:
+        raise EvidenceError("observed smoke probe warning count is invalid")
     if not isinstance(output_sanitized, bool):
         raise EvidenceError("observed smoke output sanitization status is invalid")
     if not isinstance(probe_output_sanitized, bool):
         raise EvidenceError("observed smoke probe sanitization status is invalid")
-    if not isinstance(required_skips, int) or required_skips < 0:
+    if not isinstance(initial_required_skips, int) or initial_required_skips < 0:
         raise EvidenceError("observed smoke required-skip count is invalid")
+    if not isinstance(probe_required_skips, int) or probe_required_skips < 0:
+        raise EvidenceError("observed smoke probe required-skip count is invalid")
     if not isinstance(optional_skips, int) or optional_skips < 0:
         raise EvidenceError("observed smoke optional-skip count is invalid")
     cleanup_status = smoke_observations.get("cleanup_status")
     remaining = smoke_observations.get("remaining")
     if cleanup_status not in {"passed", "failed"} or not isinstance(remaining, list):
         raise EvidenceError("observed smoke cleanup is invalid")
+    warnings = initial_warnings + probe_warnings
+    required_skips = initial_required_skips + probe_required_skips
     checks_passed = all(smoke_observations[name] for name in check_names)
     status = "passed" if (
         return_code == 0

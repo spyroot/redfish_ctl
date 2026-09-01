@@ -266,6 +266,8 @@ def _smoke_observations(*, entrypoint: bool = True) -> dict:
     observations.update(
         {
             "output_sanitized": True,
+            "warnings": 0,
+            "skipped_required_tests": 0,
             "cleanup_status": "passed",
             "remaining": [],
             "candidate_digest": DIGEST,
@@ -276,6 +278,8 @@ def _smoke_observations(*, entrypoint: bool = True) -> dict:
         {
             "cleanup": "tracked-state comparison",
             "sanitization": "quiet scan before atomic write",
+            "warnings": "initial and probe captured smoke output",
+            "skips": "initial and probe pytest -ra skip reasons",
         }
     )
     return observations
@@ -698,6 +702,73 @@ def test_observe_smoke_ignores_reports_but_fails_new_untracked_residue(
     assert dirty["remaining"] == ["?? untracked-residue.txt"]
     assert evidence["status"] == "failed"
     assert evidence["checks"]["idempotent_noop"]["status"] == "failed"
+
+
+@pytest.mark.parametrize(
+    ("diagnostic", "expected_warnings", "expected_skips"),
+    [
+        ("warning: probe fallback used\n", 1, 0),
+        ("SKIPPED [1] test_probe.py: required dependency unavailable\n", 0, 1),
+    ],
+)
+def test_observe_smoke_rejects_probe_warnings_and_required_skips(
+    tmp_path: Path,
+    diagnostic: str,
+    expected_warnings: int,
+    expected_skips: int,
+) -> None:
+    """A zero-exit idempotency probe is non-green with warnings or skips."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    root = _root(root)
+    scripts = root / "scripts"
+    scripts.mkdir()
+    check = scripts / "check.sh"
+    check.write_text(
+        "#!/bin/sh\n"
+        "command -v python3 >/dev/null 2>&1 || { "
+        "printf 'python3 missing\\n' >&2; exit 1; }\n"
+        "case \"$CI_JOB_NAME\" in\n"
+        "  *-probe) printf '%s' \"$PROBE_DIAGNOSTIC\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    check.chmod(0o755)
+    record = {
+        "job": "gate-merge",
+        "class": "wiring",
+        "command": "./scripts/check.sh --profile merge",
+        "requiredTools": ["sh"],
+        "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
+        "timeoutSeconds": 1800,
+    }
+    gate_observations = {
+        **_gate_observations(),
+        "timeout_seconds": 1800,
+        "applied_timeout_seconds": [1800],
+    }
+    env = _ci_env_for(root)
+    env["PROBE_DIAGNOSTIC"] = diagnostic
+    smoke_observations = observe_smoke(
+        record=record,
+        gate_observations=gate_observations,
+        env=env,
+        root=root,
+    )
+    evidence = build_smoke_evidence(
+        record=record,
+        gate_observations=gate_observations,
+        smoke_observations=smoke_observations,
+        env=env,
+        root=root,
+    )
+
+    assert smoke_observations["idempotent_noop"] is False
+    assert smoke_observations["warnings"] == expected_warnings
+    assert smoke_observations["skipped_required_tests"] == expected_skips
+    assert evidence["status"] == "failed"
+    assert evidence["warnings"] == expected_warnings
+    assert evidence["skipped_required_tests"] == expected_skips
 
 
 def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
