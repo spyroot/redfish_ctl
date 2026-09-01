@@ -482,7 +482,7 @@ project_ci_run_gate() {
   local mode="$2"
   local gate="$3"
   local start_seconds="$4"
-  local evidence_path=""
+  local evidence_path="" evidence_record_count=""
   local stderr_file="" cleanup_status=passed
   local elapsed_ms status=0 stderr_lines=0 warning_count=0
   local diagnostic_summary="stderr-lines=0 redaction=full"
@@ -685,15 +685,11 @@ project_ci_run_gate() {
       result_status=failed
       error_class="evidence-identity-missing"
       event_level=error
-    elif ! evidence_path="$(
+    elif ! evidence_record_count="$(
       SMOKE_JOB_NAME="$CI_JOB_NAME" yq -r '
         [.spec.smokeTests[] | select(
           .job == strenv(SMOKE_JOB_NAME) and .releaseBlocking == true
-        )] |
-        if length == 0 then ""
-        elif length == 1 then .[0].evidencePath
-        else "__duplicate__"
-        end
+        )] | length
       ' inventory/ci/smoke-tests.yaml
     )"; then
       status=2
@@ -701,15 +697,33 @@ project_ci_run_gate() {
       error_class="evidence-inventory-invalid"
       event_level=error
       evidence_path=""
-    elif [[ "$evidence_path" == "__duplicate__" ||
-            ( -n "$evidence_path" &&
-              "$evidence_path" != "reports/smoke/${CI_JOB_NAME}.json" ) ]]; then
+    elif [[ "$evidence_record_count" == "0" ]]; then
+      evidence_path=""
+    elif [[ "$evidence_record_count" != "1" ]]; then
       status=2
       result_status=failed
       error_class="evidence-inventory-invalid"
       event_level=error
       evidence_path=""
-    elif [[ -n "$evidence_path" && ! -s "$evidence_path" ]]; then
+    elif ! evidence_path="$(
+      SMOKE_JOB_NAME="$CI_JOB_NAME" yq -r '
+        .spec.smokeTests[] | select(
+          .job == strenv(SMOKE_JOB_NAME) and .releaseBlocking == true
+        ) | .evidencePath
+      ' inventory/ci/smoke-tests.yaml
+    )"; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ "$evidence_path" != "reports/smoke/${CI_JOB_NAME}.json" ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ ! -s "$evidence_path" ]]; then
       status=2
       result_status=failed
       error_class="evidence-missing"
