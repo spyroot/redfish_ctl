@@ -335,7 +335,19 @@ def _run_gate_dependency(
     gate: str = "",
     log_format: str = "text",
     cwd: Path | None = None,
+    job_name: str = "project-ci-cpu-validation",
 ) -> subprocess.CompletedProcess[str]:
+    if cwd is not None:
+        inventory = cwd / "inventory" / "ci" / "smoke-tests.yaml"
+        inventory.parent.mkdir(parents=True, exist_ok=True)
+        inventory.write_text(
+            "spec:\n"
+            "  smokeTests:\n"
+            "    - job: project-ci-cpu-validation\n"
+            "      releaseBlocking: true\n"
+            "      evidencePath: reports/smoke/project-ci-cpu-validation.json\n",
+            encoding="utf-8",
+        )
     command = (
         'source "$1"; '
         'project_ci_parse_args --log-format "$2" --run-id gate-test; '
@@ -357,7 +369,7 @@ def _run_gate_dependency(
         capture_output=True,
         text=True,
         cwd=cwd,
-        env={**os.environ, "CI_JOB_NAME": "project-ci-cpu-validation"},
+        env={**os.environ, "CI_JOB_NAME": job_name},
     )
 
 
@@ -582,6 +594,16 @@ def test_gate_dependency_success_without_evidence_fails_closed(tmp_path: Path) -
     assert result.returncode == 2
     assert "status=failed" in result.stdout
     assert "evidence_path= error_class=evidence-missing" in result.stdout
+
+    probe = _run_gate_dependency(
+        "/bin/true",
+        mode="full",
+        cwd=tmp_path,
+        job_name="project-ci-cpu-validation-probe",
+    )
+    assert probe.returncode == 0
+    assert "status=passed" in probe.stdout
+    assert "evidence_path= error_class=none" in probe.stdout
 
 
 def test_dependency_warning_stderr_is_counted_but_not_replayed(

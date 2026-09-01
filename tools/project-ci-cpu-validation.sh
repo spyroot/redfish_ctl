@@ -685,15 +685,36 @@ project_ci_run_gate() {
       result_status=failed
       error_class="evidence-identity-missing"
       event_level=error
-    else
-      evidence_path="reports/smoke/${CI_JOB_NAME}.json"
-      if [[ ! -s "$evidence_path" ]]; then
-        status=2
-        result_status=failed
-        error_class="evidence-missing"
-        event_level=error
-        evidence_path=""
-      fi
+    elif ! evidence_path="$(
+      SMOKE_JOB_NAME="$CI_JOB_NAME" yq -r '
+        [.spec.smokeTests[] | select(
+          .job == strenv(SMOKE_JOB_NAME) and .releaseBlocking == true
+        )] |
+        if length == 0 then ""
+        elif length == 1 then .[0].evidencePath
+        else "__duplicate__"
+        end
+      ' inventory/ci/smoke-tests.yaml
+    )"; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ "$evidence_path" == "__duplicate__" ||
+            ( -n "$evidence_path" &&
+              "$evidence_path" != "reports/smoke/${CI_JOB_NAME}.json" ) ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-inventory-invalid"
+      event_level=error
+      evidence_path=""
+    elif [[ -n "$evidence_path" && ! -s "$evidence_path" ]]; then
+      status=2
+      result_status=failed
+      error_class="evidence-missing"
+      event_level=error
+      evidence_path=""
     fi
   fi
 
