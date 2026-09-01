@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -79,11 +80,14 @@ def _fetch_exact(
     fetch_env = {**selected_env, "GIT_TERMINAL_PROMPT": "0"}
     job_token = fetch_env.get("CI_JOB_TOKEN", "").strip()
     if job_token:
+        basic_credential = base64.b64encode(
+            f"gitlab-ci-token:{job_token}".encode("utf-8")
+        ).decode("ascii")
         fetch_env.update(
             {
                 "GIT_CONFIG_COUNT": "2",
                 "GIT_CONFIG_KEY_0": f"http.{repository}.extraHeader",
-                "GIT_CONFIG_VALUE_0": f"JOB-TOKEN: {job_token}",
+                "GIT_CONFIG_VALUE_0": f"Authorization: Basic {basic_credential}",
                 "GIT_CONFIG_KEY_1": "http.followRedirects",
                 "GIT_CONFIG_VALUE_1": "false",
             }
