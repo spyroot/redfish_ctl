@@ -1484,6 +1484,57 @@ def test_schema_gate_checks_out_the_binding_local_path_at_the_exact_revision(
         workspace.cleanup()
 
 
+@pytest.mark.parametrize(
+    ("providers", "expected"),
+    [
+        ([], []),
+        (
+            [{"name": "builder", "binding": "builder-binding.yaml"}],
+            ["builder"],
+        ),
+        (
+            [
+                {"name": "builder", "type": "external", "binding": "builder-binding.yaml"},
+                {
+                    "name": "lab",
+                    "type": "self-managed",
+                    "authority": "https://gitlab.example.invalid/group/project.git",
+                    "repos": [],
+                },
+            ],
+            ["builder"],
+        ),
+        (
+            [
+                {
+                    "name": "lab",
+                    "type": "self-managed",
+                    "authority": "https://gitlab.example.invalid/group/project.git",
+                    "repos": ["https://github.example.invalid/group/project.git"],
+                }
+            ],
+            [],
+        ),
+    ],
+)
+def test_schema_gate_resolves_only_external_provider_bindings(
+    providers: list[dict], expected: list[str]
+) -> None:
+    """v1alpha1 entries and v1alpha2 external entries resolve; self-managed do not."""
+    binding = {"spec": {"providers": providers}}
+    selected = schema_gate.external_provider_declarations(binding)
+    assert [declaration["name"] for declaration in selected] == expected
+
+
+def test_tracked_binding_external_providers_all_name_a_tracked_file() -> None:
+    """Every external provider in the tracked binding has its binding file."""
+    binding = _yaml(REPO_ROOT / "standards-binding.yaml")
+    selected = schema_gate.external_provider_declarations(binding)
+    assert [declaration["name"] for declaration in selected] == ["builder"]
+    for declaration in selected:
+        assert (REPO_ROOT / declaration["binding"]).is_file()
+
+
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:
     """Provider host and repository trust follow one tracked runtime route."""
     root = _root(tmp_path)

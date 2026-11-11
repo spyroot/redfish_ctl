@@ -33,10 +33,29 @@ except ModuleNotFoundError:  # Direct ``python tools/schema_gate.py`` execution.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXACT_SHA = re.compile(r"^[0-9a-f]{40}$")
 IMMUTABLE_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+# ProjectStandardsBinding/v1alpha2 provider type that owns a tracked binding
+# file; v1alpha1 entries carry no type and are always external.
+EXTERNAL_PROVIDER_TYPE = "external"
 
 
 class SchemaGateError(ValueError):
     """Raised when an exact contract cannot be checked out or validated."""
+
+
+def external_provider_declarations(binding: dict) -> list[dict]:
+    """Return the provider declarations that name a tracked binding file.
+
+    Self-managed v1alpha2 declarations have no binding file to resolve
+    (Standards ``project-consumer.md`` Provider Bindings), so they are skipped.
+
+    :param binding: parsed ``standards-binding.yaml`` mapping.
+    :return: external declarations in binding order.
+    """
+    return [
+        declaration
+        for declaration in binding["spec"]["providers"]
+        if declaration.get("type", EXTERNAL_PROVIDER_TYPE) == EXTERNAL_PROVIDER_TYPE
+    ]
 
 
 def _load_yaml(path: Path) -> dict:
@@ -355,8 +374,7 @@ def run(env: dict[str, str] | None = None) -> None:
             standards_root / "schemas/project-standards-binding.schema.json",
             "standards-binding.yaml",
         )
-        declarations = binding["spec"]["providers"]
-        for declaration in declarations:
+        for declaration in external_provider_declarations(binding):
             provider_path = REPO_ROOT / declaration["binding"]
             provider = _load_yaml(provider_path)
             _validate(
