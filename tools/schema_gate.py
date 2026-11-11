@@ -17,6 +17,7 @@ import yaml
 
 try:
     from tools.provider_contract import (
+        STANDARDS_BINDING_FILE,
         ProviderContractError,
         normalized_base_url,
         provider_base_url,
@@ -24,6 +25,7 @@ try:
     )
 except ModuleNotFoundError:  # Direct ``python tools/schema_gate.py`` execution.
     from provider_contract import (  # type: ignore[no-redef]
+        STANDARDS_BINDING_FILE,
         ProviderContractError,
         normalized_base_url,
         provider_base_url,
@@ -33,10 +35,46 @@ except ModuleNotFoundError:  # Direct ``python tools/schema_gate.py`` execution.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXACT_SHA = re.compile(r"^[0-9a-f]{40}$")
 IMMUTABLE_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+# ProjectStandardsBinding versions and v1alpha2 provider types (Standards
+# project-consumer.md, Provider Bindings). v1alpha1 entries carry no type and
+# always name a tracked binding file.
+BINDING_API_V1ALPHA1 = "standards.spyroot.dev/v1alpha1"
+EXTERNAL_PROVIDER_TYPE = "external"
+SELF_MANAGED_PROVIDER_TYPE = "self-managed"
+# Builder-owned CI job and its template, imported through an exact include.
+PROJECT_CI_CPU_JOB = "project-ci-cpu-validation"
+RESOURCE_JOBS_TEMPLATE = "ci/templates/project-ci-resource-jobs.yml"
+RESOURCE_JOBS_INCLUDE_FILE = f"/{RESOURCE_JOBS_TEMPLATE}"
 
 
 class SchemaGateError(ValueError):
     """Raised when an exact contract cannot be checked out or validated."""
+
+
+def external_provider_declarations(binding: dict) -> list[dict]:
+    """Return the provider declarations that name a tracked binding file.
+
+    v1alpha1 declarations are all external. In v1alpha2 only ``external``
+    declarations have a binding file; ``self-managed`` declarations have none
+    and are skipped.
+
+    :param binding: parsed ``standards-binding.yaml`` mapping.
+    :return: external declarations in binding order.
+    :raises SchemaGateError: a v1alpha2 declaration has a missing or unknown type.
+    """
+    declarations = binding["spec"]["providers"]
+    if binding.get("apiVersion") == BINDING_API_V1ALPHA1:
+        return list(declarations)
+    selected = []
+    for declaration in declarations:
+        provider_type = declaration.get("type")
+        if provider_type == EXTERNAL_PROVIDER_TYPE:
+            selected.append(declaration)
+        elif provider_type != SELF_MANAGED_PROVIDER_TYPE:
+            raise SchemaGateError(
+                f"provider {declaration.get('name')!r} has unknown type {provider_type!r}"
+            )
+    return selected
 
 
 def _load_yaml(path: Path) -> dict:
@@ -247,7 +285,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
         job
         for record in manifest.get("trusted_includes", [])
         for job in record.get("jobs", [])
-        if job.get("name") == "project-ci-cpu-validation"
+        if job.get("name") == PROJECT_CI_CPU_JOB
     ]
     if len(expected_jobs) != 1:
         raise SchemaGateError(
@@ -277,7 +315,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
     resource_include = {
         "project": provider_binding["spec"]["dispatch"]["project"],
         "ref": revision,
-        "file": "/ci/templates/project-ci-resource-jobs.yml",
+        "file": RESOURCE_JOBS_INCLUDE_FILE,
     }
     if resource_include not in observed_includes:
         raise SchemaGateError(".gitlab-ci.yml does not pin the bound Builder CI include")
@@ -291,8 +329,8 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
     if not project_entrypoint.is_file() or not (project_entrypoint.stat().st_mode & 0o111):
         raise SchemaGateError("project CI adapter is missing or not executable")
 
-    include = _load_yaml(provider_root / "ci/templates/project-ci-resource-jobs.yml")
-    imported = include.get("project-ci-cpu-validation")
+    include = _load_yaml(provider_root / RESOURCE_JOBS_TEMPLATE)
+    imported = include.get(PROJECT_CI_CPU_JOB)
     if not isinstance(imported, dict):
         raise SchemaGateError("bound Builder include lacks project-ci-cpu-validation")
     if imported.get("allow_failure") is not expected_job.get("allowFailure"):
@@ -328,7 +366,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
     records = [
         record
         for record in smoke.get("spec", {}).get("smokeTests", [])
-        if record.get("job") == "project-ci-cpu-validation"
+        if record.get("job") == PROJECT_CI_CPU_JOB
     ]
     if len(records) != 1 or records[0].get("command") not in (imported.get("script") or []):
         raise SchemaGateError("Builder imported job and smoke command do not match")
@@ -337,7 +375,7 @@ def _validate_provider_include(provider_root: Path, provider_binding: dict) -> N
 def run(env: dict[str, str] | None = None) -> None:
     """Execute the exact-schema validation contract."""
     selected_env = dict(os.environ if env is None else env)
-    binding = _load_yaml(REPO_ROOT / "standards-binding.yaml")
+    binding = _load_yaml(REPO_ROOT / STANDARDS_BINDING_FILE)
     try:
         approved_base_url = _runtime_provider_base_url(REPO_ROOT, selected_env)
     except ProviderContractError as exc:
@@ -353,10 +391,9 @@ def run(env: dict[str, str] | None = None) -> None:
         _validate(
             binding,
             standards_root / "schemas/project-standards-binding.schema.json",
-            "standards-binding.yaml",
+            STANDARDS_BINDING_FILE,
         )
-        declarations = binding["spec"]["providers"]
-        for declaration in declarations:
+        for declaration in external_provider_declarations(binding):
             provider_path = REPO_ROOT / declaration["binding"]
             provider = _load_yaml(provider_path)
             _validate(

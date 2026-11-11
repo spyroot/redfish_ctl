@@ -7,6 +7,9 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 import yaml
 
+# The sole tracked Standards pointer (Standards manifest spec.consumer.bindingFile).
+STANDARDS_BINDING_FILE = "standards-binding.yaml"
+
 
 class ProviderContractError(ValueError):
     """Raised when a provider binding cannot establish a safe runtime route."""
@@ -46,7 +49,7 @@ def normalized_base_url(value: object, *, label: str) -> str:
 
 def provider_binding(root: Path, provider_name: str = "builder") -> dict:
     """Load one declared provider binding through ``standards-binding.yaml``."""
-    standards_path = root / "standards-binding.yaml"
+    standards_path = root / STANDARDS_BINDING_FILE
     standards = yaml.safe_load(standards_path.read_text(encoding="utf-8"))
     if not isinstance(standards, dict):
         raise ProviderContractError("standards-binding.yaml must contain a mapping")
