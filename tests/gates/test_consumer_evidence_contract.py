@@ -31,7 +31,9 @@ from tools.ci_evidence import (
     write_evidence,
 )
 from tools.provider_contract import (
+    STANDARDS_BINDING_FILE,
     ProviderContractError,
+    provider_binding,
     provider_host,
     require_provider_repository,
 )
@@ -53,8 +55,8 @@ def _yaml(path: Path) -> dict:
     return data
 
 
-def _commit_local_authority(path: Path) -> str:
-    """Create one local authority with committed and dirty working-tree states."""
+def _commit_authority_files(path: Path, files: dict[str, str]) -> str:
+    """Commit ``files`` into a new local Git authority and return the commit SHA."""
     path.mkdir()
     commands = (
         ("git", "init", "--quiet", str(path)),
@@ -63,10 +65,12 @@ def _commit_local_authority(path: Path) -> str:
     )
     for command in commands:
         subprocess.run(command, check=True, capture_output=True, text=True)
-    contract = path / "contract.txt"
-    contract.write_text("pinned\n", encoding="utf-8")
+    for relative_path, content in files.items():
+        target = path / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
     subprocess.run(
-        ("git", "-C", str(path), "add", "contract.txt"),
+        ("git", "-C", str(path), "add", "--all"),
         check=True,
         capture_output=True,
         text=True,
@@ -77,13 +81,18 @@ def _commit_local_authority(path: Path) -> str:
         capture_output=True,
         text=True,
     )
-    revision = subprocess.run(
+    return subprocess.run(
         ("git", "-C", str(path), "rev-parse", "HEAD"),
         check=True,
         capture_output=True,
         text=True,
     ).stdout.strip()
-    contract.write_text("uncommitted drift\n", encoding="utf-8")
+
+
+def _commit_local_authority(path: Path) -> str:
+    """Create one local authority with committed and dirty working-tree states."""
+    revision = _commit_authority_files(path, {"contract.txt": "pinned\n"})
+    (path / "contract.txt").write_text("uncommitted drift\n", encoding="utf-8")
     return revision
 
 
@@ -1443,8 +1452,7 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert 'repository = f"{repository}.git"' in source
     assert "JOB-TOKEN:" not in source
 
-    binding = _yaml(REPO_ROOT / "standards-binding.yaml")
-    provider = _yaml(REPO_ROOT / binding["spec"]["providers"][0]["binding"])
+    provider = provider_binding(REPO_ROOT, "builder")
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     manifest = _yaml(REPO_ROOT / "gates/manifest.yaml")
     include_identities = {
@@ -1458,7 +1466,7 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     resource_identity = (
         provider["spec"]["dispatch"]["project"],
         provider["spec"]["source"]["revision"],
-        "/ci/templates/project-ci-resource-jobs.yml",
+        schema_gate.RESOURCE_JOBS_INCLUDE_FILE,
     )
     assert include_identities == trusted_identities
     assert resource_identity in include_identities
@@ -1484,55 +1492,122 @@ def test_schema_gate_checks_out_the_binding_local_path_at_the_exact_revision(
         workspace.cleanup()
 
 
+BINDING_API_V1ALPHA2 = "standards.spyroot.dev/v1alpha2"
+BUILDER_BINDING_FILE = "builder-binding.yaml"
+LEGACY_BUILDER = {"name": "builder", "binding": BUILDER_BINDING_FILE}
+EXTERNAL_BUILDER = {"name": "builder", "type": "external", "binding": BUILDER_BINDING_FILE}
+SELF_MANAGED_LAB = {
+    "name": "lab",
+    "type": "self-managed",
+    "authority": "https://gitlab.example.invalid/group/project.git",
+    "repos": [],
+}
+SELF_MANAGED_LAB_WITH_LEAF = {
+    **SELF_MANAGED_LAB,
+    "repos": ["https://github.example.invalid/group/project.git"],
+}
+PERMISSIVE_SCHEMA = json.dumps(
+    {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}
+)
+
+
 @pytest.mark.parametrize(
-    ("providers", "expected"),
+    ("api_version", "providers", "expected"),
     [
-        ([], []),
-        (
-            [{"name": "builder", "binding": "builder-binding.yaml"}],
-            ["builder"],
-        ),
-        (
-            [
-                {"name": "builder", "type": "external", "binding": "builder-binding.yaml"},
-                {
-                    "name": "lab",
-                    "type": "self-managed",
-                    "authority": "https://gitlab.example.invalid/group/project.git",
-                    "repos": [],
-                },
-            ],
-            ["builder"],
-        ),
-        (
-            [
-                {
-                    "name": "lab",
-                    "type": "self-managed",
-                    "authority": "https://gitlab.example.invalid/group/project.git",
-                    "repos": ["https://github.example.invalid/group/project.git"],
-                }
-            ],
-            [],
-        ),
+        (schema_gate.BINDING_API_V1ALPHA1, [LEGACY_BUILDER], ["builder"]),
+        (BINDING_API_V1ALPHA2, [], []),
+        (BINDING_API_V1ALPHA2, [EXTERNAL_BUILDER, SELF_MANAGED_LAB], ["builder"]),
+        (BINDING_API_V1ALPHA2, [SELF_MANAGED_LAB, EXTERNAL_BUILDER], ["builder"]),
+        (BINDING_API_V1ALPHA2, [SELF_MANAGED_LAB_WITH_LEAF], []),
     ],
 )
 def test_schema_gate_resolves_only_external_provider_bindings(
-    providers: list[dict], expected: list[str]
+    api_version: str, providers: list[dict], expected: list[str]
 ) -> None:
     """v1alpha1 entries and v1alpha2 external entries resolve; self-managed do not."""
-    binding = {"spec": {"providers": providers}}
+    binding = {"apiVersion": api_version, "spec": {"providers": providers}}
     selected = schema_gate.external_provider_declarations(binding)
     assert [declaration["name"] for declaration in selected] == expected
 
 
+@pytest.mark.parametrize(
+    "declaration",
+    [LEGACY_BUILDER, {**EXTERNAL_BUILDER, "type": "internal"}],
+)
+def test_schema_gate_rejects_v1alpha2_provider_without_known_type(
+    declaration: dict,
+) -> None:
+    """A v1alpha2 declaration without external/self-managed type fails closed."""
+    binding = {"apiVersion": BINDING_API_V1ALPHA2, "spec": {"providers": [declaration]}}
+    with pytest.raises(schema_gate.SchemaGateError, match="unknown type"):
+        schema_gate.external_provider_declarations(binding)
+
+
 def test_tracked_binding_external_providers_all_name_a_tracked_file() -> None:
     """Every external provider in the tracked binding has its binding file."""
-    binding = _yaml(REPO_ROOT / "standards-binding.yaml")
+    binding = _yaml(REPO_ROOT / STANDARDS_BINDING_FILE)
     selected = schema_gate.external_provider_declarations(binding)
     assert [declaration["name"] for declaration in selected] == ["builder"]
     for declaration in selected:
         assert (REPO_ROOT / declaration["binding"]).is_file()
+
+
+def test_schema_gate_run_checks_external_and_skips_self_managed_providers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """run() validates the external binding and never opens a self-managed one."""
+    standards = tmp_path / "standards"
+    standards_revision = _commit_authority_files(
+        standards,
+        {
+            "schemas/project-standards-binding.schema.json": PERMISSIVE_SCHEMA,
+            "schemas/project-provider-binding.schema.json": PERMISSIVE_SCHEMA,
+        },
+    )
+    contract_path = "docs/provider-contract.md"
+    provider = tmp_path / "provider"
+    provider_revision = _commit_authority_files(provider, {contract_path: "contract\n"})
+    root = tmp_path / "project"
+    (root / "gates").mkdir(parents=True)
+    shutil.copy2(REPO_ROOT / "gates" / "manifest.yaml", root / "gates" / "manifest.yaml")
+    shutil.copytree(REPO_ROOT / "schemas", root / "schemas")
+    (root / STANDARDS_BINDING_FILE).write_text(
+        yaml.safe_dump(
+            {
+                "apiVersion": BINDING_API_V1ALPHA2,
+                "spec": {
+                    "source": {"localPath": str(standards), "revision": standards_revision},
+                    "providers": [EXTERNAL_BUILDER, SELF_MANAGED_LAB],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / BUILDER_BINDING_FILE).write_text(
+        yaml.safe_dump(
+            {
+                "metadata": {"name": "builder"},
+                "spec": {
+                    "source": {"localPath": str(provider), "revision": provider_revision},
+                    "contract": {"path": contract_path},
+                    "dispatch": {"baseUrl": "https://ci.example.invalid"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    checked: list[str] = []
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", root)
+    monkeypatch.setattr(
+        schema_gate,
+        "_validate_provider_include",
+        lambda _provider_root, binding: checked.append(binding["metadata"]["name"]),
+    )
+
+    schema_gate.run(env={})
+
+    assert checked == ["builder"]
 
 
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:
