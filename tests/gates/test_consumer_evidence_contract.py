@@ -53,7 +53,9 @@ def _yaml(path: Path) -> dict:
     return data
 
 
-def _commit_local_authority(path: Path) -> str:
+def _commit_local_authority(
+    path: Path, documents: dict[str, str] | None = None
+) -> str:
     """Create one local authority with committed and dirty working-tree states."""
     path.mkdir()
     commands = (
@@ -65,8 +67,12 @@ def _commit_local_authority(path: Path) -> str:
         subprocess.run(command, check=True, capture_output=True, text=True)
     contract = path / "contract.txt"
     contract.write_text("pinned\n", encoding="utf-8")
+    for relative_path, content in (documents or {}).items():
+        target = path / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
     subprocess.run(
-        ("git", "-C", str(path), "add", "contract.txt"),
+        ("git", "-C", str(path), "add", "contract.txt", *(documents or {})),
         check=True,
         capture_output=True,
         text=True,
@@ -1482,6 +1488,121 @@ def test_schema_gate_checks_out_the_binding_local_path_at_the_exact_revision(
         ) == "pinned\n"
     finally:
         workspace.cleanup()
+
+
+@pytest.fixture(scope="module")
+def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Build one shared baseline whose pinned schemas differ from local drift."""
+    baseline = tmp_path_factory.mktemp("provider-free-schema")
+    authority = baseline / "standards"
+    binding_schema_path = "schemas/project-standards-binding.schema.json"
+    revision = _commit_local_authority(
+        authority,
+        {
+            binding_schema_path: json.dumps(
+                {
+                    "type": "object",
+                    "required": ["apiVersion", "spec"],
+                    "properties": {
+                        "apiVersion": {"const": "standards.spyroot.dev/v1alpha2"},
+                        "spec": {
+                            "type": "object",
+                            "required": ["source", "providers"],
+                            "properties": {"providers": {"const": []}},
+                        },
+                    },
+                }
+            )
+        },
+    )
+    # Reading the authority's working tree would reject even the valid case.
+    (authority / binding_schema_path).write_text(
+        json.dumps({"not": {}}), encoding="utf-8"
+    )
+    project = baseline / "project"
+    (project / "gates").mkdir(parents=True)
+    (project / "schemas").mkdir()
+    (project / "standards-binding.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "apiVersion": "standards.spyroot.dev/v1alpha2",
+                "spec": {
+                    "source": {
+                        "localPath": str(authority),
+                        "repository": "https://standards.example.invalid/contracts.git",
+                        "revision": revision,
+                    },
+                    "providers": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (project / "gates" / "manifest.yaml").write_text(
+        "version: 1\n", encoding="utf-8"
+    )
+    (project / "schemas" / "gates.schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["version"],
+                "properties": {"version": {"type": "integer", "minimum": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return project
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "field", "replacement", "error", "message"),
+    [
+        pytest.param(None, None, None, None, None, id="valid-without-builder"),
+        pytest.param(
+            "standards-binding.yaml", "apiVersion", "unsupported",
+            schema_gate.SchemaGateError, r"standards-binding\.yaml invalid",
+            id="invalid-binding-schema",
+        ),
+        pytest.param(
+            "gates/manifest.yaml", "version", "one",
+            schema_gate.SchemaGateError, r"gates/manifest\.yaml invalid",
+            id="invalid-gate-schema",
+        ),
+        pytest.param(
+            "standards-binding.yaml", None, "\ninvalid: [",
+            yaml.YAMLError, None, id="malformed-binding-yaml",
+        ),
+    ],
+)
+def test_schema_gate_validates_provider_free_project_against_exact_pin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    provider_free_schema_baseline: Path,
+    relative_path: str | None,
+    field: str | None,
+    replacement: object,
+    error: type[Exception] | None,
+    message: str | None,
+) -> None:
+    """An empty provider list still enforces pinned binding and gate schemas."""
+    project = tmp_path / "project"
+    shutil.copytree(provider_free_schema_baseline, project)
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", project)
+    if relative_path is not None:
+        target = project / relative_path
+        if field is None:
+            target.write_text(
+                target.read_text(encoding="utf-8") + str(replacement), encoding="utf-8"
+            )
+        else:
+            document = _yaml(target)
+            document[field] = replacement
+            target.write_text(yaml.safe_dump(document), encoding="utf-8")
+    if error is None:
+        schema_gate.run(env={})
+    else:
+        with pytest.raises(error, match=message):
+            schema_gate.run(env={})
 
 
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:
