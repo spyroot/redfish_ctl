@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate local contracts against exact Standards and Builder revisions."""
+"""Validate local contracts against exact Standards and declared provider revisions."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import jsonschema
 import yaml
@@ -47,18 +48,49 @@ def _load_yaml(path: Path) -> dict:
     return value
 
 
-def _runtime_provider_base_url(root: Path, env: dict[str, str]) -> str:
-    """Bind CI job-token use to the provider host declared by the project."""
-    configured = provider_base_url(root)
+def _runtime_ci_base_url(env: dict[str, str]) -> str | None:
+    """Resolve the runtime origin for an authenticated GitLab fetch.
+
+    :param env: CI environment with the job token and server URL.
+    :returns: Normalized server URL, or None when no job token is present.
+    """
     if not env.get("CI_JOB_TOKEN", "").strip():
-        return configured
+        return None
     runtime_value = env.get("CI_SERVER_URL", "").strip()
     if not runtime_value:
         raise SchemaGateError("CI_SERVER_URL is required when CI_JOB_TOKEN is present")
-    runtime = normalized_base_url(runtime_value, label="CI_SERVER_URL")
-    if runtime != configured:
+    return normalized_base_url(runtime_value, label="CI_SERVER_URL")
+
+
+def _runtime_provider_base_url(root: Path, env: dict[str, str]) -> str:
+    """Bind CI job-token use to the provider host declared by the project.
+
+    :param root: Consumer repository root.
+    :param env: CI environment used for the fetch.
+    :returns: Normalized provider base URL.
+    """
+    configured = provider_base_url(root)
+    runtime = _runtime_ci_base_url(env)
+    if runtime is not None and runtime != configured:
         raise SchemaGateError("CI_SERVER_URL disagrees with the bound provider route")
-    return runtime
+    return configured
+
+
+def _standards_base_url(source: dict, env: dict[str, str]) -> str:
+    """Resolve the exact Standards fetch boundary from its own source.
+
+    :param source: Standards source from the project binding.
+    :param env: CI environment used for the fetch.
+    :returns: Allowed origin for the Standards repository.
+    """
+    runtime = _runtime_ci_base_url(env)
+    if runtime is not None:
+        return runtime
+    repository = normalized_base_url(
+        source.get("repository", ""), label="Standards repository"
+    )
+    parsed = urlsplit(repository)
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def _fetch_exact(
@@ -338,14 +370,14 @@ def run(env: dict[str, str] | None = None) -> None:
     """Execute the exact-schema validation contract."""
     selected_env = dict(os.environ if env is None else env)
     binding = _load_yaml(REPO_ROOT / "standards-binding.yaml")
+    standards_source = binding.get("spec", {}).get("source", {})
     try:
-        approved_base_url = _runtime_provider_base_url(REPO_ROOT, selected_env)
+        standards_base_url = _standards_base_url(standards_source, selected_env)
     except ProviderContractError as exc:
         raise SchemaGateError(str(exc)) from exc
-    standards_source = binding.get("spec", {}).get("source", {})
     standards_workspace = _checkout_exact_authority(
         standards_source,
-        approved_base_url=approved_base_url,
+        approved_base_url=standards_base_url,
         env=selected_env,
     )
     try:
@@ -357,6 +389,8 @@ def run(env: dict[str, str] | None = None) -> None:
         )
         declarations = binding["spec"]["providers"]
         for declaration in declarations:
+            if declaration.get("type", "external") != "external":
+                continue
             provider_path = REPO_ROOT / declaration["binding"]
             provider = _load_yaml(provider_path)
             _validate(
@@ -369,9 +403,13 @@ def run(env: dict[str, str] | None = None) -> None:
                     f"{provider_path.name} metadata.name disagrees with standards-binding.yaml"
                 )
             provider_source = provider["spec"]["source"]
+            try:
+                provider_base = _runtime_provider_base_url(REPO_ROOT, selected_env)
+            except ProviderContractError as exc:
+                raise SchemaGateError(str(exc)) from exc
             provider_workspace = _checkout_exact_authority(
                 provider_source,
-                approved_base_url=approved_base_url,
+                approved_base_url=provider_base,
                 env=selected_env,
             )
             try:
