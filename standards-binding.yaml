@@ -1,4 +1,4 @@
-apiVersion: standards.spyroot.dev/v1alpha1
+apiVersion: standards.spyroot.dev/v1alpha2
 kind: ProjectStandardsBinding
 metadata:
   name: redfish_ctl
@@ -6,7 +6,7 @@ spec:
   source:
     localPath: /Users/spyroot/dev/standards
     repository: https://gitlab.rnd.embedings.ai/spyroot/standards.git
-    revision: 862d88ab1700827fa90f01cb8641950523147e4a
+    revision: 39b0243d958db9e07bc528c4290bc94d48dbc49e
   requiredContracts:
     - ci
     - unit-testing
@@ -16,8 +16,22 @@ spec:
     - automation
     - project-consumer
     - provider-escalation
+    - bash-shell-standards
+    - helm-ci-standards
+    - policy-authority-standards
+    - documentation-contract
+    - documentation-rules
+    - software-design
+    - python-standards
+    - system-architecture
+    - js-standards
+    - context7
+    - work-classification
+    - go-standards
+    - linter-schemas
   providers:
     - name: builder
+      type: external
       binding: builder-binding.yaml
   projectAdditions:
     - TEAM_GUIDE.md
