@@ -395,6 +395,10 @@ def ci_report_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
     gate = baseline / "scripts/gates/unit/all.sh"
     gate.parent.mkdir(parents=True)
     shutil.copyfile(REPO_ROOT / "scripts/gates/unit/all.sh", gate)
+    (baseline / "tools").mkdir()
+    for name in ("ci_evidence.py", "provider_contract.py"):
+        shutil.copyfile(REPO_ROOT / "tools" / name, baseline / "tools" / name)
+    (baseline / "reports/tests").mkdir(parents=True)
     command_dir = baseline / "bin"
     command_dir.mkdir()
     commands = {
@@ -407,10 +411,17 @@ def ci_report_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
         ),
         "pytest": (
             'printf "%s\\n" "$@" > pytest.args\n'
-            'printf "<testsuite/>\\n" > reports/tests/junit.xml\n'
-            'if [ "$TEST_WRITE_COVERAGE" = yes ]; then\n'
-            '  printf "<coverage/>\\n" > reports/tests/coverage.xml\n'
-            'fi\n'
+            'for arg do\n'
+            '  case "$arg" in\n'
+            '    --junitxml=*) printf "%s\\n" "$TEST_JUNIT_XML" > "${arg#*=}" ;;\n'
+            '    --cov-report=xml:*)\n'
+            '      if [ "$TEST_WRITE_COVERAGE" = yes ]; then\n'
+            '        printf "<coverage/>\\n" > "${arg#*:}"\n'
+            '      fi ;;\n'
+            '  esac\n'
+            'done\n'
+            'printf "fixture coverage database\\n" > "$COVERAGE_FILE"\n'
+            'exit "$TEST_PYTEST_EXIT"\n'
         ),
     }
     for name, script in commands.items():
@@ -421,18 +432,29 @@ def ci_report_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.mark.parametrize(
-    ("override", "returncode", "diagnostic", "pytest_started"),
+    ("override", "returncode", "diagnostic", "pytest_started", "reports_published"),
     [
-        pytest.param({}, 0, "", True, id="reports-created"),
-        pytest.param({"requested_sha": "invalid"}, 2, "Usage:", False, id="malformed-sha"),
+        pytest.param({}, 0, "", True, True, id="reports-created"),
+        pytest.param({"requested_sha": "invalid"}, 2, "Usage:", False, False, id="malformed-sha"),
         pytest.param(
-            {"TEST_CHECKOUT_SHA": "b" * 40}, 1, "Expected checkout", False, id="wrong-checkout"
+            {"TEST_CHECKOUT_SHA": "b" * 40}, 1, "Expected checkout", False, False, id="wrong-checkout"
         ),
         pytest.param(
-            {"TEST_LFS_STATE": "-"}, 1, "Unhydrated Git LFS fixture", False, id="lfs-pointer"
+            {"TEST_LFS_STATE": "-"}, 1, "Unhydrated Git LFS fixture", False, False, id="lfs-pointer"
         ),
         pytest.param(
-            {"TEST_WRITE_COVERAGE": "no"}, 1, "Missing CI test report", True, id="missing-report"
+            {"TEST_WRITE_COVERAGE": "no"}, 1, "Missing CI test report", True, False, id="missing-report"
+        ),
+        pytest.param(
+            {"TEST_PYTEST_EXIT": "3"}, 3, "", True, True, id="clean-reports-from-failed-pytest"
+        ),
+        pytest.param(
+            {"TEST_JUNIT_XML": '<testsuite password="fixture-credential"/>'},
+            1, "sanitize before upload", True, False, id="credential-in-passing-report",
+        ),
+        pytest.param(
+            {"TEST_JUNIT_XML": '<testsuite password="fixture-credential"/>', "TEST_PYTEST_EXIT": "3"},
+            1, "sanitize before upload", True, False, id="credential-in-failing-report",
         ),
     ],
 )
@@ -443,6 +465,7 @@ def test_unit_gate_ci_report_contract(
     returncode: int,
     diagnostic: str,
     pytest_started: bool,
+    reports_published: bool,
 ) -> None:
     """The reporting mode rejects the wrong checkout, fixtures, or output."""
     project = tmp_path / "checkout"
@@ -452,6 +475,8 @@ def test_unit_gate_ci_report_contract(
         "TEST_CHECKOUT_SHA": "a" * 40,
         "TEST_LFS_STATE": "*",
         "TEST_WRITE_COVERAGE": "yes",
+        "TEST_JUNIT_XML": "<testsuite/>",
+        "TEST_PYTEST_EXIT": "0",
         **override,
     }
     requested_sha = settings.pop("requested_sha")
@@ -466,12 +491,17 @@ def test_unit_gate_ci_report_contract(
     assert proc.returncode == returncode, proc.stdout + proc.stderr
     assert diagnostic in proc.stderr
     assert (project / "pytest.args").is_file() == pytest_started
-    if returncode == 0:
-        reports = project / "reports/tests"
+    reports = project / "reports/tests"
+    assert sorted(path.name for path in reports.iterdir()) == (
+        [".coverage", "commit.txt", "coverage.xml", "junit.xml"] if reports_published else []
+    )
+    assert not list((project / "reports").glob(".test-evidence.*"))
+    assert "fixture-credential" not in proc.stdout + proc.stderr
+    if reports_published:
         arguments = (project / "pytest.args").read_text(encoding="utf-8").splitlines()
-        assert "--junitxml=reports/tests/junit.xml" in arguments
+        assert any(arg.startswith("--junitxml=") and arg.endswith("/junit.xml") for arg in arguments)
         assert "--cov" in arguments
-        assert "--cov-report=xml:reports/tests/coverage.xml" in arguments
+        assert any(arg.startswith("--cov-report=xml:") and arg.endswith("/coverage.xml") for arg in arguments)
         assert (reports / "commit.txt").read_text(encoding="utf-8").strip() == requested_sha
         assert (reports / "junit.xml").stat().st_size > 0
         assert (reports / "coverage.xml").stat().st_size > 0
@@ -776,3 +806,50 @@ def test_dcloud_github_status_requires_exact_readback(
         },
     )
     assert proc.returncode == (0 if mismatch == "none" else 78)
+
+
+@pytest.mark.parametrize("rejected", ["none", "pipeline", "gate", "smoke"])
+def test_waited_dcloud_dispatch_distinguishes_gate_and_pipeline_status(
+    tmp_path: Path, rejected: str,
+) -> None:
+    """A green pipeline with rejected evidence must publish only a failure receipt."""
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    statuses = tmp_path / "statuses"
+    fixture = r"""
+source "$1"
+commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+git() { printf '%s\n' https://github.com/spyroot/redfish_ctl; }
+glab() {
+  case "$*" in
+    *repository/branches/*) jq -n --arg sha "$commit" '{commit:{id:$sha}}' ;;
+    *--method\ POST*) jq -n --arg sha "$commit" '{id:12,sha:$sha}' ;;
+    *) return 99 ;;
+  esac
+}
+dcloud_post_github_status() { printf '%s\n' "$3" >> "$TEST_STATUSES"; }
+dcloud_wait_pipeline() {
+  local status=success
+  if [[ $TEST_REJECTED == pipeline ]]; then status=failed; fi
+  jq -n --arg sha "$commit" --arg status "$status" \
+    '{id:12,sha:$sha,ref:"fixture",status:$status,web_url:"https://ci.invalid/12"}'
+}
+dcloud_gate_result() {
+  [[ $TEST_REJECTED != gate ]] && printf '%s\n' '{"status":"passed"}'
+}
+dcloud_verify_smoke_result() { [[ $TEST_REJECTED != smoke ]]; }
+dispatch_dcloud redfish_ctl fixture "$commit" "" true
+"""
+    proc = subprocess.run(
+        ["bash", "-c", fixture, "dcloud-test", str(adapter)],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+        env={**os.environ, "TEST_REJECTED": rejected, "TEST_STATUSES": str(statuses)},
+    )
+    assert proc.returncode == (0 if rejected == "none" else 1), proc.stderr
+    result = json.loads(proc.stdout)
+    assert result["status"] == ("success" if rejected == "none" else "failed")
+    if rejected != "none":
+        assert result["pipeline_status"] == ("failed" if rejected == "pipeline" else "success")
+    assert statuses.read_text(encoding="utf-8").splitlines() == [
+        "pending",
+        "success" if rejected == "none" else "failure",
+    ]

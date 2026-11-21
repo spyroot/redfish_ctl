@@ -42,17 +42,32 @@ git lfs ls-files | awk '
   $2 == "-" { print "Unhydrated Git LFS fixture: " $0 > "/dev/stderr"; missing = 1 }
   END { exit missing }
 '
-mkdir -p reports/tests
-printf '%s\n' "$checkout_sha" > reports/tests/commit.txt
-export COVERAGE_FILE="$PWD/reports/tests/.coverage"
+reports="$PWD/reports/tests"
+mkdir -p "$reports"
+rm -f -- "$reports"/{commit.txt,junit.xml,coverage.xml,.coverage}
+staging="$(mktemp -d "$PWD/reports/.test-evidence.XXXXXX")"
+trap 'rm -rf -- "$staging"' EXIT
+staged_reports="$staging/tests"
+mkdir "$staged_reports"
+export COVERAGE_FILE="$staging/.coverage"
 unset PYTEST_ADDOPTS
+pytest_status=0
 pytest "${pytest_args[@]}" \
-  --junitxml=reports/tests/junit.xml \
-  --cov --cov-report=term-missing --cov-report=xml:reports/tests/coverage.xml
+  --junitxml="$staged_reports/junit.xml" \
+  --cov --cov-report=term-missing --cov-report="xml:$staged_reports/coverage.xml" ||
+  pytest_status=$?
 
-for report in reports/tests/junit.xml reports/tests/coverage.xml; do
-  if [[ ! -s $report ]]; then
+for report in "$staged_reports/junit.xml" "$staged_reports/coverage.xml"; do
+  if [[ ! -f $report || -L $report || ! -s $report ]]; then
     printf 'Missing CI test report: %s\n' "$report" >&2
     exit 1
   fi
 done
+printf '%s\n' "$checkout_sha" > "$staged_reports/commit.txt"
+python3 -m tools.ci_evidence "$staging"
+
+mv -- "$staged_reports"/{commit.txt,junit.xml,coverage.xml} "$reports/"
+if [[ -f $COVERAGE_FILE && ! -L $COVERAGE_FILE ]]; then
+  mv -- "$COVERAGE_FILE" "$reports/.coverage"
+fi
+exit "$pytest_status"

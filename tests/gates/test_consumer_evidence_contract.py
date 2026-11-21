@@ -1130,7 +1130,17 @@ def test_evidence_sanitizer_rejects_missing_evidence(tmp_path: Path) -> None:
     assert "missing" in (proc.stdout + proc.stderr).lower()
 
 
-@pytest.mark.parametrize("variant", ["xml-boundary", "credential-value", "credential-comment", "malformed"])
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "xml-boundary",
+        "credential-value",
+        "credential-attribute",
+        "credential-property",
+        "credential-comment",
+        "malformed",
+    ],
+)
 def test_evidence_sanitizer_understands_junit_fields(
     tmp_path: Path, variant: str,
 ) -> None:
@@ -1139,11 +1149,18 @@ def test_evidence_sanitizer_understands_junit_fields(
     junit = reports / "tests" / "junit.xml"
     junit.parent.mkdir(parents=True)
     payload = '<testsuite><testcase name="test_password" time="0.123"/></testsuite>'
-    fake_credential = "password: " + "fixture-secret-value"
+    fake_credential = "fixture-secret-value"
     if variant == "credential-value":
-        payload = payload.replace("test_password", fake_credential)
+        payload = payload.replace("test_password", f"password: {fake_credential}")
+    elif variant == "credential-attribute":
+        payload = payload.replace(' time=', f' password="{fake_credential}" time=')
+    elif variant == "credential-property":
+        payload = payload.replace(
+            "<testsuite>",
+            f'<testsuite><properties><property name="password" value="{fake_credential}"/></properties>',
+        )
     elif variant == "credential-comment":
-        payload = f"<!--{fake_credential}-->{payload}"
+        payload = f"<!--password: {fake_credential}-->{payload}"
     elif variant == "malformed":
         payload = payload.removesuffix("</testsuite>")
     junit.write_text(payload, encoding="utf-8")

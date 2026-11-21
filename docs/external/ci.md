@@ -60,6 +60,8 @@ For a waited merge dispatch, it posts the `gate-merge` context declared in
 back the terminal state. Success requires
 the native job plus the matching gate and smoke evidence, including the
 approved runner digest. A `--no-wait` response confirms dispatch only.
+If evidence is rejected, the waited receipt reports `status: failed`
+and retains GitLab's result in `pipeline_status`.
 An API or web dispatch with `MERGE_PROFILE=merge` selects `gate-merge`.
 Set `FOCUSED_GATE=unit.all` instead to select only
 `project-ci-cpu-validation`, the CPU job defined in `.gitlab-ci.yml`.
@@ -73,6 +75,10 @@ job succeeds and its evidence binds the project SHA, Standards revision,
 pipeline and job IDs, and toolbox digest. Gate evidence rejects warnings,
 required skips, secret-shaped output, and untracked residue outside its
 declared output. See [Gates](gates.md#failure-behavior).
+
+The shared `scripts/gates/unit/all.sh` reporting mode stages JUnit and Cobertura
+outside the forge upload paths. It only publishes reports that pass the
+credential scan, including reports from a failed pytest run.
 
 ## Protected DMTF simulator deployment
 

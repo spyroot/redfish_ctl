@@ -15,7 +15,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Iterator, Mapping, Sequence
 
 import jsonschema
 import yaml
@@ -50,6 +50,18 @@ class EvidenceError(ValueError):
     """Raised when required exact-identity evidence cannot be established."""
 
 
+def _xml_report_fields(node: ET.Element) -> Iterator[str]:
+    """Keep literal XML attributes and named JUnit properties paired with their values."""
+    yield node.tag
+    yield node.text or ""
+    yield node.tail or ""
+    for name, value in node.attrib.items():
+        yield value
+        yield f"{name}={value}"
+    if node.tag == "property" and "name" in node.attrib and "value" in node.attrib:
+        yield f"{node.attrib['name']}={node.attrib['value']}"
+
+
 def _xml_report_has_credentials(payload: bytes) -> bool:
     """Scan XML content fields without matching across markup boundaries."""
     text = payload.decode("utf-8")
@@ -64,7 +76,7 @@ def _xml_report_has_credentials(payload: bytes) -> bool:
     return any(
         _CREDENTIAL_RE.search(value)
         for node in root.iter()
-        for value in (node.tag, node.text or "", node.tail or "", *node.attrib, *node.attrib.values())
+        for value in _xml_report_fields(node)
     )
 
 
@@ -90,7 +102,7 @@ def validate_evidence_tree(directory: Path) -> None:
                         _CREDENTIAL_RE.search(payload.decode("utf-8", errors="replace"))
                     )
                 if contains_credentials:
-                    raise EvidenceError("secret-shaped content found in evidence")
+                    raise EvidenceError("secret-shaped content found in evidence; sanitize before upload")
     except (ET.ParseError, OSError, UnicodeError) as error:
         raise EvidenceError("evidence scan failed") from error
 

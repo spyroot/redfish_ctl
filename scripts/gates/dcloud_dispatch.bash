@@ -197,7 +197,7 @@ dispatch_dcloud() {
     if $reflect; then
       dcloud_post_github_status "$project_path" "$commit" failure "$url" "$context" || return 78
     fi
-    jq '{id,sha,ref,status,web_url}' <<<"$receipt"
+    jq '{id,sha,ref,status:"failed",pipeline_status:.status,web_url}' <<<"$receipt"
     return 1
   fi
   if $reflect; then
