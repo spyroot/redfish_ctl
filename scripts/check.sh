@@ -186,8 +186,14 @@ _dispatch() {
     return 78
   fi
   commit="$(git rev-parse HEAD)"
-  project_ci="$(_builder_project_ci)" || return "$?"
   project="$(_project_ci_consumer)" || return "$?"
+  if [ "$(yq -r '.spec.providers | type' standards-binding.yaml)" = '!!seq' ] &&
+    [ "$(yq -r '.spec.providers | length' standards-binding.yaml)" -eq 0 ]; then
+    source scripts/gates/dcloud_dispatch.bash
+    dispatch_dcloud "$project" "$ref" "$commit" "$selected_gate" "$dispatch_apply" "${dispatch_args[@]}"
+    return $?
+  fi
+  project_ci="$(_builder_project_ci)" || return "$?"
   args=(
     run
     --project "$project"

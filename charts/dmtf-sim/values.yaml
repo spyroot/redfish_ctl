@@ -26,6 +26,9 @@ serviceAccount:
   create: true
   name: ""
 
+securityContext:
+  useNamespaceIds: false
+
 networkPolicy:
   enabled: true
   allowedNamespaceLabels:

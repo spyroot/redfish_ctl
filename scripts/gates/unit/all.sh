@@ -19,6 +19,9 @@ pytest_args=(
   -m "not live and not emulator_live and not dmtf_sim_live"
   --ignore=tests/gates/test_redfish_schema.py
 )
+if [[ ${REDFISH_COVERAGE_REPORT:-} == true && $# == 0 ]]; then
+  set -- --ci-report "${CI_COMMIT_SHA:?CI_COMMIT_SHA is required for coverage evidence}"
+fi
 if (( $# == 0 )); then
   exec pytest "${pytest_args[@]}"
 fi

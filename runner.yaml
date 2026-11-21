@@ -1,0 +1,8 @@
+apiVersion: standards.spyroot.dev/v1alpha1
+kind: RunnerSpec
+metadata:
+  name: redfish_ctl
+spec:
+  tags: [redfish_ctl, redfish_ctl-focused, redfish_ctl-protected]
+  image: >-
+    harbor.dcloud.run/redfish_ctl/ci-toolbox@sha256:9007a2a023805a94d9906d8fffda6eb45ce6c9a4f468851423bb7556ee5cf531

@@ -143,6 +143,14 @@
         }
       }
     },
+    "securityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["useNamespaceIds"],
+      "properties": {
+        "useNamespaceIds": {"type": "boolean"}
+      }
+    },
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -157,15 +165,28 @@
           "maxItems": 2,
           "uniqueItems": true,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["homelab.embedings.ai/ci-class"],
-            "properties": {
-              "homelab.embedings.ai/ci-class": {
-                "type": "string",
-                "enum": ["validation", "protected"]
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["homelab.embedings.ai/ci-class"],
+                "properties": {
+                  "homelab.embedings.ai/ci-class": {
+                    "enum": ["validation", "protected"]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kubernetes.io/metadata.name"],
+                "properties": {
+                  "kubernetes.io/metadata.name": {
+                    "enum": ["redfish-ctl-runners-focused", "redfish-ctl-runners-protected"]
+                  }
+                }
               }
-            }
+            ]
           }
         }
       }

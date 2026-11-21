@@ -2,179 +2,105 @@
 
 Author: Mus <spyroot@gmail.com>
 
-Internal GitLab is the merge-validation authority. The `gate-merge` job, defined
-in `.gitlab-ci.yml`, runs the merge profile on the `homelab-k8s` Kubernetes
-runner; a passing GitHub workflow is not merge evidence. The GitHub Actions
-workflows described below are supplemental public checks and release automation.
-For gate semantics see [Gates](gates.md); for the release procedure, see
-[Releasing](releasing.md).
+GitHub hosts pull requests and the source branch. DCloud GitLab pulls that
+branch and runs `gate-merge`, defined in `.gitlab-ci.yml`. Merge requires
+GitHub's `test (3.10)` and DCloud's `gate-merge` for the same PR head.
+See [Gates](gates.md) and [Releasing](releasing.md).
 
 | Source | Trigger | Required path |
 |---|---|---|
-| GitHub | pull request or push to `main` | offline test workflow |
-| GitHub | `v*` tag | release workflow |
-| GitLab | merge request | `merge` profile |
-| GitLab | protected default branch | `merge` plus `integration` profiles |
-| GitLab | schedule on the protected default branch | `merge`, `integration`, and `scheduled` profiles |
+| GitHub | Pull request or push to `main` | Offline tests and coverage |
+| GitHub | `v*` tag | Release workflow |
+| DCloud | Mirrored branch update or merge request | Merge profile |
+| DCloud | Protected default branch | Merge and integration profiles |
+| DCloud | Schedule on the protected default branch | Merge, integration, and scheduled profiles |
 
-## Internal validation paths
+## DCloud runners and toolbox
 
-The tracked `builder-binding.yaml` file pins the Builder provider revision and
-dispatch authority. The `PROJECT_CI_CPU_COMMAND` variable, defined in
-`.gitlab-ci.yml`, selects the tracked `tools/project-ci-cpu-validation.sh` adapter;
-no operator-created command variable is required. The adapter supports
-dependency-free `--help`, non-executing `--dry-run`, and sanitized logging
-controls; unknown arguments fail before a gate is selected.
+`runner.yaml` declares the immutable Harbor toolbox image and the project
+runner tags. The focused runner selects `redfish_ctl-focused` for merge and
+diagnostic work. The protected runner selects `redfish_ctl-protected` for
+integration, scheduled checks, and the simulator lifecycle. Both require
+`redfish_ctl`.
 
-### Wrapper dispatch from the current branch
+`docker/Dockerfile.ci-toolbox` installs the tools listed in `toolbox.yaml`.
+Build it in the dedicated `redfish-ctl-build` OpenShift namespace when those
+inputs change, verify the published digest, and update the pin in
+`runner.yaml` and `.gitlab-ci.yml` together. Jobs create the project Conda
+environment from `environment.yml` and fetch Git LFS fixtures from GitHub.
 
-Install `yq` and `jq`. The `spec.source.localPath` and `spec.source.revision`
-fields in `builder-binding.yaml` identify the required clean Builder checkout
-and exact commit. The current named branch must already exist in Internal
-GitLab at the same exact HEAD commit. The wrapper verifies these prerequisites;
-its dry-run default prints the resolved plan without creating a pipeline:
+The `repo.schemas` gate uses the pinned files from a local Standards checkout.
+In DCloud, the same gate authenticates the minimal Git object proof published
+to the project's private Package Registry under the pinned revision. It
+requires the exact commit, binding schema, and full contract list from the
+authenticated manifest. See [Gates](gates.md#selected-gate-summary).
+
+## Dispatch an exact branch check
+
+Authenticate `glab` to the configured DCloud project and install `jq` and
+`yq`. The branch selected by `--ref`, or the current named branch by default,
+must already have the same commit on DCloud. These commands print a plan:
 
 ```bash
 ./scripts/check.sh --profile merge --gate unit.all --dispatch
 ./scripts/check.sh --profile merge --dispatch
 ```
 
-If the Builder checkout is not exact and clean, use a separate checkout at the
-pinned revision or repair Builder through its pull-request flow. Do not
-overwrite a dirty shared checkout.
-
-The first selects one diagnostic gate; the second maps the project `merge`
-profile to Builder's complete `full` validation profile. After reviewing that
-plan, this explicit apply creates the protected full pipeline, waits, and
-returns its terminal pipeline ID, URL, status, and exact commit as JSON:
+Run the second plan to collect the required merge result:
 
 ```bash
 ./scripts/check.sh --profile merge --dispatch --apply --confirm-project-ci-run
 ```
 
-Builder reads the project-scoped Internal GitLab credential from its registered
-Kubernetes Secret. The consumer wrapper accepts no token value, does not persist
-credentials, and does not place them in arguments, output, logs, or evidence.
-Optional `--no-wait`, logging, run-ID, and timeout controls pass through to the
-bound Builder command. A `--no-wait` receipt is dispatch confirmation only; it
-is not terminal gate or merge evidence.
+The wrapper checks the mirror SHA before dispatch and verifies the returned
+pipeline SHA. It waits for the terminal result unless `--no-wait` is supplied.
+An API or web dispatch with `MERGE_PROFILE=merge` selects `gate-merge`.
+Set `FOCUSED_GATE=unit.all` instead to select only
+`project-ci-cpu-validation`, the CPU job defined in `.gitlab-ci.yml`.
 
-For an unmerged pull request, select the immutable ref produced by Sync Now
-instead of the local branch name. The ref suffix must be the exact local HEAD
-commit that Builder receives as `requestedCommit`:
+### Evidence
 
-```bash
-PR_NUMBER=<pull-request-number>
-HEAD_SHA="$(git rev-parse HEAD)"
-./scripts/check.sh --profile merge --dispatch \
-  --ref "sync/pr-${PR_NUMBER}/${HEAD_SHA}"
-```
-
-### Internal validation jobs
-
-The exact Builder include defines one required `project-ci-cpu-validation` job.
-The dispatcher sets `FOCUSED_GATE` to a merge-profile gate ID from
-`gates/manifest.yaml`, such as `unit.all` or `repo.format`; the provider job
-runs that one gate through the Kubernetes-guarded `scripts/check.sh` entrypoint.
-Builder's `focused` profile selects the same job and defaults to `unit.all`,
-while its `full` profile runs the complete merge profile. Selector rules fence
-off local merge and project-service jobs, so each provider request has one
-validation owner. A focused result cannot replace complete merge evidence.
-Merge-request and default-branch pipelines continue to select `gate-merge`
-through their normal GitLab rules.
-
-The `k8s-live-check` job, defined in `.gitlab-ci.yml`, is a separate status
-probe. An unavailable Kubernetes API is reported as `UNAVAILABLE` and does not
-fail that job, so it is not merge evidence or proof of live cluster
-availability.
-
-### Manual Internal GitLab API or web dispatch
-
-1. Select the project pipeline on Internal GitLab with the immutable
-   `sync/pr-<number>/<40-character-head-sha>` ref produced by the configured
-   Sync Now path. The pipeline commit must resolve to that exact head SHA.
-2. For diagnostic feedback, unset `PROJECT_CI_PROFILE` and `MERGE_PROFILE`, then
-   set `FOCUSED_GATE=unit.all` (or another merge-profile gate ID). The pipeline
-   creates only `project-ci-cpu-validation`; the result is diagnostic-only and
-   must pass.
-3. For merge evidence, unset `PROJECT_CI_PROFILE` and `FOCUSED_GATE`, then set
-   `MERGE_PROFILE=merge`. The pipeline must create only `gate-merge`.
-4. Verify the terminal job is successful, its commit SHA equals the requested
-   head SHA, and its sanitized gate artifacts are available. A focused run ends
-   with `run.sh: gate <id> passed`; the authoritative run ends with
-   `run.sh: all merge gates passed`.
-
-### Evidence artifacts
-
-Local required jobs publish `reports/ci/<job>.json`, executed gates write
-`reports/gates/<gate-id>.json`, and required local smokes publish
-`reports/smoke/<job>.json`. A successful full provider-owned CPU job returns
-its `reports/smoke/<job>.json` path through the Builder result contract;
-focused diagnostics omit release-blocking smoke evidence. Use the full
-`gate-merge` artifacts for merge evidence. Evidence
-binds the result to the exact project commit, Standards revision, pipeline/job
-IDs, and immutable runner digest. Gate output is captured before publication:
-secret-shaped output is withheld, and warnings or required skips make evidence
-non-green. Cleanup compares tracked and untracked state, excluding only declared
-`reports/` output. Exact identity comes from independent Git read-back, and
-evidence is recorded only after a quiet scan and atomic file read-back. See
-[Gates](gates.md#failure-behavior)
-for execution and timeout policy.
-
-Smoke idempotency re-executes the registered `inventory/ci/smoke-tests.yaml`
-command once under a probe CI job identity. A non-zero probe, secret-shaped
-probe output, or new residue outside `reports/` makes smoke evidence non-green.
-
-The local exact-authority prerequisite for `repo.schemas` is documented in
-[Gates](gates.md#selected-gate-summary); the gate requires no network token.
+Required jobs publish `reports/ci/<job>.json` and
+`reports/smoke/<job>.json`. Individual gates write
+`reports/gates/<gate-id>.json`. Accept a merge result only when the required
+job succeeds and its evidence binds the project SHA, Standards revision,
+pipeline and job IDs, and toolbox digest. Gate evidence rejects warnings,
+required skips, secret-shaped output, and untracked residue outside its
+declared output. See [Gates](gates.md#failure-behavior).
 
 ## Protected DMTF simulator deployment
 
-Run the simulator deployment only from the protected default-branch pipeline
-in Internal GitLab. The exact provider template is allow-listed by
-`trusted_includes` in `gates/manifest.yaml`; see [Trusted provider
-includes](gates.md#trusted-provider-includes). The pipeline supplies
-`DMTF_RELEASE`, `PROJECT_LIVE_TEST_COMMAND`, and `PROJECT_SERVICE_NAME`; the
-last value is the service inventory key, not a runtime coordinate. The
-`integration.namespace` gate pairs that key with GitLab's runtime project
-identity when calling the Builder resolver. The resolver returns the namespace,
-service host, port, and transport; the consumer does not name or create those
-runtime resources. The inherited deployment templates remain provider-owned.
+The simulator jobs are declared in `.gitlab-ci.yml` and fenced to the
+protected default branch. `REDFISH_BUILD_NAMESPACE` and
+`REDFISH_SIM_NAMESPACE`, defined there, select the project's dedicated
+OpenShift build and simulator namespaces. The protected job identity needs
+access to start and read native builds and manage the simulator release.
+The build uses the project Harbor push Secret. Helm operations use the
+project-scoped protected Harbor credentials. The simulator values select
+the project pull Secret and allow ingress from the Redfish runner namespaces.
 
-1. Play `project-service-image-publish` and
-   `project-service-chart-publish`. Their exact-commit receipts supply the
-   image repository, image digest, chart version, and source commit; the chart
-   has no mutable tag fallback.
-2. Wait for the non-mutating `project-service-deploy-plan` evidence, then play
-   `project-service-deploy`. The deploy job is a protected, serialized manual
-   mutation unavailable to merge-request pipelines.
+1. Play `project-service-image-publish` and `project-service-chart-publish`.
+   Their receipts identify the source commit and immutable image and chart.
+2. Review `project-service-deploy-plan`, then play the serialized
+   `project-service-deploy` job. It checks the same-commit plan before applying.
 3. Require terminal success from `project-service-verify`,
-   `project-service-live-test`, and `project-service-release-evidence`. The
-   live test reads `/redfish/v1/` through `RedfishManager`; a pod readiness
-   probe or HTTP status alone is not the release evidence.
+   `project-service-live-test`, and `project-service-release-evidence`.
+   These jobs read the running image digest and exercise `/redfish/v1/`
+   against the actual service.
+4. Use `project-service-rollback` for recovery. The job shares the deployment
+   lock and verifies the restore or cleanup.
 
-`project-service-rollback` is the protected manual recovery path. The pull
-credential prerequisite is documented under [Private DMTF simulator
-image](secrets.md#private-dmtf-simulator-image), and the served resource
-contract is [Redfish Simulator Contract](simulator-contract.md).
+`publish-github`, the publication-boundary job in `.gitlab-ci.yml`, retains
+the export safety scans and verifies the source SHA on GitHub. DCloud pulls
+from GitHub. After merging, compare both `main` branch tips.
 
 ## Tests and coverage on GitHub and DCloud
 
-`.github/workflows/ci.yml` runs the complete offline unit suite on Python 3.10
-for every pull request and push to `main`, including documentation changes.
-`scripts/gates/unit/all.sh --ci-report <commit-sha>` runs the same selection
-and writes the tested commit, JUnit results, and Cobertura coverage under
-`reports/tests/`. Download these files from the GitHub `test-reports-3.10`
-artifact.
-
-`.gitlab-ci.dcloud.yml` defines the DCloud `tests-and-coverage` job for
-qualifying a mirrored branch. The job uses the `redfish_ctl` and
-`redfish_ctl-focused` tags, fetches the Git LFS fixtures, and publishes the
-same reports as job artifacts and native GitLab results.
-
-For branch qualification, select this config only while creating the
-pipeline, then restore the previous config path. Keep the default config
-until DCloud can run the required `gate-merge` and protected jobs.
+`.github/workflows/ci.yml` runs the offline Python 3.10 suite. The DCloud
+`gate-merge` job collects coverage from the same `unit.all` gate while
+executing the full merge profile. Both publish the tested commit, JUnit, and
+Cobertura reports under `reports/tests/`. GitHub retains them in
+`test-reports-3.10` and GitLab exposes them on the job.
 
 The offline suite clears BMC connection variables and excludes hardware,
 emulator, deployed simulator, and externally provisioned schema tests.

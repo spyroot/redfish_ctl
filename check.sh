@@ -45,8 +45,8 @@ spec:
         - shellcheck
         - yq
       artifactUnderTest:
-        type: repository-and-provider-resource-job
-        digestSource: git-commit-and-builder-revision
+        type: repository-and-project-resource-job
+        digestSource: git-commit-and-toolbox-digest
       mutation: none
       timeoutSeconds: 3600
       evidencePath: reports/smoke/project-ci-cpu-validation.json
@@ -85,11 +85,11 @@ spec:
       command: ./scripts/check.sh --profile integration
       requiredTools:
         - bash
-        - builder-project-resolve-binding
         - conda
         - git
         - git-lfs
         - jq
+        - kubectl
         - python3
         - yq
       artifactUnderTest:

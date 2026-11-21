@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 import jsonschema
 import yaml
 
-from tools.provider_contract import ProviderContractError, provider_host
+from tools.provider_contract import ProviderContractError, project_ci_host
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -546,7 +546,7 @@ def observe_smoke(
     protected_surface = smoke_class != "protected-live"
     if smoke_class == "protected-live":
         try:
-            expected_provider_host = provider_host(root)
+            expected_provider_host = project_ci_host(root)
         except (OSError, ProviderContractError, yaml.YAMLError):
             expected_provider_host = ""
         protected_surface = (

@@ -13,6 +13,7 @@ import textwrap
 import threading
 import time
 from pathlib import Path
+from typing import Final
 
 import jsonschema
 import pytest
@@ -39,12 +40,18 @@ from tools.provider_contract import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
 SANITIZER = REPO_ROOT / "scripts" / "gates" / "evidence" / "sanitized.sh"
-LEGACY_BUILDER_BINDING = REPO_ROOT / "builder-binding.yaml"
 CI_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "ci-evidence.schema.json"
 SMOKE_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "smoke-evidence.schema.json"
 DIGEST = "sha256:" + ("a" * 64)
 COMMIT = "b" * 40
 STANDARDS_REVISION = "c" * 40
+STANDARDS_PROOF_ENV: Final = "REDFISH_STANDARDS_PROOF_FILE"
+STANDARDS_MANIFEST_PATH: Final = "manifest.yaml"
+STANDARDS_BINDING_SCHEMA_PATH: Final = "schemas/project-standards-binding.schema.json"
+STANDARDS_PROOF_CONTRACTS: Final = ("ci", "smoke-testing")
+STANDARDS_PROOF_RESOLUTION_ERROR: Final = (
+    "local Standards proof cannot resolve the pinned commit and files"
+)
 
 
 def _yaml(path: Path) -> dict:
@@ -121,7 +128,7 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
     }
     for job in ("project-ci-cpu-validation", "gate-merge"):
         assert merge_tools <= set(records[job]["requiredTools"])
-    assert "builder-project-resolve-binding" in records["gate-integration"][
+    assert "kubectl" in records["gate-integration"][
         "requiredTools"
     ]
 
@@ -1073,28 +1080,19 @@ def test_focused_execution_cannot_emit_release_blocking_smoke() -> None:
     assert selected == inventory["spec"]["smokeTests"][0]
 
 
-def test_required_jobs_have_local_artifacts_or_external_contracts() -> None:
-    """Required jobs have local artifacts or one exact provider contract."""
+def test_required_jobs_have_local_artifacts() -> None:
+    """Required jobs publish exact local gate and smoke artifacts."""
     registry = _yaml(REPO_ROOT / "gates/manifest.yaml")
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     smoke = _yaml(REPO_ROOT / "inventory/ci/smoke-tests.yaml")
     smoke_jobs = {record["job"] for record in smoke["spec"]["smokeTests"]}
-    external_jobs = {
-        job["name"]: job
-        for include in registry["trusted_includes"]
-        for job in include.get("jobs", [])
-    }
     assert ci["gate-merge"]["script"] == [
         "./scripts/check.sh --list",
         "./scripts/check.sh --profile merge",
+        "COVERAGE_FILE=reports/tests/.coverage coverage report",
     ]
     for job_name in registry["required_jobs"]:
         assert job_name in smoke_jobs
-        if job_name in external_jobs:
-            assert job_name not in ci
-            assert external_jobs[job_name]["required"] is True
-            assert external_jobs[job_name]["allowFailure"] is False
-            continue
         assert job_name in ci
         paths = _artifact_paths(ci[job_name])
         assert f"reports/ci/{job_name}.json" in paths
@@ -1450,27 +1448,13 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert 'repository = f"{repository}.git"' in source
     assert "JOB-TOKEN:" not in source
 
-    provider = _yaml(LEGACY_BUILDER_BINDING)
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     manifest = _yaml(REPO_ROOT / "gates/manifest.yaml")
-    include_identities = {
-        (record["project"], record["ref"], record["file"])
-        for record in ci["include"]
-    }
-    trusted_identities = {
-        (record["project"], record["ref"], record["file"])
-        for record in manifest["trusted_includes"]
-    }
-    resource_identity = (
-        provider["spec"]["dispatch"]["project"],
-        provider["spec"]["source"]["revision"],
-        "/ci/templates/project-ci-resource-jobs.yml",
-    )
-    assert include_identities == trusted_identities
-    assert resource_identity in include_identities
+    assert not ci.get("include")
+    assert not manifest.get("trusted_includes")
     assert "@sha256:" in ci["default"]["image"]
-    assert ci["variables"]["PROJECT_CI_CPU_COMMAND"] == (
-        "./tools/project-ci-cpu-validation.sh"
+    assert ci["variables"]["REDFISH_STANDARDS_PACKAGE_API"] == (
+        "https://gitlab.dcloud.run/api/v4"
     )
 
 
@@ -1495,11 +1479,13 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
     """Build one shared baseline whose pinned schemas differ from local drift."""
     baseline = tmp_path_factory.mktemp("provider-free-schema")
     authority = baseline / "standards"
-    binding_schema_path = "schemas/project-standards-binding.schema.json"
     revision = _commit_local_authority(
         authority,
         {
-            binding_schema_path: json.dumps(
+            STANDARDS_MANIFEST_PATH: yaml.safe_dump(
+                {"spec": {"readOrder": [{"id": name} for name in STANDARDS_PROOF_CONTRACTS]}}
+            ),
+            STANDARDS_BINDING_SCHEMA_PATH: json.dumps(
                 {
                     "type": "object",
                     "required": ["apiVersion", "spec"],
@@ -1516,7 +1502,7 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
         },
     )
     # Reading the authority's working tree would reject even the valid case.
-    (authority / binding_schema_path).write_text(
+    (authority / STANDARDS_BINDING_SCHEMA_PATH).write_text(
         json.dumps({"not": {}}), encoding="utf-8"
     )
     project = baseline / "project"
@@ -1533,6 +1519,7 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
                         "revision": revision,
                     },
                     "providers": [],
+                    "requiredContracts": list(STANDARDS_PROOF_CONTRACTS),
                 },
             }
         ),
@@ -1603,6 +1590,192 @@ def test_schema_gate_validates_provider_free_project_against_exact_pin(
     else:
         with pytest.raises(error, match=message):
             schema_gate.run(env={})
+
+
+@pytest.fixture(scope="module")
+def standards_proof_baseline(
+    tmp_path_factory: pytest.TempPathFactory, provider_free_schema_baseline: Path
+) -> tuple[Path, dict[str, Path]]:
+    """Capture a sparse Git pack and retain its project fixture for all cases."""
+    project = tmp_path_factory.mktemp("standards-proof") / "project"
+    shutil.copytree(provider_free_schema_baseline, project)
+    binding_path = project / "standards-binding.yaml"
+    binding = _yaml(binding_path)
+    source = binding["spec"]["source"]
+    git = ("git", "-C", source["localPath"])
+    revision = source["revision"]
+    selectors = (
+        revision,
+        f"{revision}^{{tree}}",
+        f"{revision}:schemas",
+        f"{revision}:{STANDARDS_MANIFEST_PATH}",
+        f"{revision}:{STANDARDS_BINDING_SCHEMA_PATH}",
+    )
+    objects = subprocess.check_output((*git, "rev-parse", *selectors)).splitlines()
+
+    def pack(name: str, object_ids: list[bytes]) -> Path:
+        target = project.parent / name
+        with target.open("wb") as stream:
+            subprocess.run(
+                (*git, "pack-objects", "--stdout", "--window=0"),
+                input=b"\n".join(object_ids) + b"\n",
+                stdout=stream,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        return target
+
+    source["localPath"] = str(project / "unavailable-standards")
+    binding_path.write_text(yaml.safe_dump(binding), encoding="utf-8")
+    invalid = project.parent / "invalid.pack"
+    invalid.write_bytes(b"not a Git pack\n")
+    return project, {
+        "complete": pack("complete.pack", objects),
+        "invalid": invalid,
+        "missing": project.parent / "missing.pack",
+        "missing-bound-file": pack("missing-schema.pack", objects[:-1]),
+    }
+
+
+@pytest.mark.parametrize(
+    ("proof_kind", "revision", "required_contracts", "message"),
+    [
+        pytest.param("complete", None, None, None, id="exact-pack-without-fetch"),
+        pytest.param(
+            "invalid",
+            None,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="invalid-pack",
+        ),
+        pytest.param(
+            "missing",
+            None,
+            None,
+            "local Standards proof file is unavailable",
+            id="missing-pack-file",
+        ),
+        pytest.param(
+            "complete",
+            STANDARDS_REVISION,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="wrong-pinned-commit",
+        ),
+        pytest.param(
+            "missing-bound-file",
+            None,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="missing-bound-file",
+        ),
+        pytest.param(
+            "complete",
+            None,
+            tuple(reversed(STANDARDS_PROOF_CONTRACTS)),
+            "binding contracts differ from the pinned Standards manifest",
+            id="manifest-contract-order-mismatch",
+        ),
+    ],
+)
+def test_schema_gate_verifies_sparse_standards_proof(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    standards_proof_baseline: tuple[Path, dict[str, Path]],
+    proof_kind: str,
+    revision: str | None,
+    required_contracts: tuple[str, ...] | None,
+    message: str | None,
+) -> None:
+    """Accept only an exact, complete Standards proof for the binding."""
+    baseline, proofs = standards_proof_baseline
+    project = tmp_path / "project"
+    shutil.copytree(baseline, project)
+    binding_path = project / "standards-binding.yaml"
+    binding = _yaml(binding_path)
+    if revision is not None:
+        binding["spec"]["source"]["revision"] = revision
+    if required_contracts is not None:
+        binding["spec"]["requiredContracts"] = list(required_contracts)
+    binding_path.write_text(yaml.safe_dump(binding), encoding="utf-8")
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", project)
+    monkeypatch.setattr(
+        schema_gate,
+        "_checkout_exact_authority",
+        lambda *args, **kwargs: pytest.fail("the proof path tried to fetch Standards"),
+    )
+    env = {STANDARDS_PROOF_ENV: str(proofs[proof_kind])}
+    if message is None:
+        schema_gate.run(env=env)
+    else:
+        with pytest.raises(schema_gate.SchemaGateError, match=message):
+            schema_gate.run(env=env)
+
+
+@pytest.mark.parametrize(
+    ("api_url", "http_status", "message"),
+    [
+        ("https://ci.example.invalid/api/v4", 200, None),
+        ("https://other.example.invalid/api/v4", 200, "differs from the GitLab job origin"),
+        ("https://ci.example.invalid/api/v4", 302, "returned HTTP 302"),
+        ("https://ci.example.invalid/api/v4", 404, "returned HTTP 404"),
+    ],
+)
+def test_schema_gate_reads_proof_only_from_the_job_project(
+    monkeypatch: pytest.MonkeyPatch,
+    standards_proof_baseline: tuple[Path, dict[str, Path]],
+    api_url: str,
+    http_status: int,
+    message: str | None,
+) -> None:
+    """Bind the package download to the job's project and reject redirects."""
+    project, proofs = standards_proof_baseline
+    binding = _yaml(project / "standards-binding.yaml")
+    revision = binding["spec"]["source"]["revision"]
+    connection_hosts: list[str] = []
+
+    class Response:
+        status = http_status
+
+        @staticmethod
+        def read(limit: int) -> bytes:
+            return proofs["complete"].read_bytes()[:limit]
+
+    class Connection:
+        def __init__(self, host: str, *, port: int | None, timeout: int):
+            assert port is None
+            assert timeout > 0
+            connection_hosts.append(host)
+
+        def request(self, method: str, path: str, *, headers: dict[str, str]) -> None:
+            assert method == "GET"
+            assert path == (
+                f"/api/v4/projects/169/packages/generic/local-standards-proof/"
+                f"{revision}/standards.pack"
+            )
+            assert headers == {"JOB-TOKEN": "example-token"}
+
+        def getresponse(self) -> Response:
+            return Response()
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(schema_gate, "HTTPSConnection", Connection)
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", project)
+    env = {
+        "CI_SERVER_URL": "https://ci.example.invalid",
+        "CI_PROJECT_ID": "169",
+        "CI_JOB_TOKEN": "example-token",
+        "REDFISH_STANDARDS_PACKAGE_API": api_url,
+    }
+    if message is None:
+        schema_gate.run(env)
+    else:
+        with pytest.raises(schema_gate.SchemaGateError, match=message):
+            schema_gate.run(env)
+    expected = ["ci.example.invalid"] if api_url == "https://ci.example.invalid/api/v4" else []
+    assert connection_hosts == expected
 
 
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:

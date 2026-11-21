@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from http.client import HTTPException, HTTPSConnection
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -34,6 +35,8 @@ except ModuleNotFoundError:  # Direct ``python tools/schema_gate.py`` execution.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXACT_SHA = re.compile(r"^[0-9a-f]{40}$")
 IMMUTABLE_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+STANDARDS_PROOF_PATHS = ("manifest.yaml", "schemas/project-standards-binding.schema.json")
+MAX_STANDARDS_PROOF_BYTES = 64 * 1024
 
 
 class SchemaGateError(ValueError):
@@ -252,6 +255,103 @@ def _checkout_exact_authority(
     )
 
 
+def _load_local_standards_proof(
+    proof_path: Path,
+    revision: str,
+) -> tempfile.TemporaryDirectory:
+    """Read two allow-listed files through a Git object proof of the local pin.
+
+    :param proof_path: Pack with the pinned commit, tree paths and file objects.
+    :param revision: Exact commit from the project binding.
+    :returns: Temporary workspace holding the authenticated files.
+    """
+    if not EXACT_SHA.fullmatch(revision):
+        raise SchemaGateError("local Standards proof requires an exact revision")
+    try:
+        with proof_path.open("rb") as source:
+            pack = source.read(MAX_STANDARDS_PROOF_BYTES + 1)
+    except OSError as exc:
+        raise SchemaGateError("local Standards proof file is unavailable") from exc
+    if not 0 < len(pack) <= MAX_STANDARDS_PROOF_BYTES:
+        raise SchemaGateError("local Standards proof has an invalid size")
+
+    workspace = tempfile.TemporaryDirectory(prefix="redfish_ctl-standards-proof-")
+    root = Path(workspace.name)
+    objects = root / "objects.git"
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_NO_REPLACE_OBJECTS="1")
+
+    def git(*args: str, data: bytes | None = None) -> bytes:
+        result = subprocess.run(
+            ["git", *args], input=data, capture_output=True, check=False, timeout=30, env=env
+        )
+        if result.returncode:
+            raise SchemaGateError("local Standards proof cannot resolve the pinned commit and files")
+        return result.stdout
+
+    try:
+        git("init", "--quiet", "--bare", str(objects))
+        git("-C", str(objects), "index-pack", "--stdin", data=pack)
+        actual = git("-C", str(objects), "rev-parse", "--verify", f"{revision}^{{commit}}")
+        if actual.decode("ascii").strip() != revision:
+            raise SchemaGateError("local Standards proof commit differs from the binding")
+        for file in STANDARDS_PROOF_PATHS:
+            contents = git("-C", str(objects), "show", f"{revision}:{file}")
+            target = root / file
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(contents)
+    except Exception:
+        workspace.cleanup()
+        raise
+    return workspace
+
+
+def _load_published_standards_proof(
+    env: dict[str, str], revision: str
+) -> tempfile.TemporaryDirectory:
+    """Verify the pin using the exact proof published to this GitLab project.
+
+    :param env: CI variables identifying the project and its approved API.
+    :param revision: Exact Standards commit from the project binding.
+    :returns: Temporary workspace holding the authenticated manifest and schema.
+    """
+    if not EXACT_SHA.fullmatch(revision):
+        raise SchemaGateError("published Standards proof requires an exact revision")
+
+    api_url = env["REDFISH_STANDARDS_PACKAGE_API"]
+    runtime_url = _runtime_ci_base_url(env)
+    if runtime_url is None or api_url != f"{runtime_url}/api/v4":
+        raise SchemaGateError("Standards proof package API differs from the GitLab job origin")
+
+    api = urlsplit(api_url)
+    if api.scheme != "https" or api.hostname is None:
+        raise SchemaGateError("Standards proof package API requires HTTPS")
+    project_id = env.get("CI_PROJECT_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", project_id):
+        raise SchemaGateError("Standards proof package requires the GitLab project ID")
+
+    path = (
+        f"{api.path}/projects/{project_id}/packages/generic/"
+        f"local-standards-proof/{revision}/standards.pack"
+    )
+    conn = HTTPSConnection(api.hostname, port=api.port, timeout=15)
+    try:
+        conn.request("GET", path, headers={"JOB-TOKEN": env["CI_JOB_TOKEN"]})
+        response = conn.getresponse()
+        if response.status != 200:
+            raise SchemaGateError(f"Standards proof package returned HTTP {response.status}")
+        data = response.read(MAX_STANDARDS_PROOF_BYTES + 1)
+    except (OSError, HTTPException) as exc:
+        raise SchemaGateError("cannot read the Standards proof from the GitLab package API") from exc
+    finally:
+        conn.close()
+
+    with tempfile.TemporaryDirectory(prefix="redfish_ctl-standards-package-") as work:
+        proof_path = Path(work) / "standards.pack"
+        proof_path.write_bytes(data)
+        return _load_local_standards_proof(proof_path, revision)
+
+
 def _validate(document: dict, schema_path: Path, label: str) -> None:
     """Validate one document and render a bounded diagnostic on failure."""
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -371,15 +471,26 @@ def run(env: dict[str, str] | None = None) -> None:
     selected_env = dict(os.environ if env is None else env)
     binding = _load_yaml(REPO_ROOT / "standards-binding.yaml")
     standards_source = binding.get("spec", {}).get("source", {})
-    try:
-        standards_base_url = _standards_base_url(standards_source, selected_env)
-    except ProviderContractError as exc:
-        raise SchemaGateError(str(exc)) from exc
-    standards_workspace = _checkout_exact_authority(
-        standards_source,
-        approved_base_url=standards_base_url,
-        env=selected_env,
-    )
+    proof = selected_env.get("REDFISH_STANDARDS_PROOF_FILE", "").strip()
+    package_api = selected_env.get("REDFISH_STANDARDS_PACKAGE_API", "").strip()
+    local_path = str(standards_source.get("localPath", "")).strip()
+    local_available = bool(local_path and Path(local_path).expanduser().is_dir())
+    using_proof = bool((proof or package_api) and not local_available)
+    revision = str(standards_source.get("revision", ""))
+    if using_proof and package_api:
+        standards_workspace = _load_published_standards_proof(selected_env, revision)
+    elif using_proof:
+        standards_workspace = _load_local_standards_proof(Path(proof), revision)
+    else:
+        try:
+            standards_base_url = _standards_base_url(standards_source, selected_env)
+        except ProviderContractError as exc:
+            raise SchemaGateError(str(exc)) from exc
+        standards_workspace = _checkout_exact_authority(
+            standards_source,
+            approved_base_url=standards_base_url,
+            env=selected_env,
+        )
     try:
         standards_root = Path(standards_workspace.name)
         _validate(
@@ -388,6 +499,13 @@ def run(env: dict[str, str] | None = None) -> None:
             "standards-binding.yaml",
         )
         declarations = binding["spec"]["providers"]
+        if using_proof:
+            if declarations:
+                raise SchemaGateError("local Standards proof requires a provider-free binding")
+            manifest = _load_yaml(standards_root / "manifest.yaml")
+            required = [entry["id"] for entry in manifest["spec"]["readOrder"]]
+            if binding["spec"]["requiredContracts"] != required:
+                raise SchemaGateError("binding contracts differ from the pinned Standards manifest")
         for declaration in declarations:
             if declaration.get("type", "external") != "external":
                 continue

@@ -62,7 +62,7 @@ it without executing a gate.
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | Builder resolves a valid owned namespace and service endpoint for the runtime project | the provider binding is unavailable, incomplete, or invalid; the consumer never creates either resource |
+| `integration.namespace` | integration | no | the protected runner validates the configured simulator service coordinates and reads the namespace's CA ConfigMap | the binding is invalid or the protected runner cannot read the target |
 | `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
@@ -81,10 +81,12 @@ Formatting-only rules are explicitly not applicable to this syntax and data
 integrity gate. Duplicate keys are an explicit error, `yamllint` is required,
 and the gate uses no runtime warning suppression or parse-only fallback.
 
-The `repo.schemas` gate reads `spec.source.localPath`, defined in
-`standards-binding.yaml` and `builder-binding.yaml`, and checks out each
-authority's pinned `spec.source.revision` in a temporary local clone. It uses no
-network credential; a missing local checkout or exact commit fails closed.
+The `repo.schemas` gate validates the exact `spec.source.revision` from
+`standards-binding.yaml`. It checks out the pinned local Standards source when
+available. DCloud supplies the exact Git object proof from the private project
+Package Registry through the same-project job token. The gate rejects an
+unavailable proof, a mismatched commit, missing bound files, or a contract list
+that differs from the authenticated manifest.
 
 ## Telemetry liveness checks
 

@@ -13,6 +13,7 @@ patterns=(
   'scripts/*.bash'
   'tools/*.sh'
   'docker/*.sh'
+  'modules/*/scripts/*.sh'
 )
 files=()
 for pathspec in "${patterns[@]}"; do
