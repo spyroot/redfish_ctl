@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import textwrap
 import threading
 import time
@@ -793,22 +794,38 @@ def test_observe_smoke_rejects_probe_warnings_and_required_skips(
     assert evidence["skipped_required_tests"] == expected_skips
 
 
+@pytest.mark.parametrize("gate_timeout", [8, 1], ids=["outer-deadline", "gate-deadline"])
 def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
-    tmp_path: Path,
+    tmp_path: Path, gate_timeout: int,
 ) -> None:
-    """A hung exact-command smoke probe is bounded and does not leak children."""
+    """Either replay deadline stops the nested gate and removes its reports."""
     root = tmp_path / "repo"
     root.mkdir()
     root = _root(root)
     child_pid_path = tmp_path / "probe-child.pid"
+    staging_path = tmp_path / "probe-staging"
     child_script = tmp_path / "probe_child.py"
     child_script.write_text(
+        f"#!{sys.executable}\n"
         "import os\n"
-        "import pathlib\n"
-        "import sys\n"
         "import time\n"
-        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8')\n"
+        "from pathlib import Path\n"
+        "stage = Path(os.environ['REDFISH_CI_SCRATCH_DIR'])\n"
+        "(stage / 'junit.xml').write_text('<testsuite/>', encoding='utf-8')\n"
+        "Path(os.environ['PROBE_STAGING_PATH']).write_text(str(stage), encoding='utf-8')\n"
+        "Path(os.environ['PROBE_CHILD_PID']).write_text(str(os.getpid()), encoding='utf-8')\n"
         "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    child_script.chmod(0o755)
+    replay_script = tmp_path / "replay.py"
+    replay_script.write_text(
+        "import os\n"
+        "from pathlib import Path\n"
+        "from tools.ci_evidence import observe_gate\n"
+        "result = observe_gate(command=os.environ['PROBE_CHILD_SCRIPT'], "
+        "root=Path.cwd(), timeout_seconds=int(os.environ['PROBE_GATE_TIMEOUT']))\n"
+        "raise SystemExit(result['return_code'])\n",
         encoding="utf-8",
     )
     scripts = root / "scripts"
@@ -820,8 +837,7 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
         "  printf 'python3 missing\\n' >&2\n"
         "  exit 1\n"
         "}\n"
-        'python3 "$PROBE_CHILD_SCRIPT" "$PROBE_CHILD_PID" &\n'
-        "sleep 5\n",
+        'exec python3 "$PROBE_REPLAY_SCRIPT"\n',
         encoding="utf-8",
     )
     check.chmod(0o755)
@@ -831,7 +847,7 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
         "command": "./scripts/check.sh --profile merge",
         "requiredTools": ["sh"],
         "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
-        "timeoutSeconds": 1,
+        "timeoutSeconds": 2,
     }
     gate_observations = {
         **_gate_observations(),
@@ -841,6 +857,10 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
     env = _ci_env_for(root)
     env["PROBE_CHILD_PID"] = str(child_pid_path)
     env["PROBE_CHILD_SCRIPT"] = str(child_script)
+    env["PROBE_STAGING_PATH"] = str(staging_path)
+    env["PROBE_REPLAY_SCRIPT"] = str(replay_script)
+    env["PROBE_GATE_TIMEOUT"] = str(gate_timeout)
+    env["PYTHONPATH"] = str(REPO_ROOT)
     child_pid: int | None = None
     child_running = False
     start = time.monotonic()
@@ -869,12 +889,13 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
             except ProcessLookupError:
                 pass
 
-    assert elapsed < 3
+    assert elapsed < 4
     assert smoke_observations["idempotent_noop"] is False
     assert smoke_observations["cleanup_status"] == "passed"
     assert smoke_observations["remaining"] == []
     assert child_pid is not None
     assert child_running is False
+    assert not Path(staging_path.read_text(encoding="utf-8")).exists()
 
 
 @pytest.mark.parametrize("timeout", [59, 3601, True, None])
@@ -1250,6 +1271,35 @@ def test_dispatch_ref_is_explicit_safe_and_dispatch_only() -> None:
     assert proc.returncode == 2
     assert unsafe not in combined
     assert "safe branch ref" in combined
+
+
+@pytest.mark.parametrize("status", [0, 1, 78], ids=["passed", "failed", "blocked"])
+def test_native_dispatch_returns_without_running_local_gates(tmp_path: Path, status: int) -> None:
+    """The native dispatch exit code is authoritative for the CLI invocation."""
+    root = _root(tmp_path)
+    (root / "standards-binding.yaml").write_text(
+        yaml.safe_dump({"metadata": {"name": "fixture-project"}, "spec": {"providers": []}}),
+        encoding="utf-8",
+    )
+    scripts = root / "scripts"
+    (scripts / "gates").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(CHECK_SH, scripts / "check.sh")
+    (scripts / "gates/dcloud_dispatch.bash").write_text(
+        'dispatch_dcloud() { printf "%s\\n" "fixture-receipt"; return "$FIXTURE_STATUS"; }\n',
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        ["/bin/bash", str(scripts / "check.sh"), "--profile", "merge", "--dispatch", "--ref", "fixture"],
+        cwd=root,
+        env={**_off_cluster_env(), "FIXTURE_STATUS": str(status)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == status, proc.stderr
+    assert proc.stdout == "fixture-receipt\n"
+    assert "REFUSING" not in proc.stderr
 
 
 def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> None:

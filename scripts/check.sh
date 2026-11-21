@@ -356,6 +356,7 @@ fi
 
 if $dispatch; then
   _dispatch "$profile" "$gate" "$dispatch_ref"
+  exit "$?"
 fi
 
 runner_args=(--profile "$profile")

@@ -44,6 +44,8 @@ _CREDENTIAL_RE = re.compile(
 )
 _TEST_REPORTS = {Path("tests/junit.xml"), Path("tests/coverage.xml")}
 _XML_COMMENTS_AND_INSTRUCTIONS = re.compile(r"<!--.*?-->|<\?.*?\?>", re.DOTALL)
+_SCRATCH_ENV = "REDFISH_CI_SCRATCH_DIR"
+_SMOKE_PARENT_SESSION_ENV = "REDFISH_CI_SMOKE_PARENT_SESSION"
 
 
 class EvidenceError(ValueError):
@@ -394,6 +396,7 @@ def observe_gate(
         command=command,
         root=root,
         timeout_seconds=timeout_seconds,
+        join_smoke_session=True,
     )
     output_sanitized = _CREDENTIAL_RE.search(output) is None
     if output_sanitized:
@@ -433,6 +436,7 @@ def _run_captured_command(
     root: Path,
     timeout_seconds: float,
     env: Mapping[str, str] | None = None,
+    join_smoke_session: bool = False,
 ) -> tuple[str, int, bool]:
     """Run one command while privately retaining its ordered output.
 
@@ -448,6 +452,8 @@ def _run_captured_command(
     :param timeout_seconds: positive wall-clock limit.
     :param env: optional subprocess environment; inherits the caller environment
         when omitted.
+    :param join_smoke_session: reuse the verified smoke replay session, if
+        present, so either deadline terminates the whole replay.
     :return: combined output, effective return code, and timeout flag.
     """
     command_args = [command] if isinstance(command, str) else list(command)
@@ -455,16 +461,27 @@ def _run_captured_command(
         isinstance(value, str) and value for value in command_args
     ):
         raise EvidenceError("captured command argument vector is invalid")
-    with tempfile.TemporaryDirectory(prefix=".redfish-ci-", dir=root) as scratch:
-        selected_env = dict(os.environ if env is None else env)
-        selected_env["REDFISH_CI_SCRATCH_DIR"] = scratch
+    selected_env = dict(os.environ if env is None else env)
+    parent_scratch = selected_env.get(_SCRATCH_ENV)
+    smoke_session = False
+    if join_smoke_session:
+        parent_session = selected_env.pop(_SMOKE_PARENT_SESSION_ENV, "")
+        session_id = os.getsid(0)
+        smoke_session = (
+            bool(parent_scratch)
+            and parent_session.isdecimal()
+            and int(parent_session) != session_id
+            and os.getpgrp() == session_id
+        )
+    with tempfile.TemporaryDirectory(prefix=".redfish-ci-", dir=parent_scratch or root) as scratch:
+        selected_env[_SCRATCH_ENV] = scratch
         process = subprocess.Popen(
             command_args,
             cwd=root,
             env=selected_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            start_new_session=True,
+            start_new_session=not smoke_session,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -475,7 +492,7 @@ def _run_captured_command(
         except subprocess.TimeoutExpired:
             timed_out = True
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                os.killpg(os.getpgrp() if smoke_session else process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             output, _ = process.communicate()
@@ -581,7 +598,11 @@ def observe_smoke(
     probe_job = f"{selected_env.get('CI_JOB_NAME', 'smoke')}-probe"
     if not _SAFE_NAME_RE.fullmatch(probe_job):
         raise EvidenceError("derived smoke probe job name is unsafe")
-    probe_env = {**selected_env, "CI_JOB_NAME": probe_job}
+    probe_env = {
+        **selected_env,
+        "CI_JOB_NAME": probe_job,
+        _SMOKE_PARENT_SESSION_ENV: str(os.getsid(0)),
+    }
     probe_output, probe_return_code, probe_timed_out = _run_captured_command(
         command=command_args,
         root=root,
