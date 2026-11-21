@@ -1,8 +1,6 @@
 name: CI
 
-# Offline test + lint gate. Runs on pushes to main and on every PR.
-# It never talks to a BMC, uses no secrets, and does not publish anything —
-# tests are offline by design and auto-skip live (@pytest.mark.live) cases.
+# Offline test, coverage, lint and documentation checks for main and pull requests.
 
 on:
   push:
@@ -40,56 +38,27 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install the pinned Helm and Git LFS tools
+        run: |
+          bash tools/install-ci-test-tools.sh "$RUNNER_TEMP/redfish-bin"
+          printf '%s\n' "$RUNNER_TEMP/redfish-bin" >> "$GITHUB_PATH"
       - name: Install (runtime + dev extras)
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Detect docs-only change
-        # A PR that touches ONLY docs/ and Markdown files skips the full suite
-        # below and runs just the docs-coupled tests instead. Anything else —
-        # including push events, where the base diff is not fetched — runs the
-        # full suite. Step-level (not job/workflow-level) so the required
-        # check names always report and branch protection is never left pending.
-        id: changes
-        if: github.event_name == 'pull_request'
-        run: |
-          # Fail safe: if the base fetch or diff fails (e.g. merge-base beyond
-          # the shallow fetch), fall through to the full suite.
-          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}" || true
-          changed="$(git diff --name-only FETCH_HEAD...HEAD 2>/dev/null || true)"
-          echo "$changed"
-          if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^docs/|\.md$'; then
-            echo "docs_only=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Offline tests (no BMC, no IDRAC_IP)
-        if: steps.changes.outputs.docs_only != 'true'
-        # dmtf_sim_live is a private-CI integration lane (needs the deployed sim);
-        # exclude it here so GitHub CI stays offline and green.
-        run: pytest -q -m "not dmtf_sim_live"
-      - name: Offline tests (docs-only fast path — docs-coupled tests)
-        # Docs edits can still break tests that read docs/ or any Markdown
-        # file (path links, Makefile/docker doc contracts, simulator-contract
-        # references), so run exactly those instead of the whole suite. The
-        # set is discovered by grep over every test module, so a new
-        # docs-reading test is picked up automatically; if a shared fixture
-        # module (conftest or a helper) ever becomes docs-coupled, fall back
-        # to the full suite rather than guess.
-        if: steps.changes.outputs.docs_only == 'true'
-        run: |
-          if grep -qlE '\bdocs/|\.md\b' tests/conftest.py tests/test_utils.py tests/vendor_corpus.py 2>/dev/null; then
-            echo "shared test helper is docs-coupled; running the full suite"
-            pytest -q -m "not dmtf_sim_live"
-            exit 0
-          fi
-          files="$(grep -rlE '\bdocs/|\.md\b' tests/test_*.py || true)"
-          if [ -n "$files" ]; then
-            # shellcheck disable=SC2086
-            pytest -q -m "not dmtf_sim_live" $files
-          else
-            echo "no docs-coupled tests detected"
-          fi
+      - name: Run offline tests and collect coverage
+        run: bash scripts/gates/unit/all.sh --ci-report "$GITHUB_SHA"
+      - name: Upload test and coverage reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-${{ matrix.python-version }}
+          path: |
+            reports/tests/commit.txt
+            reports/tests/junit.xml
+            reports/tests/coverage.xml
+          if-no-files-found: error
+          retention-days: 14
       - name: Lint changed-file hygiene (informational)
         # The tree carries pre-existing ruff debt, so lint is reported but does
         # not fail the build. New code should still be clean.

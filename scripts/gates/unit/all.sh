@@ -14,6 +14,31 @@ unset \
   REDFISH_IP REDFISH_USERNAME REDFISH_PASSWORD REDFISH_PORT \
   IDRAC_IP IDRAC_USERNAME IDRAC_PASSWORD IDRAC_PORT
 
+report_args=()
+if (( $# > 0 )); then
+  if [[ $# != 2 || $1 != --ci-report || ! $2 =~ ^[0-9a-f]{40}$ ]]; then
+    printf 'Usage: %s [--ci-report <commit-sha>]\n' "$0" >&2
+    exit 2
+  fi
+
+  checkout_sha=$(git rev-parse HEAD)
+  if [[ $checkout_sha != "$2" ]]; then
+    printf 'Expected checkout %s, found %s\n' "$2" "$checkout_sha" >&2
+    exit 1
+  fi
+
+  mkdir -p reports/tests
+  printf '%s\n' "$checkout_sha" > reports/tests/commit.txt
+  export COVERAGE_FILE="$PWD/reports/tests/.coverage"
+  unset PYTEST_ADDOPTS
+  report_args=(
+    --junitxml=reports/tests/junit.xml
+    --cov
+    --cov-report=term-missing
+    --cov-report=xml:reports/tests/coverage.xml
+  )
+fi
+
 exec pytest -q -ra -W error \
   -m "not live and not emulator_live and not dmtf_sim_live" \
-  --ignore=tests/gates/test_redfish_schema.py
+  --ignore=tests/gates/test_redfish_schema.py "${report_args[@]}"
