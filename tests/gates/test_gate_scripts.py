@@ -7,6 +7,7 @@ scripts and asserting they fail when they must.
 
 Author Mus spyroot@gmail.com
 """
+import json
 import os
 import shutil
 import subprocess
@@ -286,6 +287,14 @@ def test_kubernetes_schema_validates_a_non_empty_manifest_set(tmp_path) -> None:
     assert "kubernetes.schema: OK" in combined, combined
 
 
+def _legacy_namespace_gate_env() -> dict[str, str]:
+    """Supply the provider fixture with no live project or DCloud binding."""
+    return {
+        key: value for key, value in os.environ.items()
+        if key not in {"CI_PROJECT_NAME", "REDFISH_CI_SERVER_HOST", "REDFISH_SIM_NAMESPACE"}
+    }
+
+
 def test_namespace_gate_resolves_builder_owned_namespace_and_service(
     tmp_path: Path,
 ) -> None:
@@ -321,7 +330,7 @@ def test_namespace_gate_resolves_builder_owned_namespace_and_service(
         capture_output=True,
         text=True,
         env={
-            **os.environ,
+            **_legacy_namespace_gate_env(),
             "CI_PROJECT_NAME": "runtime-project",
             "PROJECT_SERVICE_NAME": "redfish-ctl-dmtf-sim",
             "PATH": f"{command_dir}:{os.environ['PATH']}",
@@ -345,12 +354,11 @@ def test_namespace_gate_resolves_builder_owned_namespace_and_service(
 def test_namespace_gate_requires_the_runtime_project_identity() -> None:
     """A consumer project is never inferred from a hardcoded repository name."""
     script = REPO_ROOT / "scripts" / "gates" / "integration" / "namespace-test.sh"
-    env = {key: value for key, value in os.environ.items() if key != "CI_PROJECT_NAME"}
     proc = subprocess.run(
         [str(script)],
         capture_output=True,
         text=True,
-        env=env,
+        env=_legacy_namespace_gate_env(),
     )
     assert proc.returncode == 78
     assert "requires CI_PROJECT_NAME" in proc.stderr
@@ -668,3 +676,60 @@ def test_protected_apply_refuses_a_merge_request_pipeline() -> None:
     )
     assert proc.returncode == 1, "a live apply must never run from a merge-request pipeline"
     assert "merge-request pipeline" in proc.stdout + proc.stderr
+
+
+@pytest.mark.parametrize("digest_state", ["approved", "different", "missing"])
+def test_dcloud_dispatch_requires_the_approved_runner_digest(
+    tmp_path: Path, digest_state: str,
+) -> None:
+    """Successful native status alone cannot attest an unapproved toolchain."""
+    sha = "a" * 40
+    standards = "b" * 40
+    digest = f"sha256:{'c' * 64}"
+    (tmp_path / "standards-binding.yaml").write_text(
+        yaml.safe_dump({"spec": {"source": {"revision": standards}}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "runner.yaml").write_text(
+        yaml.safe_dump({"spec": {"image": f"registry.invalid/redfish/toolbox@{digest}"}}),
+        encoding="utf-8",
+    )
+    evidence = {
+        "commit": sha, "job_id": "12", "pipeline_id": "34", "name": "gate-merge",
+        "standards_revision": standards, "runner_digest": digest, "status": "passed",
+        "return_code": 0, "evidence_sanitized": True, "warnings": 0,
+        "skipped_required_tests": 0, "cleanup": {"status": "passed"},
+    }
+    if digest_state == "different":
+        evidence["runner_digest"] = f"sha256:{'d' * 64}"
+    elif digest_state == "missing":
+        del evidence["runner_digest"]
+    fake_glab = tmp_path / "glab"
+    fake_glab.write_text(
+        '#!/bin/sh\ncase "$2" in\n'
+        '  projects/169/pipelines/34/jobs) printf "%s" "$REDFISH_TEST_GATE_JOB" ;;\n'
+        '  projects/169/jobs/12/artifacts/*) printf "%s" "$REDFISH_TEST_GATE_EVIDENCE" ;;\n'
+        '  *) exit 1 ;;\nesac\n',
+        encoding="utf-8",
+    )
+    fake_glab.chmod(0o755)
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1"; dcloud_gate_result ci.invalid projects/169 34 "$2" ""',
+         "dcloud-test", str(adapter), sha],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "REDFISH_TEST_GATE_JOB": json.dumps([
+                {"id": 12, "name": "gate-merge", "status": "success", "commit": {"id": sha}},
+            ]),
+            "REDFISH_TEST_GATE_EVIDENCE": json.dumps(evidence),
+        },
+    )
+    if digest_state == "approved":
+        assert proc.returncode == 0, proc.stderr
+        assert json.loads(proc.stdout)["runner_digest"] == digest
+    else:
+        assert proc.returncode == 78, proc.stdout + proc.stderr
+        assert "missing successful exact-commit gate evidence" in proc.stderr

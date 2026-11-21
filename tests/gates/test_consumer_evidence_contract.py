@@ -233,6 +233,7 @@ def _root(tmp_path: Path) -> Path:
 def _ci_env_for(root: Path, job: str = "gate-merge") -> dict[str, str]:
     """Return CI identity matching the fixture repository's exact HEAD."""
     env = _ci_env(job=job)
+    env["PATH"] = os.environ["PATH"]
     env["CI_COMMIT_SHA"] = subprocess.check_output(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         text=True,

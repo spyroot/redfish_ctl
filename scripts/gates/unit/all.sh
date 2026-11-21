@@ -22,6 +22,7 @@ pytest_args=(
 if [[ ${REDFISH_COVERAGE_REPORT:-} == true && $# == 0 ]]; then
   set -- --ci-report "${CI_COMMIT_SHA:?CI_COMMIT_SHA is required for coverage evidence}"
 fi
+unset REDFISH_COVERAGE_REPORT
 if (( $# == 0 )); then
   exec pytest "${pytest_args[@]}"
 fi

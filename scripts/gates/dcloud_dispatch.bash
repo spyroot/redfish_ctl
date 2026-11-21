@@ -4,7 +4,7 @@ dcloud_gate_result() {
   local host="$1" endpoint="$2" pipeline="$3" commit="$4" gate="$5"
   local job_name=gate-merge evidence_name=gate-merge
   local artifact=reports/ci/gate-merge.json
-  local response job standards_revision
+  local response job standards_revision runner_image runner_digest
   if [[ -n $gate ]]; then
     job_name="project-ci-cpu-validation"
     evidence_name="$gate"
@@ -20,15 +20,22 @@ dcloud_gate_result() {
     return 78
   }
   standards_revision="$(yq -er '.spec.source.revision' standards-binding.yaml)" || return 78
+  runner_image="$(yq -er '.spec.image' runner.yaml)" || return 78
+  runner_digest="${runner_image##*@}"
+  if [[ ! $runner_digest =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    echo "BLOCKER: runner.yaml does not pin an approved image digest" >&2
+    return 78
+  fi
   response="$(GITLAB_HOST="$host" glab api "$endpoint/jobs/$job/artifacts/$artifact")" ||
     return 78
   jq -e --arg commit "$commit" --arg job "$job" --arg pipeline "$pipeline" \
-    --arg name "$evidence_name" --arg revision "$standards_revision" '
+    --arg name "$evidence_name" --arg revision "$standards_revision" --arg digest "$runner_digest" '
     select(.commit == $commit and .job_id == $job and .pipeline_id == $pipeline
-           and .name == $name and .standards_revision == $revision and .status == "passed"
+           and .name == $name and .standards_revision == $revision
+           and .runner_digest == $digest and .status == "passed"
            and .return_code == 0 and .evidence_sanitized and .warnings == 0
            and .skipped_required_tests == 0 and .cleanup.status == "passed")
-    | {commit, job, job_id, pipeline_id, standards_revision, name, status}
+    | {commit, job, job_id, pipeline_id, standards_revision, runner_digest, name, status}
   ' <<<"$response" || {
     echo "BLOCKER: DCloud job is missing successful exact-commit gate evidence" >&2
     return 78
