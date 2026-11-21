@@ -78,6 +78,8 @@ setup_info = dict(name='redfish_ctl',
                       ],
                       "dev": [
                           "pytest >= 7",
+                          "pytest-cov >= 6.1",
+                          "psutil >= 5.9",
                           "requests-mock >= 1.10",
                           "ruff",
                           "mypy",
