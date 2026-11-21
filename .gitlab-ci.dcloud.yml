@@ -28,7 +28,10 @@ tests-and-coverage:
     # GitHub is the source of the mirrored LFS fixture objects. This remote
     # uses the public URL, independent of GitLab's authenticated clone remote.
     - git remote add github-fixtures https://github.com/spyroot/redfish_ctl.git
-    - git lfs pull github-fixtures
+    - unset GIT_LFS_SKIP_SMUDGE
+    - git lfs install --local
+    - git lfs fetch github-fixtures "$CI_COMMIT_SHA"
+    - git lfs checkout
     - python -m pip install -e '.[dev]'
   script:
     - bash scripts/gates/unit/all.sh --ci-report "$CI_COMMIT_SHA"

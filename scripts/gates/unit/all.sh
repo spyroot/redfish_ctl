@@ -27,6 +27,10 @@ if (( $# > 0 )); then
     exit 1
   fi
 
+  git lfs ls-files | awk '
+    $2 == "-" { print "Unhydrated Git LFS fixture: " $0 > "/dev/stderr"; missing = 1 }
+    END { exit missing }
+  '
   mkdir -p reports/tests
   printf '%s\n' "$checkout_sha" > reports/tests/commit.txt
   export COVERAGE_FILE="$PWD/reports/tests/.coverage"
