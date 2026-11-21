@@ -38,6 +38,7 @@ variables:
   REDFISH_HARBOR_PROJECT: harbor.dcloud.run/redfish_ctl
   REDFISH_HARBOR_BUILD_SECRET: redfish-harbor-build
   REDFISH_HARBOR_PULL_SECRET: redfish-harbor-pull
+  HELM_DRIVER: configmap
 
 .private-api-web:
   rules:

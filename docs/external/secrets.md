@@ -68,7 +68,10 @@ serve different endpoints. See [Telemetry liveness checks](gates.md#telemetry-li
 `redfish-harbor-pull`, selected by `charts/dmtf-sim/values-dcloud.yaml`, is the
 image-pull Secret for the `redfish-ctl-simulator` namespace. Use a private
 Harbor credential limited to pulling from the Redfish registry project. The
-same project pull access is needed by the focused and protected CI runners.
+same Secret name is configured in both CI runner namespaces for kubelet
+pulls. The protected simulator jobs use Helm's ConfigMap storage so their
+service account can manage release records without reading the pull Secret.
+Image and chart publication use their own registry authority.
 See [Protected DMTF simulator deployment](ci.md#protected-dmtf-simulator-deployment)
 for the publish and deploy sequence.
 

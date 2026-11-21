@@ -32,6 +32,7 @@ files="$(git ls-files \
   'k8s/*.yaml' 'k8s/**/*.yaml' \
   'charts/*.yaml' 'charts/**/*.yaml' | while read -r f; do
   case "$(basename "$f")" in Chart.yaml | values.yaml) continue ;; esac
+  [[ "$f" != "$DMTF_SIM_DCLOUD_VALUES" ]] || continue
   grep -qE '\{\{|__[A-Z0-9_]+__' "$f" || echo "$f"
 done)"
 if [ -z "$files" ]; then

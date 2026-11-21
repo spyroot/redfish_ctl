@@ -6,7 +6,7 @@ dcloud_gate_result() {
   local artifact=reports/ci/gate-merge.json
   local response job standards_revision
   if [[ -n $gate ]]; then
-    job_name=project-ci-cpu-validation
+    job_name="project-ci-cpu-validation"
     evidence_name="$gate"
     artifact="reports/gates/$gate.json"
   fi

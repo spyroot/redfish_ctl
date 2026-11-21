@@ -737,7 +737,7 @@ def _render(target: Target, chart: Path, values: Path) -> str:
     """Render the exact proposed Helm release without writing live state."""
     return run(
         "helm", "template", target.release, str(chart),
-        "--namespace", target.namespace, "--values", str(values), timeout=120,
+        "--namespace", target.namespace, "--values", str(values), "--skip-tests", timeout=120,
     )
 
 
