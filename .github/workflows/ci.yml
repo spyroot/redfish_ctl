@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install the pinned Helm and Git LFS tools
+      - name: Install the pinned CI tools
         run: |
           bash tools/install-ci-test-tools.sh "$RUNNER_TEMP/redfish-bin"
           printf '%s\n' "$RUNNER_TEMP/redfish-bin" >> "$GITHUB_PATH"

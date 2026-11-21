@@ -360,24 +360,165 @@ def test_kubernetes_render_fails_when_helm_is_missing(tmp_path) -> None:
     """The required chart render gate cannot silently skip a missing Helm."""
     command_dir = tmp_path / "bin"
     command_dir.mkdir()
-    commands = {
-        "dirname": shutil.which("dirname"),
-        "python": sys.executable,
-    }
-    assert all(commands.values()), commands
-    for name, target in commands.items():
-        (command_dir / name).symlink_to(target)
+    dirname = shutil.which("dirname")
+    assert dirname is not None
+    (command_dir / "dirname").symlink_to(dirname)
+    # Invoke the virtualenv interpreter at its original path so it locates pyvenv.cfg.
+    python = command_dir / "python"
+    python.write_text('#!/bin/sh\nexec "$TEST_PYTHON" "$@"\n', encoding="utf-8")
+    python.chmod(0o755)
 
     script = REPO_ROOT / "scripts" / "gates" / "kubernetes" / "render.sh"
     proc = subprocess.run(
         ["/bin/bash", str(script)],
         capture_output=True,
         text=True,
-        env={**os.environ, "PATH": str(command_dir)},
+        env={**os.environ, "PATH": str(command_dir), "TEST_PYTHON": sys.executable},
     )
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 1, combined
     assert "helm not installed" in combined, combined
+
+
+@pytest.fixture(scope="module")
+def ci_report_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create a shared offline checkout with fake Git and pytest commands."""
+    baseline = tmp_path_factory.mktemp("ci-report-baseline")
+    gate = baseline / "scripts/gates/unit/all.sh"
+    gate.parent.mkdir(parents=True)
+    shutil.copyfile(REPO_ROOT / "scripts/gates/unit/all.sh", gate)
+    command_dir = baseline / "bin"
+    command_dir.mkdir()
+    commands = {
+        "git": (
+            'case "$*" in\n'
+            '  "rev-parse HEAD") printf "%s\\n" "$TEST_CHECKOUT_SHA" ;;\n'
+            '  "lfs ls-files") printf "abcdef %s fixture.tar.gz\\n" "$TEST_LFS_STATE" ;;\n'
+            '  *) exit 99 ;;\n'
+            'esac\n'
+        ),
+        "pytest": (
+            'printf "%s\\n" "$@" > pytest.args\n'
+            'printf "<testsuite/>\\n" > reports/tests/junit.xml\n'
+            'if [ "$TEST_WRITE_COVERAGE" = yes ]; then\n'
+            '  printf "<coverage/>\\n" > reports/tests/coverage.xml\n'
+            'fi\n'
+        ),
+    }
+    for name, script in commands.items():
+        destination = command_dir / name
+        destination.write_text("#!/bin/sh\n" + script, encoding="utf-8")
+        destination.chmod(0o755)
+    return baseline
+
+
+@pytest.mark.parametrize(
+    ("override", "returncode", "diagnostic", "pytest_started"),
+    [
+        pytest.param({}, 0, "", True, id="reports-created"),
+        pytest.param({"requested_sha": "invalid"}, 2, "Usage:", False, id="malformed-sha"),
+        pytest.param(
+            {"TEST_CHECKOUT_SHA": "b" * 40}, 1, "Expected checkout", False, id="wrong-checkout"
+        ),
+        pytest.param(
+            {"TEST_LFS_STATE": "-"}, 1, "Unhydrated Git LFS fixture", False, id="lfs-pointer"
+        ),
+        pytest.param(
+            {"TEST_WRITE_COVERAGE": "no"}, 1, "Missing CI test report", True, id="missing-report"
+        ),
+    ],
+)
+def test_unit_gate_ci_report_contract(
+    tmp_path: Path,
+    ci_report_baseline: Path,
+    override: dict[str, str],
+    returncode: int,
+    diagnostic: str,
+    pytest_started: bool,
+) -> None:
+    """The reporting mode rejects the wrong checkout, fixtures, or output."""
+    project = tmp_path / "checkout"
+    shutil.copytree(ci_report_baseline, project)
+    settings = {
+        "requested_sha": "a" * 40,
+        "TEST_CHECKOUT_SHA": "a" * 40,
+        "TEST_LFS_STATE": "*",
+        "TEST_WRITE_COVERAGE": "yes",
+        **override,
+    }
+    requested_sha = settings.pop("requested_sha")
+    proc = subprocess.run(
+        ["/bin/bash", str(project / "scripts/gates/unit/all.sh"), "--ci-report", requested_sha],
+        env={**os.environ, **settings, "PATH": f"{project / 'bin'}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert proc.returncode == returncode, proc.stdout + proc.stderr
+    assert diagnostic in proc.stderr
+    assert (project / "pytest.args").is_file() == pytest_started
+    if returncode == 0:
+        reports = project / "reports/tests"
+        assert (reports / "commit.txt").read_text(encoding="utf-8").strip() == requested_sha
+        assert (reports / "junit.xml").stat().st_size > 0
+        assert (reports / "coverage.xml").stat().st_size > 0
+
+
+@pytest.fixture(scope="module")
+def ci_tool_install_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Provide a fixed previous installation and a network-free downloader."""
+    baseline = tmp_path_factory.mktemp("ci-tool-install-baseline")
+    command_dir = baseline / "bin"
+    command_dir.mkdir()
+    curl = command_dir / "curl"
+    curl.write_text(
+        '#!/bin/sh\n'
+        'while [ "$#" -gt 0 ]; do\n'
+        '  if [ "$1" = --output ]; then\n'
+        '    printf "invalid archive" > "$2"\n'
+        '    exit "$TEST_CURL_RESULT"\n'
+        '  fi\n'
+        '  shift\n'
+        'done\n'
+        'exit 99\n',
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    destination = baseline / "tools"
+    destination.mkdir()
+    (destination / "helm").write_bytes(b"existing tool")
+    return baseline
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.uname().machine != "x86_64",
+    reason="the CI installer targets Linux amd64",
+)
+@pytest.mark.parametrize("curl_result", [22, 0], ids=["download-failure", "checksum-mismatch"])
+def test_ci_tool_install_failure_preserves_destination(
+    tmp_path: Path, ci_tool_install_baseline: Path, curl_result: int
+) -> None:
+    """A failed or unverified download cannot replace an installed binary."""
+    work = tmp_path / "installer"
+    shutil.copytree(ci_tool_install_baseline, work)
+    destination = work / "tools"
+    old_helm = destination / "helm"
+    proc = subprocess.run(
+        ["/bin/bash", str(REPO_ROOT / "tools/install-ci-test-tools.sh"), str(destination)],
+        env={
+            **os.environ,
+            "TEST_CURL_RESULT": str(curl_result),
+            "PATH": f"{work / 'bin'}:{os.environ['PATH']}",
+        },
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert old_helm.read_bytes() == b"existing tool"
+    assert list(destination.iterdir()) == [old_helm]
 
 
 def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:

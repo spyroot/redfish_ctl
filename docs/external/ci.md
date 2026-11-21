@@ -167,12 +167,14 @@ and writes the tested commit, JUnit results, and Cobertura coverage under
 `reports/tests/`. Download these files from the GitHub `test-reports-3.10`
 artifact.
 
-`.gitlab-ci.dcloud.yml` defines the DCloud `tests-and-coverage` job. With
-this file selected as the DCloud project's CI/CD configuration file, run a
-pipeline on a mirrored branch. The job uses the `redfish_ctl` and
-`redfish_ctl-focused` tags, downloads the source's Git LFS fixtures, and
-publishes the same report files as job artifacts. GitLab also displays the
-JUnit results and the Cobertura coverage.
+`.gitlab-ci.dcloud.yml` defines the DCloud `tests-and-coverage` job for
+qualifying a mirrored branch. The job uses the `redfish_ctl` and
+`redfish_ctl-focused` tags, fetches the Git LFS fixtures, and publishes the
+same reports as job artifacts and native GitLab results.
+
+For branch qualification, select this config only while creating the
+pipeline, then restore the previous config path. Keep the default config
+until DCloud can run the required `gate-merge` and protected jobs.
 
 The offline suite clears BMC connection variables and excludes hardware,
 emulator, deployed simulator, and externally provisioned schema tests.
