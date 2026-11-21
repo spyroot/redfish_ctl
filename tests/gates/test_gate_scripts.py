@@ -733,3 +733,46 @@ def test_dcloud_dispatch_requires_the_approved_runner_digest(
     else:
         assert proc.returncode == 78, proc.stdout + proc.stderr
         assert "missing successful exact-commit gate evidence" in proc.stderr
+
+
+@pytest.mark.parametrize("mismatch", ["none", "sha", "repository", "state", "context", "target_url"])
+def test_dcloud_github_status_requires_exact_readback(
+    tmp_path: Path, mismatch: str,
+) -> None:
+    """A posted status counts only when GitHub reads back the same identity."""
+    repo = "example/redfish_ctl"
+    sha = "a" * 40
+    url = "https://ci.invalid/example/redfish_ctl/-/pipelines/12"
+    context = "gate-merge"
+    status = {"id": 123, "state": "success", "target_url": url, "context": context}
+    reply = {"sha": sha, "repository": {"full_name": repo}, "statuses": [status]}
+    if mismatch == "sha":
+        reply["sha"] = "b" * 40
+    elif mismatch == "repository":
+        reply["repository"] = {"full_name": "example/other"}
+    elif mismatch == "state":
+        status["state"] = "pending"
+    elif mismatch == "context":
+        status["context"] = "different-gate"
+    elif mismatch == "target_url":
+        status["target_url"] = url + "3"
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        '#!/bin/sh\nif [ "$4" = --method ]; then\n'
+        '  printf "%s" \'{"id":123}\'\nelse\n'
+        '  printf "%s" "$REDFISH_TEST_GITHUB_STATUS"\nfi\n',
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1"; shift; sleep() { :; }; dcloud_post_github_status "$@"',
+         "dcloud-test", str(adapter), repo, sha, "success", url, context],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "REDFISH_TEST_GITHUB_STATUS": json.dumps(reply),
+        },
+    )
+    assert proc.returncode == (0 if mismatch == "none" else 78)

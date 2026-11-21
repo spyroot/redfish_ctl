@@ -1130,6 +1130,31 @@ def test_evidence_sanitizer_rejects_missing_evidence(tmp_path: Path) -> None:
     assert "missing" in (proc.stdout + proc.stderr).lower()
 
 
+@pytest.mark.parametrize("variant", ["xml-boundary", "credential-value", "credential-comment", "malformed"])
+def test_evidence_sanitizer_understands_junit_fields(
+    tmp_path: Path, variant: str,
+) -> None:
+    """JUnit markup may mention a password without publishing a secret."""
+    reports = tmp_path / "reports"
+    junit = reports / "tests" / "junit.xml"
+    junit.parent.mkdir(parents=True)
+    payload = '<testsuite><testcase name="test_password" time="0.123"/></testsuite>'
+    fake_credential = "password: " + "fixture-secret-value"
+    if variant == "credential-value":
+        payload = payload.replace("test_password", fake_credential)
+    elif variant == "credential-comment":
+        payload = f"<!--{fake_credential}-->{payload}"
+    elif variant == "malformed":
+        payload = payload.removesuffix("</testsuite>")
+    junit.write_text(payload, encoding="utf-8")
+    proc = subprocess.run(
+        [str(SANITIZER)], cwd=REPO_ROOT, capture_output=True, text=True,
+        timeout=30, check=False, env={**os.environ, "EVIDENCE_DIR": str(reports)},
+    )
+    assert proc.returncode == (0 if variant == "xml-boundary" else 1)
+    assert fake_credential not in proc.stdout + proc.stderr
+
+
 def test_dispatch_rejects_raw_argument_without_echoing_it() -> None:
     """Unknown raw values never enter dispatch argv or diagnostics."""
     secret_shaped_value = "gl" + "pat-" + ("A" * 24)

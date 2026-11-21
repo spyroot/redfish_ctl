@@ -37,9 +37,10 @@ authenticated manifest. See [Gates](gates.md#selected-gate-summary).
 
 ## Dispatch an exact branch check
 
-Authenticate `glab` to the configured DCloud project and install `jq` and
-`yq`. The branch selected by `--ref`, or the current named branch by default,
-must already have the same commit on DCloud. These commands print a plan:
+Authenticate `glab` to the configured DCloud project and `gh` to the GitHub
+repository, and install `jq` and `yq`. The branch selected by `--ref`, or the
+current named branch by default, must already have the same commit on DCloud.
+These commands print a plan:
 
 ```bash
 ./scripts/check.sh --profile merge --gate unit.all --dispatch
@@ -54,7 +55,11 @@ Run the second plan to collect the required merge result:
 
 The wrapper checks the mirror SHA before dispatch and verifies the returned
 pipeline SHA. It waits for the terminal result unless `--no-wait` is supplied.
-For a successful result it reads back the exact job and its gate evidence.
+For a waited merge dispatch, it posts the `gate-merge` context declared in
+`inventory/ci/go-no-go.yaml` as pending on the exact GitHub commit and reads
+back the terminal state. Success requires
+the native job plus the matching gate and smoke evidence, including the
+approved runner digest. A `--no-wait` response confirms dispatch only.
 An API or web dispatch with `MERGE_PROFILE=merge` selects `gate-merge`.
 Set `FOCUSED_GATE=unit.all` instead to select only
 `project-ci-cpu-validation`, the CPU job defined in `.gitlab-ci.yml`.

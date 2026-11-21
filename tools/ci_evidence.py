@@ -13,6 +13,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -41,10 +42,57 @@ _CREDENTIAL_RE = re.compile(
     r"[Bb]earer [A-Za-z0-9._-]{20,}|glpat-[A-Za-z0-9_-]{20,}|"
     r"ghp_[A-Za-z0-9]{30,}|password[\"' :=]+[^ *]{6,}"
 )
+_TEST_REPORTS = {Path("tests/junit.xml"), Path("tests/coverage.xml")}
+_XML_COMMENTS_AND_INSTRUCTIONS = re.compile(r"<!--.*?-->|<\?.*?\?>", re.DOTALL)
 
 
 class EvidenceError(ValueError):
     """Raised when required exact-identity evidence cannot be established."""
+
+
+def _xml_report_has_credentials(payload: bytes) -> bool:
+    """Scan XML content fields without matching across markup boundaries."""
+    text = payload.decode("utf-8")
+    if "<!DOCTYPE" in text:
+        raise EvidenceError("XML evidence must not contain a document type")
+    if any(
+        _CREDENTIAL_RE.search(markup.group())
+        for markup in _XML_COMMENTS_AND_INSTRUCTIONS.finditer(text)
+    ):
+        return True
+    root = ET.fromstring(text)
+    return any(
+        _CREDENTIAL_RE.search(value)
+        for node in root.iter()
+        for value in (node.tag, node.text or "", node.tail or "", *node.attrib, *node.attrib.values())
+    )
+
+
+def validate_evidence_tree(directory: Path) -> None:
+    """Reject secret-shaped content and unreadable reports throughout an evidence tree."""
+    if not directory.is_dir():
+        raise EvidenceError("required evidence directory is missing")
+
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
+    try:
+        for parent, _, files in os.walk(directory, onerror=raise_walk_error):
+            for name in files:
+                path = Path(parent) / name
+                if path.is_symlink():
+                    continue
+                payload = path.read_bytes()
+                if path.relative_to(directory) in _TEST_REPORTS:
+                    contains_credentials = _xml_report_has_credentials(payload)
+                else:
+                    contains_credentials = b"\0" not in payload and bool(
+                        _CREDENTIAL_RE.search(payload.decode("utf-8", errors="replace"))
+                    )
+                if contains_credentials:
+                    raise EvidenceError("secret-shaped content found in evidence")
+    except (ET.ParseError, OSError, UnicodeError) as error:
+        raise EvidenceError("evidence scan failed") from error
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -796,3 +844,22 @@ def write_evidence(
         if temporary is not None and temporary.exists():
             temporary.unlink()
     return finalized
+
+
+def main() -> int:
+    """Validate the evidence directory supplied by the guarded shell gate."""
+    if len(sys.argv) != 2:
+        print("usage: python -m tools.ci_evidence <evidence-directory>", file=sys.stderr)
+        return 2
+    directory = Path(sys.argv[1])
+    try:
+        validate_evidence_tree(directory)
+    except EvidenceError as error:
+        print(f"evidence.sanitized: {error}", file=sys.stderr)
+        return 1
+    print(f"evidence.sanitized: OK ({directory} clean)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

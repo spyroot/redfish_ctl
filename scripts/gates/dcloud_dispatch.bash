@@ -42,14 +42,73 @@ dcloud_gate_result() {
   }
 }
 
+dcloud_verify_smoke_result() {
+  local host="$1" endpoint="$2" gate_result="$3"
+  local job response
+  job="$(jq -er '.job_id' <<<"$gate_result")" || return 78
+  response="$(GITLAB_HOST="$host" glab api "$endpoint/jobs/$job/artifacts/reports/smoke/gate-merge.json")" ||
+    return 78
+  jq -e --argjson gate "$gate_result" '
+    select(.kind == "smoke" and .name == $gate.name and .commit == $gate.commit
+           and .job_id == $gate.job_id and .pipeline_id == $gate.pipeline_id
+           and .standards_revision == $gate.standards_revision and .runner_digest == $gate.runner_digest
+           and .status == "passed" and .return_code == 0 and .evidence_sanitized
+           and .warnings == 0 and .skipped_required_tests == 0 and .cleanup.status == "passed"
+           and (.checks|length > 0) and all(.checks[]; .status == "passed"))
+  ' <<<"$response" >/dev/null || {
+    echo "BLOCKER: DCloud job is missing successful exact-commit smoke evidence" >&2
+    return 78
+  }
+}
+
+dcloud_post_github_status() {
+  local repo="$1" commit="$2" state="$3" target_url="$4" context="$5"
+  local created status_id response attempt
+  created="$(gh api --hostname github.com --method POST "repos/$repo/statuses/$commit" \
+    -f "state=$state" -f "context=$context" -f "target_url=$target_url" \
+    -f "description=DCloud gate-merge: $state")" || return 78
+  status_id="$(jq -er '.id | tostring' <<<"$created")" || return 78
+  for attempt in 1 2 3; do
+    response="$(gh api --hostname github.com "repos/$repo/commits/$commit/status")" || return 78
+    if jq -e --arg repo "$repo" --arg sha "$commit" --arg state "$state" \
+      --arg context "$context" --arg target "$target_url" --arg status_id "$status_id" '
+        .sha == $sha and .repository.full_name == $repo and any(.statuses[];
+          (.id|tostring) == $status_id and .context == $context
+          and .state == $state and .target_url == $target)
+      ' <<<"$response" >/dev/null; then
+      return 0
+    fi
+    if ((attempt < 3)); then sleep 1; fi
+  done
+  echo "BLOCKER: the exact DCloud status could not be read back from GitHub" >&2
+  return 78
+}
+
+dcloud_wait_pipeline() {
+  local host="$1" endpoint="$2" id="$3" commit="$4" timeout_seconds="$5"
+  local deadline=$((SECONDS + timeout_seconds))
+  local receipt status
+  while ((SECONDS < deadline)); do
+    receipt="$(GITLAB_HOST="$host" glab api "$endpoint/pipelines/$id")" || return 78
+    status="$(jq -er --arg sha "$commit" 'select(.sha == $sha).status' <<<"$receipt")" || return 78
+    case "$status" in
+      success|failed|canceled|skipped|manual) printf '%s\n' "$receipt"; return 0 ;;
+    esac
+    sleep 5
+  done
+  echo "BLOCKER: DCloud dispatch exceeded its result timeout" >&2
+  return 78
+}
+
 dispatch_dcloud() {
   local project="$1" ref="$2" commit="$3" gate="$4" apply="$5"
   shift 5
-  local host project_path endpoint variable value request receipt status id deadline
+  local host project_path endpoint variable value request receipt status id
   local no_wait=false timeout_seconds=1800
   host="$(yq -er '.variables.REDFISH_CI_SERVER_HOST' .gitlab-ci.yml)" || return 78
   project_path="$(yq -er '.variables.REDFISH_CI_PROJECT_PATH' .gitlab-ci.yml)" || return 78
-  if [[ ! $host =~ ^[a-zA-Z0-9.-]+$ || ${project_path##*/} != "$project" ]]; then
+  if [[ ! $host =~ ^[a-zA-Z0-9.-]+$ || ! $project_path =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ||
+        ${project_path##*/} != "$project" ]]; then
     echo "BLOCKER: CI authority disagrees with the project binding" >&2
     return 78
   fi
@@ -94,34 +153,55 @@ dispatch_dcloud() {
     echo "BLOCKER: GitLab mirror ref differs from the requested local commit" >&2
     return 78
   fi
-  receipt="$(GITLAB_HOST="$host" glab api --method POST "$endpoint/pipeline" --input - <<<"$request")" ||
-    return 78
-  if [[ $(jq -r '.sha' <<<"$receipt") != "$commit" ]]; then
-    echo "BLOCKER: dispatched GitLab pipeline used a different commit" >&2
-    return 78
-  fi
-  id="$(jq -er '.id' <<<"$receipt")" || return 78
-  deadline=$((SECONDS + timeout_seconds))
-  while :; do
-    status="$(jq -er '.status' <<<"$receipt")" || return 78
-    case "$status" in
-      success|failed|canceled|skipped|manual) break ;;
-    esac
-    if $no_wait; then break; fi
-    if ((SECONDS >= deadline)); then
-      echo "BLOCKER: DCloud dispatch exceeded its result timeout" >&2
+  local reflect=false remote url repo_url context
+  url="https://$host/$project_path/-/pipelines?sha=$commit"
+  if [[ -z $gate && $no_wait == false ]]; then
+    remote="$(git remote get-url origin)" || return 78
+    repo_url="https://github.com/$project_path"
+    if [[ ${remote%.git} != "$repo_url" ]]; then
+      echo "BLOCKER: GitHub status target disagrees with origin" >&2
       return 78
     fi
-    sleep 5
-    receipt="$(GITLAB_HOST="$host" glab api "$endpoint/pipelines/$id")" || return 78
-  done
-  if $no_wait || [[ $status != success ]]; then
-    jq '{id,sha,ref,status,web_url}' <<<"$receipt"
-    [[ $no_wait == true ]]
-    return $?
+    context="$(yq -er '.spec.ci.requiredContext' inventory/ci/go-no-go.yaml)" || return 78
+    if [[ -z $context || $context == null ]]; then
+      echo "BLOCKER: the merge inventory lacks a required GitHub status context" >&2
+      return 78
+    fi
+    dcloud_post_github_status "$project_path" "$commit" pending "$url" "$context" || return 78
+    reflect=true
   fi
+  if ! receipt="$(GITLAB_HOST="$host" glab api --method POST "$endpoint/pipeline" --input - <<<"$request")" ||
+     ! id="$(jq -er --arg sha "$commit" 'select(.sha == $sha and (.id|type) == "number").id' <<<"$receipt")"; then
+    if $reflect; then
+      dcloud_post_github_status "$project_path" "$commit" error "$url" "$context" || return 78
+    fi
+    echo "BLOCKER: GitLab did not create the selected exact-commit pipeline" >&2
+    return 78
+  fi
+  if $no_wait; then
+    jq '{id,sha,ref,status,web_url}' <<<"$receipt"
+    return
+  fi
+  url="https://$host/$project_path/-/pipelines/$id"
+  if ! receipt="$(dcloud_wait_pipeline "$host" "$endpoint" "$id" "$commit" "$timeout_seconds")"; then
+    if $reflect; then
+      dcloud_post_github_status "$project_path" "$commit" error "$url" "$context" || return 78
+    fi
+    return 78
+  fi
+  status="$(jq -er '.status' <<<"$receipt")" || return 78
   local gate_result
-  gate_result="$(dcloud_gate_result "$host" "$endpoint" "$id" "$commit" "$gate")" ||
-    return "$?"
+  if [[ $status != success ]] ||
+     ! gate_result="$(dcloud_gate_result "$host" "$endpoint" "$id" "$commit" "$gate")" ||
+     { $reflect && ! dcloud_verify_smoke_result "$host" "$endpoint" "$gate_result"; }; then
+    if $reflect; then
+      dcloud_post_github_status "$project_path" "$commit" failure "$url" "$context" || return 78
+    fi
+    jq '{id,sha,ref,status,web_url}' <<<"$receipt"
+    return 1
+  fi
+  if $reflect; then
+    dcloud_post_github_status "$project_path" "$commit" success "$url" "$context" || return 78
+  fi
   jq --argjson gate "$gate_result" '{id,sha,ref,status,web_url,gate:$gate}' <<<"$receipt"
 }
