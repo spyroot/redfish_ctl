@@ -1,0 +1,16 @@
+# CI tools for the Redfish project on its DCloud Kubernetes runners.
+FROM quay.io/condaforge/miniforge3:25.3.1-0@sha256:5e88cdc957318a7ad805d94a58379c01c16d7d3f9c203da42d1760b960b5cf03
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git util-linux \
+    && rm -rf /var/lib/apt/lists/* \
+    && conda install --yes shellcheck=0.11.0 yamllint=1.38.0 \
+    && conda clean --all --yes
+
+COPY tools/install-ci-test-tools.sh /tmp/install-ci-test-tools.sh
+RUN bash /tmp/install-ci-test-tools.sh --toolbox /usr/local/bin \
+    && rm /tmp/install-ci-test-tools.sh
+
+ENV CONDA_ENVS_PATH=/tmp/redfish-conda/envs \
+    CONDA_PKGS_DIRS=/tmp/redfish-conda/pkgs
+USER 1001
