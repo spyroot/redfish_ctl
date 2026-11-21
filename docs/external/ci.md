@@ -158,28 +158,35 @@ credential prerequisite is documented under [Private DMTF simulator
 image](secrets.md#private-dmtf-simulator-image), and the served resource
 contract is [Redfish Simulator Contract](simulator-contract.md).
 
-## Supplemental `.github/workflows/ci.yml` check
+## Tests and coverage on GitHub and DCloud
 
-Triggers on pushes to `main` and on every pull request.
+`.github/workflows/ci.yml` runs the complete offline unit suite on Python 3.10
+for every pull request and push to `main`, including documentation changes.
+`scripts/gates/unit/all.sh --ci-report <commit-sha>` runs the same selection
+and writes the tested commit, JUnit results, and Cobertura coverage under
+`reports/tests/`. Download these files from the GitHub `test-reports-3.10`
+artifact.
 
-- Runs the full **offline** test suite (`pytest -q -m "not dmtf_sim_live"`) on
-  Python **3.10** for pushes and PRs with non-documentation changes. For a
-  docs-only PR, the supplemental fast path scans a bounded top-level test set
-  and may run no tests. The Internal GitLab merge profile remains the
-  authoritative gate, including nested test coverage.
+`.gitlab-ci.dcloud.yml` defines the DCloud `tests-and-coverage` job for
+qualifying a mirrored branch. The job uses the `redfish_ctl` and
+`redfish_ctl-focused` tags, fetches the Git LFS fixtures, and publishes the
+same reports as job artifacts and native GitLab results.
+
+For branch qualification, select this config only while creating the
+pipeline, then restore the previous config path. Keep the default config
+until DCloud can run the required `gate-merge` and protected jobs.
+
+The offline suite clears BMC connection variables and excludes hardware,
+emulator, deployed simulator, and externally provisioned schema tests.
+The required `gate-merge` and protected jobs remain in `.gitlab-ci.yml`.
+
+The GitHub workflow also performs these checks.
+
 - Runs `ruff check` as **informational** (reported, not failing — the tree carries pre-existing lint
   debt; new code should still be clean).
 - Runs blocking docstring checks with `python tools/docstring_gate.py --base FETCH_HEAD`
   for pull-request changes and `python tools/docstring_gate.py --all` for the
   whole tree.
-- Uses **no secrets** and never contacts a BMC. Hardware-backed `live` tests
-  skip without the private binding, emulator tests skip without their endpoint
-  variables, and `dmtf_sim_live` is excluded. Checkout enables Git LFS for the
-  committed offline corpus and specification artifacts used by the suite.
-
-Installs the package with its test dependencies via `pip install -e ".[dev]"` (the `dev` extra pulls
-in `pytest`, `requests-mock`, `ruff`, `mypy`, and `numpy`, the last needed for the discovery
-`.npy` test).
 
 ## `release.yml` — publish on a version tag
 

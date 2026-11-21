@@ -39,6 +39,7 @@ from tools.provider_contract import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
 SANITIZER = REPO_ROOT / "scripts" / "gates" / "evidence" / "sanitized.sh"
+LEGACY_BUILDER_BINDING = REPO_ROOT / "builder-binding.yaml"
 CI_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "ci-evidence.schema.json"
 SMOKE_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "smoke-evidence.schema.json"
 DIGEST = "sha256:" + ("a" * 64)
@@ -1449,8 +1450,7 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert 'repository = f"{repository}.git"' in source
     assert "JOB-TOKEN:" not in source
 
-    binding = _yaml(REPO_ROOT / "standards-binding.yaml")
-    provider = _yaml(REPO_ROOT / binding["spec"]["providers"][0]["binding"])
+    provider = _yaml(LEGACY_BUILDER_BINDING)
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     manifest = _yaml(REPO_ROOT / "gates/manifest.yaml")
     include_identities = {

@@ -1,0 +1,50 @@
+# Standalone DCloud test lane. The project CI configuration file selects this
+# path. The existing merge and protected jobs are declared in .gitlab-ci.yml.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $CI_COMMIT_BRANCH'
+    - when: never
+
+stages: [test]
+
+tests-and-coverage:
+  stage: test
+  image: python:3.10-bookworm@sha256:39b8470a9f625a81098294331d1df87459634eff7f9e3facbd1a9b5739985f45
+  tags: [redfish_ctl, redfish_ctl-focused]
+  timeout: 25 minutes
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "0"
+    GIT_LFS_SKIP_SMUDGE: "1"
+    GIT_TERMINAL_PROMPT: "0"
+  before_script:
+    - bash tools/install-ci-test-tools.sh "$CI_PROJECT_DIR/.ci-bin"
+    - python -m venv "$CI_PROJECT_DIR/.ci-venv"
+    - export PATH="$CI_PROJECT_DIR/.ci-bin:$CI_PROJECT_DIR/.ci-venv/bin:$PATH"
+    # GitHub is the source of the mirrored LFS fixture objects. This remote
+    # uses the public URL, independent of GitLab's authenticated clone remote.
+    - git remote add github-fixtures https://github.com/spyroot/redfish_ctl.git
+    - unset GIT_LFS_SKIP_SMUDGE
+    - git lfs install --local
+    - git lfs fetch github-fixtures "$CI_COMMIT_SHA"
+    - git lfs checkout
+    - python -m pip install -e '.[dev]'
+  script:
+    - bash scripts/gates/unit/all.sh --ci-report "$CI_COMMIT_SHA"
+  coverage: '/^TOTAL\s+.*\s+(\d+(?:\.\d+)?%)$/'
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - reports/tests/commit.txt
+      - reports/tests/junit.xml
+      - reports/tests/coverage.xml
+    reports:
+      junit: reports/tests/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: reports/tests/coverage.xml
