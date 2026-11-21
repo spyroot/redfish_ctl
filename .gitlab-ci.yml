@@ -25,6 +25,8 @@ variables:
   GIT_LFS_SKIP_SMUDGE: "1"
   GIT_TERMINAL_PROMPT: "0"
   CONDA_ENV: redfish_ctl
+  CONDA_NUMBER_CHANNEL_NOTICES: "0"
+  CONDA_REGISTER_ENVS: "false"
   PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
   REDFISH_CI_SERVER_HOST: gitlab.dcloud.run
   REDFISH_CI_PROJECT_PATH: spyroot/redfish_ctl

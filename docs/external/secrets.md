@@ -65,10 +65,10 @@ serve different endpoints. See [Telemetry liveness checks](gates.md#telemetry-li
 
 ### Private DMTF simulator image
 
-`harbor-registry-pull`, defined by the Builder project-service binding and
-provisioned by its protected bootstrap, is the image-pull `Secret` referenced
-by `charts/dmtf-sim/values.yaml`. It must exist in the `dmtf-bmc` namespace;
-operators do not copy its credential into chart values or pipeline variables.
+`redfish-harbor-pull`, selected by `charts/dmtf-sim/values-dcloud.yaml`, is the
+image-pull Secret for the `redfish-ctl-simulator` namespace. Use a private
+Harbor credential limited to pulling from the Redfish registry project. The
+same project pull access is needed by the focused and protected CI runners.
 See [Protected DMTF simulator deployment](ci.md#protected-dmtf-simulator-deployment)
 for the publish and deploy sequence.
 
