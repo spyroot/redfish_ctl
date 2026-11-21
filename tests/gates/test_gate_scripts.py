@@ -460,6 +460,10 @@ def test_unit_gate_ci_report_contract(
     assert (project / "pytest.args").is_file() == pytest_started
     if returncode == 0:
         reports = project / "reports/tests"
+        arguments = (project / "pytest.args").read_text(encoding="utf-8").splitlines()
+        assert "--junitxml=reports/tests/junit.xml" in arguments
+        assert "--cov" in arguments
+        assert "--cov-report=xml:reports/tests/coverage.xml" in arguments
         assert (reports / "commit.txt").read_text(encoding="utf-8").strip() == requested_sha
         assert (reports / "junit.xml").stat().st_size > 0
         assert (reports / "coverage.xml").stat().st_size > 0
@@ -495,17 +499,28 @@ def ci_tool_install_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
     sys.platform != "linux" or os.uname().machine != "x86_64",
     reason="the CI installer targets Linux amd64",
 )
-@pytest.mark.parametrize("curl_result", [22, 0], ids=["download-failure", "checksum-mismatch"])
-def test_ci_tool_install_failure_preserves_destination(
-    tmp_path: Path, ci_tool_install_baseline: Path, curl_result: int
+@pytest.mark.parametrize(
+    ("curl_result", "options", "returncode"),
+    [
+        pytest.param(22, (), 1, id="download-failure"),
+        pytest.param(0, (), 1, id="checksum-mismatch"),
+        pytest.param(22, ("--dry-run",), 0, id="dry-run"),
+    ],
+)
+def test_ci_tool_install_preserves_destination_when_no_tool_is_installed(
+    tmp_path: Path,
+    ci_tool_install_baseline: Path,
+    curl_result: int,
+    options: tuple[str, ...],
+    returncode: int,
 ) -> None:
-    """A failed or unverified download cannot replace an installed binary."""
+    """Dry-run and unsuccessful downloads leave the old tool and no temporary files."""
     work = tmp_path / "installer"
     shutil.copytree(ci_tool_install_baseline, work)
     destination = work / "tools"
     old_helm = destination / "helm"
     proc = subprocess.run(
-        ["/bin/bash", str(REPO_ROOT / "tools/install-ci-test-tools.sh"), str(destination)],
+        ["/bin/bash", str(REPO_ROOT / "tools/install-ci-test-tools.sh"), *options, str(destination)],
         env={
             **os.environ,
             "TEST_CURL_RESULT": str(curl_result),
@@ -516,7 +531,11 @@ def test_ci_tool_install_failure_preserves_destination(
         timeout=10,
         check=False,
     )
-    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.returncode == returncode, proc.stdout + proc.stderr
+    if options:
+        assert proc.stdout.count("Would install ") == 4
+    else:
+        assert "Failed to verify or install" in proc.stderr
     assert old_helm.read_bytes() == b"existing tool"
     assert list(destination.iterdir()) == [old_helm]
 

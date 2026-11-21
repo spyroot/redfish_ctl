@@ -4,6 +4,11 @@ set -euo pipefail
 
 install_release_binary() (
   local url=$1 checksum=$2 member=$3 destination=$4 staging
+  if [[ $dry_run == true ]]; then
+    printf 'Would install %s from %s (sha256 %s)\n' "$destination" "$url" "$checksum"
+    exit 0
+  fi
+
   staging=$(mktemp -d "$(dirname "$destination")/.install.XXXXXX")
   trap 'rm -rf -- "$staging"' EXIT
   trap 'exit 130' INT
@@ -13,7 +18,7 @@ install_release_binary() (
     --output "$staging/download" "$url" ||
     ! printf '%s  %s\n' "$checksum" "$staging/download" | sha256sum --check --status; then
     printf 'Failed to verify or install %s\n' "$url" >&2
-    return 1
+    exit 1
   fi
 
   if [[ -n $member ]]; then
@@ -25,12 +30,19 @@ install_release_binary() (
   mv -f -- "$staging/binary" "$destination"
 )
 
-if [[ $# != 1 || $(uname -sm) != 'Linux x86_64' ]]; then
-  printf 'Usage on Linux amd64: bash %s <bin-directory>\n' "$0" >&2
+dry_run=false
+if [[ ${1:-} == --dry-run ]]; then
+  dry_run=true
+  shift
+fi
+if [[ $# != 1 || ( $dry_run == false && $(uname -sm) != 'Linux x86_64' ) ]]; then
+  printf 'Usage: bash %s [--dry-run] <Linux amd64 bin-directory>\n' "$0" >&2
   exit 2
 fi
 
-mkdir -p -- "$1"
+if [[ $dry_run == false ]]; then
+  mkdir -p -- "$1"
+fi
 install_release_binary \
   https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz \
   ee88b3c851ae6466a3de507f7be73fe94d54cbf2987cbaa3d1a3832ea331f2cd \
