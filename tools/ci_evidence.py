@@ -440,6 +440,8 @@ def _run_captured_command(
     evidence parsing. Output is returned only after the complete capture can be
     scanned for secret-shaped content. A new process group lets a timeout stop
     the gate and any child processes that inherited the output pipe.
+    The parent owns the command's scratch directory, so a killed child cannot
+    leave unvalidated staged reports behind.
 
     :param command: executable path or exact argument vector.
     :param root: working directory for the gate.
@@ -453,27 +455,30 @@ def _run_captured_command(
         isinstance(value, str) and value for value in command_args
     ):
         raise EvidenceError("captured command argument vector is invalid")
-    process = subprocess.Popen(
-        command_args,
-        cwd=root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    timed_out = False
-    try:
-        output, _ = process.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
-        timed_out = True
+    with tempfile.TemporaryDirectory(prefix=".redfish-ci-", dir=root) as scratch:
+        selected_env = dict(os.environ if env is None else env)
+        selected_env["REDFISH_CI_SCRATCH_DIR"] = scratch
+        process = subprocess.Popen(
+            command_args,
+            cwd=root,
+            env=selected_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        timed_out = False
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
+            output, _ = process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            output, _ = process.communicate()
 
     return output, 124 if timed_out else process.returncode, timed_out
 

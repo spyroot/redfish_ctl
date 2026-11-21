@@ -45,7 +45,8 @@ git lfs ls-files | awk '
 reports="$PWD/reports/tests"
 mkdir -p "$reports"
 rm -f -- "$reports"/{commit.txt,junit.xml,coverage.xml,.coverage}
-staging="$(mktemp -d "$PWD/reports/.test-evidence.XXXXXX")"
+scratch_root="${REDFISH_CI_SCRATCH_DIR:-$PWD/reports}"
+staging="$(mktemp -d "$scratch_root/.test-evidence.XXXXXX")"
 trap 'rm -rf -- "$staging"' EXIT
 staged_reports="$staging/tests"
 mkdir "$staged_reports"

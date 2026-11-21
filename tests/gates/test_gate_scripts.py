@@ -815,10 +815,27 @@ def test_waited_dcloud_dispatch_distinguishes_gate_and_pipeline_status(
     """A green pipeline with rejected evidence must publish only a failure receipt."""
     adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
     statuses = tmp_path / "statuses"
+    project_path = "fixture-owner/fixture-project"
+    (tmp_path / ".gitlab-ci.yml").write_text(
+        json.dumps({
+            "variables": {
+                "REDFISH_CI_SERVER_HOST": "ci.invalid",
+                "REDFISH_CI_PROJECT_PATH": project_path,
+            },
+        }),
+        encoding="utf-8",
+    )
+    inventory = tmp_path / "inventory/ci"
+    inventory.mkdir(parents=True)
+    (inventory / "go-no-go.yaml").write_text(
+        json.dumps({"spec": {"ci": {"requiredContext": "fixture-merge"}}}),
+        encoding="utf-8",
+    )
     fixture = r"""
 source "$1"
+project_path="$2"
 commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-git() { printf '%s\n' https://github.com/spyroot/redfish_ctl; }
+git() { printf 'https://github.com/%s\n' "$project_path"; }
 glab() {
   case "$*" in
     *repository/branches/*) jq -n --arg sha "$commit" '{commit:{id:$sha}}' ;;
@@ -837,11 +854,11 @@ dcloud_gate_result() {
   [[ $TEST_REJECTED != gate ]] && printf '%s\n' '{"status":"passed"}'
 }
 dcloud_verify_smoke_result() { [[ $TEST_REJECTED != smoke ]]; }
-dispatch_dcloud redfish_ctl fixture "$commit" "" true
+dispatch_dcloud "${project_path##*/}" fixture "$commit" "" true
 """
     proc = subprocess.run(
-        ["bash", "-c", fixture, "dcloud-test", str(adapter)],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+        ["bash", "-c", fixture, "dcloud-test", str(adapter), project_path],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
         env={**os.environ, "TEST_REJECTED": rejected, "TEST_STATUSES": str(statuses)},
     )
     assert proc.returncode == (0 if rejected == "none" else 1), proc.stderr

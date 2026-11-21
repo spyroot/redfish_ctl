@@ -79,6 +79,8 @@ declared output. See [Gates](gates.md#failure-behavior).
 The shared `scripts/gates/unit/all.sh` reporting mode stages JUnit and Cobertura
 outside the forge upload paths. It only publishes reports that pass the
 credential scan, including reports from a failed pytest run.
+The DCloud gate runner in `tools/ci_evidence.py` owns the scratch directory
+and removes it even when a gate times out.
 
 ## Protected DMTF simulator deployment
 

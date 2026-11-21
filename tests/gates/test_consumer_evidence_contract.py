@@ -543,11 +543,16 @@ def test_observe_gate_counts_nonnumeric_warning_forms_as_non_green(
 
 
 def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
-    """A timed-out gate returns bounded evidence without a surviving child."""
+    """A timed-out gate returns bounded evidence and removes its report staging."""
     root = _root(tmp_path)
     command = root / "timeout.sh"
     command.write_text(
-        "#!/bin/sh\nprintf 'started\\n'\nsleep 5\n",
+        "#!/bin/sh\n"
+        "mkdir -p reports\n"
+        'stage="$(mktemp -d "${REDFISH_CI_SCRATCH_DIR:-reports}/.test-evidence.XXXXXX")"\n'
+        'printf "%s\\n" "$stage" > reports/staging-path\n'
+        'printf "<testsuite/>\\n" > "$stage/junit.xml"\n'
+        "sleep 5\n",
         encoding="utf-8",
     )
     command.chmod(0o755)
@@ -555,11 +560,13 @@ def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
     observations = observe_gate(
         command=str(command),
         root=root,
-        timeout_seconds=0.1,
+        timeout_seconds=0.5,
     )
 
     assert observations["timed_out"] is True
     assert observations["return_code"] == 124
+    report_stage = root / (root / "reports/staging-path").read_text(encoding="utf-8").strip()
+    assert not report_stage.exists()
 
 
 def test_smoke_timeout_comes_from_inventory_and_is_observed(
