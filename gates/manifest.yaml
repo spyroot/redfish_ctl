@@ -21,6 +21,7 @@ required_jobs:
   - gate-scheduled
 
 # Keep the complete simulator lifecycle on the protected runner and branch.
+protected_resource_group: redfish-ctl-dmtf-sim
 protected_jobs:
   project-service-image-publish: {when: manual, serialized: false}
   project-service-chart-publish: {when: manual, serialized: false}

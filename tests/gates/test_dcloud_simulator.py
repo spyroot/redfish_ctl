@@ -140,50 +140,209 @@ def test_existing_image_is_independently_verified_without_rebuild(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("override", "expected_writes", "message"),
+    ("changed", "create_error", "expect_delete"),
     [
-        (None, ("uninstall",), None),
-        ({"revision": 2}, (), "modified by another pipeline"),
-        ({"commit": "b" * 40}, (), "modified by another pipeline"),
-        ({"image": f"{TARGET.image_repo}@sha256:{'9' * 64}"}, (), "modified by another pipeline"),
+        (None, "create timed out", True),
+        (("metadata", "labels", "redfish-ctl/build-attempt"), "already exists", False),
+        (("spec", "output", "to", "name"), "create timed out", False),
     ],
 )
-def test_first_install_rollback_is_scoped_to_observed_apply(
-    monkeypatch, override, expected_writes, message,
+def test_uncertain_build_create_reconciles_only_the_owned_attempt(
+    monkeypatch, changed, create_error, expect_delete,
 ):
-    """Recreate the baseline for each disagreement and guard live rollback."""
-    plan = {
+    """Use the exact submitted manifest as the baseline for uncertain-create cases."""
+    current = None
+    deletions = []
+    name = f"sim-{TARGET.pipeline}-{TARGET.job}"
+    uid = "fixture-created-uid"
+    monkeypatch.setattr(lifecycle, "_build_context", lambda folder, _target: folder / "source.tar")
+
+    def tool(*args, data=None, **_options):
+        nonlocal current
+        if args[:6] == ("oc", "-n", TARGET.build_namespace, "create", "-f", "-"):
+            # REST creates the object, but the command never receives its result.
+            current = json.loads(data)
+            current["metadata"]["uid"] = uid
+            if changed is not None:
+                field = current
+                for component in changed[:-1]:
+                    field = field[component]
+                field[changed[-1]] = "other-attempt"
+            raise lifecycle.LifecycleError(create_error)
+        if args[:6] == ("oc", "-n", TARGET.build_namespace, "get", "buildconfig", name):
+            return "" if current is None else json.dumps(current)
+        if args[:3] == ("oc", "delete", "--raw"):
+            assert args[3] == (
+                f"/apis/build.openshift.io/v1/namespaces/{TARGET.build_namespace}/buildconfigs/{name}"
+            )
+            assert args[4:] == ("-f", "-")
+            request = json.loads(data)
+            assert request["preconditions"] == {"uid": uid}
+            assert request["propagationPolicy"] == "Foreground"
+            deletions.append(request)
+            current = None
+            return "{}"
+        if args[:5] == ("oc", "-n", TARGET.build_namespace, "get", "build"):
+            return '{"items":[]}'
+        pytest.fail(f"unexpected tool command {args}")
+
+    monkeypatch.setattr(lifecycle, "run", tool)
+    with pytest.raises(lifecycle.LifecycleError, match=create_error):
+        lifecycle._build_image(TARGET, "build-push")
+    assert bool(deletions) is expect_delete
+    assert (current is None) is expect_delete
+
+
+@pytest.fixture
+def _rollback_plan():
+    """Seal an exact plan while allowing tests to select its prior release."""
+    def seal(prior=None):
+        plan = {
+            "namespace": TARGET.namespace,
+            "release": TARGET.release,
+            "desired": dict(DESIRED),
+            "rendered": DIGEST,
+            "before": prior,
+            "values": {
+                "provenance": lifecycle._operation_provenance(TARGET),
+            },
+        }
+        fingerprint = lifecycle._fingerprint(plan)
+        lifecycle.write_receipt(TARGET, "plan", plan=plan, fingerprint=fingerprint)
+        return fingerprint
+
+    return seal
+
+
+def _owned_helm(status, revision=1):
+    """Return submitted Helm metadata and values for the candidate revision."""
+    release = {
+        "status": status,
+        "revision": str(revision),
+        "name": TARGET.release,
         "namespace": TARGET.namespace,
-        "release": TARGET.release,
-        "desired": dict(DESIRED),
-        "rendered": DIGEST,
-        "before": None,
+        "chart": OBSERVED["chart"],
     }
-    fingerprint = lifecycle._fingerprint(plan)
-    lifecycle.write_receipt(TARGET, "plan", plan=plan, fingerprint=fingerprint)
-    lifecycle.write_receipt(TARGET, "apply", fingerprint=fingerprint, after=dict(OBSERVED))
-    current = [{**OBSERVED, **(override or {})}]
-    writes = []
+    values = {
+        "provenance": lifecycle._operation_provenance(TARGET),
+        "image": {"repository": TARGET.image_repo, "digest": DIGEST},
+    }
+    return release, values
+
+
+@pytest.mark.parametrize("status", ["pending-install", "failed", "deployed", "uninstalling"])
+def test_first_install_recovers_without_an_apply_receipt(monkeypatch, _rollback_plan, status):
+    """Helm-owned revisions recover without a successful apply or ready workload."""
+    fingerprint = _rollback_plan()
+    assert not (lifecycle.REPORTS / "apply.json").exists()
+    release, values = _owned_helm(status)
+    current = [release]
+    mutations = []
+    monkeypatch.setattr(lifecycle, "_mutation_checks", lambda _target: None)
+    monkeypatch.setattr(
+        lifecycle, "_release_record", lambda _target, **_options: current[0],
+    )
+
+    def submitted(target, revision):
+        assert target == TARGET
+        assert revision == 1
+        return values
+
+    def snapshot(_target):
+        assert current[0] is None
+        return None
 
     def mutation(tool, action, *args, **_opts):
-        assert tool == "helm"
-        assert args[:3] == (TARGET.release, "--namespace", TARGET.namespace)
-        writes.append(action)
+        assert (tool, action, *args[:3]) == (
+            "helm", "uninstall", TARGET.release, "--namespace", TARGET.namespace,
+        )
+        mutations.append(action)
         current[0] = None
 
-    monkeypatch.setattr(lifecycle, "snapshot", lambda _target: current[0])
+    monkeypatch.setattr(lifecycle, "_release_values", submitted)
+    monkeypatch.setattr(lifecycle, "snapshot", snapshot)
     monkeypatch.setattr(lifecycle, "run", mutation)
-    monkeypatch.setattr(lifecycle, "_mutation_checks", lambda _target: None)
 
-    if message:
-        with pytest.raises(lifecycle.LifecycleError, match=message):
-            lifecycle.rollback_release(TARGET, {})
-    else:
-        report = lifecycle.rollback_release(TARGET, {})
-        assert report["before"] == dict(OBSERVED)
-        assert report["after"] is None
-        assert report["remainingResources"] == []
-        repeated = lifecycle.rollback_release(replace(TARGET, job="124"), {})
-        assert repeated["reused"] is True
-        assert repeated["before"] == repeated["after"] is None
-    assert tuple(writes) == expected_writes
+    report = lifecycle.rollback_release(TARGET, {})
+    assert report["fingerprint"] == fingerprint
+    assert report["before"]["status"] == status
+    assert report["before"]["image"] == DESIRED["image"]
+    assert report["after"] is None
+    assert report["remainingResources"] == []
+    replay = lifecycle.rollback_release(replace(TARGET, job="124"), {})
+    assert replay["reused"] is True
+    assert replay["before"] == replay["after"] is None
+    assert mutations == ["uninstall"]
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value", "message"),
+    [
+        ("current", "revision", "2", "outside this simulator plan"),
+        ("current", "chart", "dmtf-sim-2.0.0", "without this pipeline's provenance"),
+        ("current", "status", "unknown", "without this pipeline's provenance"),
+        ("provenance", "operationId", "d" * 64, "without this pipeline's provenance"),
+        ("provenance", "sourceCommit", "b" * 40, "without this pipeline's provenance"),
+        ("image", "digest", f"sha256:{'9' * 64}", "without this pipeline's provenance"),
+    ],
+)
+def test_rollback_rejects_an_unowned_helm_revision(
+    monkeypatch, _rollback_plan, section, field, value, message,
+):
+    """Each disagreement copies the baseline and changes one ownership invariant."""
+    _rollback_plan()
+    baseline, values = _owned_helm("pending-install")
+    current = dict(baseline)
+    submitted = {key: dict(record) for key, record in values.items()}
+    (current if section == "current" else submitted[section])[field] = value
+    monkeypatch.setattr(lifecycle, "_mutation_checks", lambda _target: None)
+    monkeypatch.setattr(
+        lifecycle, "_release_record", lambda _target, **_options: current,
+    )
+    monkeypatch.setattr(lifecycle, "_release_values", lambda _target, _revision: submitted)
+    monkeypatch.setattr(lifecycle, "snapshot", lambda _target: dict(OBSERVED))
+    monkeypatch.setattr(
+        lifecycle, "run", lambda *_args, **_options: pytest.fail("unowned rollback attempted"),
+    )
+
+    with pytest.raises(lifecycle.LifecycleError, match=message):
+        lifecycle.rollback_release(TARGET, {})
+
+
+def test_partial_upgrade_recovers_only_the_planned_prior_revision(monkeypatch, _rollback_plan):
+    """Rollback proves the stored recovery target and independently observes its return."""
+    prior = {**OBSERVED, "commit": "b" * 40, "image": f"{TARGET.image_repo}@sha256:{'2' * 64}"}
+    _rollback_plan(prior)
+    release, values = _owned_helm("pending-upgrade", revision=2)
+    prior_values = {
+        "provenance": {"sourceCommit": prior["commit"]},
+        "image": {"repository": TARGET.image_repo, "digest": f"sha256:{'2' * 64}"},
+    }
+    reads = []
+    mutations = []
+    monkeypatch.setattr(lifecycle, "_mutation_checks", lambda _target: None)
+    monkeypatch.setattr(lifecycle, "_release_record", lambda _target, **_options: release)
+
+    def stored(target, revision):
+        assert target == TARGET
+        reads.append(revision)
+        return {1: prior_values, 2: values}[revision]
+
+    def mutation(tool, action, *args, **_opts):
+        assert (tool, action, *args[:4]) == (
+            "helm", "rollback", TARGET.release, "1", "--namespace", TARGET.namespace,
+        )
+        mutations.append(action)
+
+    def snapshot(_target):
+        assert mutations == ["rollback"]
+        return {**prior, "revision": 3}
+
+    monkeypatch.setattr(lifecycle, "_release_values", stored)
+    monkeypatch.setattr(lifecycle, "run", mutation)
+    monkeypatch.setattr(lifecycle, "snapshot", snapshot)
+
+    report = lifecycle.rollback_release(TARGET, {})
+    assert reads == [2, 1]
+    assert report["before"]["status"] == "pending-upgrade"
+    assert report["after"] == {**prior, "revision": 3}

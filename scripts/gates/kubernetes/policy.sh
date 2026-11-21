@@ -24,12 +24,17 @@ fi
 dmtf_sim_set_helm_values "$source_commit"
 simulator_release="$(helm_chart_name charts/dmtf-sim)"
 simulator_namespace="$(helm_render_namespace "$simulator_release")"
-rendered_dmtf="$(mktemp)"
-trap 'rm -f -- "$rendered_dmtf"' EXIT
+rendered_dmtf="$(mktemp -d)"
+trap 'rm -rf -- "$rendered_dmtf"' EXIT
 helm template "$simulator_release" charts/dmtf-sim \
   --namespace "$simulator_namespace" \
-  "${DMTF_SIM_HELM_VALUES[@]}" >"$rendered_dmtf"
+  "${DMTF_SIM_HELM_VALUES[@]}" >"$rendered_dmtf/default.yaml"
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" --values "$DMTF_SIM_DCLOUD_VALUES" \
+  "${DMTF_SIM_HELM_VALUES[@]}" >"$rendered_dmtf/dcloud.yaml"
 kube-linter lint \
   k8s/ \
   charts/redfish-controller/ \
-  "$rendered_dmtf" && echo "kubernetes.policy: OK"
+  "$rendered_dmtf/default.yaml"
+kube-linter lint "$rendered_dmtf/dcloud.yaml"
+echo "kubernetes.policy: OK"

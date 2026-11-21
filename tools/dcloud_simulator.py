@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from http.client import HTTPException, HTTPSConnection
 from pathlib import Path
 from urllib.parse import urlencode
+from uuid import uuid4
 
 import yaml
 
@@ -330,10 +331,89 @@ def _wait_for_build(namespace: str, name: str) -> str:
     raise LifecycleError("OpenShift simulator build exceeded its deadline")
 
 
+def _read_buildconfig(namespace: str, name: str) -> dict | None:
+    """Read an exact BuildConfig, distinguishing absence from API failure."""
+    observed = run(
+        "oc", "-n", namespace, "get", "buildconfig", name,
+        "--ignore-not-found", "-o", "json", timeout=15,
+    )
+    return _read_json(observed) if observed else None
+
+
+def _owned_buildconfig_uid(manifest: dict, observed: dict) -> str | None:
+    """Recognize only the exact attempt's named BuildConfig and output."""
+    expected = manifest["metadata"]
+    metadata = observed.get("metadata", {})
+    uid = metadata.get("uid")
+    if (
+        observed.get("apiVersion") != manifest["apiVersion"]
+        or observed.get("kind") != manifest["kind"]
+        or any(metadata.get(key) != expected[key] for key in ("name", "namespace"))
+        or any(metadata.get("labels", {}).get(key) != value for key, value in expected["labels"].items())
+        or observed.get("spec", {}).get("output", {}).get("to") != manifest["spec"]["output"]["to"]
+        or not isinstance(uid, str) or not uid
+    ):
+        return None
+    return uid
+
+
+def _cleanup_buildconfig(manifest: dict, created_uid: str | None) -> None:
+    """Reconcile an uncertain create and remove only the API object this attempt owns."""
+    namespace, name = (manifest["metadata"][key] for key in ("namespace", "name"))
+    observed = _read_buildconfig(namespace, name)
+    if created_uid is None:
+        # A create that timed out can still be completing on the API server.
+        # Give that attempt a bounded read-back window before declaring absence.
+        for _ in range(2):
+            if observed is not None:
+                break
+            time.sleep(2)
+            observed = _read_buildconfig(namespace, name)
+        if observed is None or _owned_buildconfig_uid(manifest, observed) is None:
+            return
+
+    uid = created_uid if observed is None else _owned_buildconfig_uid(manifest, observed)
+    if uid is None or (created_uid is not None and uid != created_uid):
+        raise LifecycleError("the simulator BuildConfig identity changed before cleanup")
+    if observed is not None:
+        # The UID precondition also protects a replacement created between
+        # this read and the delete. Use foreground deletion for owned Builds.
+        request = {
+            "apiVersion": "v1", "kind": "DeleteOptions",
+            "preconditions": {"uid": uid}, "propagationPolicy": "Foreground",
+        }
+        endpoint = f"/apis/build.openshift.io/v1/namespaces/{namespace}/buildconfigs/{name}"
+        run("oc", "delete", "--raw", endpoint, "-f", "-", data=_canonical(request))
+
+    deadline = time.monotonic() + 80
+    while time.monotonic() < deadline:
+        remaining = _read_buildconfig(namespace, name)
+        if remaining is None:
+            break
+        if remaining.get("metadata", {}).get("uid") != uid:
+            break
+        time.sleep(2)
+    else:
+        raise LifecycleError("the owned simulator BuildConfig was not removed")
+
+    builds = _read_json(run(
+        "oc", "-n", namespace, "get", "build", "-l", f"buildconfig={name}", "-o", "json",
+    ))["items"]
+    if (remaining is None and builds) or any(
+        owner.get("uid") == uid
+        for build in builds for owner in build["metadata"].get("ownerReferences", [])
+    ):
+        raise LifecycleError("the owned simulator builds were not fully removed")
+
+
 def _build_image(target: Target, push_secret: str) -> str:
     """Run an isolated binary build and remove only its owned temporary build objects."""
     name = f"sim-{target.pipeline}-{target.job}"
-    selector = {"app.kubernetes.io/managed-by": "redfish-ctl-ci", "redfish-ctl/job-id": target.job}
+    selector = {
+        "app.kubernetes.io/managed-by": "redfish-ctl-ci",
+        "redfish-ctl/job-id": target.job,
+        "redfish-ctl/build-attempt": uuid4().hex,
+    }
     manifest = {
         "apiVersion": "build.openshift.io/v1",
         "kind": "BuildConfig",
@@ -359,8 +439,15 @@ def _build_image(target: Target, push_secret: str) -> str:
     }
     with tempfile.TemporaryDirectory() as work:
         archive = _build_context(Path(work), target)
-        run("oc", "-n", target.build_namespace, "create", "-f", "-", data=_canonical(manifest))
+        uid = None
         try:
+            created = _read_json(run(
+                "oc", "-n", target.build_namespace, "create", "-f", "-", "-o", "json",
+                data=_canonical(manifest),
+            ))
+            uid = _owned_buildconfig_uid(manifest, created)
+            if uid is None:
+                raise LifecycleError("OpenShift did not confirm ownership of the simulator BuildConfig")
             build = run(
                 "oc", "-n", target.build_namespace, "start-build", name,
                 f"--from-archive={archive}", "-o", "name", timeout=180,
@@ -369,20 +456,7 @@ def _build_image(target: Target, push_secret: str) -> str:
                 raise LifecycleError("OpenShift returned an unrelated build identity")
             return _wait_for_build(target.build_namespace, build)
         finally:
-            run(
-                "oc", "-n", target.build_namespace, "delete", "buildconfig", name,
-                "--cascade=foreground", "--wait=true", "--timeout=80s", timeout=100,
-            )
-            leftover_config = run(
-                "oc", "-n", target.build_namespace, "get", "buildconfig", name,
-                "--ignore-not-found", "-o", "name",
-            )
-            leftover_build = run(
-                "oc", "-n", target.build_namespace, "get", "build",
-                "-l", f"buildconfig={name}", "-o", "name",
-            )
-            if leftover_config or leftover_build:
-                raise LifecycleError("the owned simulator build was not fully removed")
+            _cleanup_buildconfig(manifest, uid)
 
 
 def publish_image(target: Target, env: dict[str, str]) -> dict:
@@ -493,8 +567,8 @@ def publish_chart(target: Target, env: dict[str, str]) -> dict:
     )
 
 
-def _release_record(target: Target) -> dict | None:
-    """Read the active release record, distinguishing absence from command errors."""
+def _release_record(target: Target, *, require_deployed: bool = True) -> dict | None:
+    """Read the latest Helm revision, optionally accepting an incomplete release."""
     records = json.loads(run(
         "helm", "list", "-n", target.namespace, "--all", "--max", "2",
         "--filter", f"^{target.release}$", "-o", "json",
@@ -506,10 +580,19 @@ def _release_record(target: Target) -> dict | None:
     record = records[0]
     if (
         record.get("name") != target.release or record.get("namespace") != target.namespace
-        or record.get("status") != "deployed" or not str(record.get("revision", "")).isdigit()
+        or re.fullmatch(r"[1-9][0-9]*", str(record.get("revision", ""))) is None
+        or (require_deployed and record.get("status") != "deployed")
     ):
-        raise LifecycleError("the target Helm release is not healthy and deployed")
+        raise LifecycleError("the target Helm release does not match the required identity and state")
     return record
+
+
+def _release_values(target: Target, revision: int) -> dict:
+    """Read the submitted values stored under one specific Helm release revision."""
+    return _read_json(run(
+        "helm", "get", "values", target.release, "--revision", str(revision),
+        "--namespace", target.namespace, "--output", "json",
+    ))
 
 
 def _installed_plan(target: Target) -> str:
@@ -623,6 +706,14 @@ def _candidate(target: Target) -> dict:
     }
 
 
+def _operation_provenance(target: Target) -> dict:
+    """Bind Helm ownership to this pipeline's exact source, release, and namespace."""
+    operation_id = _fingerprint({
+        **target.identity(), "namespace": target.namespace, "release": target.release,
+    })
+    return {"sourceCommit": target.commit, "operationId": operation_id}
+
+
 def _values(target: Target, desired: dict, env: dict[str, str]) -> dict:
     """Compose pinned identity and optionally read exact tracked DCloud Helm overrides."""
     override = env.get("REDFISH_SIM_VALUES_FILE")
@@ -635,7 +726,7 @@ def _values(target: Target, desired: dict, env: dict[str, str]) -> dict:
         if not isinstance(values, dict):
             raise LifecycleError("tracked simulator values override must be a mapping")
     values.update(
-        provenance={"sourceCommit": target.commit},
+        provenance=_operation_provenance(target),
         image={"repository": target.image_repo, "digest": desired["image"].rsplit("@", 1)[-1]},
         imagePullSecrets=[_required(env, "REDFISH_HARBOR_PULL_SECRET", DNS_LABEL)],
     )
@@ -658,6 +749,9 @@ def _load_plan(target: Target) -> tuple[dict, dict]:
         raise LifecycleError("simulator plan fingerprint is invalid")
     if (plan.get("namespace"), plan.get("release")) != (target.namespace, target.release):
         raise LifecycleError("simulator plan has a different namespace or release")
+    values = plan.get("values")
+    if not isinstance(values, dict) or values.get("provenance") != _operation_provenance(target):
+        raise LifecycleError("simulator plan does not bind ownership to this pipeline")
     if not DIGEST.fullmatch(str(plan.get("rendered", ""))):
         raise LifecycleError("simulator plan lacks a rendered artifact digest")
     return record, plan
@@ -790,21 +884,57 @@ def _without_revision(record: dict | None) -> dict | None:
     return None if record is None else {key: value for key, value in record.items() if key != "revision"}
 
 
+def _revision_image(values: dict) -> str:
+    """Return the image reference saved in the submitted Helm revision values."""
+    image = values.get("image", {})
+    if not isinstance(image, dict):
+        return ""
+    return f"{image.get('repository', '')}@{image.get('digest', '')}"
+
+
 def rollback_release(target: Target, _env: dict[str, str]) -> dict:
-    """Restore the exact prior release or remove an owned first installation."""
+    """Recover an owned Helm revision even if apply could not write its receipt."""
     record, plan = _load_plan(target)
-    applied = _plan_stage(target, "apply", record["fingerprint"])
     prior = plan["before"]
-    observed = snapshot(target)
     _mutation_checks(target)
-    if _without_revision(observed) == _without_revision(prior):
-        return write_receipt(
-            target, "rollback", fingerprint=record["fingerprint"], before=observed,
-            after=observed, reused=True, remainingResources=[],
-        )
-    if observed != applied.get("after"):
-        raise LifecycleError("refusing to roll back a release modified by another pipeline")
-    _check_candidate(target, observed, plan["desired"])
+    current = _release_record(target, require_deployed=False)
+    owned_revision = 1 if prior is None else prior["revision"] + 1
+    if current is None or int(current["revision"]) != owned_revision:
+        observed = snapshot(target)
+        if _without_revision(observed) == _without_revision(prior):
+            return write_receipt(
+                target, "rollback", fingerprint=record["fingerprint"], before=observed,
+                after=observed, reused=True, remainingResources=[],
+            )
+        raise LifecycleError("refusing to roll back a Helm revision outside this simulator plan")
+
+    submitted = _release_values(target, owned_revision)
+    desired = plan["desired"]
+    if (
+        current["status"] not in {"deployed", "failed", "pending-install", "pending-upgrade", "uninstalling"}
+        or current["chart"] != f"{CHART.name}-{desired['version']}"
+        or submitted.get("provenance") != _operation_provenance(target)
+        or _revision_image(submitted) != desired["image"]
+    ):
+        raise LifecycleError("refusing to roll back a Helm revision without this pipeline's provenance")
+    observed = {
+        "revision": owned_revision, "status": current["status"], "chart": current["chart"],
+        "commit": target.commit, "image": desired["image"],
+        "operationId": submitted["provenance"]["operationId"],
+    }
+
+    if prior is not None:
+        prior_values = _release_values(target, prior["revision"])
+        prior_provenance = prior_values.get("provenance")
+        if (
+            not isinstance(prior_provenance, dict)
+            or prior_provenance.get("sourceCommit") != prior["commit"]
+            or _revision_image(prior_values) != prior["image"]
+        ):
+            raise LifecycleError("the prior Helm revision no longer matches the plan's recovery target")
+    if _release_record(target, require_deployed=False) != current:
+        raise LifecycleError("the current Helm revision changed during rollback preflight")
+
     if prior is None:
         run(
             "helm", "uninstall", target.release, "--namespace", target.namespace,

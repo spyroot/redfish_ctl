@@ -1,5 +1,40 @@
 # Dispatch a tracked, self-managed GitLab check and verify the returned SHA.
 
+dcloud_gate_result() {
+  local host="$1" endpoint="$2" pipeline="$3" commit="$4" gate="$5"
+  local job_name=gate-merge evidence_name=gate-merge
+  local artifact=reports/ci/gate-merge.json
+  local response job standards_revision
+  if [[ -n $gate ]]; then
+    job_name=project-ci-cpu-validation
+    evidence_name="$gate"
+    artifact="reports/gates/$gate.json"
+  fi
+  response="$(GITLAB_HOST="$host" glab api "$endpoint/pipelines/$pipeline/jobs")" ||
+    return 78
+  job="$(jq -er --arg name "$job_name" --arg commit "$commit" '
+    [.[] | select(.name == $name and .status == "success" and .commit.id == $commit)]
+    | select(length == 1) | .[0].id
+  ' <<<"$response")" || {
+    echo "BLOCKER: no successful required DCloud job for the selected commit" >&2
+    return 78
+  }
+  standards_revision="$(yq -er '.spec.source.revision' standards-binding.yaml)" || return 78
+  response="$(GITLAB_HOST="$host" glab api "$endpoint/jobs/$job/artifacts/$artifact")" ||
+    return 78
+  jq -e --arg commit "$commit" --arg job "$job" --arg pipeline "$pipeline" \
+    --arg name "$evidence_name" --arg revision "$standards_revision" '
+    select(.commit == $commit and .job_id == $job and .pipeline_id == $pipeline
+           and .name == $name and .standards_revision == $revision and .status == "passed"
+           and .return_code == 0 and .evidence_sanitized and .warnings == 0
+           and .skipped_required_tests == 0 and .cleanup.status == "passed")
+    | {commit, job, job_id, pipeline_id, standards_revision, name, status}
+  ' <<<"$response" || {
+    echo "BLOCKER: DCloud job is missing successful exact-commit gate evidence" >&2
+    return 78
+  }
+}
+
 dispatch_dcloud() {
   local project="$1" ref="$2" commit="$3" gate="$4" apply="$5"
   shift 5
@@ -73,6 +108,13 @@ dispatch_dcloud() {
     sleep 5
     receipt="$(GITLAB_HOST="$host" glab api "$endpoint/pipelines/$id")" || return 78
   done
-  jq '{id,sha,ref,status,web_url}' <<<"$receipt"
-  [[ $no_wait == true || $status == success ]]
+  if $no_wait || [[ $status != success ]]; then
+    jq '{id,sha,ref,status,web_url}' <<<"$receipt"
+    [[ $no_wait == true ]]
+    return $?
+  fi
+  local gate_result
+  gate_result="$(dcloud_gate_result "$host" "$endpoint" "$id" "$commit" "$gate")" ||
+    return "$?"
+  jq --argjson gate "$gate_result" '{id,sha,ref,status,web_url,gate:$gate}' <<<"$receipt"
 }

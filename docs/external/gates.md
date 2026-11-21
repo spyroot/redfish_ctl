@@ -18,7 +18,7 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 Off-cluster, `check.sh --profile` refuses; a gate never runs on a workstation.
 The configured CI invokes `scripts/gates/run.sh` internally; operators must use
 the guarded `scripts/check.sh` entry point.
-See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
+See [CI/CD Pipeline](ci.md#dispatch-an-exact-branch-check) for guarded dispatch.
 
 ## Profiles
 
@@ -30,15 +30,12 @@ See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
 
-## Trusted provider includes
+## Protected simulator jobs
 
-`trusted_includes` in `gates/manifest.yaml` is the only allow-list for
-provider-owned GitLab templates. Each entry pins the provider project, exact
-40-character commit, template file, permitted hidden templates, and their
-mutation classification. A local wrapper must still declare its stage, runner tags, rules, and
-`allow_failure: false`, so `tools/gate_meta.py` can reject a floating include,
-unknown template, or merge-request-reachable mutation. The protected simulator
-job sequence is documented in [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
+`protected_jobs` in `gates/manifest.yaml` declares the eight protected
+simulator jobs, their branch rules, and which jobs share the release lock.
+`tools/gate_meta.py` checks these constraints against the root pipeline.
+See [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
 
 ## Selected gate summary
 
@@ -55,7 +52,7 @@ it without executing a gate.
 | `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML syntax and duplicate-key policy from `.yamllint` | yamllint is absent, or a configured error or parse failure occurs |
-| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a local authority checkout, exact revision, schema, or provider include does not match |
+| `repo.schemas` | merge | no | the registry and tracked binding match the exact Standards revision | the authorized source or proof is unavailable, or its schema or manifest differs |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
 | `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |

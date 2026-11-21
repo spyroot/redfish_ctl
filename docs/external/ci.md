@@ -54,6 +54,7 @@ Run the second plan to collect the required merge result:
 
 The wrapper checks the mirror SHA before dispatch and verifies the returned
 pipeline SHA. It waits for the terminal result unless `--no-wait` is supplied.
+For a successful result it reads back the exact job and its gate evidence.
 An API or web dispatch with `MERGE_PROFILE=merge` selects `gate-merge`.
 Set `FOCUSED_GATE=unit.all` instead to select only
 `project-ci-cpu-validation`, the CPU job defined in `.gitlab-ci.yml`.
@@ -88,7 +89,8 @@ the project pull Secret and allow ingress from the Redfish runner namespaces.
    These jobs read the running image digest and exercise `/redfish/v1/`
    against the actual service.
 4. Use `project-service-rollback` for recovery. The job shares the deployment
-   lock and verifies the restore or cleanup.
+   lock, verifies the installed operation against the plan, and checks the
+   restore or cleanup even if apply stopped before writing its receipt.
 
 `publish-github`, the publication-boundary job in `.gitlab-ci.yml`, retains
 the export safety scans and verifies the source SHA on GitHub. DCloud pulls

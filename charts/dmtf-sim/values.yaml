@@ -15,6 +15,7 @@ dmtf:
 
 provenance:
   sourceCommit: ""
+  operationId: ""
 
 containerPort: 8080
 

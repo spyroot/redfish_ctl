@@ -48,6 +48,10 @@ helm template "$simulator_release" charts/dmtf-sim \
   "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary
 helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" --skip-tests --values "$DMTF_SIM_DCLOUD_VALUES" \
+  "${DMTF_SIM_HELM_VALUES[@]}" |
+  kubeconform -ignore-missing-schemas -summary
+helm template "$simulator_release" charts/dmtf-sim \
   --namespace "$simulator_namespace" \
   --show-only templates/tests/test-connection.yaml \
   "${DMTF_SIM_HELM_VALUES[@]}" |

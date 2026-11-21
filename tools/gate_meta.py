@@ -485,7 +485,8 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
     protected_jobs = registry.get("protected_jobs", {})
-    for name in protected_jobs.keys() - real_jobs.keys():
+    resource_group = registry.get("protected_resource_group")
+    for name in sorted(protected_jobs.keys() - real_jobs.keys()):
         failures.append(f"protected GitLab job missing: {name}")
     external_names = [
         job["name"]
@@ -571,8 +572,9 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
             if protected_job:
                 expected_when = protected_job["when"]
                 valid_lock = (
-                    bool(job.get("resource_group"))
-                    and (job.get("variables") or {}).get("MUTATION_LOCK") == job["resource_group"]
+                    bool(resource_group)
+                    and job.get("resource_group") == resource_group
+                    and (job.get("variables") or {}).get("MUTATION_LOCK") == resource_group
                 )
                 if (
                     job.get("allow_failure") is not False

@@ -491,7 +491,8 @@ def test_meta_gate_rejects_early_rules_for_every_provider_mutation(
 
 def test_gitlab_preserves_the_native_protected_simulator_lifecycle() -> None:
     """Retain protected manual mutation and independent read-back for every job."""
-    contracts = gate_meta._load_registry()["protected_jobs"]
+    registry = gate_meta._load_registry()
+    contracts = registry["protected_jobs"]
     assert set(contracts) == set(PROJECT_SERVICE_JOBS)
     jobs = _gitlab_jobs()
     for name, contract in contracts.items():
@@ -503,7 +504,22 @@ def test_gitlab_preserves_the_native_protected_simulator_lifecycle() -> None:
         assert "trigger" not in job
         assert all(word not in repr(job) for word in ("/Users/", "~/", "PRIVATE-TOKEN"))
         if contract["serialized"]:
+            assert job["resource_group"] == registry["protected_resource_group"]
             assert job["variables"]["MUTATION_LOCK"] == job["resource_group"]
+
+def test_meta_gate_rejects_a_different_mutation_lock(tmp_path, monkeypatch) -> None:
+    """Apply and rollback must contend on the same registry-declared lock."""
+    registry = gate_meta._load_registry()
+    for name in ("project-service-deploy", "project-service-rollback"):
+        ci = _ci_config()
+        ci[name]["resource_group"] = "different-lock"
+        ci[name]["variables"]["MUTATION_LOCK"] = "different-lock"
+        failures, ran = _check_temp_gitlab(
+            tmp_path, monkeypatch, yaml.safe_dump(ci), registry
+        )
+        assert ran
+        assert f"gitlab job {name}: protected lifecycle rule drift" in failures
+
 
 def test_native_project_service_uses_project_owned_ci_coordinates() -> None:
     """DCloud jobs share one project, registry, and simulator release binding."""
@@ -532,7 +548,7 @@ def test_gitlab_project_service_jobs_consume_required_artifacts() -> None:
         "deploy": ["image-publish", "chart-publish", "deploy-plan"],
         "verify": ["deploy-plan", "deploy"],
         "live-test": ["deploy-plan", "verify"],
-        "rollback": ["deploy-plan", "deploy"],
+        "rollback": ["deploy-plan"],
         "release-evidence": ["deploy-plan", "deploy", "verify", "live-test"],
     }
     for job, prerequisites in dependency_suffixes.items():

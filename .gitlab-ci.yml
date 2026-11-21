@@ -280,7 +280,7 @@ project-service-rollback:
   tags: *protected-tags
   allow_failure: false
   rules: *protected-manual-rules
-  needs: [project-service-deploy-plan, project-service-deploy]
+  needs: [project-service-deploy-plan]
   resource_group: redfish-ctl-dmtf-sim
   variables:
     MUTATION_LOCK: redfish-ctl-dmtf-sim

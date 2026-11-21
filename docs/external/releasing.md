@@ -96,7 +96,7 @@ Use this order so a broken package does not reach PyPI:
 ## Verify
 
 Obtain a successful `gate-merge` result for the exact release commit through
-the Internal GitLab path documented in [CI/CD Pipeline](ci.md#internal-validation-paths).
+the DCloud path documented in [CI/CD Pipeline](ci.md#dispatch-an-exact-branch-check).
 The merge profile runs the offline suite and changed-file Ruff gate in the
 configured Kubernetes runner; workstation output is not release evidence.
 Use the immutable-ref dispatch command in

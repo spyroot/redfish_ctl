@@ -72,6 +72,10 @@
         "minLength": 1
       }
     },
+    "protected_resource_group": {
+      "type": "string",
+      "minLength": 1
+    },
     "protected_jobs": {
       "type": "object",
       "minProperties": 1,
