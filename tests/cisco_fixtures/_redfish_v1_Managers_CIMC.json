@@ -1,0 +1,286 @@
+{
+  "@odata.id": "/redfish/v1/Managers/CIMC",
+  "@odata.type": "#Manager.v1_19_0.Manager",
+  "@odata.context": "/redfish/v1/$metadata#Manager.Manager",
+  "Description": "Cisco Integrated Management Controller",
+  "LogServices": {
+    "@odata.id": "/redfish/v1/Managers/CIMC/LogServices"
+  },
+  "SerialInterfaces": {
+    "@odata.id": "/redfish/v1/Managers/CIMC/SerialInterfaces"
+  },
+  "NetworkProtocol": {
+    "@odata.id": "/redfish/v1/Managers/CIMC/NetworkProtocol"
+  },
+  "VirtualMedia": {
+    "@odata.id": "/redfish/v1/Managers/CIMC/VirtualMedia"
+  },
+  "EthernetInterfaces": {
+    "@odata.id": "/redfish/v1/Managers/CIMC/EthernetInterfaces"
+  },
+  "Links": {
+    "ManagerInChassis": {
+      "@odata.id": "/redfish/v1/Chassis/1"
+    },
+    "ManagerForChassis": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1"
+      }
+    ],
+    "ManagerForServers": [
+      {
+        "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01"
+      }
+    ],
+    "Oem": {
+      "Cisco": {
+        "SPDMTrustStoreCertificateCollection": {
+          "@odata.id": "/redfish/v1/Managers/CIMC/Oem/Cisco/SPDMTrustStore/Certificates"
+        }
+      }
+    }
+  },
+  "RemoteRedfishServiceUri": "REDACTED",
+  "ServiceEntryPointUUID": "REDACTED",
+  "FirmwareVersion": "6.0(1.250192)",
+  "GraphicalConsole": {
+    "ServiceEnabled": true,
+    "MaxConcurrentSessions": 4,
+    "ConnectTypesSupported": [
+      "KVMIP",
+      "Oem"
+    ]
+  },
+  "Model": "UCSC-C220-M8E3S",
+  "UUID": "00000000-0000-0000-0000-000000000000",
+  "AutoDSTEnabled": true,
+  "RemoteAccountService": {
+    "@odata.id": "/redfish/v1/AccountService"
+  },
+  "CommandShell": {
+    "ServiceEnabled": true,
+    "MaxConcurrentSessions": 4,
+    "ConnectTypesSupported": [
+      "SSH",
+      "IPMI",
+      "Oem"
+    ]
+  },
+  "Id": "CIMC",
+  "Name": "Cisco Integrated Management Controller",
+  "Oem": {
+    "Cisco": {
+      "HardwareX509Identity": {
+        "Certificate": "REDACTED",
+        "CertificateFormat": "PEM"
+      },
+      "FanPolicy": "Acoustic",
+      "@odata.type": "#CiscoUCSExtensions.v1_0_0.CiscoUCSExtensions",
+      "SignatureInfo": {
+        "Signature": "MEUCIBM1y7Z5QvcodPClFFbnkwkVXROpJ2kkxZ3tr9R7p+wzAiEAkE/aBxWqyptV15Xt2BOz\neI/D9nd2kdj2kLtM5hmB89Q=\n",
+        "RequestID": "65a523e7e31c6556d9fdc508747eb329",
+        "SignatureStatus": "Completed"
+      },
+      "EnableLowPowerUsb": true,
+      "AggressiveCoolingEnabled": false,
+      "CiscoInternalStorage": {
+        "@odata.id": "/redfish/v1/Managers/CIMC/Oem/CiscoInternalStorage"
+      },
+      "ManagerMode": "IntersightManagedStandalone",
+      "InventoryState": "PartialInventoryReady",
+      "CiscoKMIPClient": {
+        "KMIPServerSettings": {
+          "KMIPServers": [],
+          "UserName": null,
+          "Password": null,
+          "Enabled": false,
+          "UseKMIPLogin": false,
+          "KMIPServerPublicKey": false
+        },
+        "Certificates": {
+          "@odata.id": "/redfish/v1/Managers/CIMC/Oem/Cisco/CiscoKMIPClient/Certificates"
+        }
+      },
+      "UserLabel": "REDACTED"
+    }
+  },
+  "ManagerType": "BMC",
+  "DateTimeLocalOffset": "-05:00",
+  "DateTime": "2026-11-22T08:48:49-05:00",
+  "TimeZoneName": "America/New_York",
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK"
+  },
+  "Actions": {
+    "#Manager.Reset": {
+      "target": "/redfish/v1/Managers/CIMC/Actions/Manager.Reset",
+      "ResetType@Redfish.AllowableValues": [
+        "ForceRestart"
+      ]
+    },
+    "Oem": {
+      "#CiscoUCSExtensions.BmcTechSupportExport": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.BmcTechSupportExport",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ExportTechSupport",
+        "Protocol@Redfish.AllowableValues": [
+          "TFTP",
+          "SCP",
+          "SFTP",
+          "FTP",
+          "HTTP"
+        ],
+        "RemoteUsername@Redfish.AllowableValues": [
+          "Remote Server Username"
+        ],
+        "RemotePath@Redfish.AllowableValues": [
+          "Valid Remote Share Path and filename with valid extension (tar.gz)"
+        ],
+        "RemoteHostname@Redfish.AllowableValues": [
+          "Valid Hostname/IP Address"
+        ],
+        "RemotePassword@Redfish.AllowableValues": [
+          "Remote Server Password"
+        ]
+      },
+      "#CiscoUCSExtensions.ExportBmcConfig": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.ExportBmcConfig",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ExportBmcConfig",
+        "Protocol@Redfish.AllowableValues": [
+          "TFTP",
+          "SCP",
+          "SFTP",
+          "FTP",
+          "HTTP"
+        ],
+        "RemoteUsername@Redfish.AllowableValues": [
+          "Remote Server Username"
+        ],
+        "RemotePath@Redfish.AllowableValues": [
+          "Valid Remote Share Path and filename with valid extension (.json)"
+        ],
+        "RemoteHostname@Redfish.AllowableValues": [
+          "Valid Hostname/IP Address"
+        ],
+        "RemotePassword@Redfish.AllowableValues": [
+          "Remote Server Password"
+        ],
+        "Passphrase@Redfish.AllowableValues": [
+          "Passphrase"
+        ]
+      },
+      "#CiscoUCSExtensions.ImportBmcConfig": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.ImportBmcConfig",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ImportBmcConfig",
+        "Protocol@Redfish.AllowableValues": [
+          "TFTP",
+          "SCP",
+          "SFTP",
+          "FTP",
+          "HTTP"
+        ],
+        "RemoteUsername@Redfish.AllowableValues": [
+          "Remote Server Username"
+        ],
+        "RemotePath@Redfish.AllowableValues": [
+          "Valid Remote Share Path and filename with valid extension (.json)"
+        ],
+        "RemoteHostname@Redfish.AllowableValues": [
+          "Valid Hostname/IP Address"
+        ],
+        "RemotePassword@Redfish.AllowableValues": [
+          "Remote Server Password"
+        ],
+        "Passphrase@Redfish.AllowableValues": [
+          "Passphrase"
+        ]
+      },
+      "#CiscoUCSExtensions.HostOSBootManagement": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.HostOSBootManagement",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.HostOSBootManagement",
+        "BootOption@Redfish.AllowableValues": [
+          "Immediate",
+          "OnNextBoot"
+        ],
+        "ImageRepository@Redfish.AllowableValues": [
+          "This parameter shall specify the directory path of extracted HSU bundle or the string URI of the remote HUU ISO file. Standard mount options can be specified as query parameter to the URI."
+        ],
+        "Mode@Redfish.AllowableValues": [
+          "Discovery",
+          "StartConfigure",
+          "EndConfigure",
+          "Diagnostics"
+        ],
+        "Password@Redfish.AllowableValues": [
+          "The password to be used when accessing the URI specified by the ImageRepository parameter."
+        ],
+        "TransferProtocol@Redfish.AllowableValues": [
+          "CIFS",
+          "HTTPS",
+          "NFS",
+          "VMEDIA-CIFS",
+          "VMEDIA-HTTPS",
+          "VMEDIA-HTTP",
+          "VMEDIA-NFS",
+          "LOCAL-HOST"
+        ],
+        "Username@Redfish.AllowableValues": [
+          "The username to be used when accessing the URI specified by the ImageRepository parameter."
+        ]
+      },
+      "#CiscoUCSExtensions.BmcFwActivate": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.BmcFwActivate",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.BmcFwActivate"
+      },
+      "#CiscoUCSExtensions.BiosFwActivate": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.BiosFwActivate",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.CiscoUCSExtensions"
+      },
+      "#CiscoUCSExtensions.SigningRequest": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.SigningRequest",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.SigningRequest",
+        "HashToSign@Redfish.AllowableValues": [
+          "SHA-256 hash encoded in base64"
+        ],
+        "RequestedSignatureAlgorithm@Redfish.AllowableValues": [
+          "Signing algorithm to be used, currently supported algorithm is ECCsecp256r1"
+        ],
+        "RequestID@Redfish.AllowableValues": [
+          "A unique string generated by the requester to match response, min is 1 and max is 128"
+        ]
+      },
+      "#CiscoUCSExtensions.ResetToFactoryDefaults": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.ResetToFactoryDefaults",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ResetToFactoryDefaults"
+      },
+      "#CiscoUCSExtensions.KmipTestConnection": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.KmipTestConnection",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.KmipTestConnection",
+        "KMIPServer@Redfish.AllowableValues": [
+          "Primary",
+          "Secondary"
+        ]
+      },
+      "#CiscoUCSExtensions.ResetMemoryErrors": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.ResetMemoryErrors",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ResetMemoryErrors"
+      },
+      "#CiscoUCSExtensions.DiskScrub": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.DiskScrub",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.DiskScrub",
+        "HostSoftwareImage@Redfish.AllowableValues": "VirtualMedia or FlexMMC or FlexUtil image URI containing the HSU image."
+      },
+      "#CiscoUCSExtensions.DataSanitize": {
+        "target": "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.DataSanitize",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.DataSanitize",
+        "SanitizeTargets@Redfish.AllowableValues": [
+          "BoardDomainComponents",
+          "HostDomainComponents"
+        ],
+        "HostSoftwareImage@Redfish.AllowableValues": [
+          "VirtualMedia URI containing the HSU image."
+        ]
+      }
+    }
+  }
+}
