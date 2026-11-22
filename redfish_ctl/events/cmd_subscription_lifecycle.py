@@ -225,7 +225,7 @@ class _SubscriptionBase(RedfishManager):
         headers = self.json_content_type.copy()
         if method == HTTPMethod.POST:
             # Cisco CIMC rejects a charset parameter on subscription creation.
-            headers["Content-Type"] = "application/json"
+            headers["Content-Type"] = headers["Content-Type"].partition(";")[0].strip()
         request = f"{self._default_method}{self.redfish_ip}{target}"
         response = None
         try:

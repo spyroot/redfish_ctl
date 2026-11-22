@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import textwrap
+from http import HTTPStatus
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"
 SUBSCRIPTION_ONE_PATH = f"{SUBSCRIPTIONS_PATH}/1"
 DESTINATION = "https://listener.example.com/redfish/events"
 CREATED_SUBSCRIPTION_PATH = f"{SUBSCRIPTIONS_PATH}/created"
+JSON_MEDIA_TYPE = "application/json"
 
 
 def _request_type(name):
@@ -77,8 +79,8 @@ def _replace_post_response(service, status_code, headers=None, *, required_conte
     def post_cb(request, context):
         service.requests.append(request)
         if required_content_type and request.headers.get("Content-Type") != required_content_type:
-            context.status_code = 415
-            return json.dumps(_error_payload(415))
+            context.status_code = HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value
+            return json.dumps(_error_payload(context.status_code))
         context.status_code = status_code
         for key, value in (headers or {}).items():
             context.headers[key] = value
@@ -178,7 +180,7 @@ def test_subscription_create_confirm_uses_plain_json_and_returns_created_locatio
         service,
         201,
         headers={"Location": CREATED_SUBSCRIPTION_PATH},
-        required_content_type="application/json",
+        required_content_type=JSON_MEDIA_TYPE,
     )
 
     result = manager.sync_invoke(
@@ -198,7 +200,7 @@ def test_subscription_create_confirm_uses_plain_json_and_returns_created_locatio
     assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
     assert len(posts) == 1
     assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
-    assert posts[0].headers["Content-Type"] == "application/json"
+    assert posts[0].headers["Content-Type"] == JSON_MEDIA_TYPE
 
 
 def test_subscription_create_async_accepts_direct_response_from_transport(
