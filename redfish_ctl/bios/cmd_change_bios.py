@@ -24,7 +24,12 @@ import json
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument, InvalidJsonSpec, UncommittedPendingChanges
+from ..cmd_exceptions import (
+    InvalidArgument,
+    InvalidJsonSpec,
+    UncommittedPendingChanges,
+    UnsupportedAction,
+)
 from ..cmd_utils import from_json_spec
 from ..redfish_api_common import (
     REDFISH_API,
@@ -34,7 +39,8 @@ from ..redfish_api_common import (
     Singleton,
 )
 from ..redfish_manager import CommandResult, RedfishManager
-from ..redfish_shared import RedfishApi
+from ..redfish_shared import RedfishApi, RedfishJson
+from .bios_registry import _query_bios_registry, _query_bios_resource
 
 
 class BiosChangeSettings(RedfishManager,
@@ -209,56 +215,27 @@ class BiosChangeSettings(RedfishManager,
 
         return bios_payload
 
-    def _resolve_bios_registry_uri(self, do_async):
-        """Locate the BIOS attribute registry vendor-neutrally.
+    def _resolve_bios_settings_uri(self, do_async: Optional[bool]) -> str:
+        """Find the SettingsObject advertised by the BIOS resource.
 
-        Dell exposes it at ``{system}/Bios/BiosRegistry``; standard Redfish (iLO,
-        others) names it via ``Bios.AttributeRegistry`` resolved under
-        ``/redfish/v1/Registries/<name>`` whose ``Location[].Uri`` is the registry.
-        Prefer the Dell subpath when it resolves; otherwise follow the standard chain.
-
-        :param do_async: note async will subscribe to an event loop.
-        :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
+        :param do_async: whether to use the asynchronous GET transport.
+        :return: the validated settings path, or the legacy path on Dell.
+        :raises UnsupportedAction: when no usable settings path is available.
         """
-        dell_uri = f"{self.managed_system_uri}{REDFISH_API.BiosRegistry}"
-        try:
-            if (self.base_query(dell_uri, do_async=do_async).data or {}).get(REDFISH_JSON.RegistryEntries):
-                return dell_uri
-        except Exception:
-            pass
-        try:
-            bios = self.base_query(f"{self.managed_system_uri}/Bios",
-                                   do_async=do_async).data or {}
-            name = bios.get("AttributeRegistry")
-            if name:
-                reg = self.base_query(f"{RedfishApi.Version}/Registries/{name}",
-                                      do_async=do_async).data or {}
-                for loc in reg.get("Location", []):
-                    uri = loc.get("Uri") if isinstance(loc, dict) else None
-                    if uri:
-                        return uri
-        except Exception:
-            pass
-        return dell_uri
+        system_uri = self.managed_system_uri
+        if not system_uri:
+            raise UnsupportedAction("No managed system is available for BIOS settings.")
 
-    def _resolve_bios_settings_uri(self, do_async):
-        """Resolve the BIOS SettingsObject link, not a hardcoded path.
-
-        Reads ``Bios.@Redfish.Settings.SettingsObject.@odata.id`` (which iLO emits
-        lowercased), falling back to ``{system}/Bios/Settings`` for Dell.
-
-        :param do_async: note async will subscribe to an event loop.
-        :return: the BIOS SettingsObject URI, defaulting to the Dell Settings path.
-        """
-        try:
-            bios = self.base_query(f"{self.managed_system_uri}/Bios",
-                                   do_async=do_async).data or {}
-            settings = (bios.get("@Redfish.Settings") or {}).get("SettingsObject") or {}
-            if settings.get("@odata.id"):
-                return settings["@odata.id"]
-        except Exception:
-            pass
-        return f"{self.managed_system_uri}{REDFISH_API.BiosSettings}"
+        bios = _query_bios_resource(self, f"{system_uri}{RedfishApi.Bios}", do_async).data
+        settings = bios.get("@Redfish.Settings") if isinstance(bios, dict) else None
+        settings_object = settings.get("SettingsObject") if isinstance(settings, dict) else None
+        link = settings_object.get(RedfishJson.Data_id) if isinstance(settings_object, dict) else None
+        uri = self._local_resource_uri(link)
+        if uri:
+            return uri
+        if link is None and self.uses_dell_job_semantics:
+            return f"{system_uri}{REDFISH_API.BiosSettings}"
+        raise UnsupportedAction("BIOS does not advertise a valid SettingsObject URI.")
 
     def execute(self,
                 attr_name: Optional[str] = None,
@@ -283,19 +260,23 @@ class BiosChangeSettings(RedfishManager,
         :param default_duration:
         :param apply:
         :param do_show: will only show final spec but will not apply any changes.
-        :param do_commit: by default value are in pending state.
+        :param do_commit: apply staged settings using the Dell BIOS job.
         :param attr_value:  attribute value or list of values
         :param attr_name: attribute name or list of values
         :param do_async: note async will subscribe to an event loop.
         :param filename: if filename indicate call will save the response to this file.
         :param from_spec: read bios changes from a spec file
-        :param commit_pending:  this command will first commit all pending changes before do new change.
+        :param commit_pending: apply existing pending settings using the Dell BIOS job.
         :param verbose: enables verbose output
         :param data_type: accepted for CLI compatibility; not used by this command.
         :param start_time:
         :param start_date:
         :return: CommandResult and if filename provide will save to a file.
+        :raises UnsupportedAction: when the requested commit or staging target is unavailable.
         """
+        if not do_show and (do_commit or commit_pending) and not self.uses_dell_job_semantics:
+            raise UnsupportedAction("--commit and --commit_pending require Dell BIOS job support.")
+
         # We read changes either from a JSON spec file or build them from
         # --attr_name/--attr_value. A spec file is self-contained, so the BIOS
         # registry is only fetched (and validated) on the args path.
@@ -303,15 +284,13 @@ class BiosChangeSettings(RedfishManager,
             if from_spec is not None and len(from_spec) > 0:
                 payload = from_json_spec(from_spec)
             else:
-                target_api = self._resolve_bios_registry_uri(do_async)
-                cmd_result = self.base_query(
-                    target_api, filename=filename,
-                    do_async=do_async, do_expanded=False
-                )
+                cmd_result = _query_bios_registry(self, do_async, filename=filename)
+                if cmd_result.error is not None:
+                    return cmd_result
                 if verbose:
                     self.default_json_printer(cmd_result.data)
 
-                if cmd_result is None or not isinstance(cmd_result.data, dict):
+                if not isinstance(cmd_result.data, dict):
                     return CommandResult(
                         {"Status": "Failed fetch bios registry"}, None, None, None
                     )
@@ -350,6 +329,8 @@ class BiosChangeSettings(RedfishManager,
         if do_show:
             return CommandResult(payload, None, None, None)
 
+        target_api = self._resolve_bios_settings_uri(do_async)
+
         if self.uses_dell_job_semantics:
             cmd_pending = self.sync_invoke(
                 ApiRequestType.BiosQueryPending,
@@ -369,12 +350,12 @@ class BiosChangeSettings(RedfishManager,
                         "Please apply changes first."
                     )
 
-        # update bios (resolve the SettingsObject link, not a hardcoded path).
-        target_api = self._resolve_bios_settings_uri(do_async)
         cmd_result, api_resp = self.base_patch(
             target_api, payload=payload,
             do_async=do_async
         )
+        if cmd_result.error is not None:
+            return cmd_result
 
         if api_resp == RedfishApiRespond.AcceptedTaskGenerated:
             task_id = cmd_result.data['task_id']

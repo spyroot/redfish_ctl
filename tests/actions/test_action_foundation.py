@@ -6,6 +6,10 @@ a DESTRUCTIVE/IRREVERSIBLE action must NOT POST without explicit confirm. All ru
 against tests/supermicro_fixtures/ through the real requests path; the mock
 records every POST so we can assert exactly what did (or did not) fire.
 """
+import json
+
+import pytest
+
 from redfish_ctl.actions.action_policy import Destructiveness, classify
 from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import RedfishApiRespond
@@ -116,16 +120,105 @@ def test_request_log_payload_redacts_sensitive_fields():
     assert payload["Nested"]["OldPassword"] == "old-secret"
 
 
-def test_invoke_resolves_target_from_actions_block(redfish_mock_factory):
+@pytest.mark.parametrize("full_action_type", ["#EventService.SubmitTestEvent", None])
+def test_invoke_resolves_target_from_actions_block(redfish_mock_factory, full_action_type):
     """invoke_action discovers the real GB300 target, not a hardcoded path."""
     mgr, svc = redfish_mock_factory("supermicro")
     # reversible action executes and POSTs to the discovered EventService target
     result = mgr.invoke_action("/redfish/v1/EventService", "SubmitTestEvent",
                                payload={"MessageId": "Alert.1.0.TestEvent"},
-                               full_action_type="#EventService.SubmitTestEvent")
+                               full_action_type=full_action_type)
     assert result.data.get("executed") is True
     assert result.data["target"] == "/redfish/v1/EventService/Actions/EventService.SubmitTestEvent"
     assert _post_count(svc) == 1
+
+
+@pytest.fixture
+def overlapping_reset_actions(redfish_mock_factory):
+    """Advertise same-name actions with distinct targets and input domains."""
+    manager, service = redfish_mock_factory("supermicro")
+    resource_uri = "/redfish/v1/Systems/System_0"
+    resource = json.loads("""{
+        "Actions": {
+            "#ComputerSystem.Reset": {
+                "target": "/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset",
+                "ResetType@Redfish.AllowableValues": ["GracefulRestart"]
+            },
+            "Oem": {
+                "#ExampleSystem.Reset": {
+                    "target": "/redfish/v1/Systems/System_0/Actions/Oem/ExampleSystem.Reset",
+                    "ResetType@Redfish.AllowableValues": ["PowerCycle"]
+                }
+            }
+        },
+        "Oem": {
+            "Other": {
+                "Actions": {
+                    "#OtherSystem.Reset": {
+                        "target": "/redfish/v1/Systems/System_0/Oem/Other/Actions/OtherSystem.Reset",
+                        "ResetType@Redfish.AllowableValues": ["On"]
+                    }
+                }
+            }
+        }
+    }""")
+    service._overlay[resource_uri] = resource
+    service._overlay[resource_uri.lower()] = resource
+    return manager, service, resource_uri
+
+
+@pytest.mark.parametrize(
+    ("action_type", "reset_type", "target_suffix"),
+    [
+        ("#ComputerSystem.Reset", "GracefulRestart", "/Actions/ComputerSystem.Reset"),
+        ("#ExampleSystem.Reset", "PowerCycle", "/Actions/Oem/ExampleSystem.Reset"),
+        ("#OtherSystem.Reset", "On", "/Oem/Other/Actions/OtherSystem.Reset"),
+    ],
+)
+def test_invoke_action_uses_exact_entry_for_target_and_metadata(
+    overlapping_reset_actions, action_type, reset_type, target_suffix
+):
+    """Validate each action against the advertised values of its own entry."""
+    manager, service, resource_uri = overlapping_reset_actions
+
+    result = manager.invoke_action(
+        resource_uri,
+        "Reset",
+        payload={"ResetType": reset_type},
+        full_action_type=action_type,
+        dry_run=True,
+    )
+
+    assert result.error is None
+    assert result.data["action"] == action_type
+    assert result.data["target"] == resource_uri + target_suffix
+    assert result.data["dry_run"] is True
+    assert _post_count(service) == 0
+
+
+@pytest.mark.parametrize(
+    ("action_type", "error_fragment"),
+    [
+        ("#ComputerSystem.Reset", "invalid value"),
+        ("#MissingSystem.Reset", "not found"),
+    ],
+)
+def test_invoke_action_rejects_same_name_oem_fallback(
+    overlapping_reset_actions, action_type, error_fragment
+):
+    """An OEM-compatible value cannot authorize a different action."""
+    manager, service, resource_uri = overlapping_reset_actions
+
+    result = manager.invoke_action(
+        resource_uri,
+        "Reset",
+        payload={"ResetType": "PowerCycle"},
+        full_action_type=action_type,
+        confirm=True,
+    )
+
+    assert result.error and error_fragment in result.error
+    assert _post_count(service) == 0
 
 
 def test_invoke_action_rejected_post_reports_error(redfish_mock_factory, monkeypatch):

@@ -42,7 +42,7 @@ LEGACY_UNGUARDED_MUTATION_CALLS = {
     "redfish_ctl/attribute/cmd_attribute_clear_pending.py:93 execute base_post",
     "redfish_ctl/attribute/cmd_attribute_update.py:94 execute base_patch",
     "redfish_ctl/bios/cmd_bios_clear_pending.py:81 execute base_post",
-    "redfish_ctl/bios/cmd_change_bios.py:374 execute base_patch",
+    "redfish_ctl/bios/cmd_change_bios.py:353 execute base_patch",
     "redfish_ctl/bios/cmd_change_boot_order.py:177 execute base_patch",
     "redfish_ctl/boot_source/cmd_clear_pending.py:69 execute base_post",
     "redfish_ctl/boot_source/cmd_enable.py:121 execute base_patch",

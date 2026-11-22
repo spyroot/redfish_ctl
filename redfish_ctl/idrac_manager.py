@@ -1590,6 +1590,22 @@ class IDracManager(RedfishManager):
             self.logger.error("")
         return ""
 
+    def _virtual_media_candidates(
+            self, managers: list[str], host_system: str, other_systems: list[str]
+    ) -> tuple[list[str], str]:
+        """Prefer the iDRAC host System and retain its legacy collection URI.
+
+        :param managers: advertised Manager URIs.
+        :param host_system: selected ComputerSystem URI, if available.
+        :param other_systems: other advertised ComputerSystem URIs.
+        :return: ordered resource URIs and the legacy collection URI, if available.
+        """
+        roots, _ = super()._virtual_media_candidates(managers, host_system, other_systems)
+        if host_system.endswith("/System.Embedded.1"):
+            roots.insert(0, host_system)
+        fallback_system = host_system or (other_systems[0] if other_systems else "")
+        return roots, f"{fallback_system}/VirtualMedia" if fallback_system else ""
+
     @cached_property
     def idrac_managers_count(self) -> str:
         """Return manager count. typically it 1

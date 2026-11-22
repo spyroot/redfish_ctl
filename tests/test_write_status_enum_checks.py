@@ -19,6 +19,7 @@ from redfish_ctl.bios.cmd_change_bios import BiosChangeSettings
 from redfish_ctl.bios.cmd_change_boot_order import ChangeBootOrder
 from redfish_ctl.boot_source.cmd_update import BootSourceUpdate
 from redfish_ctl.chassis.cmd_update_chassis import ChassisUpdate
+from redfish_ctl.idrac_manager import IDracManager
 from redfish_ctl.redfish_api_common import RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 from redfish_ctl.system.cmd_system_import import ImportSystemConfig
@@ -68,7 +69,7 @@ def test_bios_change_failed_patch_does_not_commit(tmp_path, monkeypatch):
     api_resp.Ok`` (enum-member attribute access is always truthy), so a
     failed BIOS write logged "Commit changes and rebooting" and rebooted.
     """
-    cmd = _cmd(BiosChangeSettings)
+    cmd = _cmd(IDracManager._runtime_command_class(BiosChangeSettings))
     invoked = []
     monkeypatch.setattr(cmd, "sync_invoke", _spy_sync_invoke(invoked))
     monkeypatch.setattr(
@@ -85,7 +86,7 @@ def test_bios_change_failed_patch_does_not_commit(tmp_path, monkeypatch):
 
 def test_bios_change_ok_patch_still_commits(tmp_path, monkeypatch):
     """bios-change: a real success with do_commit still schedules JobApply."""
-    cmd = _cmd(BiosChangeSettings)
+    cmd = _cmd(IDracManager._runtime_command_class(BiosChangeSettings))
     invoked = []
     monkeypatch.setattr(cmd, "sync_invoke", _spy_sync_invoke(invoked))
     monkeypatch.setattr(

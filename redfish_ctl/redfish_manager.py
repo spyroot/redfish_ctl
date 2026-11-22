@@ -19,11 +19,12 @@ import time
 import uuid
 import warnings
 from abc import abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
 from functools import cached_property
 from typing import Any, Callable, Dict, Hashable, Optional, Tuple
+from urllib.parse import urlsplit
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -31,13 +32,14 @@ from urllib3.util.retry import Retry
 
 from .cmd_exceptions import (
     AuthenticationFailed,
+    InvalidArgument,
     InvalidArgumentFormat,
     MissingMandatoryArguments,
     ResourceNotFound,
     TaskIdUnavailable,
     UnsupportedAction,
 )
-from .cmd_utils import save_if_needed
+from .cmd_utils import save_if_needed, validate_redfish_path
 from .config import http_backoff, http_pool, http_retries, http_timeout
 from .custom_argparser.customer_argdefault import CustomArgumentDefaultsHelpFormatter
 from .redfish_api_common import (
@@ -1685,38 +1687,77 @@ class RedfishManager:
         return self.value_from_json_list(cmd_result.data, RedfishJson.Data_id)
 
     @staticmethod
-    def _flatten_action_targets(resource):
-        """Map every ``#Type.Action`` (top-level and Oem) to its target URL.
+    def _action_entries(resource: Mapping[str, Any]) -> Iterator[tuple[str, Any, bool]]:
+        """Yield advertised action names and entries in discovery order.
 
-        Unlike the short-name discovery map, this does NOT collapse two actions
-        that share a short name, so an exact full-type lookup is unambiguous.
-
-        :param resource: the parsed Redfish resource whose ``Actions`` block is read.
-        :return: a dict mapping each action full type to its target URL.
+        :param resource: parsed Redfish resource with standard or OEM actions.
+        :return: triples of qualified action name, entry and short-name visibility.
         """
-        out = {}
-        actions = (resource or {}).get("Actions") or {}
+        actions = (resource or {}).get(RedfishJson.Actions) or {}
         if not isinstance(actions, dict):
-            return out
-        for key, val in actions.items():
-            if key == "Oem" and isinstance(val, dict):
-                for ok, ov in val.items():
-                    if isinstance(ov, dict) and ov.get("target"):
-                        out[ok] = ov["target"]
-            elif isinstance(val, dict) and val.get("target"):
-                out[key] = val["target"]
+            return
+        for name, entry in actions.items():
+            if name == "Oem" and isinstance(entry, dict):
+                for nested_name, nested_entry in entry.items():
+                    yield nested_name, nested_entry, True
+            else:
+                yield name, entry, True
         oem = (resource or {}).get("Oem") or {}
         if isinstance(oem, dict):
             for vendor_ext in oem.values():
                 vendor_actions = (
-                    vendor_ext.get("Actions") if isinstance(vendor_ext, dict) else None
+                    vendor_ext.get(RedfishJson.Actions) if isinstance(vendor_ext, dict) else None
                 )
-                if not isinstance(vendor_actions, dict):
-                    continue
-                for key, val in vendor_actions.items():
-                    if isinstance(val, dict) and val.get("target"):
-                        out[key] = val["target"]
-        return out
+                if isinstance(vendor_actions, dict):
+                    for name, entry in vendor_actions.items():
+                        yield name, entry, False
+
+    @staticmethod
+    def _targeted_action_entries(
+            entries: Iterable[tuple[str, Any, bool]],
+    ) -> dict[str, dict[str, Any]]:
+        """Index entries with advertised targets by qualified name.
+
+        :param entries: advertised action names and their entries.
+        :return: qualified action entries that carry a usable target.
+        """
+        return {
+            name: entry for name, entry, _ in entries
+            if isinstance(entry, dict) and entry.get("target")
+        }
+
+    @classmethod
+    def _flatten_action_targets(cls, resource: Mapping[str, Any]) -> dict[str, str]:
+        """Map each fully qualified action name to its advertised target.
+
+        :param resource: parsed Redfish resource containing the actions.
+        :return: advertised targets keyed by fully qualified action name.
+        """
+        return {
+            full_name: entry["target"]
+            for full_name, entry in cls._targeted_action_entries(cls._action_entries(resource)).items()
+        }
+
+    @staticmethod
+    def _parse_action_entry(
+            action_name: str, full_name: str, entry: Mapping[str, Any],
+    ) -> RedfishAction:
+        """Build a RedfishAction with the target and inline allowable values.
+
+        :param action_name: short action name.
+        :param full_name: advertised fully qualified action name.
+        :param entry: action entry containing the target and optional values.
+        :return: action built from the advertised entry.
+        """
+        action = RedfishAction(
+            action_name=action_name,
+            target=entry["target"],
+            full_redfish_name=full_name,
+        )
+        for key, values in entry.items():
+            if "@Redfish.AllowableValues" in key:
+                action.add_action_arg(key.split("@", 1)[0], values)
+        return action
 
     @staticmethod
     def _validate_action_payload(full_action_type: str,
@@ -1772,41 +1813,6 @@ class RedfishManager:
         return errors
 
     @staticmethod
-    def _get_actions(cls, json_data):
-        """Parse json from the manager for all supported action
-        and action method arg.
-        :param cls:
-        :param json_data:
-        :return:
-        """
-        unfiltered_actions = {}
-        full_redfish_names = {}
-
-        if RedfishJson.Actions not in json_data:
-            return unfiltered_actions, full_redfish_names
-
-        redfish_actions = json_data[RedfishJson.Actions]
-        for a in redfish_actions:
-            _ca = redfish_actions[a]
-            if a == "Oem" and isinstance(_ca, dict):
-                for k in _ca.keys():
-                    rest_api_action = k.split(".")
-                    if len(rest_api_action) < 2:
-                        continue
-                    rest_api_action = rest_api_action[-1]
-                    unfiltered_actions[rest_api_action] = _ca[k]
-                    full_redfish_names[rest_api_action] = k
-            else:
-                rest_api_action = a.split(".")
-                if len(rest_api_action) < 2:
-                    continue
-                rest_api_action = rest_api_action[-1]
-                unfiltered_actions[rest_api_action] = _ca
-                full_redfish_names[rest_api_action] = a
-
-        return unfiltered_actions, full_redfish_names
-
-    @staticmethod
     def discover_member_redfish_actions(cls, json_data):
         """
         :param cls:
@@ -1829,34 +1835,35 @@ class RedfishManager:
 
         return action_dict
 
+    @classmethod
+    def _short_actions(cls, entries: Iterable[tuple[str, Any, bool]]) -> dict[str, RedfishAction]:
+        """Project the resource's legacy short-name action view.
+
+        :param entries: advertised action names and their entries.
+        :return: actions keyed by short name, retaining the last matching entry.
+        """
+        short_entries = {
+            full_name.rsplit(".", 1)[-1]: (full_name, entry)
+            for full_name, entry, visible in entries
+            if visible and "." in full_name
+        }
+        return {
+            name: cls._parse_action_entry(name, full_name, entry)
+            for name, (full_name, entry) in short_entries.items()
+            if isinstance(entry, dict) and "target" in entry
+        }
+
     @staticmethod
-    def discover_redfish_actions(cls, json_data):
-        """Discovers all redfish action, args and args choices.
-        :param cls:
-        :param json_data:
-        :return:
+    def discover_redfish_actions(cls, json_data: Mapping[str, Any] | requests.Response) -> dict[str, RedfishAction]:
+        """Discover the resource's actions and inline parameter values.
+
+        :param cls: manager class supplying the action projection.
+        :param json_data: resource dictionary or HTTP response carrying one.
+        :return: discovered Redfish actions keyed by short name.
         """
         if isinstance(json_data, requests.models.Response):
             json_data = json_data.json()
-
-        action_dict = {}
-        unfiltered_actions, full_redfish_names = cls._get_actions(cls, json_data)
-        for ra in unfiltered_actions.keys():
-            if 'target' not in unfiltered_actions[ra]:
-                continue
-            action_tuple = unfiltered_actions[ra]
-            if isinstance(action_tuple, Dict):
-                arg_keys = action_tuple.keys()
-                redfish_action = RedfishAction(action_name=ra,
-                                               target=action_tuple['target'],
-                                               full_redfish_name=full_redfish_names[ra])
-                action_dict[ra] = redfish_action
-                for k in arg_keys:
-                    if '@Redfish.AllowableValues' in k:
-                        arg_name = k.split('@')[0]
-                        action_dict[ra].add_action_arg(arg_name, action_tuple[k])
-
-        return action_dict
+        return cls._short_actions(cls._action_entries(json_data))
 
     def invoke_action(self,
                       resource_uri: str,
@@ -1892,8 +1899,8 @@ class RedfishManager:
         :param action_name: short action name as keyed by discover_redfish_actions,
             e.g. ``Reset``, ``InsertMedia``, ``SubmitTestEvent``.
         :param payload: JSON body to POST (None -> {}).
-        :param full_action_type: exact ``#Type.Action`` to disambiguate when two
-            actions collapse to the same short name (e.g. Reset vs ResetToDefaults).
+        :param full_action_type: require this exact ``#Type.Action`` entry, including
+            its target and parameter metadata.
         :param do_async: use the asyncio HTTP path.
         :param expected_status: expected POST status (202 async job / 204 sync).
         :param dry_run: force a dry-run regardless of classification.
@@ -1909,35 +1916,27 @@ class RedfishManager:
         except Exception as e:
             return CommandResult(None, None, None, f"failed to read {resource_uri}: {e}")
 
-        actions = self.discover_redfish_actions(self, resource)
-        full = None
-        target = None
-        # Prefer an exact "#Type.Action" match read straight from the raw Actions
-        # block. This is collision-proof: two actions can share a short name (e.g.
-        # #Manager.ResetToDefaults vs the Oem #NvidiaManager.ResetToDefaults), and
-        # the short-name discovery map keeps only one of them.
+        entries = list(self._action_entries(resource))
+        actions = self._short_actions(entries)
+        targeted_entries = self._targeted_action_entries(entries)
         if full_action_type:
-            full_targets = self._flatten_action_targets(resource)
-            if full_action_type in full_targets:
-                full = full_action_type
-                target = full_targets[full_action_type]
-        # Otherwise fall back to the discovered short-name map.
-        if target is None:
+            entry = targeted_entries.get(full_action_type)
+            action = None if entry is None else self._parse_action_entry(
+                full_action_type.rsplit(".", 1)[-1], full_action_type, entry,
+            )
+        else:
             action = actions.get(action_name)
-            if action is not None and getattr(action, "target", None):
-                full = action.full_redfish_name or f"#{action_name}"
-                target = action.target
-        if target is None:
-            available = sorted(set(list(actions.keys())
-                                   + list(self._flatten_action_targets(resource).keys())))
+        if action is None or not action.target:
+            available = sorted(actions.keys() | targeted_entries.keys())
             wanted = full_action_type or action_name
             return CommandResult(
                 {"action": wanted, "available": available}, actions, None,
                 f"action '{wanted}' not found on {resource_uri}")
 
+        full = action.full_redfish_name or f"#{action_name}"
+        target = action.target
         level = classify(full)
         body = payload or {}
-        action = actions.get(action_name)
         validation_errors = self._validate_action_payload(full, action, body)
         if validation_errors:
             first = validation_errors[0]
@@ -2064,6 +2063,45 @@ class RedfishManager:
         """
         return self.manager_uri
 
+    def _local_resource_uri(self, uri: object) -> str:
+        """Return the path of an advertised resource on this Redfish service.
+
+        :param uri: origin-relative or absolute resource identifier.
+        :return: a local Redfish path, or an empty string for unusable links.
+        """
+        if (
+            not isinstance(uri, str)
+            or not uri
+            or "\\" in uri
+            or any(char.isspace() or ord(char) < 32 for char in uri)
+        ):
+            return ""
+        try:
+            link = urlsplit(uri)
+            if link.scheme or link.netloc:
+                origin = urlsplit(f"{self._default_method}{self.redfish_ip}")
+                default_port = 443 if origin.scheme == "https" else 80
+                link_port = link.port if link.port is not None else default_port
+                origin_port = origin.port if origin.port is not None else default_port
+                if (
+                    not link.netloc
+                    or link.username is not None
+                    or (link.scheme or origin.scheme) != origin.scheme
+                    or link.hostname != origin.hostname
+                    or link_port != origin_port
+                ):
+                    return ""
+        except ValueError:
+            return ""
+
+        if link.query or link.fragment:
+            return ""
+        try:
+            validate_redfish_path(link.path)
+        except InvalidArgument:
+            return ""
+        return link.path
+
     def _host_system(self, system_ids) -> str:
         """Return the host ComputerSystem id from a multi-system collection.
 
@@ -2072,15 +2110,18 @@ class RedfishManager:
         baseboard carries GPUs but no Bios). Returns "" if undecidable.
 
         :param system_ids: candidate ComputerSystem ids to probe.
-        :return: the id exposing a Bios/Boot link, or "" if none qualifies.
+        :return: the local path exposing a Bios/Boot link, or "" if none qualifies.
         """
         for sid in system_ids:
+            uri = self._local_resource_uri(sid)
+            if not uri:
+                continue
             try:
-                data = self.base_query(sid).data
+                data = self.base_query(uri).data
             except Exception:
                 continue
             if isinstance(data, dict) and ("Bios" in data or "Boot" in data):
-                return sid
+                return uri
         return ""
 
     @cached_property
@@ -2091,20 +2132,20 @@ class RedfishManager:
         service. On a multi-system service, such as a host plus an accelerator
         baseboard, the resource exposing ``Bios`` or ``Boot`` is selected.
 
-        :return: host ComputerSystem ``@odata.id``, or ``""`` if unresolved.
+        :return: local host ComputerSystem path, or ``""`` if unresolved.
         """
         resolved = ""
         try:
-            links = self.base_query(self.manager_uri, key=RedfishJson.Links).data
+            manager_uri = self._local_resource_uri(self.manager_uri)
+            links = self.base_query(manager_uri, key=RedfishJson.Links).data if manager_uri else None
         except Exception:
             links = None
         if isinstance(links, dict):
             managed = links.get(RedfishJson.ManagerServers)
             if isinstance(managed, list):
                 self._manage_servers_obs = managed
-                resolved = self.value_from_json_list(
-                    managed,
-                    RedfishJson.Data_id,
+                resolved = self._local_resource_uri(
+                    self.value_from_json_list(managed, RedfishJson.Data_id)
                 )
 
         try:
@@ -2116,7 +2157,7 @@ class RedfishManager:
             if host:
                 return host
         if len(system_ids) == 1:
-            return system_ids[0]
+            return self._local_resource_uri(system_ids[0]) or resolved
         return resolved
 
     @cached_property
@@ -2324,54 +2365,60 @@ class RedfishManager:
             task_state.value if task_state is not None else "unknown",
         )
 
-    def discover_virtual_media_uri(self, do_async: Optional[bool] = False) -> str:
-        """Resolve the VirtualMedia collection URI, vendor-neutrally.
+    def _virtual_media_candidates(
+            self, managers: list[str], host_system: str, other_systems: list[str]
+    ) -> tuple[list[str], str]:
+        """Return resource discovery order and any vendor fallback URI.
 
-        Dell hangs VirtualMedia off the ComputerSystem; iLO and Supermicro hang it
-        off a Manager. Check every Manager first, then the host System, returning
-        the first that advertises a VirtualMedia link. Falls back to the Dell
-        ``{system}/VirtualMedia`` subpath so existing Dell behavior is unchanged.
+        :param managers: advertised Manager URIs.
+        :param host_system: selected ComputerSystem URI, if available.
+        :param other_systems: other advertised ComputerSystem URIs.
+        :return: ordered resource URIs and an optional fallback collection URI.
+        """
+        return [*managers, host_system, *other_systems], ""
+
+    def discover_virtual_media_uri(self, do_async: Optional[bool] = False) -> str:
+        """Resolve an advertised VirtualMedia collection on this service.
 
         :param do_async: issue the underlying queries asynchronously when True.
         :return: the VirtualMedia collection URI.
         :raise ResourceNotFound: if no VirtualMedia collection can be resolved.
         """
-        # Managers first for iLO/Supermicro/OpenBMC; keep the historical Dell
-        # System.Embedded.1 preference when both System and Manager advertise it.
         manager_roots = []
         try:
-            manager_roots.extend(self.discover_manager_ids() or [])
+            manager_roots = [
+                uri for root in self.discover_manager_ids()
+                if (uri := self._local_resource_uri(root))
+            ]
         except Exception:
             pass
         try:
-            host_system = self.managed_system_uri
+            host_system = self._local_resource_uri(self.managed_system_uri)
         except Exception:
             host_system = ""
         system_roots = []
         if not host_system:
             try:
-                system_roots.extend(self.discover_computer_system_ids() or [])
+                system_roots = [
+                    uri for root in self.discover_computer_system_ids()
+                    if (uri := self._local_resource_uri(root))
+                ]
             except Exception:
                 pass
-        roots = []
-        if host_system.endswith("/System.Embedded.1"):
-            roots.append(host_system)
-        roots.extend(root for root in manager_roots if root not in roots)
-        if host_system and host_system not in roots:
-            roots.append(host_system)
-        roots.extend(root for root in system_roots if root not in roots)
-        for root in roots:
+        roots, fallback = self._virtual_media_candidates(manager_roots, host_system, system_roots)
+        for root in dict.fromkeys(filter(None, roots)):
             try:
-                data = self.base_query(root, do_async=do_async).data or {}
+                data = self.base_query(root, do_async=do_async).data
             except Exception:
                 continue
-            link = data.get("VirtualMedia")
-            uri = link.get("@odata.id") if isinstance(link, dict) else None
+            link = data.get("VirtualMedia") if isinstance(data, Mapping) else None
+            uri = self._local_resource_uri(link.get(RedfishJson.Data_id)) if isinstance(
+                link, Mapping
+            ) else ""
             if uri:
                 return uri
-        fallback_system = host_system or (system_roots[0] if system_roots else "")
-        if fallback_system:
-            return f"{fallback_system}/VirtualMedia"
+        if fallback:
+            return fallback
         raise ResourceNotFound("VirtualMedia collection not found in Managers or Systems")
 
     def api_success_msg(self,

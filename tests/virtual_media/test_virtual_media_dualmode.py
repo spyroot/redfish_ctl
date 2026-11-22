@@ -78,6 +78,72 @@ def test_virtual_media_query_prefers_dell_system_link_when_both_exist(
     )
 
 
+@pytest.mark.parametrize(
+    ("manager_link_prefix", "selected_root"),
+    [
+        pytest.param("", "Managers/iDRAC.Embedded.1", id="relative-manager-link"),
+        pytest.param(
+            "https://mock-idrac", "Managers/iDRAC.Embedded.1", id="same-authority"
+        ),
+        pytest.param(
+            "https://other.example.test", "Systems/System.Embedded.1", id="foreign-host"
+        ),
+        pytest.param(
+            "//other.example.test", "Systems/System.Embedded.1", id="foreign-network-path"
+        ),
+    ],
+)
+def test_generic_virtual_media_discovery_follows_local_advertised_links(
+    redfish_mock, redfish_service, manager_link_prefix, selected_root
+):
+    """A generic manager follows advertised local links in discovery order."""
+    generic = RedfishManager(host=redfish_mock.redfish_ip, username="root", password="mock")
+    manager_uri = "/redfish/v1/Managers/iDRAC.Embedded.1"
+    system_uri = "/redfish/v1/Systems/System.Embedded.1"
+    for uri, prefix in ((manager_uri, manager_link_prefix), (system_uri, "")):
+        resource = dict(redfish_service._state(uri))
+        resource["VirtualMedia"] = {"@odata.id": f"{prefix}{uri}/VirtualMedia"}
+        redfish_service._overlay[uri] = resource
+        redfish_service._overlay[uri.lower()] = resource
+
+    assert generic.discover_virtual_media_uri() == f"/redfish/v1/{selected_root}/VirtualMedia"
+    assert all(request.hostname == redfish_mock.redfish_ip for request in redfish_service.requests)
+
+
+def test_generic_virtual_media_query_does_not_synthesize_system_subpath(
+    redfish_mock, redfish_service
+):
+    """An unadvertised Dell fixture endpoint is ignored by the generic manager."""
+    generic = RedfishManager(host=redfish_mock.redfish_ip, username="root", password="mock")
+
+    result = generic.sync_invoke(ApiRequestType.VirtualMediaGet, "virtual_disk_query")
+
+    assert result.error == "VirtualMedia collection not found in Managers or Systems"
+    assert all("/virtualmedia" not in request.path for request in redfish_service.requests)
+
+
+@pytest.mark.parametrize("manager_class", [RedfishManager, IDracManager])
+def test_virtual_media_discovery_skips_untrusted_manager_member_uri(
+    redfish_mock, redfish_service, manager_class
+):
+    """A foreign Manager member never receives a discovery request."""
+    manager = manager_class(host=redfish_mock.redfish_ip, username="root", password="mock")
+    managers_uri = "/redfish/v1/Managers"
+    system_uri = "/redfish/v1/Systems/System.Embedded.1"
+    managers = dict(redfish_service._state(managers_uri))
+    managers["Members"] = [
+        {"@odata.id": "https://other.example.test/redfish/v1/Managers/1"},
+    ]
+    system = dict(redfish_service._state(system_uri))
+    system["VirtualMedia"] = {"@odata.id": f"{system_uri}/VirtualMedia"}
+    for uri, data in ((managers_uri, managers), (system_uri, system)):
+        redfish_service._overlay[uri] = data
+        redfish_service._overlay[uri.lower()] = data
+
+    assert manager.discover_virtual_media_uri() == f"{system_uri}/VirtualMedia"
+    assert all(request.hostname == redfish_mock.redfish_ip for request in redfish_service.requests)
+
+
 def test_virtual_media_query_filters_by_device_id(redfish_api):
     """device_id returns the matching virtual-media member."""
     result = redfish_api.sync_invoke(
