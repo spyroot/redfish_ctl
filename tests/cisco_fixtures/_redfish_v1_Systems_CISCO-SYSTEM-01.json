@@ -1,0 +1,311 @@
+{
+  "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01",
+  "@odata.type": "#ComputerSystem.v1_15_0.ComputerSystem",
+  "@odata.context": "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
+  "Description": "Represents general resources for the overall system",
+  "Processors": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Processors"
+  },
+  "SimpleStorage": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/SimpleStorage"
+  },
+  "Storage": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Storage"
+  },
+  "Memory": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Memory"
+  },
+  "MemoryDomains": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/MemoryDomains"
+  },
+  "NetworkInterfaces": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/NetworkInterfaces"
+  },
+  "Bios": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Bios"
+  },
+  "SecureBoot": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/SecureBoot"
+  },
+  "LogServices": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/LogServices"
+  },
+  "EthernetInterfaces": {
+    "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/EthernetInterfaces"
+  },
+  "Links": {
+    "Chassis": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1"
+      }
+    ],
+    "CooledBy": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1/Thermal"
+      }
+    ],
+    "ManagedBy": [
+      {
+        "@odata.id": "/redfish/v1/Managers/CIMC"
+      }
+    ],
+    "PoweredBy": [
+      {
+        "@odata.id": "/redfish/v1/Chassis/1/Power"
+      }
+    ],
+    "Oem": {
+      "Cisco": {
+        "SPDMDeviceCertificates": {
+          "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Oem/Cisco/SPDMDevice/Certificates"
+        },
+        "SPDMTrustStoreCertificateCollection": {
+          "@odata.id": "/redfish/v1/Managers/CIMC/Oem/Cisco/SPDMTrustStore/Certificates"
+        }
+      }
+    }
+  },
+  "Oem": {
+    "Cisco": {
+      "@odata.type": "#CiscoUCSExtensions.v1_0_0.CiscoUCSExtensions",
+      "DimmBlocklistingEnabled": true,
+      "SystemEffectiveMemory": 1024,
+      "SystemMemorySummary": {
+        "FailedDIMMCount": 0,
+        "RedundantMemoryMiB": 0,
+        "FailedMemoryMiB": 0,
+        "TotalSystemMemoryGiB": 1024,
+        "IgnoredMemoryMiB": 0,
+        "RASMemoryConfiguration": "MaximumPerformance Mirroring PartialMirror",
+        "MemoryConfiguration": "MaximumPerformance",
+        "EffectiveSpeedMHz": 6400,
+        "EffectiveMemoryGiB": 1024,
+        "IgnoredDIMMCount": 0
+      },
+      "SystemEffectiveSpeed": 6400,
+      "SystemEffectiveMemory@Message.ExtendedInfo": [
+        {
+          "@odata.type": "#Message.v1_1_1.Message",
+          "MessageId": "CiscoUCS.1.8.0.PropertyWillBeDeprecated",
+          "Message": "The property 'SystemEffectiveMemory' will be deprecated from next release onwards",
+          "MessageArgs": [
+            "SystemEffectiveMemory"
+          ],
+          "Severity": "Warning",
+          "MessageSeverity": "Warning"
+        }
+      ],
+      "SystemEffectiveSpeed@Message.ExtendedInfo": [
+        {
+          "@odata.type": "#Message.v1_1_1.Message",
+          "MessageId": "CiscoUCS.1.8.0.PropertyWillBeDeprecated",
+          "Message": "The property 'SystemEffectiveSpeed' will be deprecated from next release onwards",
+          "MessageArgs": [
+            "SystemEffectiveSpeed"
+          ],
+          "Severity": "Warning",
+          "MessageSeverity": "Warning"
+        }
+      ],
+      "PostCompletionStatus": true,
+      "FrontPanelButtonsLocked": false,
+      "PowerRestoreDelayType": "Fixed",
+      "PowerRestoreDelayValue": 0,
+      "MCTP": {
+        "FaultAlertSetting": "Partial",
+        "SPDMHandShakeStatus": "Completed"
+      }
+    }
+  },
+  "AssetTag": "REDACTED-ASSET",
+  "SystemType": "Physical",
+  "BiosVersion": "C220M8.6.0.1c.0.1117250232",
+  "HostName": "redfish-host",
+  "Boot": {
+    "BootSourceOverrideEnabled": "Disabled",
+    "BootSourceOverrideTarget@Redfish.AllowableValues": [
+      "None",
+      "Pxe",
+      "Floppy",
+      "Cd",
+      "Hdd",
+      "BiosSetup",
+      "Diags"
+    ],
+    "BootSourceOverrideEnabled@Redfish.AllowableValues": [
+      "Once",
+      "Continuous",
+      "Disabled"
+    ],
+    "BootSourceOverrideTarget": "None",
+    "Certificates": {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/Boot/Certificates"
+    }
+  },
+  "Id": "CISCO-SYSTEM-01",
+  "ProcessorSummary": {
+    "CoreCount": 64,
+    "Model": "Intel(R) Xeon(R) 6737P",
+    "Count": 2
+  },
+  "PCIeDevices@odata.count": 13,
+  "PCIeDevices": [
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/MLOM"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/MSTOR-RAID"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-1"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-2"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-3"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-4"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-5"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-6"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-7"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-8"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-9"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-10"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-11"
+    }
+  ],
+  "PCIeFunctions@odata.count": 13,
+  "PCIeFunctions": [
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/MLOM/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/MSTOR-RAID/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-1/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-2/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-3/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-4/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-5/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-6/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-7/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-8/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-9/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-10/PCIeFunctions/0"
+    },
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01/PCIeDevices/FRONT-NVME-11/PCIeFunctions/0"
+    }
+  ],
+  "Model": "UCSC-C220-M8E3S",
+  "SerialNumber": "REDACTED-SERIAL",
+  "Name": "UCS C220 M8E3S",
+  "HostWatchdogTimer": {
+    "WarningAction": "None",
+    "Status": {
+      "State": "Disabled"
+    },
+    "FunctionEnabled": false,
+    "TimeoutAction": "PowerDown"
+  },
+  "Manufacturer": "Cisco Systems Inc",
+  "MemorySummary": {
+    "TotalSystemMemoryGiB": 1024,
+    "Status": {
+      "Health": "OK",
+      "HealthRollup": "OK"
+    }
+  },
+  "IndicatorLED": "Off",
+  "LocationIndicatorActive": false,
+  "TrustedModules": [
+    {
+      "FirmwareVersion": "15.24.18954.0",
+      "Status": {
+        "State": "Enabled"
+      },
+      "Oem": {
+        "Cisco": {
+          "TPM": {
+            "Manufacturer": "Cisco Systems Inc",
+            "Model": "UCS-TPM-002D",
+            "OwnershipStatus": "Owned",
+            "Revision": 1,
+            "SerialNumber": "REDACTED-SERIAL"
+          }
+        }
+      },
+      "InterfaceType": "TPM2_0"
+    }
+  ],
+  "UUID": "00000000-0000-0000-0000-000000000000",
+  "PowerRestorePolicy": "LastState",
+  "PowerState": "On",
+  "BootProgress": {
+    "LastState": "OSBootStarted"
+  },
+  "Status": {
+    "State": "Enabled",
+    "Health": "OK",
+    "HealthRollup": "OK"
+  },
+  "Actions": {
+    "#ComputerSystem.Reset": {
+      "target": "/redfish/v1/Systems/CISCO-SYSTEM-01/Actions/ComputerSystem.Reset",
+      "ResetType@Redfish.AllowableValues": [
+        "On",
+        "ForceOff",
+        "GracefulShutdown",
+        "GracefulRestart",
+        "ForceRestart",
+        "Nmi",
+        "PowerCycle"
+      ]
+    },
+    "Oem": {
+      "#CiscoUCSExtensions.ResetBIOSCMOS": {
+        "target": "/redfish/v1/Systems/CISCO-SYSTEM-01/Actions/Oem/ComputerSystem.ResetBIOSCMOS",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ResetBIOSCMOS"
+      },
+      "#CiscoUCSExtensions.ResetHostPowerAndBIOSCMOS": {
+        "target": "/redfish/v1/Systems/CISCO-SYSTEM-01/Actions/Oem/ComputerSystem.ResetHostPowerAndBIOSCMOS",
+        "@odata.type": "#CiscoUCSExtensions.v1_0_0.ResetHostPowerAndBIOSCMOS"
+      }
+    }
+  }
+}

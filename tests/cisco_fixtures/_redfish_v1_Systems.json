@@ -1,0 +1,13 @@
+{
+  "@odata.id": "/redfish/v1/Systems",
+  "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
+  "@odata.context": "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
+  "Description": "Collection of Computer Systems",
+  "Name": "Computer System Collection",
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/Systems/CISCO-SYSTEM-01"
+    }
+  ],
+  "Members@odata.count": 1
+}

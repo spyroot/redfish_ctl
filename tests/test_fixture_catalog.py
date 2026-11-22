@@ -18,6 +18,7 @@ def test_default_fixture_catalog_lists_known_active_roots():
     assert catalog.require("dell-idrac-overlay").vendor == "dell"
     assert catalog.require("generic-dmtf-public-rackmount1").vendor == "generic"
     assert catalog.require("supermicro-gb300-corpus").generation == "gb300"
+    assert catalog.require("cisco-cimc-corpus") in catalog.active_sets()
 
 
 def test_active_fixture_roots_resolve_to_non_empty_json_trees():
@@ -35,7 +36,6 @@ def test_pending_fixture_sets_are_explicitly_reported():
     catalog = load_catalog()
 
     pending = {fixture_set.key: fixture_set for fixture_set in catalog.pending_sets()}
-    assert "cisco-cimc-corpus" in pending
     assert "lenovo-xcc-doc-seeded" in pending
     assert all(fixture_set.reason for fixture_set in pending.values())
 

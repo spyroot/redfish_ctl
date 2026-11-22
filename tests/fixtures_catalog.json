@@ -84,9 +84,10 @@
       "vendor": "cisco",
       "generation": "ucs-c-series",
       "path": "tests/cisco_fixtures",
-      "status": "pending",
+      "status": "active",
+      "redfish_version": "1.16.1",
       "oem_types": ["Cisco"],
-      "reason": "Waiting for a sanitized Cisco CIMC Redfish crawl."
+      "source": "Sanitized Cisco CIMC service root, system, and manager fixtures captured from a lab UCS C220 M8."
     },
     {
       "key": "lenovo-xcc-doc-seeded",

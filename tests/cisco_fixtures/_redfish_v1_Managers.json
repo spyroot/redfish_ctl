@@ -1,0 +1,16 @@
+{
+  "@odata.id": "/redfish/v1/Managers",
+  "@odata.type": "#ManagerCollection.ManagerCollection",
+  "@odata.context": "/redfish/v1/$metadata#ManagerCollection.ManagerCollection",
+  "Description": "Collection of Managers",
+  "Name": "Manager Collection",
+  "Members": [
+    {
+      "@odata.id": "/redfish/v1/Managers/CIMC"
+    },
+    {
+      "@odata.id": "/redfish/v1/Managers/UCSC-M-V5D200GV2_CISCO-COMPONENT-01"
+    }
+  ],
+  "Members@odata.count": 2
+}
