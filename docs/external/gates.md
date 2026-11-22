@@ -13,39 +13,54 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 ```
 ./scripts/check.sh --list                 # enumerate every registered gate
 ./scripts/check.sh --profile merge         # run all merge gates (in-cluster only; refuses off-cluster)
-./scripts/gates/run.sh <profile>           # the runner (invoked inside a homelab-k8s runner pod)
 ```
 
-Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`make k8s-ci REF=<branch>`)
-— a gate never runs on a workstation.
+Off-cluster, `check.sh --profile` refuses; a gate never runs on a workstation.
+The configured CI invokes `scripts/gates/run.sh` internally; operators must use
+the guarded `scripts/check.sh` entry point.
+See [CI/CD Pipeline](ci.md#dispatch-an-exact-branch-check) for guarded dispatch.
 
 ## Profiles
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
-- **integration** — needs the cluster; smoke/namespace checks. No BMC mutation.
+- **integration** — read-only simulator namespace and service binding validation plus live GitLab token
+  checks. No cluster or BMC mutation.
+- **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
 
-## The gates
+## Protected simulator jobs
+
+`protected_jobs` in `gates/manifest.yaml` declares the eight protected
+simulator jobs, their branch rules, and which jobs share the release lock.
+`tools/gate_meta.py` checks these constraints against the root pipeline.
+See [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
+
+## Selected gate summary
+
+This table summarizes the primary operator-facing gates. The exact complete
+list comes from `gates/manifest.yaml`; run `./scripts/check.sh --list` to render
+it without executing a gate.
 
 | id | profile | mutates | what it checks | fails when |
 | -- | ------- | ------- | -------------- | ---------- |
 | `meta.gate-registry` | merge | no | registry is schema-valid, ids unique, commands exist+executable, mandatory present | any registry inconsistency |
-| `meta.ci-runner-tags` | merge | no | every GitLab job carries the `homelab-k8s` tag | a job missing the tag |
-| `meta.required-jobs` | merge | no | required jobs exist, no `allow_failure`, no live-apply in an MR pipeline | a required job missing/mis-configured |
+| `meta.ci-runner-tags` | merge | no | every GitLab job carries the `redfish_ctl` tag | a job missing the tag |
+| `meta.required-jobs` | merge | no | required jobs and their smoke contracts/evidence paths exist, with no `allow_failure` or MR-reachable live apply | a required job or smoke contract is missing or misconfigured |
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
-| `repo.shellcheck` | merge | no | shell scripts pass shellcheck (error severity) | a shell error, or shellcheck absent |
+| `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
-| `repo.yaml` | merge | no | YAML lints/parses | invalid YAML |
-| `repo.schemas` | merge | no | schema-backed docs validate (registry vs its JSON schema) | a schema violation |
+| `repo.yaml` | merge | no | YAML syntax and duplicate-key policy from `.yamllint` | yamllint is absent, or a configured error or parse failure occurs |
+| `repo.schemas` | merge | no | the registry and tracked binding match the exact Standards revision | the authorized source or proof is unavailable, or its schema or manifest differs |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
-| `unit.all` | merge | no | the offline unit suite | any test fails |
+| `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | the home cluster is reachable (fail-closed smoke) | cluster unreachable |
+| `integration.namespace` | integration | no | the protected runner validates the configured simulator service coordinates and reads the namespace's CA ConfigMap | the binding is invalid or the protected runner cannot read the target |
+| `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
 | `gitlab.project-token.api-access` | integration | no | the token carries API scope | `/version` returns 403 (no api scope) |
@@ -56,13 +71,50 @@ Off-cluster, `check.sh --profile` refuses and prints the in-cluster dispatch (`m
 | `mutation.serialized` | deploy | no | a mutation lock is held (no concurrent apply) | no lock held |
 | `mutation.verify-required` | deploy | no | the applied module exposes a verify step | module has no `verify.sh` |
 | `mutation.rollback-required` | deploy | no | the applied module exposes a rollback step | module has no `rollback.sh` |
-| `evidence.sanitized` | merge | no | the evidence artifact contains no secret material | a secret-shaped token in the artifact |
+| `evidence.sanitized` | merge | no | evidence already present at gate time contains no secret-shaped content; gate output is scanned before publication, and later job and smoke records are scanned before atomic write | the directory is missing, scanning fails, or a secret-shaped token is found |
+
+The `.yamllint` file defines the structural policy consumed by `repo.yaml`.
+Formatting-only rules are explicitly not applicable to this syntax and data
+integrity gate. Duplicate keys are an explicit error, `yamllint` is required,
+and the gate uses no runtime warning suppression or parse-only fallback.
+
+The `repo.schemas` gate validates the exact `spec.source.revision` from
+`standards-binding.yaml`. It checks out the pinned local Standards source when
+available. DCloud supplies the exact Git object proof from the private project
+Package Registry through the same-project job token. The gate rejects an
+unavailable proof, a mismatched commit, missing bound files, or a contract list
+that differs from the authenticated manifest.
+
+## Telemetry liveness checks
+
+From a source checkout, inspect selected Splunk MTS metrics or validate the
+catalog-driven full-coverage policy without network access:
+
+```bash
+python -m tools.splunk_metric_gate hw.power hw.temperature --token-env SPLUNK_API_TOKEN
+python -m tools.splunk_full_coverage_gate --dry-run
+```
+
+The scheduled full check is read-only and uses the registered realm and
+API-scoped token. Run it only in the configured protected CI environment:
+
+```bash
+python -m tools.splunk_full_coverage_gate --token-env SPLUNK_API_TOKEN
+```
+
+For exact-revision fleet verification, use the build identity check documented in
+[Telemetry metrics](telemetry-metrics.md#build-identity-and-fleet-read-back). It requires
+the complete host inventory and fails on missing, stale, or mixed `hw.build_info`
+identities.
+
+See [Telemetry metrics](telemetry-metrics.md#scheduled-splunk-liveness) for
+`always_on` and `condition_gated` semantics.
 
 ## Permissions
 
 merge/integration gates run under a **read-only** CI ServiceAccount with no production credentials.
 Live apply (deploy profile) runs under a **separate, explicitly selected** apply ServiceAccount, only
-from a protected pipeline. See `docs/secrets.md` for value-free credential creation and `k8s/base/` for
+from a protected pipeline. See [Secrets](secrets.md) for value-free credential creation and `k8s/base/` for
 the ServiceAccount definitions.
 
 ## Failure behavior
@@ -71,3 +123,14 @@ Every gate exits non-zero on failure; `scripts/gates/run.sh` stops at the first 
 required tool is absent **fails** (a skipped gate is never an implicit pass). Required CI jobs never use
 `allow_failure`, so a red gate blocks the pipeline. Do not claim a gate passed without terminal or
 GitLab pipeline evidence.
+
+A runtime test skip in `unit.all` also makes its evidence non-green; live and
+vendored-schema-only lanes are excluded before execution. The `timeoutSeconds`
+field, defined for each required job in `inventory/ci/smoke-tests.yaml`, bounds
+the complete gate sequence. Each provider-facing gate record in
+`gates/manifest.yaml` defines its own `timeoutSeconds`; the runner applies the
+lesser of that value and the time remaining for the complete sequence.
+
+The gate runner writes exact-identity JSON under `reports/gates/`. Required job
+and smoke artifacts are defined in
+[CI/CD Pipeline](ci.md#evidence-artifacts).

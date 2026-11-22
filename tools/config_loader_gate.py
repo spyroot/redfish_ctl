@@ -1,16 +1,17 @@
 """Gate: environment is read in ONE loader, nowhere else.
 
 Application code must receive canonical config from redfish_ctl/config.py, not
-re-derive it from the environment at each call site. This gate forbids a raw env
-read - ``os.getenv(...)``, ``os.environ[...]``/``.get``/``.setdefault``, or the
-``env_first(...)`` primitive - anywhere outside the loader.
+re-derive it from the environment at each call site. This gate is a PLAIN ban
+with no baseline: a raw env read - ``os.getenv(...)``, ``os.environ[...]``/
+``.get``/``.setdefault``, or the ``env_first(...)`` primitive - is forbidden in
+any git-tracked ``redfish_ctl/**.py`` other than the loader itself.
 
     python3 tools/config_loader_gate.py
 
 Stronger than name-scanning (repo.no-ghost-env): that checks env-var *names*;
-this forces *centralization* so there is exactly one place env is read. Ratchet:
-existing scattered reads are grandfathered in tools/config_loader_baseline.txt;
-a NEW read outside the loader fails, and a migrated one must leave the baseline.
+this forces *centralization* so there is exactly one place env is read. There is
+no grandfathering - every scattered read must migrate into the loader and expose
+a config accessor. Exits 0 when clean, 1 listing every offender.
 
 Author Mus spyroot@gmail.com
 """
@@ -26,7 +27,6 @@ _LOADER = "redfish_ctl/config.py"
 # A raw env read. env_first is matched as a CALL (``env_first(``) so the
 # re-export import line in redfish_shared.py is not flagged.
 _READ = re.compile(r"os\.getenv\(|os\.environ\b|\benv_first\(")
-_BASELINE = pathlib.Path(__file__).parent / "config_loader_baseline.txt"
 
 
 def _violations() -> list[str]:
@@ -47,36 +47,19 @@ def _violations() -> list[str]:
     return sorted(out)
 
 
-def _baseline() -> set[str]:
-    """Return grandfathered ``path:line`` reads.
-
-    :return: the allowed pre-existing offending locations.
-    """
-    if not _BASELINE.exists():
-        return set()
-    return {ln.strip() for ln in _BASELINE.read_text().splitlines()
-            if ln.strip() and not ln.startswith("#")}
-
-
 def main() -> int:
-    """Report new out-of-loader env reads and stale baseline entries.
+    """Report every out-of-loader env read.
 
-    :return: 0 when clean, 1 on a new read or a stale baseline entry.
+    :return: 0 when no offender is found, 1 when at least one exists.
     """
-    base = _baseline()
-    viol = set(_violations())
-    new = sorted(viol - base)
-    stale = sorted(base - viol)
-    for v in new:
+    viol = _violations()
+    for v in viol:
         print(f"config-loader: {v} - env read outside the loader; move it into "
-              f"{_LOADER} and expose a config value")
-    for v in stale:
-        print(f"config-loader: {v} baselined but no longer an env read - "
-              "remove it from the baseline (ratchet tightens)")
-    if new or stale:
-        print(f"config-loader: {len(new)} new, {len(stale)} stale")
+              f"{_LOADER} and expose a config accessor")
+    if viol:
+        print(f"config-loader: {len(viol)} offending env read(s) outside {_LOADER}")
         return 1
-    print(f"config-loader: clean ({len(base)} reads baselined for migration)")
+    print(f"config-loader: clean (env read only in {_LOADER})")
     return 0
 
 

@@ -9,7 +9,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, UnsupportedAction
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _SECURE_ERASE_ACTION = "#Drive.SecureErase"

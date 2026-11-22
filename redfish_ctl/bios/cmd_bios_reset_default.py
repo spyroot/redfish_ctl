@@ -14,15 +14,14 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 _RESET_BIOS_ACTION = "#Bios.ResetBios"
 
 
-class BiosResetDefault(IDracManager,
+class BiosResetDefault(RedfishManager,
                        scm_type=ApiRequestType.BiosResetDefault,
                        name="bios_reset",
                        metaclass=Singleton):
@@ -72,7 +71,7 @@ class BiosResetDefault(IDracManager,
         :param do_async: issue the host-system query over the async path when True.
         :return: the linked BIOS resource URI, or the standard ``/Bios`` fallback.
         """
-        system_uri = self.idrac_manage_servers
+        system_uri = self.managed_system_uri
         system = self.base_query(system_uri, do_async=do_async).data or {}
         bios_link = system.get("Bios") if isinstance(system, dict) else None
         if isinstance(bios_link, dict) and bios_link.get("@odata.id"):

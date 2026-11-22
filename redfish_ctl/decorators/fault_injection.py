@@ -5,7 +5,7 @@ hide: a signal (SIGTERM/SIGINT) arriving while a request is in flight, and a net
 read that stalls or drops. Signal-vs-event-loop ordering and socket timing cannot be
 reproduced faithfully with mocks, so these decorators sit at fixed points on the real
 sync and async HTTP call methods. Each is a NO-OP unless its env flag is set, so
-production and normal test runs pay only a single ``os.getenv`` check.
+production and normal test runs pay only a single env-flag check.
 
 Flags (``1``/``true``/``yes``/``on`` enables; unset or any other value disables):
 

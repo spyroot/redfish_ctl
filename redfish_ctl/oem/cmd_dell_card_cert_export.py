@@ -15,8 +15,10 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from ..cmd_exceptions import ResourceNotFound
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_exceptions import RedfishNotFound
 from ..redfish_manager import CommandResult
 
 
@@ -162,12 +164,14 @@ class DellCardCertExport(IDracManager,
 
         :param uri: Redfish resource URI.
         :param do_async: run the query asynchronously when True.
-        :return: parsed resource body, or an empty dict when the read fails.
+        :return: parsed resource body, or an empty dict when the resource is absent.
         """
         try:
             data = self.base_query(uri, do_async=do_async).data or {}
-        except Exception:
+        except (ResourceNotFound, RedfishNotFound):
             return {}
+        except Exception as exc:
+            raise RuntimeError(f"{uri}: {exc}") from exc
         return data if isinstance(data, dict) else {}
 
     def _card_service_uris(self, do_async):
@@ -275,7 +279,16 @@ class DellCardCertExport(IDracManager,
         :param do_async: issue the underlying queries/POST on the async path when True.
         :return: CommandResult with a listing, preview, execution result, or error.
         """
-        rows = self._discover_rows(bool(do_async))
+        try:
+            rows = self._discover_rows(bool(do_async))
+        except Exception as exc:
+            return CommandResult(
+                None,
+                None,
+                None,
+                "failed to read Dell iDRAC card certificate export resources: "
+                f"{exc}",
+            )
         if action is None:
             return CommandResult(rows, None, None, None)
 

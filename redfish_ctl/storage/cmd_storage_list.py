@@ -12,12 +12,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class StorageListView(IDracManager,
+class StorageListView(RedfishManager,
                       scm_type=ApiRequestType.StorageListQuery,
                       name='storage_list',
                       metaclass=Singleton):
@@ -57,7 +56,7 @@ class StorageListView(IDracManager,
         """
         # Standard Redfish Storage subpath; degrade gracefully when a host does
         # not expose it (return empty rather than raising a 404).
-        target_api = f"{self.idrac_manage_servers}/Storage"
+        target_api = f"{self.managed_system_uri}/Storage"
         try:
             return self.base_query(target_api,
                                    filename=filename,

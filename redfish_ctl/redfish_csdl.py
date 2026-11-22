@@ -10,6 +10,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Mapping
 
+from redfish_ctl.config import csdl_dir
+
 _VERSION_SUFFIX = re.compile(r"\.v\d+_\d+_\d+$")
 
 
@@ -67,7 +69,7 @@ def _default_schema_dir() -> Path:
     :return: the path from ``REDFISH_CSDL_DIR`` when set, otherwise the bundled
         ``tools/redfish-schemas`` directory.
     """
-    configured = os.environ.get("REDFISH_CSDL_DIR")
+    configured = csdl_dir()
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[1] / "tools" / "redfish-schemas"

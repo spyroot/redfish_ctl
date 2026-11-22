@@ -1,0 +1,22 @@
+apiVersion: standards.spyroot.dev/v1alpha1
+kind: ToolboxSpec
+metadata:
+  name: redfish_ctl
+spec:
+  tools:
+    - bash
+    - conda
+    - curl
+    - git
+    - git-lfs
+    - gitleaks
+    - helm
+    - jq
+    - kubeconform
+    - kube-linter
+    - kubectl
+    - oc
+    - setsid
+    - shellcheck
+    - yamllint
+    - yq

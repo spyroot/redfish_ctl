@@ -29,13 +29,12 @@ redfish_ctl.py --json storage --filter AHCI
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 from abc import abstractmethod
 from typing import Optional, Tuple
 
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -113,16 +112,17 @@ class StorageQuery(IDracManager, scm_type=ApiRequestType.StorageQuery,
 
         target_api = f"{self.idrac_manage_servers}/Storage"
         if do_expanded:
-            r = f"{self._default_method}{self.idrac_ip}{target_api}{self.expanded()}"
+            r = f"{self._default_method}{self.redfish_ip}{target_api}{self.expanded()}"
         else:
-            r = f"{self._default_method}{self.idrac_ip}{target_api}"
+            r = f"{self._default_method}{self.redfish_ip}{target_api}"
 
         if not do_async:
             response = self.api_get_call(r, headers)
             self.default_error_handler(response)
         else:
-            loop = self._event_loop()
-            response = loop.run_until_complete(self.api_async_get_until_complete(r, headers))
+            response = self._run_coroutine_sync(
+                self.api_async_get_until_complete(r, headers)
+            )
 
         data = response.json()
         save_if_needed(filename, data)

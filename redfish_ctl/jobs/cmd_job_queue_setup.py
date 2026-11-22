@@ -8,7 +8,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 _DELL_JOB_SERVICE = "/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/DellJobService"

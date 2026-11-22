@@ -1,6 +1,6 @@
 """Opt-in emulator-backed smoke test (the "live-like" lane).
 
-This validates idrac_ctl's real Redfish client against a spec-conformant
+This validates redfish_ctl's real Redfish client against a spec-conformant
 emulator running locally, with no hardware. The recommended emulator is the
 OpenStack sushy-tools fake driver (pip install sushy-tools), which needs no
 libvirt and supports mutating Actions:
@@ -22,6 +22,8 @@ import os
 
 import pytest
 
+pytestmark = pytest.mark.emulator_live
+
 _EMU = os.environ.get("REDFISH_EMULATOR_URL", "").rstrip("/")
 _skip = pytest.mark.skipif(
     not _EMU,
@@ -34,9 +36,9 @@ def _client():
     # host:port parsed from the emulator URL; api_*_call takes full URLs anyway.
     host = _EMU.split("://", 1)[-1]
     return IDracManager(
-        idrac_ip=host,
-        idrac_username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
-        idrac_password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
+        host=host,
+        username=os.environ.get("REDFISH_EMULATOR_USER", "admin"),
+        password=os.environ.get("REDFISH_EMULATOR_PASSWORD", "password"),
         insecure=True,
         is_debug=False,
     )

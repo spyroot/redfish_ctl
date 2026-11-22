@@ -9,14 +9,12 @@ redfish_ctl boot-settings
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import InvalidArgument
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -73,15 +71,14 @@ class BootSettings(IDracManager,
 
         # DellBootSources is a Dell OEM resource; degrade gracefully off Dell.
         target_api = f"{self.idrac_manage_servers}/Oem/Dell/DellBootSources/Settings"
-        r = f"{self._default_method}{self.idrac_ip}{target_api}"
+        r = f"{self._default_method}{self.redfish_ip}{target_api}"
 
         try:
             if not do_async:
                 response = self.api_get_call(r, headers)
                 self.default_error_handler(response)
             else:
-                loop = self._event_loop()
-                response = loop.run_until_complete(
+                response = self._run_coroutine_sync(
                     self.api_async_get_until_complete(r, headers)
                 )
             data = response.json()

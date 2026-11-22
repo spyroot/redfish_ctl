@@ -9,20 +9,18 @@ to a file and consume asynchronously or synchronously.
 
 Author Mus spyroot@gmail.com
 """
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
 from tqdm import tqdm
 
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi
 
 
-class PciDeviceQuery(IDracManager,
+class PciDeviceQuery(RedfishManager,
                      scm_type=ApiRequestType.PciDeviceQuery,
                      name='pci_device_query',
                      metaclass=Singleton):
@@ -74,7 +72,7 @@ class PciDeviceQuery(IDracManager,
         if data_type == "json":
             headers.update(self.json_content_type)
 
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
+        r = f"{self._default_method}{self.redfish_ip}{self.managed_system_uri}" \
             f"?$select={pci_type}"
 
         try:
@@ -82,8 +80,7 @@ class PciDeviceQuery(IDracManager,
                 response = self.api_get_call(r, headers)
                 self.default_error_handler(response)
             else:
-                loop = self._event_loop()
-                response = loop.run_until_complete(
+                response = self._run_coroutine_sync(
                     self.api_async_get_until_complete(r, headers))
             data = response.json()
         except Exception:

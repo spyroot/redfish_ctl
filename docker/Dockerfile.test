@@ -42,7 +42,7 @@ RUN touch redfish_ctl/__init__.py \
 WORKDIR /work
 ENV PYTHONPATH=/work
 
-# Default: the offline suite (live tests auto-skip with no IDRAC_IP).
+# Default: the offline suite (live tests auto-skip with no REDFISH_IP).
 CMD ["pytest", "-q"]
 
 # Manual equivalent of run-tests.sh:

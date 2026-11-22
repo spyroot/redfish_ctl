@@ -12,24 +12,24 @@ The spec files used below are indexed with vendor and safety labels in [Specs](.
 ## Read, Preview, Stage, Verify
 
 ```bash
-redfish_ctl bios-registry --attr_name SysProfile
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl --vendor dell bios-registry --attr_name SysProfile
+redfish_ctl --vendor dell bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
 ```
 
 After approval, stage the pending BIOS change and verify the pending state:
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
-redfish_ctl bios-pending
-redfish_ctl jobs
+redfish_ctl --vendor dell bios-change --from_spec specs/realtime.opt.spec.json on-reset --commit
+redfish_ctl --vendor dell bios-pending
+redfish_ctl --vendor dell jobs
 ```
 
 Use `-r` only during an approved maintenance window, then verify after the host returns:
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
-redfish_ctl jobs
-redfish_ctl bios --filter SysProfile,ProcCStates,MemFrequency
+redfish_ctl --vendor dell bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl --vendor dell jobs
+redfish_ctl --vendor dell bios --filter SysProfile,ProcCStates,MemFrequency
 ```
 
 `bios-change`, defined in `redfish_ctl/bios/cmd_change_bios.py`, requires an apply mode:
@@ -45,8 +45,8 @@ attributes to stage and must match a captured vendor registry before it is accep
 contacting a BMC:
 
 ```bash
-redfish_ctl bios-profile list
-redfish_ctl bios-profile show gb300-power-capped
+redfish_ctl --vendor dell bios-profile list
+redfish_ctl --vendor dell bios-profile show gb300-power-capped
 ```
 
 Use the catalog by operator purpose first, then inspect the exact attributes before staging anything:
@@ -60,10 +60,10 @@ Use the catalog by operator purpose first, then inspect the exact attributes bef
 The intended named-profile workflow is read, compare, then stage:
 
 ```bash
-redfish_ctl bios-profile list
-redfish_ctl bios-profile show gb300-power-capped
-redfish_ctl bios-profile diff gb300-power-capped
-redfish_ctl bios-profile apply gb300-power-capped --dry_run
+redfish_ctl --vendor dell bios-profile list
+redfish_ctl --vendor dell bios-profile show gb300-power-capped
+redfish_ctl --vendor dell bios-profile diff gb300-power-capped
+redfish_ctl --vendor dell bios-profile apply gb300-power-capped --dry_run
 ```
 
 The catalog command ships all four actions: `list` and `show` read only the local catalog, `diff`
@@ -73,8 +73,8 @@ Applying a profile stages BIOS settings and can require a host reset; only run t
 an approved maintenance window.
 
 ```bash
-redfish_ctl bios-profile apply gb300-power-capped --confirm
-redfish_ctl bios-pending
+redfish_ctl --vendor dell bios-profile apply gb300-power-capped --confirm
+redfish_ctl --vendor dell bios-pending
 ```
 
 ## Included Examples
@@ -94,13 +94,13 @@ The low-latency profile turns off common jitter sources such as deep CPU C-state
 tests, then enables high-performance memory and SR-IOV knobs where the platform supports them.
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
+redfish_ctl --vendor dell bios-change --from_spec specs/realtime.opt.spec.json on-reset --show
 ```
 
 After approval:
 
 ```bash
-redfish_ctl bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
+redfish_ctl --vendor dell bios-change --from_spec specs/realtime.opt.spec.json on-reset -r
 ```
 
 Always verify attribute names and allowed values on the target BMC. Dell, HPE, and other vendors do
@@ -111,14 +111,14 @@ not use exactly the same BIOS registry names.
 Dell PowerEdge systems often expose one high-level `SysProfile` attribute:
 
 ```bash
-redfish_ctl bios-registry --attr_name SysProfile
-redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset --show
+redfish_ctl --vendor dell bios-registry --attr_name SysProfile
+redfish_ctl --vendor dell bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset --show
 ```
 
 After approval:
 
 ```bash
-redfish_ctl bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset -r
+redfish_ctl --vendor dell bios-change --attr_name SysProfile --attr_value PerfOptimized on-reset -r
 ```
 
 Newer systems can also expose `WorkloadProfile`; read the registry before assuming the value name.
@@ -140,13 +140,13 @@ A custom profile is just a JSON spec with an `Attributes` object:
 Save it and preview it:
 
 ```bash
-redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset --show
+redfish_ctl --vendor dell bios-change --from_spec /tmp/my_profile.spec.json on-reset --show
 ```
 
 After approval:
 
 ```bash
-redfish_ctl bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
+redfish_ctl --vendor dell bios-change --from_spec /tmp/my_profile.spec.json on-reset -r
 ```
 
 ## Intel And AMD Notes

@@ -56,6 +56,31 @@ def test_flags_agent_only_directories():
     assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
 
 
+def test_allows_the_standards_required_ci_inventory_files():
+    """The public go/no-go profile and smoke inventory are tracked exceptions."""
+    assert not agent_name_guard.is_agent_file("inventory/ci/go-no-go.yaml")
+    assert not agent_name_guard.is_agent_file("inventory/ci/smoke-tests.yaml")
+
+
+def test_rejects_sibling_and_other_inventory_files():
+    """Only the exact public CI bindings are allowed under the denied inventory prefix."""
+    assert agent_name_guard.is_agent_file("inventory/ci/extra.yaml")
+    assert agent_name_guard.is_agent_file("inventory/go-no-go.yaml")
+    assert agent_name_guard.is_agent_file("inventory/home-lab/cluster.yaml")
+
+
+def test_file_scan_keeps_only_the_allowed_inventory_files(monkeypatch):
+    """Tracked CI bindings are ignored while adjacent inventory files still fail."""
+    stdout = "\n".join([
+        "inventory/ci/go-no-go.yaml",
+        "inventory/ci/smoke-tests.yaml",
+        "inventory/ci/extra.yaml",
+        "redfish_ctl/redfish_manager.py",
+    ])
+    monkeypatch.setattr(agent_name_guard.subprocess, "run", _fake_git(0, stdout))
+    assert agent_name_guard._agent_file_findings() == ["inventory/ci/extra.yaml"]
+
+
 def test_ordinary_source_is_not_flagged():
     """Real project source and docs are not agent files."""
     assert not agent_name_guard.is_agent_file("redfish_ctl/redfish_manager.py")

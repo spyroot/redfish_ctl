@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # kubernetes.render (merge, mutates:false): statically render + validate the k8s manifests and the
-# Helm chart. YAML-parses every non-templated manifest (always runnable) and, when helm is present,
-# lints + templates the chart. No cluster contact — pure render/validate.
+# Helm charts. YAML-parses every non-templated manifest, then requires Helm to
+# lint strictly and render every chart. No cluster contact is made.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+source scripts/gates/kubernetes/dmtf_sim_values.bash
+source scripts/gates/kubernetes/chart_coordinates.bash
 
 # YAML syntax gate over static (non-__PLACEHOLDER__) manifests.
 python - <<'PY'
@@ -24,10 +26,51 @@ if bad:
 print("kubernetes.render: static manifests parse OK")
 PY
 
-if command -v helm >/dev/null 2>&1; then
-  helm lint charts/redfish-controller >/dev/null
-  helm template charts/redfish-controller >/dev/null
-  echo "kubernetes.render: helm lint + template OK"
-else
-  echo "kubernetes.render: helm not installed — chart render skipped"
+if ! command -v helm >/dev/null 2>&1; then
+  echo "kubernetes.render: helm not installed in this gate environment" >&2
+  exit 1
 fi
+
+source_commit="${CI_COMMIT_SHA:-}"
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  source_commit="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "kubernetes.render: exact source commit is unavailable" >&2
+  exit 1
+fi
+
+dmtf_sim_set_helm_values "$source_commit"
+controller_release="$(helm_chart_name charts/redfish-controller)"
+controller_namespace="$(helm_render_namespace "$controller_release")"
+simulator_release="$(helm_chart_name charts/dmtf-sim)"
+simulator_namespace="$(helm_render_namespace "$simulator_release")"
+
+helm lint --strict charts/redfish-controller >/dev/null
+helm template "$controller_release" charts/redfish-controller \
+  --namespace "$controller_namespace" >/dev/null
+helm lint --strict charts/dmtf-sim \
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
+  --skip-tests \
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
+helm lint --strict charts/dmtf-sim --values "$DMTF_SIM_DCLOUD_VALUES" \
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" --skip-tests --values "$DMTF_SIM_DCLOUD_VALUES" \
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
+  --show-only templates/tests/test-connection.yaml \
+  "${DMTF_SIM_HELM_VALUES[@]}" >/dev/null
+
+if helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" \
+  "${DMTF_SIM_HELM_VALUES[@]}" \
+  --set-string dmtf.profile=no-such-profile >/dev/null 2>&1; then
+  echo "kubernetes.render: dmtf-sim accepted an unknown profile" >&2
+  exit 1
+fi
+
+echo "kubernetes.render: strict Helm lint + template OK"

@@ -4,7 +4,10 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 if ! command -v ruff >/dev/null 2>&1; then echo "repo.format: ruff not installed" >&2; exit 1; fi
-git fetch -q origin main 2>/dev/null || true
+if ! git fetch -q origin main 2>/dev/null; then
+  echo "repo.format: failed to refresh origin/main" >&2
+  exit 1
+fi
 # An empty changed-file list is only a legitimate pass when the comparison point actually resolved.
 # Without these checks an unreachable origin/main yields an empty list and the gate reports OK having
 # linted nothing — a fetch failure must never read as "no Python changed".
@@ -17,7 +20,10 @@ if ! merge_base="$(git merge-base "$base_sha" HEAD 2>/dev/null)"; then
   # the merge base can sit below origin/main's shallow boundary even though origin/main itself resolves.
   # Deepen once and retry. This is recovery, not a bypass: if the baseline is still unknowable the gate
   # fails below, so an empty changed set can never come from an unknown baseline.
-  git fetch -q --deepen=200 origin main 2>/dev/null || true
+  if ! git fetch -q --deepen=200 origin main 2>/dev/null; then
+    echo "repo.format: failed to deepen origin/main history" >&2
+    exit 1
+  fi
   if ! merge_base="$(git merge-base "$base_sha" HEAD 2>/dev/null)"; then
     echo "repo.format: no merge-base with origin/main even after deepening — changed-file set unknown" >&2
     exit 1

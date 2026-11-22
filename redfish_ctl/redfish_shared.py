@@ -22,6 +22,7 @@ class RedfishApiRespond(Enum):
     """
     Ok = auto()
     Error = auto()
+    Created = auto()
     Success = auto()
     AcceptedTaskGenerated = auto()
 
@@ -89,7 +90,7 @@ class RedfishJson:
 
     # DMTF Task schema keys, served on a #Task resource at
     # /redfish/v1/TaskService/Tasks/{id}. Generic (not Dell): the Dell OEM job
-    # model uses JobState/Message on #DellJob instead (see idrac_shared.py).
+    # model uses JobState/Message on #DellJob instead (see redfish_api_common.py).
     TaskState = "TaskState"
     TaskStatus = "TaskStatus"
     PercentComplete = "PercentComplete"

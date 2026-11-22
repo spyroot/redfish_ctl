@@ -26,7 +26,7 @@ cd "$_dir/../../.."
 fail=0
 
 # --- runtime, owned by the shared image -------------------------------------
-for tool in conda git-lfs; do
+for tool in conda git-lfs yq; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "BLOCKED: shared toolbox missing $tool" >&2
         echo "  The consumer does not install it. Fix lands in builder:" >&2
@@ -77,5 +77,8 @@ if [ -n "$prefix" ]; then
 fi
 
 echo "toolbox.consumer-smoke: OK"
-echo "  runtime  (image):   conda=$(command -v conda) git-lfs=$(command -v git-lfs)"
-echo "  project  (env '$env_name'): python=$(command -v python) pytest=$(command -v pytest) ruff=$(command -v ruff)"
+printf '  runtime  (image):   conda=%s git-lfs=%s yq=%s\n' \
+    "$(command -v conda)" "$(command -v git-lfs)" "$(command -v yq)"
+printf "  project  (env '%s'): python=%s pytest=%s ruff=%s\n" \
+    "$env_name" "$(command -v python)" "$(command -v pytest)" \
+    "$(command -v ruff)"

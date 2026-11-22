@@ -1,0 +1,70 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-update-delete-success
+spec:
+  rules:
+    - id: method.update-delete.success
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["7.5.2"]
+        statement: generic-patch-put-delete-success
+        wording: should
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: [PATCH, PUT, DELETE]
+          operationKind: modification
+      expect:
+        alternatives:
+          - id: completed-with-representation
+            status:
+              accept: {matcher: exact, values: [200]}
+              emitAllowed: true
+            body:
+              presence: required
+              represents: targeted_or_deleted_resource
+          - id: accepted-asynchronously
+            status:
+              accept: {matcher: exact, values: [202]}
+              emitAllowed: true
+            headers:
+              Location:
+                presence: required
+                semantic: task_monitor_uri
+            body:
+              presence: optional
+              ifPresent:
+                schema: Task
+          - id: completed-without-representation
+            status:
+              accept: {matcher: exact, values: [204]}
+              emitAllowed: true
+            body:
+              presence: forbidden
+      normative:
+        strength: recommended
+        keyword: should
+
+    - id: method.modification.error-is-atomic
+      type: state_invariant
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["7.5.3"]
+        statement: modification-error-does-not-change-resource
+        wording: shall_not
+      match:
+        exchange:
+          operationKind: modification
+        condition:
+          responseStatusClass: [4xx, 5xx]
+      expect:
+        resourceCreated: false
+        resourceModified: false
+      normative:
+        strength: prohibited
+        keyword: shall_not

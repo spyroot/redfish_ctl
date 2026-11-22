@@ -4,10 +4,11 @@ mainly for formatting, color etc.
 Author Mus spyroot@gmail.com
 """
 import argparse
-import os
 import string
 import textwrap as _textwrap
 from typing import Optional
+
+from redfish_ctl.config import term_type
 
 
 class TermColors:
@@ -34,7 +35,7 @@ def make_color_string(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
     :return: the message with color escape codes when the terminal supports
         color, otherwise the original message unchanged.
     """
-    current_term = os.getenv("TERM")
+    current_term = term_type()
     if current_term is not None and current_term in TermList:
         msg = msg.replace("[", "[" + tcolor)
         msg = msg.replace("]", "]" + TermColors.ENDC)
@@ -67,7 +68,7 @@ def make_action_colorful(msg: str, tcolor: Optional[str] = TermColors.OK_GREEN):
     :return: the message with color escape codes when the terminal supports
         color, otherwise the original message unchanged.
     """
-    current_term = os.getenv("TERM")
+    current_term = term_type()
 
     if current_term is not None and current_term in TermList:
         msg = msg.replace("{", "{" + TermColors.OK_BLUE)

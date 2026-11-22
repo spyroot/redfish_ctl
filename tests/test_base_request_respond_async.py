@@ -23,7 +23,7 @@ Author Mus spyroot@gmail.com
 """
 import pytest
 
-from redfish_ctl.idrac_shared import HTTPMethod, RedfishApiRespond
+from redfish_ctl.redfish_api_common import HTTPMethod, RedfishApiRespond
 from redfish_ctl.redfish_manager import CommandResult
 
 
@@ -107,7 +107,7 @@ def test_async_accepted_task_reads_the_header_from_the_response(redfish_mock, mo
     """An accepted async task must read its id from the Response, not from the enum.
 
     This is the branch that made the reversal expensive: on AcceptedTaskGenerated the code calls
-    ``job_id_from_header(response)``. With the names swapped that receives an enum, so a caller
+    ``task_id_from_header(response)``. With the names swapped that receives an enum, so a caller
     polling an async job could never learn its task id — after the mutation had already been issued.
     """
     fake = _FakeResponse(202, {})
@@ -126,6 +126,40 @@ def test_async_accepted_task_reads_the_header_from_the_response(redfish_mock, mo
     assert api_resp is RedfishApiRespond.AcceptedTaskGenerated
     assert isinstance(result, CommandResult)
     assert "task_id" in result.data, "the task id must come from the Response headers"
+
+
+def test_async_accepted_dell_task_falls_back_to_response_body(
+    redfish_mock,
+    monkeypatch,
+):
+    """Dell 202 responses can carry their JID in JSON instead of Location."""
+    fake = _FakeResponse(202, {"id": "JID_123456789"})
+    _stub_async(
+        monkeypatch,
+        redfish_mock,
+        "api_async_post_until_complete",
+        fake,
+        RedfishApiRespond.AcceptedTaskGenerated,
+    )
+
+    result, api_resp = redfish_mock.base_request_respond(
+        "/redfish/v1/Systems/System.Embedded.1/Actions/Anything",
+        HTTPMethod.POST,
+        payload={},
+        do_async=True,
+        expected_status=202,
+    )
+
+    assert api_resp is RedfishApiRespond.AcceptedTaskGenerated
+    assert result.data["task_id"] == "JID_123456789"
+
+
+def test_parse_task_id_returns_dell_body_fallback(redfish_mock):
+    """The Dell parser must not discard the body's non-empty JID string."""
+    response = _FakeResponse(202, {"Id": "JID_987654321"})
+    wrapped = CommandResult(None, None, response, None)
+
+    assert redfish_mock.parse_task_id(wrapped) == "JID_987654321"
 
 
 def test_async_and_sync_agree_on_the_return_contract(redfish_mock, monkeypatch):

@@ -53,7 +53,29 @@ kubectl create secret generic splunk-ingest \
   --from-literal=ingestUrl='https://ingest.<realm>.signalfx.com/v2/datapoint'
 ```
 
-## Image pull (only if the images are private)
+## Splunk metric-query gate
+
+The scheduled read-only MTS gate needs `SPLUNK_O11Y_REALM`, the realm used to
+build the query URL, and `SPLUNK_API_TOKEN`, an API-scoped Observability token.
+Provide both as masked, protected CI variables or through the configured secret
+provider. Do not reuse the exporter ingest token: ingest and API-query scopes
+serve different endpoints. See [Telemetry liveness checks](gates.md#telemetry-liveness-checks).
+
+## Image pull
+
+### Private DMTF simulator image
+
+`redfish-harbor-pull`, selected by `charts/dmtf-sim/values-dcloud.yaml`, is the
+image-pull Secret for the `redfish-ctl-simulator` namespace. Use a private
+Harbor credential limited to pulling from the Redfish registry project. The
+same Secret name is configured in both CI runner namespaces for kubelet
+pulls. The protected simulator jobs use Helm's ConfigMap storage so their
+service account can manage release records without reading the pull Secret.
+Image and chart publication use their own registry authority.
+See [Protected DMTF simulator deployment](ci.md#protected-dmtf-simulator-deployment)
+for the publish and deploy sequence.
+
+### Public GHCR images
 
 The published images (`redfish-ctl`, `redfish-ctl-controller`, `redfish-ctl-mock-bmc`) are intended to
 be public on GHCR, so no pull secret is needed. Verify with an anonymous pull before assuming it:

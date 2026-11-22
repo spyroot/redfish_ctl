@@ -28,7 +28,7 @@ DELL_TASK_FIXTURE = (
 
 def _mgr() -> RedfishManager:
     """Return a RedfishManager bound to a dummy endpoint; no I/O until api_get_call."""
-    return RedfishManager(redfish_ip="127.0.0.1")
+    return RedfishManager(host="127.0.0.1")
 
 
 def _task(state: str, status: str = "OK", percent: int = 0) -> dict:

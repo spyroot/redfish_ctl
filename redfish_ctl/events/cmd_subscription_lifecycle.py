@@ -4,21 +4,19 @@
     redfish_ctl subscription-delete --subscription <id-or-uri> --confirm
 """
 
-import asyncio
 import inspect
 import json
 from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
-from ..idrac_manager import IDracManager
-from ..idrac_shared import (
+from ..redfish_api_common import (
     REDFISH_API,
     ApiRequestType,
     HTTPMethod,
     RedfishApiRespond,
     Singleton,
 )
-from ..redfish_manager import CommandResult
+from ..redfish_manager import CommandResult, RedfishManager
 
 
 def _as_list(values) -> list[str]:
@@ -39,7 +37,7 @@ def _as_list(values) -> list[str]:
     return normalized
 
 
-class _SubscriptionBase(IDracManager):
+class _SubscriptionBase(RedfishManager):
     """Shared EventService subscription helpers."""
 
     @staticmethod
@@ -57,12 +55,10 @@ class _SubscriptionBase(IDracManager):
     def _subscription_collection_uri(self, do_async):
         """Resolve the EventService Subscriptions collection URI.
 
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport when True.
         :return: the Subscriptions collection URI.
         :raises InvalidArgument: when the EventService Subscriptions link is absent.
         """
-        if do_async:
-            self._event_loop()
         service = self.base_query(
             REDFISH_API.EventServiceQuery,
             do_async=do_async,
@@ -76,11 +72,9 @@ class _SubscriptionBase(IDracManager):
         """List the member URIs in the Subscriptions collection.
 
         :param subscriptions_uri: the Subscriptions collection URI.
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport when True.
         :return: the ``@odata.id`` of each subscription member (possibly empty).
         """
-        if do_async:
-            self._event_loop()
         collection = self.base_query(subscriptions_uri, do_async=do_async).data or {}
         members = collection.get("Members")
         if not isinstance(members, list):
@@ -96,7 +90,7 @@ class _SubscriptionBase(IDracManager):
 
         :param subscription: a subscription id or a full member URI.
         :param subscriptions_uri: the Subscriptions collection URI.
-        :param do_async: prime the async event loop when True.
+        :param do_async: use the async transport while resolving members when True.
         :return: the resolved subscription member URI.
         :raises InvalidArgument: when empty, when the value is the collection URI
             itself, when it falls outside the collection, or when it is not found.
@@ -139,11 +133,15 @@ class _SubscriptionBase(IDracManager):
         :param expected_status: the status a success is expected to return.
         :return: Success on the expected status, Ok on any other 2xx, else Error.
         """
-        mapped_status = self._http_code_mapping.get(response.status_code)
         if response.status_code == expected_status:
-            return mapped_status or RedfishApiRespond.Success
+            return {
+                200: RedfishApiRespond.Ok,
+                201: RedfishApiRespond.Created,
+                202: RedfishApiRespond.AcceptedTaskGenerated,
+                204: RedfishApiRespond.Success,
+            }.get(response.status_code, RedfishApiRespond.Success)
         if 200 <= response.status_code < 300:
-            return mapped_status or RedfishApiRespond.Ok
+            return RedfishApiRespond.Ok
         return RedfishApiRespond.Error
 
     def _error_text(self, response):
@@ -185,10 +183,9 @@ class _SubscriptionBase(IDracManager):
                 return self.api_post_call(request, json.dumps(body), headers)
             if method == HTTPMethod.DELETE:
                 return self.api_delete_call(request, headers)
-        loop = self._event_loop()
         if method == HTTPMethod.POST:
-            return loop.run_until_complete(
-                self._await_async_response(
+            return self._run_coroutine_sync(
+                lambda loop: self._await_async_response(
                     self.api_async_post_call(
                         loop,
                         request,
@@ -198,8 +195,8 @@ class _SubscriptionBase(IDracManager):
                 )
             )
         if method == HTTPMethod.DELETE:
-            return loop.run_until_complete(
-                self._await_async_response(
+            return self._run_coroutine_sync(
+                lambda loop: self._await_async_response(
                     self.api_async_delete_call(loop, request, "", headers)
                 )
             )

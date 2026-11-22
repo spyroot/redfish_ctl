@@ -1,9 +1,11 @@
 # Telemetry and tracing merge gates
 
 Operator-defined gate contract (2026-07-17). Every telemetry or tracing change merges only
-through the gates below. Machine-readable companions: `span_contract.yaml` (span attribute
-schema) and `expected_signals.yaml` (fixture-to-signal mapping). Contract tests assert these
-documents against the code; drift in either direction blocks merge.
+through the gates below. Machine-readable companions are `span_contract.yaml`
+(span attributes), `catalog.yaml` (shared exporter self-metrics), and the
+concrete reader contracts `supermicro/catalog.yaml` and
+`supermicro/expected_signals.yaml`. Contract tests assert these documents
+against the code; drift in either direction blocks merge.
 
 ## Merge gates
 
@@ -12,7 +14,7 @@ documents against the code; drift in either direction blocks merge.
 | G0 — Signal contract | merge | Every metric and span change is represented in a machine-readable contract. Generated documentation has no diff after regeneration. |
 | G1 — High-value telemetry completeness | merge | Every fixture row for `Status.Health`, `Status.HealthRollup`, `Status.State`, `LinkDownReasonCode`, `EDPViolationState`, `PowerBreakPerformanceState`, and `LastResetType` produces the expected signal or an explicitly documented unsupported result. |
 | G2 — Metric semantic correctness | merge | Name, unit, type, temporality, dimensions, boolean conversion, enum conversion, and OTLP Sum/Gauge classification match the contract across all three backends (Prometheus, SignalFx, OTLP). |
-| G3 — HTTP trace coverage | merge | Every GET, POST, PATCH, DELETE, async request, Redfish Action, and firmware upload produces exactly one CLIENT request span. No new direct HTTP bypass is introduced (repository check detects direct `requests.*` calls outside the traced seams). |
+| G3 — HTTP trace coverage | merge | Every GET, POST, PATCH, DELETE, async request, Redfish Action, and firmware upload produces exactly one CLIENT request span. No new direct HTTP bypass is introduced (repository check detects module aliases, imported verbs, and Session/client methods outside the traced seams). |
 | G6 — Lifecycle and flush | merge | Finished spans are exported on normal exit, command failure, interrupt, and termination. Shutdown does not hang beyond the configured budget. |
 | G10 — Runtime regression | production canary | Scrape latency, BMC request count, exporter failures, dropped spans, and trace volume stay within the agreed canary budgets. |
 | G11 — Documentation truth | merge | `observability.md` and the generated telemetry catalog contain only capabilities verified by contract tests. |
@@ -42,7 +44,7 @@ Each span test asserts:
 * `server.address` or the agreed `bmc.ip` attribute is present.
 * HTTP method and status are present.
 * Exceptions and timeouts set the span error status.
-* `redfish.action` is present only for Actions.
+* `redfish.action.*` attributes (`name`, `type`, `target`, `level`) are present only for Actions.
 * No request or response body is captured.
 * One physical BMC request produces one span — not one span in the helper and another in its caller.
 
@@ -61,8 +63,14 @@ Normal CLI operation:
 
 ```
 Operation ROOT
-└── redfish.bmc.request CLIENT
+├── preflight redfish.bmc.request CLIENT
+├── command redfish.bmc.request CLIENT
+└── post-processing redfish.bmc.request CLIENT
 ```
+
+The CLI root encloses manager construction, version/vendor preflight, command
+dispatch, vendor post-processing, and rendering. A surrounding ambient span is
+never its parent.
 
 Action followed by a task:
 
@@ -102,10 +110,14 @@ Fleet:
 
 ```
 Fleet coordinator ROOT
-├── link → Node A operation ROOT
-├── link → Node B operation ROOT
-└── link → Node C operation ROOT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+├── link → fleet.node ROOT → redfish.bmc.request CLIENT
+└── link → fleet.node ROOT → redfish.bmc.request CLIENT
 ```
+
+Each node span is an independent root linked to the coordinator. Its bounded
+BMC identity and coordinator link are supplied at span creation so samplers can
+use them.
 
 For `N` nodes:
 
@@ -132,7 +144,8 @@ k8s.redfish_node_profile.reconcile ROOT
 Controller root spans carry the bounded Kubernetes identity fields
 `k8s.namespace.name`, `k8s.resource.name`, and `k8s.resource.kind`, plus
 `server.address`. They do not record Secret data, request bodies, response
-bodies, raw URLs, or query strings.
+bodies, raw URLs, or query strings. Each reconcile is a root independent of any
+framework span, with its sampler-visible identity supplied at span creation.
 
 ## Lifecycle gate (G6 details)
 
@@ -185,7 +198,7 @@ Gate:
 Covered source properties: `Status.Health`, `Status.HealthRollup`, `Status.State`,
 `LinkDownReasonCode`, `EDPViolationState`, `PowerBreakPerformanceState`, `LastResetType`.
 
-Every property has fixture rows in `expected_signals.yaml`, e.g.:
+Every property has fixture rows in `supermicro/expected_signals.yaml`, e.g.:
 
 ```yaml
 source_property: Status.Health
@@ -202,19 +215,32 @@ The gate computes `expected signals − emitted signals` over the fixtures and r
 
 ### R1 — Exporter self-signals
 
-```
-hw.scrape.source.ok{source="thermal"} 0|1
-hw.scrape.source.duration_seconds{source="thermal"}
-hw.scrape.source.errors_total{source="thermal", error_class="timeout"}
-hw.scrape.sources_attempted
-hw.scrape.sources_succeeded
-hw.scrape.sources_failed
-hw.scrape.bmc_requests_total{method="GET", source="thermal", status_class="2xx"}
+```text
+redfish_exporter_scrape_success 0|1
+redfish_exporter_scrape_partial 0|1
+redfish_exporter_scrape_duration_seconds
+redfish_exporter_last_success_timestamp_seconds
+redfish_exporter_collector_success{collector="thermal"} 0|1
+redfish_exporter_collector_supported{collector="thermal"} 0|1
+redfish_exporter_collector_duration_seconds{collector="thermal"}
+redfish_exporter_collector_samples{collector="thermal"}
+redfish_exporter_collection_errors_total{collector="thermal", error="timeout"}
+hw.scrape.ok 0|1
+hw.scrape.duration_seconds
+hw.bmc.up 0|1
+hw.build_info{commit="<build-revision>", version="<package-version>",
+              schema_contract_version="<catalog-version>"} 1
 ```
 
-Gate: every listed self-signal is emitted each scrape cycle and covered by the same
-fixture-driven expected-signal check as M2; a per-source failure changes
-`hw.scrape.source.ok` for that source only.
+Gate: scrape-level signals are emitted every cycle. Collector signals are emitted for
+each attempted collector, and `redfish_exporter_collection_errors_total` is emitted for
+observed collector/error pairs. Fixture-driven checks require metric definitions and
+samples to agree across the supported output backends.
+
+Deployment currency is a profile-required extension of this gate. It must verify the
+complete host inventory at one exact build revision and telemetry catalog version.
+Operational inputs and read-back steps live in
+[Telemetry metrics](../../docs/external/telemetry-metrics.md#build-identity-and-fleet-read-back).
 
 ### R2 — Push-loop survival
 

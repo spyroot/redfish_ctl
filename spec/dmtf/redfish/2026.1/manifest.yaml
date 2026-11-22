@@ -131,6 +131,26 @@ artifacts:
     gitStorage: git-lfs
     localRequired: true
 
+  - id: DSP0285
+    title: Redfish RedPath Specification
+    version: "1.1.0"
+    status: Standard
+    role: redpath
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP0285_1.1.0.pdf"
+    localPath: "protocol/DSP0285_1.1.0.pdf"
+    gitStorage: git-lfs
+    localRequired: false
+
+  - id: DSP0270
+    title: Redfish Host Interface Specification
+    version: "1.3.1"
+    status: Standard
+    role: host-interface
+    url: "https://www.dmtf.org/sites/default/files/standards/documents/DSP0270_1.3.1.pdf"
+    localPath: "protocol/DSP0270_1.3.1.pdf"
+    gitStorage: git-lfs
+    localRequired: false
+
 supplementalArtifacts:
   - id: DSP-IS0027-WIP80
     title: Redfish Telemetry Streaming and Reporting WIP
@@ -174,6 +194,19 @@ supplementalArtifacts:
     localRequired: true
 
 contracts:
+  - id: http-semantics-rule-graph
+    authority:
+      - DSP0266
+    rule: >
+      HTTP response classification uses the operation, target, resource state,
+      status, required headers, and body-presence constraints. OEM observations
+      remain compatibility overlays and never replace the DMTF rules.
+    enforcedBy:
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_contracts_validate"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_generated_artifacts_are_current"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_classifier_requires_location_for_completed_create"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_classifier_requires_active_subscription_for_delivery"
+
   - id: error-envelope-normalization
     authority:
       - DSP0266
@@ -242,6 +275,12 @@ contracts:
       - "tests/test_redfish_error_contract.py::test_output_adapter_plan_is_documented"
 
 gates:
+  - id: dmtf-http-semantics
+    command: "scripts/check.sh via GitLab homelab-k8s unit.all gate"
+    checks:
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_contracts_validate"
+      - "spec/redfish-http-semantics-bundle/tests/test_contracts.py::test_all_generated_artifacts_are_current"
+
   - id: dmtf-release-manifest
     command: "scripts/check.sh via GitLab homelab-k8s gate; includes pytest tests/test_redfish_error_contract.py"
     checks:
@@ -286,3 +325,37 @@ automationRules:
   - Do not add a new user-visible output mode unless it renders the normalized result object shared by human, JSON, and YAML.
   - Do not extract bundled ZIP archives in unit tests; inspect central-directory members unless a fixture needs a specific file.
   - Do not add a new simulator seed corpus without adding it to this manifest and a gate that proves it can be discovered.
+
+# ---------------------------------------------------------------------------
+# BINDING — content addresses + consumer contracts (added 2026-07-25).
+# Every artifact is Git-LFS tracked; the LFS oid IS the sha256 of the content,
+# so "which DMTF is this tree" is a checkable fact per artifact.
+# ---------------------------------------------------------------------------
+binding:
+  sha256:
+    DSP0266: "e009d0c74955366da633a313fe2ae4285964b501b1407142ab2c788090f8aafa"
+    DSP0268: "44e666d5a1b45a0720bc84594fa1bcc8687ea54bd5e45ecebebce6d885e91971"
+    DSP0272: "326c04fbdf8781f87152970197414b7e31f81a7c532b6a44f8782ee01df01502"
+    DSP2043: "481990aa1e77a675b5cc919483b4bc2dd8e832f91ba9b0e3f001ee2b2c8ddef7"
+    DSP2065: "931603433fc621137581151860cf0e3b68dab425a1c22f297b54dfb06f0759b8"
+    DSP8010: "15e1dfee82208f36d10fb89569dd19e9fa65b1fb22b0a547b9374e2df76ceada"
+    DSP8011: "6749cf0f62cc9f6e20db91c365fe20ad333e1fa0377a4130c987cb10537f3e3d"
+    DSP8013: "c771eac344c92d4687272d66cbb06cdab210aeaa92b0e8a4529f8cb6455dfc44"
+  consumer_contracts:
+    DSP8010:
+      role: "the FULL DMTF baseline for classification (inference check 1)"
+      layout: "the zip's json/ directory carries every schema; the schema
+        FILENAME matches the API/resource name — resolution is filename
+        lookup, never search"
+      consumers: ["the pre-code inference pass (overlap subset|full|full_plus_oem)",
+                  "future schema validation of corpus/sim responses"]
+    DSP2043:
+      role: "the DMTF full-JSON mockup trees — the DMTF-generic lens"
+      contract: "specs/sim/dmtf-sim-contract.yaml (content-addressed to the
+        sha256 above; served by the mockup server; proven 1:1 by
+        tools/mockup_consistency_check.py — 27/27 profiles)"
+    DSP8011:
+      role: "standard message registries — the error-envelope vocabulary the
+        state-decode chokepoints parse"
+    DSP0266:
+      role: "the protocol law (URI rules §6.7 govern the sim's special URIs)"

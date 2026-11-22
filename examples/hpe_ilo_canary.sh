@@ -26,11 +26,10 @@ export REDFISH_USERNAME="root" REDFISH_PASSWORD="root_password"
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 # 3) run vendor-neutral READ commands against the live HPE tree
-redfish_ctl sensors                                   # chassis sensor readings
-redfish_ctl network-adapters                          # NICs / DPUs
-redfish_ctl metric-reports                            # TelemetryService values
-redfish_ctl component-integrity                       # SPDM attestation state
-redfish_ctl actions                                   # every action + its risk level
-redfish_ctl system-reset --reset_type GracefulRestart # DRY-RUN preview (no --confirm)
+redfish_ctl --vendor hp sensors                 # chassis sensor readings
+redfish_ctl --vendor hp network-adapters        # NICs / DPUs
+redfish_ctl --vendor hp metric-reports          # TelemetryService values
+redfish_ctl --vendor hp component-integrity     # SPDM attestation state
+redfish_ctl --vendor hp actions                 # every action + its risk level
 
 echo "HPE iLO canary OK — redfish_ctl drove a live non-Dell Redfish service."

@@ -1,0 +1,9 @@
+# OpenShift assigns the IDs from the simulator namespace's restricted SCC.
+securityContext:
+  useNamespaceIds: true
+imagePullSecrets:
+  - redfish-harbor-pull
+networkPolicy:
+  allowedNamespaceLabels:
+    - kubernetes.io/metadata.name: redfish-ctl-runners-protected
+    - kubernetes.io/metadata.name: redfish-ctl-runners-focused

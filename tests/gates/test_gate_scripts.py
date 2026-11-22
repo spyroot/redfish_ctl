@@ -7,9 +7,11 @@ scripts and asserting they fail when they must.
 
 Author Mus spyroot@gmail.com
 """
+import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = REPO_ROOT / "gates" / "manifest.yaml"
 CHECK_SH = REPO_ROOT / "scripts" / "check.sh"
+RUN_SH = REPO_ROOT / "scripts" / "gates" / "run.sh"
 
 
 def _in_a_pod() -> bool:
@@ -38,6 +41,18 @@ def _registry() -> dict:
     return yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
 
 
+def _off_cluster_env() -> dict[str, str]:
+    """Return an environment that cannot satisfy check.sh's Kubernetes guard.
+
+    :return: a copy of the process environment with kube service variables removed.
+    """
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"}
+    }
+
+
 def test_registry_commands_exist_and_are_executable() -> None:
     """Every command named in the registry resolves to an executable file.
 
@@ -56,6 +71,45 @@ def test_registry_commands_exist_and_are_executable() -> None:
     assert not not_executable, f"registry commands are not executable: {not_executable}"
 
 
+def test_no_secrets_suppresses_success_progress_stderr(tmp_path: Path) -> None:
+    """The secret gate keeps successful gitleaks progress off stderr."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    args_path = tmp_path / "gitleaks.args"
+    fake_gitleaks = command_dir / "gitleaks"
+    fake_gitleaks.write_text(
+        "#!/bin/bash\n"
+        "printf '%s\\n' \"$@\" >\"$GITLEAKS_ARGS_PATH\"\n",
+        encoding="utf-8",
+    )
+    fake_gitleaks.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "no-secrets.sh"
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "GITLEAKS_ARGS_PATH": str(args_path),
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+        },
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stderr == ""
+    args = args_path.read_text(encoding="utf-8").splitlines()
+    assert args == [
+        "detect",
+        "--no-banner",
+        "--redact",
+        "--log-level",
+        "error",
+        "--source",
+        ".",
+    ]
+
+
 def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     """run.sh reads the real registry, and an unregistered profile is an error, not a silent pass.
 
@@ -65,7 +119,7 @@ def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     executes real gates.
     """
     proc = subprocess.run(
-        [str(REPO_ROOT / "scripts" / "gates" / "run.sh"), "no-such-profile"],
+        [str(RUN_SH), "no-such-profile"],
         capture_output=True, text=True,
     )
     assert proc.returncode != 0, "an unknown profile must fail, not pass silently"
@@ -74,6 +128,38 @@ def test_run_sh_loads_the_registry_and_rejects_an_unknown_profile() -> None:
     # Proves the registry parsed: the error lists the profiles it found rather than a load traceback.
     assert "merge" in combined, combined
     assert "FileNotFoundError" not in combined, combined
+
+
+def test_run_sh_rejects_an_unknown_focused_gate_without_running_the_profile() -> None:
+    """A focused gate typo is a hard error before any profile gate starts.
+
+    API/web focused dispatch takes the gate id from CI variables, so the runner
+    must reject an unknown id instead of falling back to the full merge profile.
+    """
+    proc = subprocess.run(
+        [str(RUN_SH), "--profile", "merge", "--gate", "no.such-gate"],
+        capture_output=True, text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, "an unknown focused gate must fail closed"
+    assert "unknown gate 'no.such-gate'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
+
+
+def test_run_sh_rejects_a_focused_gate_profile_mismatch_without_running_it() -> None:
+    """A gate id is valid only in its registered profile.
+
+    This prevents a focused integration/deploy request from smuggling a merge
+    gate through a profile that has different safety and evidence semantics.
+    """
+    proc = subprocess.run(
+        [str(RUN_SH), "--profile", "integration", "--gate", "unit.all"],
+        capture_output=True, text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, "profile/gate mismatches must fail closed"
+    assert "gate 'unit.all' belongs to profile 'merge', not 'integration'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
 
 
 def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
@@ -90,6 +176,7 @@ def test_evidence_sanitized_fails_on_a_planted_secret(tmp_path) -> None:
     )
     assert proc.returncode == 1, f"planted secret was not detected: {proc.stdout}{proc.stderr}"
     assert "sanitize before upload" in proc.stdout + proc.stderr
+    assert "hunter2hunter2" not in proc.stdout + proc.stderr
 
 
 def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
@@ -105,22 +192,390 @@ def test_evidence_sanitized_passes_on_clean_evidence(tmp_path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-@pytest.mark.skipif(shutil.which("kubeconform") is None, reason="kubeconform not in this environment")
-def test_kubernetes_schema_validates_a_non_empty_manifest_set() -> None:
+def test_yaml_gate_fails_when_yamllint_is_missing(tmp_path) -> None:
+    """The required YAML policy cannot fall back to weaker parse-only evidence."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    dirname = shutil.which("dirname")
+    assert dirname is not None
+    (command_dir / "dirname").symlink_to(dirname)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": str(command_dir)},
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0
+    assert "required command is unavailable: yamllint" in combined
+
+
+def test_yaml_gate_uses_explicit_error_only_policy(tmp_path) -> None:
+    """The YAML gate runs its tracked policy without hiding diagnostics."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    arguments = tmp_path / "yamllint.args"
+    yamllint = command_dir / "yamllint"
+    yamllint.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$@\" >\"$YAMLLINT_ARGS\"\n"
+        "case \" $* \" in\n"
+        "  *' --no-warnings '*) exit 91 ;;\n"
+        "  *' -c .yamllint '*) exit 0 ;;\n"
+        "  *) exit 92 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    yamllint.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "repository" / "yaml.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+            "YAMLLINT_ARGS": str(arguments),
+        },
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    linter_arguments = arguments.read_text(encoding="utf-8").splitlines()
+    assert "--no-warnings" not in linter_arguments
+    assert linter_arguments[:2] == ["-c", ".yamllint"]
+    assert not any("/templates/" in value for value in linter_arguments[2:])
+    policy = yaml.safe_load((REPO_ROOT / ".yamllint").read_text(encoding="utf-8"))
+    assert policy == {
+        "rules": {
+            "key-duplicates": {"level": "error"},
+        }
+    }
+    assert "repo.yaml: OK (yamllint)" in combined
+
+
+def test_kubernetes_schema_validates_a_non_empty_manifest_set(tmp_path) -> None:
     """kubernetes.schema selects concrete manifests and reports how many it validated.
 
     The selection previously inverted: ``grep -qL`` silently behaves as ``grep -q`` (the -q wins), so the
     gate validated exactly the Helm templates it meant to skip and zero real manifests. An empty
     selection now fails the gate rather than printing OK, so the count in the output is the assertion.
     """
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    selected_path = os.environ["PATH"]
+    if shutil.which("kubeconform") is None:
+        kubeconform = command_dir / "kubeconform"
+        kubeconform.write_text(
+            "#!/bin/sh\ncat >/dev/null || exit $?\nexit 0\n",
+            encoding="utf-8",
+        )
+        kubeconform.chmod(0o755)
+        selected_path = f"{command_dir}:{selected_path}"
+
     proc = subprocess.run(
         [str(REPO_ROOT / "scripts" / "gates" / "kubernetes" / "schema.sh")],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": selected_path},
     )
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
     assert "no concrete manifests selected" not in combined, combined
     assert "kubernetes.schema: OK" in combined, combined
+
+
+def _legacy_namespace_gate_env() -> dict[str, str]:
+    """Supply the provider fixture with no live project or DCloud binding."""
+    return {
+        key: value for key, value in os.environ.items()
+        if key not in {"CI_PROJECT_NAME", "REDFISH_CI_SERVER_HOST", "REDFISH_SIM_NAMESPACE"}
+    }
+
+
+def test_namespace_gate_resolves_builder_owned_namespace_and_service(
+    tmp_path: Path,
+) -> None:
+    """The consumer validates Builder's binding without naming or creating resources."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    arguments = tmp_path / "resolver.args"
+    resolver = command_dir / "builder-project-resolve-binding"
+    resolver.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$@\" >\"$RESOLVER_ARGS\"\n"
+        "printf '%s\\n' "
+        "'{\"kubernetes\":{\"namespace\":\"runtime-owned\"},"
+        "\"endpoint\":{\"host\":\"runtime-service.runtime-owned.svc.cluster.local\","
+        "\"port\":8080,\"transport\":\"http\"}}'\n",
+        encoding="utf-8",
+    )
+    resolver.chmod(0o755)
+    jq = command_dir / "jq"
+    jq.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "value = json.load(sys.stdin)\n"
+        "print('\\t'.join(str(item) for item in ("
+        "value['kubernetes']['namespace'], value['endpoint']['host'], "
+        "value['endpoint']['port'], value['endpoint']['transport'])))\n",
+        encoding="utf-8",
+    )
+    jq.chmod(0o755)
+    script = REPO_ROOT / "scripts" / "gates" / "integration" / "namespace-test.sh"
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            **_legacy_namespace_gate_env(),
+            "CI_PROJECT_NAME": "runtime-project",
+            "PROJECT_SERVICE_NAME": "redfish-ctl-dmtf-sim",
+            "PATH": f"{command_dir}:{os.environ['PATH']}",
+            "RESOLVER_ARGS": str(arguments),
+        },
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    assert "Builder-owned runtime-owned" in combined
+    assert "service http://runtime-service.runtime-owned.svc.cluster.local:8080" in combined
+    assert arguments.read_text(encoding="utf-8").splitlines() == [
+        "--consumer",
+        "runtime-project",
+        "--service",
+        "redfish-ctl-dmtf-sim",
+        "--format",
+        "json",
+    ]
+
+
+def test_namespace_gate_requires_the_runtime_project_identity() -> None:
+    """A consumer project is never inferred from a hardcoded repository name."""
+    script = REPO_ROOT / "scripts" / "gates" / "integration" / "namespace-test.sh"
+    proc = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        env=_legacy_namespace_gate_env(),
+    )
+    assert proc.returncode == 78
+    assert "requires CI_PROJECT_NAME" in proc.stderr
+
+
+def test_kubernetes_render_fails_when_helm_is_missing(tmp_path) -> None:
+    """The required chart render gate cannot silently skip a missing Helm."""
+    command_dir = tmp_path / "bin"
+    command_dir.mkdir()
+    dirname = shutil.which("dirname")
+    assert dirname is not None
+    (command_dir / "dirname").symlink_to(dirname)
+    # Invoke the virtualenv interpreter at its original path so it locates pyvenv.cfg.
+    python = command_dir / "python"
+    python.write_text('#!/bin/sh\nexec "$TEST_PYTHON" "$@"\n', encoding="utf-8")
+    python.chmod(0o755)
+
+    script = REPO_ROOT / "scripts" / "gates" / "kubernetes" / "render.sh"
+    proc = subprocess.run(
+        ["/bin/bash", str(script)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": str(command_dir), "TEST_PYTHON": sys.executable},
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 1, combined
+    assert "helm not installed" in combined, combined
+
+
+@pytest.fixture(scope="module")
+def ci_report_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create a shared offline checkout with fake Git and pytest commands."""
+    baseline = tmp_path_factory.mktemp("ci-report-baseline")
+    gate = baseline / "scripts/gates/unit/all.sh"
+    gate.parent.mkdir(parents=True)
+    shutil.copyfile(REPO_ROOT / "scripts/gates/unit/all.sh", gate)
+    (baseline / "tools").mkdir()
+    for name in ("ci_evidence.py", "provider_contract.py"):
+        shutil.copyfile(REPO_ROOT / "tools" / name, baseline / "tools" / name)
+    (baseline / "reports/tests").mkdir(parents=True)
+    command_dir = baseline / "bin"
+    command_dir.mkdir()
+    commands = {
+        "git": (
+            'case "$*" in\n'
+            '  "rev-parse HEAD") printf "%s\\n" "$TEST_CHECKOUT_SHA" ;;\n'
+            '  "lfs ls-files") printf "abcdef %s fixture.tar.gz\\n" "$TEST_LFS_STATE" ;;\n'
+            '  *) exit 99 ;;\n'
+            'esac\n'
+        ),
+        "pytest": (
+            'printf "%s\\n" "$@" > pytest.args\n'
+            'for arg do\n'
+            '  case "$arg" in\n'
+            '    --junitxml=*) printf "%s\\n" "$TEST_JUNIT_XML" > "${arg#*=}" ;;\n'
+            '    --cov-report=xml:*)\n'
+            '      if [ "$TEST_WRITE_COVERAGE" = yes ]; then\n'
+            '        printf "<coverage/>\\n" > "${arg#*:}"\n'
+            '      fi ;;\n'
+            '  esac\n'
+            'done\n'
+            'printf "fixture coverage database\\n" > "$COVERAGE_FILE"\n'
+            'exit "$TEST_PYTEST_EXIT"\n'
+        ),
+    }
+    for name, script in commands.items():
+        destination = command_dir / name
+        destination.write_text("#!/bin/sh\n" + script, encoding="utf-8")
+        destination.chmod(0o755)
+    return baseline
+
+
+@pytest.mark.parametrize(
+    ("override", "returncode", "diagnostic", "pytest_started", "reports_published"),
+    [
+        pytest.param({}, 0, "", True, True, id="reports-created"),
+        pytest.param({"requested_sha": "invalid"}, 2, "Usage:", False, False, id="malformed-sha"),
+        pytest.param(
+            {"TEST_CHECKOUT_SHA": "b" * 40}, 1, "Expected checkout", False, False, id="wrong-checkout"
+        ),
+        pytest.param(
+            {"TEST_LFS_STATE": "-"}, 1, "Unhydrated Git LFS fixture", False, False, id="lfs-pointer"
+        ),
+        pytest.param(
+            {"TEST_WRITE_COVERAGE": "no"}, 1, "Missing CI test report", True, False, id="missing-report"
+        ),
+        pytest.param(
+            {"TEST_PYTEST_EXIT": "3"}, 3, "", True, True, id="clean-reports-from-failed-pytest"
+        ),
+        pytest.param(
+            {"TEST_JUNIT_XML": '<testsuite password="fixture-credential"/>'},
+            1, "sanitize before upload", True, False, id="credential-in-passing-report",
+        ),
+        pytest.param(
+            {"TEST_JUNIT_XML": '<testsuite password="fixture-credential"/>', "TEST_PYTEST_EXIT": "3"},
+            1, "sanitize before upload", True, False, id="credential-in-failing-report",
+        ),
+    ],
+)
+def test_unit_gate_ci_report_contract(
+    tmp_path: Path,
+    ci_report_baseline: Path,
+    override: dict[str, str],
+    returncode: int,
+    diagnostic: str,
+    pytest_started: bool,
+    reports_published: bool,
+) -> None:
+    """The reporting mode rejects the wrong checkout, fixtures, or output."""
+    project = tmp_path / "checkout"
+    shutil.copytree(ci_report_baseline, project)
+    settings = {
+        "requested_sha": "a" * 40,
+        "TEST_CHECKOUT_SHA": "a" * 40,
+        "TEST_LFS_STATE": "*",
+        "TEST_WRITE_COVERAGE": "yes",
+        "TEST_JUNIT_XML": "<testsuite/>",
+        "TEST_PYTEST_EXIT": "0",
+        **override,
+    }
+    requested_sha = settings.pop("requested_sha")
+    proc = subprocess.run(
+        ["/bin/bash", str(project / "scripts/gates/unit/all.sh"), "--ci-report", requested_sha],
+        env={**os.environ, **settings, "PATH": f"{project / 'bin'}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert proc.returncode == returncode, proc.stdout + proc.stderr
+    assert diagnostic in proc.stderr
+    assert (project / "pytest.args").is_file() == pytest_started
+    reports = project / "reports/tests"
+    assert sorted(path.name for path in reports.iterdir()) == (
+        [".coverage", "commit.txt", "coverage.xml", "junit.xml"] if reports_published else []
+    )
+    assert not list((project / "reports").glob(".test-evidence.*"))
+    assert "fixture-credential" not in proc.stdout + proc.stderr
+    if reports_published:
+        arguments = (project / "pytest.args").read_text(encoding="utf-8").splitlines()
+        assert any(arg.startswith("--junitxml=") and arg.endswith("/junit.xml") for arg in arguments)
+        assert "--cov" in arguments
+        assert any(arg.startswith("--cov-report=xml:") and arg.endswith("/coverage.xml") for arg in arguments)
+        assert (reports / "commit.txt").read_text(encoding="utf-8").strip() == requested_sha
+        assert (reports / "junit.xml").stat().st_size > 0
+        assert (reports / "coverage.xml").stat().st_size > 0
+
+
+@pytest.fixture(scope="module")
+def ci_tool_install_baseline(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Provide a fixed previous installation and a network-free downloader."""
+    baseline = tmp_path_factory.mktemp("ci-tool-install-baseline")
+    command_dir = baseline / "bin"
+    command_dir.mkdir()
+    curl = command_dir / "curl"
+    curl.write_text(
+        '#!/bin/sh\n'
+        'while [ "$#" -gt 0 ]; do\n'
+        '  if [ "$1" = --output ]; then\n'
+        '    printf "invalid archive" > "$2"\n'
+        '    exit "$TEST_CURL_RESULT"\n'
+        '  fi\n'
+        '  shift\n'
+        'done\n'
+        'exit 99\n',
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    destination = baseline / "tools"
+    destination.mkdir()
+    (destination / "helm").write_bytes(b"existing tool")
+    return baseline
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.uname().machine != "x86_64",
+    reason="the CI installer targets Linux amd64",
+)
+@pytest.mark.parametrize(
+    ("curl_result", "options", "returncode"),
+    [
+        pytest.param(22, (), 1, id="download-failure"),
+        pytest.param(0, (), 1, id="checksum-mismatch"),
+        pytest.param(22, ("--dry-run",), 0, id="dry-run"),
+    ],
+)
+def test_ci_tool_install_preserves_destination_when_no_tool_is_installed(
+    tmp_path: Path,
+    ci_tool_install_baseline: Path,
+    curl_result: int,
+    options: tuple[str, ...],
+    returncode: int,
+) -> None:
+    """Dry-run and unsuccessful downloads leave the old tool and no temporary files."""
+    work = tmp_path / "installer"
+    shutil.copytree(ci_tool_install_baseline, work)
+    destination = work / "tools"
+    old_helm = destination / "helm"
+    proc = subprocess.run(
+        ["/bin/bash", str(REPO_ROOT / "tools/install-ci-test-tools.sh"), *options, str(destination)],
+        env={
+            **os.environ,
+            "TEST_CURL_RESULT": str(curl_result),
+            "PATH": f"{work / 'bin'}:{os.environ['PATH']}",
+        },
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert proc.returncode == returncode, proc.stdout + proc.stderr
+    if options:
+        assert proc.stdout.count("Would install ") == 4
+    else:
+        assert "Failed to verify or install" in proc.stderr
+    assert old_helm.read_bytes() == b"existing tool"
+    assert list(destination.iterdir()) == [old_helm]
 
 
 def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
@@ -139,9 +594,49 @@ def test_check_sh_refuses_when_only_the_service_host_variable_is_set() -> None:
         capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
     )
     combined = proc.stdout + proc.stderr
-    assert proc.returncode == 3, f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    assert proc.returncode == 3, (
+        f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    )
     assert "REFUSING" in combined, combined
     assert "unknown profile" not in combined, f"the guard let the runner start: {combined}"
+
+
+def test_check_sh_accepts_focused_gate_syntax_but_preserves_local_refusal() -> None:
+    """`check.sh --profile merge --gate unit.all` parses, then refuses off-cluster.
+
+    The focused CI path needs this exact command shape, but the local laptop
+    guard remains the stronger invariant: parsing success must not become local
+    test execution.
+    """
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", "unit.all"],
+        capture_output=True, text=True, env=_off_cluster_env(), cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 3, (
+        f"expected the local refusal (3), got {proc.returncode}: {combined}"
+    )
+    assert "REFUSING" in combined, combined
+    assert "unexpected argument" not in combined, combined
+    assert "unknown gate" not in combined, combined
+    assert "=== gate" not in combined, f"the guard let a gate start locally: {combined}"
+
+
+def test_check_sh_rejects_unsafe_gate_without_reflecting_it() -> None:
+    """Dispatcher input is bounded before it can reach runner diagnostics."""
+    unsafe = "gl" + "pat-" + ("A" * 24) + "/newline\n"
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", unsafe],
+        capture_output=True,
+        text=True,
+        env=_off_cluster_env(),
+        cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 2
+    assert unsafe not in combined
+    assert "safe registry identifier" in combined
+    assert "=== gate" not in combined
 
 
 @pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
@@ -161,6 +656,24 @@ def test_check_sh_still_runs_in_cluster() -> None:
     combined = proc.stdout + proc.stderr
     assert "REFUSING" not in combined, f"the guard refused inside a real pod: {combined}"
     assert "unknown profile" in combined, combined
+
+
+@pytest.mark.skipif(not _in_a_pod(), reason="in-cluster acceptance: only meaningful inside a pod")
+def test_check_sh_passes_focused_gate_to_the_runner_inside_cluster() -> None:
+    """Inside Kubernetes, focused arguments reach run.sh instead of local refusal.
+
+    The deliberately unknown gate keeps the test from recursively running the
+    unit gate while still proving the in-cluster path accepts focused syntax.
+    """
+    proc = subprocess.run(
+        [str(CHECK_SH), "--profile", "merge", "--gate", "no.such-gate"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 3, f"the guard refused inside a real pod: {combined}"
+    assert "REFUSING" not in combined, combined
+    assert "unknown gate 'no.such-gate'" in combined, combined
+    assert "=== gate" not in combined, f"a gate ran before validation failed: {combined}"
 
 
 def test_protected_apply_refuses_without_a_protected_pipeline() -> None:
@@ -193,3 +706,167 @@ def test_protected_apply_refuses_a_merge_request_pipeline() -> None:
     )
     assert proc.returncode == 1, "a live apply must never run from a merge-request pipeline"
     assert "merge-request pipeline" in proc.stdout + proc.stderr
+
+
+@pytest.mark.parametrize("digest_state", ["approved", "different", "missing"])
+def test_dcloud_dispatch_requires_the_approved_runner_digest(
+    tmp_path: Path, digest_state: str,
+) -> None:
+    """Successful native status alone cannot attest an unapproved toolchain."""
+    sha = "a" * 40
+    standards = "b" * 40
+    digest = f"sha256:{'c' * 64}"
+    (tmp_path / "standards-binding.yaml").write_text(
+        yaml.safe_dump({"spec": {"source": {"revision": standards}}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "runner.yaml").write_text(
+        yaml.safe_dump({"spec": {"image": f"registry.invalid/redfish/toolbox@{digest}"}}),
+        encoding="utf-8",
+    )
+    evidence = {
+        "commit": sha, "job_id": "12", "pipeline_id": "34", "name": "gate-merge",
+        "standards_revision": standards, "runner_digest": digest, "status": "passed",
+        "return_code": 0, "evidence_sanitized": True, "warnings": 0,
+        "skipped_required_tests": 0, "cleanup": {"status": "passed"},
+    }
+    if digest_state == "different":
+        evidence["runner_digest"] = f"sha256:{'d' * 64}"
+    elif digest_state == "missing":
+        del evidence["runner_digest"]
+    fake_glab = tmp_path / "glab"
+    fake_glab.write_text(
+        '#!/bin/sh\ncase "$2" in\n'
+        '  projects/169/pipelines/34/jobs) printf "%s" "$REDFISH_TEST_GATE_JOB" ;;\n'
+        '  projects/169/jobs/12/artifacts/*) printf "%s" "$REDFISH_TEST_GATE_EVIDENCE" ;;\n'
+        '  *) exit 1 ;;\nesac\n',
+        encoding="utf-8",
+    )
+    fake_glab.chmod(0o755)
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1"; dcloud_gate_result ci.invalid projects/169 34 "$2" ""',
+         "dcloud-test", str(adapter), sha],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "REDFISH_TEST_GATE_JOB": json.dumps([
+                {"id": 12, "name": "gate-merge", "status": "success", "commit": {"id": sha}},
+            ]),
+            "REDFISH_TEST_GATE_EVIDENCE": json.dumps(evidence),
+        },
+    )
+    if digest_state == "approved":
+        assert proc.returncode == 0, proc.stderr
+        assert json.loads(proc.stdout)["runner_digest"] == digest
+    else:
+        assert proc.returncode == 78, proc.stdout + proc.stderr
+        assert "missing successful exact-commit gate evidence" in proc.stderr
+
+
+@pytest.mark.parametrize("mismatch", ["none", "sha", "repository", "state", "context", "target_url"])
+def test_dcloud_github_status_requires_exact_readback(
+    tmp_path: Path, mismatch: str,
+) -> None:
+    """A posted status counts only when GitHub reads back the same identity."""
+    repo = "example/redfish_ctl"
+    sha = "a" * 40
+    url = "https://ci.invalid/example/redfish_ctl/-/pipelines/12"
+    context = "gate-merge"
+    status = {"id": 123, "state": "success", "target_url": url, "context": context}
+    reply = {"sha": sha, "repository": {"full_name": repo}, "statuses": [status]}
+    if mismatch == "sha":
+        reply["sha"] = "b" * 40
+    elif mismatch == "repository":
+        reply["repository"] = {"full_name": "example/other"}
+    elif mismatch == "state":
+        status["state"] = "pending"
+    elif mismatch == "context":
+        status["context"] = "different-gate"
+    elif mismatch == "target_url":
+        status["target_url"] = url + "3"
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        '#!/bin/sh\nif [ "$4" = --method ]; then\n'
+        '  printf "%s" \'{"id":123}\'\nelse\n'
+        '  printf "%s" "$REDFISH_TEST_GITHUB_STATUS"\nfi\n',
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1"; shift; sleep() { :; }; dcloud_post_github_status "$@"',
+         "dcloud-test", str(adapter), repo, sha, "success", url, context],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "REDFISH_TEST_GITHUB_STATUS": json.dumps(reply),
+        },
+    )
+    assert proc.returncode == (0 if mismatch == "none" else 78)
+
+
+@pytest.mark.parametrize("rejected", ["none", "pipeline", "gate", "smoke"])
+def test_waited_dcloud_dispatch_distinguishes_gate_and_pipeline_status(
+    tmp_path: Path, rejected: str,
+) -> None:
+    """A green pipeline with rejected evidence must publish only a failure receipt."""
+    adapter = REPO_ROOT / "scripts/gates/dcloud_dispatch.bash"
+    statuses = tmp_path / "statuses"
+    project_path = "fixture-owner/fixture-project"
+    (tmp_path / ".gitlab-ci.yml").write_text(
+        json.dumps({
+            "variables": {
+                "REDFISH_CI_SERVER_HOST": "ci.invalid",
+                "REDFISH_CI_PROJECT_PATH": project_path,
+            },
+        }),
+        encoding="utf-8",
+    )
+    inventory = tmp_path / "inventory/ci"
+    inventory.mkdir(parents=True)
+    (inventory / "go-no-go.yaml").write_text(
+        json.dumps({"spec": {"ci": {"requiredContext": "fixture-merge"}}}),
+        encoding="utf-8",
+    )
+    fixture = r"""
+source "$1"
+project_path="$2"
+commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+git() { printf 'https://github.com/%s\n' "$project_path"; }
+glab() {
+  case "$*" in
+    *repository/branches/*) jq -n --arg sha "$commit" '{commit:{id:$sha}}' ;;
+    *--method\ POST*) jq -n --arg sha "$commit" '{id:12,sha:$sha}' ;;
+    *) return 99 ;;
+  esac
+}
+dcloud_post_github_status() { printf '%s\n' "$3" >> "$TEST_STATUSES"; }
+dcloud_wait_pipeline() {
+  local status=success
+  if [[ $TEST_REJECTED == pipeline ]]; then status=failed; fi
+  jq -n --arg sha "$commit" --arg status "$status" \
+    '{id:12,sha:$sha,ref:"fixture",status:$status,web_url:"https://ci.invalid/12"}'
+}
+dcloud_gate_result() {
+  [[ $TEST_REJECTED != gate ]] && printf '%s\n' '{"status":"passed"}'
+}
+dcloud_verify_smoke_result() { [[ $TEST_REJECTED != smoke ]]; }
+dispatch_dcloud "${project_path##*/}" fixture "$commit" "" true
+"""
+    proc = subprocess.run(
+        ["bash", "-c", fixture, "dcloud-test", str(adapter), project_path],
+        cwd=tmp_path, capture_output=True, text=True, check=False, timeout=30,
+        env={**os.environ, "TEST_REJECTED": rejected, "TEST_STATUSES": str(statuses)},
+    )
+    assert proc.returncode == (0 if rejected == "none" else 1), proc.stderr
+    result = json.loads(proc.stdout)
+    assert result["status"] == ("success" if rejected == "none" else "failed")
+    if rejected != "none":
+        assert result["pipeline_status"] == ("failed" if rejected == "pipeline" else "success")
+    assert statuses.read_text(encoding="utf-8").splitlines() == [
+        "pending",
+        "success" if rejected == "none" else "failure",
+    ]

@@ -1,0 +1,491 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-dsp0266-1.24.0-eventing
+spec:
+  scope:
+    primarySection: "12.1.2"
+    resourceSchemas: [EventService, EventDestination, Event, MetricReport]
+  rules:
+    - id: event.subscription.create.completed
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2", "8.3"]
+        statement: event-subscription-create-completed
+        wording: shall
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: POST
+          operationKind: create_subscription
+          target:
+            kind: collection
+            relation: ServiceRoot.EventService.Subscriptions
+        request:
+          body:
+            schema: EventDestination
+        condition:
+          processingState: completed
+          outcome: success
+      expect:
+        status:
+          accept: {matcher: exact, values: [201]}
+          emit: 201
+        headers:
+          Location:
+            presence: required
+            semantic: created_subscription_resource_uri
+        body:
+          presence: recommended
+          schema: EventDestination
+          represents: created_subscription
+      effects:
+        resourceCreated: true
+        subscriptionState: {from: absent, to: active}
+        historicalEventsDelivered: false
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.subscription.create.body-representation
+      type: payload_contract
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: event-subscription-create-response-body
+        wording: should
+      match:
+        ruleRef: event.subscription.create.completed
+      expect:
+        body:
+          presence: recommended
+          schema: EventDestination
+          represents: created_subscription
+      normative:
+        strength: recommended
+        keyword: should
+
+    - id: event.subscription.create.accepted-async
+      type: http_exchange
+      inherits: [method.post-create.success, task.operation.accepted]
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["7.5.2", "12.2"]
+        statement: inherited-asynchronous-subscription-create
+        wording: shall
+        origin: inherited_generic_behavior
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: POST
+          operationKind: create_subscription
+          target:
+            kind: collection
+            relation: ServiceRoot.EventService.Subscriptions
+        condition:
+          processingState: pending
+          outcome: accepted
+      expect:
+        status:
+          accept: {matcher: exact, values: [202]}
+          emit: 202
+        headers:
+          Location:
+            presence: required
+            semantic: task_monitor_uri
+          Retry-After:
+            presence: optional
+        body:
+          presence: recommended
+          ifPresent:
+            schema: Task
+      effects:
+        subscriptionState: {from: absent, to: creating}
+      continuation:
+        poll:
+          method: GET
+          uriFrom: response.headers.Location
+        whilePending:
+          status: 202
+        whenComplete:
+          applyRule: event.subscription.create.completed
+          subscriptionState: {from: creating, to: active}
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.subscription.create.unsupported-parameter
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2", "8.3", "8.6"]
+        statement: unsupported-subscription-parameter
+        wording: shall
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: POST
+          operationKind: create_subscription
+          target:
+            kind: collection
+            relation: ServiceRoot.EventService.Subscriptions
+        condition:
+          requestBodyContainsUnsupportedParameter: true
+      expect:
+        status:
+          accept: {matcher: exact, values: [400]}
+          emit: 400
+        body:
+          presence: required
+          kind: redfish_error
+          error:
+            codeFormat: MessageId
+            message: required
+            extendedInfo:
+              property: "@Message.ExtendedInfo"
+              presence: recommended
+            selectionPolicy: most_specific_registered_message
+      effects:
+        resourceCreated: false
+        subscriptionState: {unchanged: true}
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.subscription.create.conflicting-body
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2", "8.3", "8.6"]
+        statement: conflicting-subscription-request-body
+        wording: shall
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: POST
+          operationKind: create_subscription
+          target:
+            kind: collection
+            relation: ServiceRoot.EventService.Subscriptions
+        condition:
+          requestBodyConflicting: true
+          requestBodyContainsUnsupportedParameter: false
+      expect:
+        outcome: error
+        status:
+          accept:
+            matcher: derived
+            requiredClass: 4xx
+          resolver: global_status_by_failure_cause
+          examples:
+            invalid_or_missing_value: 400
+            current_resource_state_conflict: 409
+            unsupported_media_type: 415
+            required_precondition_missing: 428
+          fallback: 400
+          examplesExhaustive: false
+        body:
+          presence: required
+          kind: redfish_error
+      effects:
+        resourceCreated: false
+        subscriptionState: {unchanged: true}
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.push.supported-for-event-capable-resources
+      type: capability
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: push-eventing-supported-for-event-capable-resources
+        wording: shall
+      match:
+        resource:
+          canSendEvents: true
+      expect:
+        pushStyleEventingSupported: true
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.push.requires-active-subscription
+      type: prohibition
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: no-push-without-subscription
+        wording: shall_not
+      match:
+        attemptedExchange:
+          initiator: redfish_service
+          responder: event_receiver
+          method: POST
+          operationKind: deliver_event
+          target:
+            relation: subscription.Destination
+        condition:
+          subscriptionState:
+            notIn: [active]
+      expect:
+        requestSent: false
+      normative:
+        strength: prohibited
+        keyword: shall_not
+
+    - id: event.push.delivery-acknowledgement
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: event-receiver-success-acknowledgement
+        wording: shall
+        exampleWording: such_as
+      match:
+        exchange:
+          initiator: redfish_service
+          responder: event_receiver
+          method: POST
+          operationKind: deliver_event
+          target:
+            relation: subscription.Destination
+        preconditions:
+          subscriptionState: active
+        request:
+          body:
+            oneOfSchemas: [Event, MetricReport]
+      expect:
+        status:
+          accept: {matcher: class, values: [2xx]}
+          emitPreferred: 204
+          examples: [200, 204]
+          examplesExhaustive: false
+        bodyByStatus:
+          "204": {presence: forbidden}
+          "200": {presence: optional}
+      deliveryResult:
+        on2xx: acknowledged
+        onNon2xx: delivery_error
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.push.payload-limit
+      type: payload_constraint
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: event-payload-size-limit
+        wording: shall_not
+      match:
+        exchange:
+          initiator: redfish_service
+          responder: event_receiver
+          method: POST
+          operationKind: deliver_event
+        payload:
+          format: Event
+      expect:
+        unsplitPayload:
+          maximumBytesInclusive: 1048576
+        oversizedPayload:
+          splitRequired: true
+          splitAt: nearest_Event_entry
+          eachTransmittedPayload:
+            maximumBytesExclusive: 1048576
+      normative:
+        strength: prohibited
+        keyword: shall_not
+
+    - id: event.push.metric-report-payload-exemption
+      type: payload_constraint
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: metric-report-payload-limit-exemption
+        wording: shall_not_apply
+      match:
+        payload:
+          format: MetricReport
+      expect:
+        exemptFromRule: event.push.payload-limit
+      normative:
+        strength: defined_behavior
+        keyword: declarative
+
+    - id: event.subscription.persistent-across-restart
+      type: lifecycle_invariant
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: subscription-persists-across-service-restart
+        wording: shall
+      match:
+        trigger: redfish_service_restart
+        subscriptionStateBefore: active
+      expect:
+        subscriptionStateAfter: active
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.subscription.no-historical-replay
+      type: lifecycle_invariant
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: no-retroactive-events-or-history-retention
+        wording: declarative
+      match:
+        trigger: subscription_becomes_active
+      expect:
+        deliverEventsCreatedBeforeActivation: false
+        retainHistoricalEventsForSubscription: false
+      normative:
+        strength: defined_behavior
+        keyword: declarative
+
+    - id: event.subscription.delete
+      type: http_exchange
+      inherits: [method.update-delete.success]
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2", "7.5.2"]
+        statement: unsubscribe-by-deleting-subscription
+        wording: shall
+      match:
+        exchange:
+          initiator: [redfish_client, administrator]
+          responder: redfish_service
+          method: DELETE
+          operationKind: delete_subscription
+          target:
+            kind: resource
+            relation: ServiceRoot.EventService.Subscriptions.member
+        preconditions:
+          subscriptionState: active
+      expect:
+        alternatives:
+          - id: completed-with-representation
+            status:
+              accept: {matcher: exact, values: [200]}
+              emitAllowed: true
+            body:
+              presence: required
+              represents: deleted_subscription
+          - id: accepted-asynchronously
+            status:
+              accept: {matcher: exact, values: [202]}
+              emitAllowed: true
+            headers:
+              Location:
+                presence: required
+                semantic: task_monitor_uri
+            body:
+              presence: optional
+              ifPresent:
+                schema: Task
+          - id: completed-without-representation
+            status:
+              accept: {matcher: exact, values: [204]}
+              emitPreferred: true
+            body:
+              presence: forbidden
+      effects:
+        onStatus:
+          "200": {subscriptionState: {from: active, to: terminated}}
+          "204": {subscriptionState: {from: active, to: terminated}}
+          "202": {subscriptionState: {from: active, to: terminating}}
+        onAsyncCompletion:
+          subscriptionState: {from: terminating, to: terminated}
+      normative:
+        strength: required
+        keyword: shall
+
+    - id: event.subscription.request-after-termination
+      type: http_exchange
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: terminated-subscription-subsequent-request
+        wording: declarative
+      match:
+        exchange:
+          initiator: redfish_client
+          responder: redfish_service
+          method: "*"
+          target:
+            kind: resource
+            relation: ServiceRoot.EventService.Subscriptions.member
+        preconditions:
+          subscriptionState: terminated
+      expect:
+        status:
+          accept: {matcher: exact, values: [404]}
+          emit: 404
+        body:
+          presence: recommended
+          kind: redfish_error
+      effects:
+        subscriptionState: {unchanged: true}
+      normative:
+        strength: defined_behavior
+        keyword: declarative
+
+    - id: event.subscription.service-termination-after-errors
+      type: lifecycle_transition
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: service-may-terminate-after-delivery-errors
+        wording: may
+      match:
+        trigger: delivery_error_count_exceeds_service_threshold
+        subscriptionStateBefore: active
+      expect:
+        serviceMayTerminate: true
+        subscriptionStateAfter: terminated
+      normative:
+        strength: permitted
+        keyword: may
+
+    - id: event.subscription.termination-last-event
+      type: optional_event
+      source:
+        document: DSP0266
+        version: 1.24.0
+        sections: ["12.1.2"]
+        statement: subscription-terminated-message-as-last-event
+        wording: may
+      match:
+        trigger: service_terminates_subscription
+      expect:
+        lastEvent:
+          permitted: true
+          messageId:
+            registry: Base
+            key: SubscriptionTerminated
+      normative:
+        strength: permitted
+        keyword: may

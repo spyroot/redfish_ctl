@@ -1,0 +1,34 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: OemCompatibilityOverlay
+metadata:
+  name: example-vendor-example-bmc-4.2
+spec:
+  vendor: example-vendor
+  productFamily: example-bmc
+  firmware: "4.2"
+  base:
+    document: DSP0266
+    version: 1.24.0
+  observations:
+    - id: example.subscription-create-returns-200
+      baseRule: event.subscription.create.completed
+      observed:
+        status: 200
+        headers:
+          Location:
+            presence: absent
+        body:
+          schema: EventDestination
+      classification: known_dmtf_deviation
+      behavior:
+        strictDmtfMode:
+          accept: false
+          emit: false
+        oemCompatibilityMode:
+          accept: true
+          emit: false
+          severity: warning
+      evidence:
+        fixture: examples/observations/oem-subscription-create-200.yaml
+        verifiedByLiveTest: false
+        note: Replace this example with a sanitized live transcript.

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -244,5 +244,4 @@ class DellLcSupportAssistStatus(
             full_action_type=spec.full_type,
             do_async=do_async,
             dry_run=bool(dry_run),
-            confirm=True,
         )

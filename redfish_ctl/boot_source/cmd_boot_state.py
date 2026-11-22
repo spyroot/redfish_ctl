@@ -17,12 +17,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class BootState(IDracManager,
+class BootState(RedfishManager,
                 scm_type=ApiRequestType.BootState,
                 name='boot-state',
                 metaclass=Singleton):
@@ -119,7 +118,7 @@ class BootState(IDracManager,
                  Override, OverrideTarget, OneTimeBootPending, NextBoot, BootOrder,
                  BootableEntries, MountedMedia).
         """
-        system_uri = self.idrac_manage_servers
+        system_uri = self.managed_system_uri
         boot = self._get(system_uri, do_async).get("Boot") or {}
         override = boot.get("BootSourceOverrideEnabled")
         target = boot.get("BootSourceOverrideTarget")

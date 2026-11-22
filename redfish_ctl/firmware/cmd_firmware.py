@@ -13,13 +13,12 @@ Example::
 Author Mus spyroot@gmail.com
 """
 import argparse
-import asyncio
 from abc import abstractmethod
 from typing import Optional
 
 from ..cmd_utils import save_if_needed
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -82,17 +81,18 @@ class FirmwareQuery(IDracManager,
             headers.update(self.json_content_type)
 
         if do_deep:
-            r = f"{self._default_method}{self.idrac_ip}/redfish/v1/UpdateService/" \
+            r = f"{self._default_method}{self.redfish_ip}/redfish/v1/UpdateService/" \
                 f"FirmwareInventory?$expand=*($levels=1)"
         else:
-            r = f"{self._default_method}{self.idrac_ip}/redfish/v1/UpdateService/FirmwareInventory"
+            r = f"{self._default_method}{self.redfish_ip}/redfish/v1/UpdateService/FirmwareInventory"
 
         if not do_async:
             response = self.api_get_call(r, headers)
             self.default_error_handler(response)
         else:
-            loop = self._event_loop()
-            response = loop.run_until_complete(self.api_async_get_until_complete(r, headers))
+            response = self._run_coroutine_sync(
+                self.api_async_get_until_complete(r, headers)
+            )
 
         self.default_error_handler(response)
         data = response.json()

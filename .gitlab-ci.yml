@@ -1,116 +1,325 @@
-# GitLab pipeline for the homelab platform. Every job runs on the self-managed `homelab-k8s` runner
-# (Kubernetes executor: one disposable pod per job — the execution authority). Gates are driven from
-# gates/manifest.yaml via scripts/gates/run.sh <profile>. The meta-gate (tools/gate_meta.py) enforces
-# that the required jobs exist, none uses allow_failure, every job carries the homelab-k8s tag, and no
-# live-apply job is reachable from a merge-request pipeline.
-#
-# Four pipeline shapes:
-#   merge-request  -> gate-merge (static + unit + render; NO cluster mutation, NO production creds)
-#   default-branch -> gate-merge + gate-integration
-#   scheduled      -> gate-integration (cluster smoke)
-#   manual protected deploy -> deploy-apply (protected branch only, manual, serialized)
-#   protected default branch -> publish-github (GATED outbound mirror: agent files/names/secrets
-#                               must pass the boundary gates before anything reaches public GitHub)
-stages: [validate, integration, deploy, publish]
+# DCloud runs the project-owned gate registry on its dedicated Kubernetes runners.
+stages: [project-ci-validation, validate, integration, deploy, publish]
 
-# The shared toolbox image is the ONLY CI image. It supplies the runtime (conda,
-# git-lfs, gate tools); this project supplies its dependencies via environment.yml.
-# Registry and tag come from builder inventory/images/shared-images.yaml.
+workflow:
+  rules:
+    - if: '$CI_SERVER_HOST == "gitlab.dcloud.run"'
+    - when: never
+
 default:
-  image: harbor.rnd.embedings.ai:30443/spyroot/builder/toolbox:latest
-  tags: [homelab-k8s]
+  image: >-
+    harbor.dcloud.run/redfish_ctl/ci-toolbox@sha256:9007a2a023805a94d9906d8fffda6eb45ce6c9a4f468851423bb7556ee5cf531
+  tags: [redfish_ctl, redfish_ctl-focused]
   before_script:
-    # Corpora and the DMTF spec bundles are Git LFS; without this the suite runs
-    # against pointer files and the bundle/corpus tests fail with BadZipFile/ReadError.
-    - git lfs install --local && git lfs pull --include='tests/*_corpus.tar.gz,full_corpus/*.tar.gz,spec/dmtf/**/*.zip'
-    # Bootstrap the project environment from its own declaration. conda env
-    # create IS the dependency test: an unresolvable or malformed environment.yml
-    # fails here, before any gate runs.
-    - conda env create -q -f environment.yml || conda env update -q -f environment.yml --prune
+    - git remote add github-fixtures https://github.com/spyroot/redfish_ctl.git
+    - unset GIT_LFS_SKIP_SMUDGE
+    - git lfs install --local
+    - git lfs fetch github-fixtures "$CI_COMMIT_SHA"
+    - git lfs checkout
+    - conda env create -q -f environment.yml
     - eval "$(conda shell.bash hook)" && conda activate redfish_ctl
 
 variables:
-  # Gates resolve pytest/ruff through the project environment, never a
-  # pre-installed toolchain in the image.
+  GIT_STRATEGY: clone
+  GIT_DEPTH: "0"
+  GIT_LFS_SKIP_SMUDGE: "1"
+  GIT_TERMINAL_PROMPT: "0"
   CONDA_ENV: redfish_ctl
+  CONDA_NUMBER_CHANNEL_NOTICES: "0"
+  CONDA_REGISTER_ENVS: "false"
+  PROJECT_CI_CPU_COMMAND: ./tools/project-ci-cpu-validation.sh
+  REDFISH_CI_SERVER_HOST: gitlab.dcloud.run
+  REDFISH_CI_PROJECT_PATH: spyroot/redfish_ctl
+  REDFISH_STANDARDS_PACKAGE_API: https://gitlab.dcloud.run/api/v4
+  REDFISH_BUILD_NAMESPACE: redfish-ctl-build
+  REDFISH_SIM_NAMESPACE: redfish-ctl-simulator
+  PROJECT_SERVICE_NAME: redfish-ctl-dmtf-sim
+  REDFISH_SIM_VALUES_FILE: charts/dmtf-sim/values-dcloud.yaml
+  REDFISH_HARBOR_PROJECT: harbor.dcloud.run/redfish_ctl
+  REDFISH_HARBOR_BUILD_SECRET: redfish-harbor-build
+  REDFISH_HARBOR_PULL_SECRET: redfish-harbor-pull
+  HELM_DRIVER: configmap
+
+.private-api-web:
+  rules:
+    - &private-api-web
+      if: >-
+        $CI_SERVER_HOST == "gitlab.dcloud.run" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api")
+
+.focused-dispatch:
+  rules:
+    - &focused-dispatch
+      if: >-
+        $CI_SERVER_HOST == "gitlab.dcloud.run" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        $FOCUSED_GATE != null && $FOCUSED_GATE != ""
+
+.merge-profile-dispatch:
+  rules:
+    - &merge-profile-dispatch
+      if: >-
+        $CI_SERVER_HOST == "gitlab.dcloud.run" &&
+        ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") &&
+        ($FOCUSED_GATE == null || $FOCUSED_GATE == "") &&
+        $MERGE_PROFILE == "merge"
+
+.project-ci-selector-deny:
+  rules:
+    - &project-ci-selector-deny
+      if: >-
+        ($FOCUSED_GATE != null && $FOCUSED_GATE != "") ||
+        $MERGE_PROFILE == "merge" ||
+        (($PROJECT_CI_PROFILE != null && $PROJECT_CI_PROFILE != "") &&
+        $PROJECT_CI_PROFILE != "protected") ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+      when: never
+
+.protected-manual:
+  rules: &protected-manual-rules
+    - *project-ci-selector-deny
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+    - when: never
+
+.protected-read:
+  rules: &protected-read-rules
+    - *project-ci-selector-deny
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - when: never
+
+project-ci-cpu-validation:
+  stage: project-ci-validation
+  rules:
+    - <<: *merge-profile-dispatch
+      when: never
+    - <<: *focused-dispatch
+    - if: >-
+        $CI_SERVER_HOST == "gitlab.dcloud.run" &&
+        ($PROJECT_CI_PROFILE == "focused" || $PROJECT_CI_PROFILE == "full" ||
+        $PROJECT_CI_SMOKE != null)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        PROJECT_CI_SMOKE: project-ci-cpu-validation
+  script:
+    - bash -lc "$PROJECT_CI_CPU_COMMAND"
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/project-ci-cpu-validation.json
+      - reports/gates/
+      - reports/smoke/project-ci-cpu-validation.json
 
 gate-merge:
   stage: validate
-  tags: [homelab-k8s]
   rules:
+    - if: >-
+        $PROJECT_CI_PROFILE == "focused" || $PROJECT_CI_PROFILE == "full" ||
+        ($PROJECT_CI_SMOKE != null && $PROJECT_CI_SMOKE != "")
+      when: never
+    - <<: *focused-dispatch
+      when: never
+    - *merge-profile-dispatch
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  variables:
+    REDFISH_COVERAGE_REPORT: "true"
   script:
     - ./scripts/check.sh --list
-    - ./scripts/gates/run.sh merge
+    - ./scripts/check.sh --profile merge
+    - COVERAGE_FILE=reports/tests/.coverage coverage report
+  coverage: '/^TOTAL\s+.*\s+(\d+(?:\.\d+)?%)$/'
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/gate-merge.json
+      - reports/gates/
+      - reports/smoke/gate-merge.json
+      - reports/tests/commit.txt
+      - reports/tests/junit.xml
+      - reports/tests/coverage.xml
+    reports:
+      junit: reports/tests/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: reports/tests/coverage.xml
 
 gate-integration:
   stage: integration
-  tags: [homelab-k8s]
+  tags: &protected-tags [redfish_ctl, redfish_ctl-protected]
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - <<: *private-api-web
+      when: never
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
+        $CI_PIPELINE_SOURCE == "schedule"
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - ./scripts/gates/run.sh integration
+    - export GITLAB_URL="$CI_SERVER_URL" GITLAB_PROJECT_ID="$CI_PROJECT_ID"
+    - ./scripts/check.sh --profile integration
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/gate-integration.json
+      - reports/gates/
+      - reports/smoke/gate-integration.json
 
-# Live cluster checks run HERE, as a pipeline job on the in-cluster runner —
-# never from a workstation. The runner pod already carries a ServiceAccount, so
-# no kubeconfig or context is involved.
-#
-# Cluster-down is an expected state, not a failure of this project: the job
-# reports UNAVAILABLE and succeeds, so an outage cannot red a pipeline that has
-# nothing to do with the cluster. A cluster that IS up but answers wrongly does
-# fail, because that is a real defect.
+gate-scheduled:
+  stage: integration
+  tags: *protected-tags
+  rules:
+    - if: >-
+        $CI_COMMIT_REF_PROTECTED == "true" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
+        $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - ./scripts/check.sh --profile scheduled
+  artifacts:
+    when: always
+    paths:
+      - reports/ci/gate-scheduled.json
+      - reports/gates/
+      - reports/smoke/gate-scheduled.json
+
 k8s-live-check:
   stage: integration
-  tags: [homelab-k8s]
+  tags: *protected-tags
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-  before_script: []          # no project env needed; this probes the cluster only
+    - <<: *private-api-web
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  before_script: []
   script:
-    - |
-      if ! kubectl version --request-timeout=10s >/dev/null 2>&1; then
-        echo "k8s-live-check: UNAVAILABLE (API unreachable from the runner pod)"
-        echo "  This is reported, not failed: cluster availability is not this project's gate."
-        exit 0
-      fi
-      echo "k8s-live-check: cluster reachable"
-      kubectl get nodes -o wide
-      kubectl get crd 2>/dev/null | grep -i redfish || echo "(no redfish CRDs registered)"
+    - kubectl get --raw=/readyz
+    - kubectl -n "$REDFISH_SIM_NAMESPACE" get services
 
-# Live apply: protected branch ONLY, manual, serialized (resource_group), never from a merge request.
-deploy-apply:
+project-service-image-publish:
   stage: deploy
-  tags: [homelab-k8s]
-  environment:
-    name: production
-  resource_group: homelab-apply
-  rules:
-    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
-      when: manual
-  variables:
-    MUTATION_LOCK: "$CI_JOB_ID"
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-manual-rules
+  resource_group: redfish-sim-image-$CI_COMMIT_SHA
   script:
-    - ./scripts/gates/run.sh deploy
+    - python tools/dcloud_simulator.py publish-image --apply
+  artifacts:
+    paths: [reports/simulator/image.json]
 
-# Gated outbound mirror: internal GitLab is the source of truth; this is the ONLY path to public GitHub.
-# Runs the boundary gates (agent files/names/secrets) FIRST, then pushes on pass. Protected default
-# branch only — never a merge request (an MR must never push to the public mirror).
+project-service-chart-publish:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-manual-rules
+  resource_group: redfish-sim-chart-$CI_COMMIT_SHA
+  script:
+    - python tools/dcloud_simulator.py publish-chart --apply
+  artifacts:
+    paths: [reports/simulator/chart.json]
+
+project-service-deploy-plan:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-read-rules
+  needs: [project-service-image-publish, project-service-chart-publish]
+  script:
+    - python tools/dcloud_simulator.py plan
+  artifacts:
+    paths: [reports/simulator/plan.json]
+
+project-service-deploy:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-manual-rules
+  needs: [project-service-image-publish, project-service-chart-publish, project-service-deploy-plan]
+  resource_group: redfish-ctl-dmtf-sim
+  variables:
+    MUTATION_LOCK: redfish-ctl-dmtf-sim
+  script:
+    - python tools/dcloud_simulator.py apply --apply
+  artifacts:
+    when: always
+    paths: [reports/simulator/apply.json, reports/gates/]
+
+project-service-verify:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-read-rules
+  needs: [project-service-deploy-plan, project-service-deploy]
+  script:
+    - python tools/dcloud_simulator.py verify
+  artifacts:
+    paths: [reports/simulator/verify.json]
+
+project-service-live-test:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-read-rules
+  needs: [project-service-deploy-plan, project-service-verify]
+  script:
+    - python tools/dcloud_simulator.py live-test
+  artifacts:
+    paths: [reports/simulator/live-test.json]
+
+project-service-rollback:
+  stage: deploy
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-manual-rules
+  needs: [project-service-deploy-plan]
+  resource_group: redfish-ctl-dmtf-sim
+  variables:
+    MUTATION_LOCK: redfish-ctl-dmtf-sim
+  script:
+    - python tools/dcloud_simulator.py rollback --apply
+  artifacts:
+    when: always
+    paths: [reports/simulator/rollback.json, reports/gates/]
+
+project-service-release-evidence:
+  stage: publish
+  tags: *protected-tags
+  allow_failure: false
+  rules: *protected-read-rules
+  needs: [project-service-deploy-plan, project-service-deploy, project-service-verify, project-service-live-test]
+  script:
+    - python tools/dcloud_simulator.py evidence
+    - ./scripts/gates/evidence/sanitized.sh
+  artifacts:
+    paths: [reports/simulator/release.json]
+
+# GitHub is the publication authority and DCloud pulls from it. The existing
+# export profile still validates the exact mirrored source and publication boundary.
 publish-github:
   stage: publish
-  tags: [homelab-k8s]
+  tags: *protected-tags
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
-  before_script: []          # boundary gates need no project environment
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - <<: *private-api-web
+      when: never
+    - if: >-
+        $CI_PIPELINE_SOURCE != "schedule" &&
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH &&
+        $CI_COMMIT_REF_PROTECTED == "true"
   script:
-    # Run the PROFILE, not a hand-listed set of scripts. A hand-listed set silently stops covering
-    # the boundary the moment a gate is added to the registry — which is exactly how the exact-commit,
-    # agent-artifact and large-artifact checks came to be missing here.
-    - ./scripts/gates/run.sh repository-export
-    # The shared contract's export chain also requires a secret scan and sanitized evidence. Both are
-    # registered under `merge` because they run there too, and the schema allows a gate exactly one
-    # profile, so they are named explicitly rather than duplicated under a second id.
+    - ./scripts/check.sh --profile repository-export
     - ./scripts/gates/repository/no-secrets.sh
     - ./scripts/gates/evidence/sanitized.sh
-    - ./scripts/publish_github.sh
+    - git fetch github-fixtures "$CI_DEFAULT_BRANCH"
+    - test "$(git rev-parse FETCH_HEAD)" = "$CI_COMMIT_SHA"

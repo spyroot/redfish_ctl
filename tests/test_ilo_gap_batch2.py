@@ -4,7 +4,7 @@ Proves three more standard-Redfish capabilities the coverage audit flagged as
 missing, verified against the HPE iLO and GB300 corpora. firmware-update is a
 guarded mutating action — the tests assert it never POSTs without --confirm.
 """
-from redfish_ctl.idrac_shared import ApiRequestType
+from redfish_ctl.redfish_api_common import ApiRequestType
 
 
 def _post_count(svc):
@@ -32,7 +32,7 @@ def test_secure_boot_on_supermicro(redfish_mock_factory):
 def test_telemetry_triggers_ilo(redfish_mock_factory):
     """telemetry-triggers lists iLO metric alert thresholds."""
     mgr, _ = redfish_mock_factory("hpe")
-    result = mgr.sync_invoke(ApiRequestType.Triggers, "telemetry-triggers")
+    result = mgr.sync_invoke(ApiRequestType.SupermicroTriggers, "telemetry-triggers")
     assert isinstance(result.data, list) and result.data
     assert all("MetricType" in r for r in result.data)
 
@@ -61,7 +61,7 @@ def test_firmware_update_fires_with_confirm_ilo(redfish_mock_factory):
 def test_gap_batch2_graceful_on_dell(redfish_mock):
     """All three degrade gracefully on the Dell mock (no crash, no stray POST)."""
     sb = redfish_mock.sync_invoke(ApiRequestType.SecureBoot, "secure-boot")
-    tr = redfish_mock.sync_invoke(ApiRequestType.Triggers, "telemetry-triggers")
+    tr = redfish_mock.sync_invoke(ApiRequestType.SupermicroTriggers, "telemetry-triggers")
     fw = redfish_mock.sync_invoke(ApiRequestType.FirmwareUpdate, "firmware-update",
                                   image_uri="http://example/fw.bin")
     assert isinstance(sb.data, list)

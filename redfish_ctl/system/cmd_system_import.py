@@ -13,7 +13,7 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, RedfishApiRespond, Singleton
+from ..redfish_api_common import ApiRequestType, RedfishApiRespond, Singleton
 from ..redfish_manager import CommandResult
 
 
@@ -144,7 +144,7 @@ class ImportSystemConfig(IDracManager,
                    "ShareParameters": {"Target": "ALL"}
                    }
 
-        r = f"{self._default_method}{self.idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
+        r = f"{self._default_method}{self.redfish_ip}/redfish/v1/Managers/iDRAC.Embedded.1/" \
             f"Actions/Oem/EID_674_Manager.ImportSystemConfiguration"
 
         data = {}

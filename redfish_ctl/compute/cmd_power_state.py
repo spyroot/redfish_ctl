@@ -8,18 +8,14 @@ Command provides the option to reboot, and change power state.
 Author Mus spyroot@gmail.com
 """
 import argparse
-import time
 from abc import abstractmethod
 from typing import Optional
 
-from ..cmd_exceptions import MissingResource
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, CliJobTypes, Singleton
-from ..redfish_exceptions import RedfishException
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class RebootHost(IDracManager,
+class RebootHost(RedfishManager,
                  scm_type=ApiRequestType.ComputerSystemReset,
                  name='reboot',
                  metaclass=Singleton):
@@ -82,55 +78,19 @@ class RebootHost(IDracManager,
         return cmd_parser, "reboot", help_text
 
     def wait_for_reboot(self, sleep_time, max_retry):
-        """If we need wait or graceful shutdown.  It will wait for reboot task
-        and wait for reboot to complete. It makes sense to call this method
-        only if reset already called.
+        """Wait for the BMC to go down and return through the shared wait command.
 
-        :param sleep_time: seconds to sleep between reboot-pending polls.
-        :param max_retry: maximum retries while waiting for the reboot job.
-        :return: the jobs-query CommandResult if that query errors; otherwise
-                 None once the reboot-pending wait loop completes.
+        :param sleep_time: seconds between reachability polls.
+        :param max_retry: maximum number of polling intervals.
+        :return: wait command result for the complete reboot cycle.
         """
-        _reboot = 1
-        retry_counter = 0
-        while _reboot != 0:
-            if max_retry == 10:
-                self.logger.info(
-                    "Power state, max retried reached, "
-                    "no pending reboot states."
-                )
-                break
-
-            # get reboot reboot pending tasks
-            scheduled_jobs = self.sync_invoke(
-                ApiRequestType.Jobs, "jobs_sources_query",
-                reboot_pending=True,
-                job_type=CliJobTypes.RebootNoForce.value,
-                job_ids=True
-            )
-            if scheduled_jobs.error is not None:
-                return scheduled_jobs
-
-            if len(scheduled_jobs.data) == 0:
-                time.sleep(sleep_time)
-
-            try:
-                for job in scheduled_jobs.data:
-                    # reboot and wait for completion.
-                    self.logger.info(f"Reboot pending job created: task id {job}")
-                    self.fetch_task(job)
-                    _reboot -= 1
-            except MissingResource as mr:
-                self.logger.error(str(mr))
-                time.sleep(sleep_time)
-            except RedfishException as re:
-                self.logger.error(str(re))
-                time.sleep(sleep_time)
-
-            self.logger.info(f"Sleeping {sleep_time} sec "
-                             f"and waiting for reboot pending")
-            time.sleep(sleep_time)
-            retry_counter += 1
+        return self.sync_invoke(
+            ApiRequestType.WaitReady,
+            "wait",
+            wait_timeout=float(sleep_time) * int(max_retry),
+            wait_interval=float(sleep_time),
+            wait_reboot_cycle=True,
+        )
 
     def execute(self,
                 filename: Optional[str] = "",
@@ -172,7 +132,7 @@ class RebootHost(IDracManager,
         self.logger.info(f"issuing reset request ResetType={reset_type}")
 
         cmd_result = self.invoke_action(
-            self.idrac_manage_servers,
+            self.managed_system_uri,
             "Reset",
             payload={"ResetType": reset_type},
             full_action_type="#ComputerSystem.Reset",
@@ -193,6 +153,14 @@ class RebootHost(IDracManager,
             data["task_id"] = task_id
 
         if do_wait and fired:
-            self.wait_for_reboot(sleep_time, max_retry)
+            wait_result = self.wait_for_reboot(sleep_time, max_retry)
+            data["wait"] = wait_result.data
+            if wait_result.error is not None:
+                return CommandResult(
+                    data,
+                    cmd_result.discovered,
+                    cmd_result.extra,
+                    wait_result.error,
+                )
 
         return cmd_result

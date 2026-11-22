@@ -5,7 +5,8 @@ A mapping redfish error python object.
 
 Author Mus spyroot@gmail.com
 """
-from typing import Optional, List
+from typing import List, Optional
+
 from .redfish_shared import RedfishJsonMessage as jsonMessage
 
 

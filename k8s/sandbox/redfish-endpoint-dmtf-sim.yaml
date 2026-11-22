@@ -1,0 +1,15 @@
+apiVersion: redfish.ctl.dev/v1alpha1
+kind: RedfishEndpoint
+metadata:
+  name: dmtf-sim
+  namespace: redfish-sandbox
+  labels:
+    app.kubernetes.io/component: redfish-sandbox
+spec:
+  address: http://dmtf-sim.redfish-sandbox.svc.cluster.local
+  port: 80
+  insecure: true
+  pollInterval: 10s
+  # Created by k8s/sandbox/dmtf-credentials.yaml for basic-auth coverage.
+  secretRef:
+    name: dmtf-sim-credentials

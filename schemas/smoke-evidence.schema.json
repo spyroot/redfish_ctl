@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spyroot.dev/schemas/redfish_ctl-smoke-evidence-v1.json",
+  "title": "redfish_ctl smoke evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "kind",
+    "name",
+    "job",
+    "job_id",
+    "pipeline_id",
+    "commit",
+    "standards_revision",
+    "runner_digest",
+    "artifact_digest",
+    "smoke_class",
+    "command",
+    "return_code",
+    "candidate",
+    "checks",
+    "tools",
+    "status",
+    "warnings",
+    "skipped_required_tests",
+    "skipped_optional_tests",
+    "cleanup",
+    "observation_sources",
+    "evidence_sanitized"
+  ],
+  "properties": {
+    "schema": {"const": "redfish_ctl.smoke_evidence/v1"},
+    "kind": {"const": "smoke"},
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "job": {"type": "string", "minLength": 1},
+    "job_id": {"type": "string", "minLength": 1},
+    "pipeline_id": {"type": "string", "minLength": 1},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "standards_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "runner_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact_digest": {"type": "null"},
+    "smoke_class": {
+      "enum": [
+        "wiring",
+        "offline-component",
+        "ephemeral-integration",
+        "protected-live",
+        "recovery",
+        "status-reflection"
+      ]
+    },
+    "command": {"type": "string", "minLength": 1},
+    "return_code": {"type": "integer", "minimum": 0},
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "digest_source", "digest"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "digest_source": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startup",
+        "tools",
+        "entrypoint",
+        "negative_path",
+        "read_back",
+        "bounded_timeout",
+        "idempotent_noop",
+        "protected_surface"
+      ],
+      "properties": {
+        "startup": {"$ref": "#/$defs/observedCheck"},
+        "tools": {"$ref": "#/$defs/observedCheck"},
+        "entrypoint": {"$ref": "#/$defs/observedCheck"},
+        "negative_path": {"$ref": "#/$defs/observedCheck"},
+        "read_back": {"$ref": "#/$defs/observedCheck"},
+        "bounded_timeout": {"$ref": "#/$defs/observedCheck"},
+        "idempotent_noop": {"$ref": "#/$defs/observedCheck"},
+        "protected_surface": {"$ref": "#/$defs/observedCheck"}
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "missing"],
+      "properties": {
+        "required": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "missing": {"type": "array", "maxItems": 0}
+      }
+    },
+    "status": {"enum": ["passed", "failed"]},
+    "warnings": {"type": "integer", "minimum": 0},
+    "skipped_required_tests": {"type": "integer", "minimum": 0},
+    "skipped_optional_tests": {"type": "integer", "minimum": 0},
+    "cleanup": {"$ref": "#/$defs/cleanup"},
+    "observation_sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "evidence_sanitized": {"type": "boolean"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "passed"}}},
+      "then": {
+        "properties": {
+          "return_code": {"const": 0},
+          "warnings": {"const": 0},
+          "skipped_required_tests": {"const": 0},
+          "skipped_optional_tests": {"const": 0},
+          "evidence_sanitized": {"const": true},
+          "checks": {
+            "properties": {
+              "startup": {"properties": {"status": {"const": "passed"}}},
+              "tools": {"properties": {"status": {"const": "passed"}}},
+              "entrypoint": {"properties": {"status": {"const": "passed"}}},
+              "negative_path": {"properties": {"status": {"const": "passed"}}},
+              "read_back": {"properties": {"status": {"const": "passed"}}},
+              "bounded_timeout": {"properties": {"status": {"const": "passed"}}},
+              "idempotent_noop": {"properties": {"status": {"const": "passed"}}},
+              "protected_surface": {"properties": {"status": {"const": "passed"}}}
+            }
+          },
+          "cleanup": {
+            "properties": {
+              "status": {"const": "passed"},
+              "remaining": {"maxItems": 0}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "observedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "source"],
+      "properties": {
+        "status": {"enum": ["passed", "failed"]},
+        "source": {"type": "string", "minLength": 1}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "remaining"],
+      "properties": {
+        "status": {"enum": ["passed", "failed"]},
+        "remaining": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

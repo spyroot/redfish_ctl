@@ -23,13 +23,12 @@ from typing import Optional
 
 from ..cmd_exceptions import InvalidArgument, ResourceNotFound
 from ..cmd_utils import save_if_needed
-from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
 class VirtualDiskQuery(
-    IDracManager,
+    RedfishManager,
     scm_type=ApiRequestType.VirtualDiskQuery,
     name='virtual_disk_query',
     metaclass=Singleton):
@@ -94,7 +93,7 @@ class VirtualDiskQuery(
             raise InvalidArgument(f"Storage device_id {device_id} "
                                   f"not found, available {storage_ids}")
 
-        r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
+        r = f"{self._default_method}{self.redfish_ip}{self.managed_system_uri}" \
             f"/Storage/{device_id}/Volumes"
         #
         response = self.api_get_call(r, headers)
@@ -107,7 +106,7 @@ class VirtualDiskQuery(
 
         results = []
         for vol_id in vd_list:
-            r = f"{self._default_method}{self.idrac_ip}{self.idrac_manage_servers}" \
+            r = f"{self._default_method}{self.redfish_ip}{self.managed_system_uri}" \
                 f"/Storage/Volumes/{vol_id}"
             try:
                 response = self.api_get_call(r, headers)

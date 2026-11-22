@@ -1,0 +1,425 @@
+# Flat Redfish corpus -> mockup tree conversion contract.
+#
+# This contract defines the deterministic boundary between the committed
+# vendor corpora and the directory protocol consumed by mock_bmc_server.py.
+# It describes the converter another implementation may provide; it does not
+# grant a converted vendor capture DMTF conformance.
+schema: redfish_ctl.corpus_tree_conversion/v1
+
+lifecycle:
+  state: implementation-candidate
+  implementation_available: true
+  activation_status: pending-authoritative-ci
+  activation_requires:
+    - contract tests and converter behavior pass in authoritative CI
+  note: >-
+    The converter entrypoint exists, but a profile MUST NOT be published or
+    selected by the simulator until the authoritative CI requirement passes.
+
+purpose:
+  source: tests/corpus/manifest.json
+  directory_protocol_contract: specs/sim/dmtf-sim-contract.yaml
+  source_layout: "<arcname>/_redfish_v1_*.json inside a Git-LFS tar.gz"
+  output_layout: "<output>/<profile-id>/<redfish-path-segments>/index.<format>"
+  server: "k8s/sandbox/mock_bmc_server.py --mockup-dir <profile-root>"
+  profile_kind: vendor-corpus
+  conformance_claim: none
+  forbidden_claims:
+    - dmtf-reference-profile
+    - dmtf-conformance
+    - dmtf-compliance
+  note: >-
+    A vendor-corpus profile uses the DSP2043 directory protocol only. Its
+    bytes remain a vendor capture and MUST NOT be labelled a DMTF reference
+    profile or a DMTF conformance result.
+
+implementation:
+  entrypoint: tools/corpus_tree.py
+  commands:
+    plan:
+      mutates: false
+      output: conversion report only
+      argv: >-
+        plan --manifest <path> --vendor <vendor> --model <model>
+    materialize:
+      mutates: true
+      output: profile tree plus conversion report
+      precondition: the same input plan report has result=pass
+      argv: >-
+        materialize --manifest <path> --vendor <vendor> --model <model>
+        --output <directory>
+    verify:
+      mutates: false
+      output: verification report for an existing profile tree
+      argv: >-
+        verify --manifest <path> --vendor <vendor> --model <model>
+        --output <directory>
+  exit_codes:
+    0: report result is pass
+    1: report result is fail
+    2: input, environment, or existing-output precondition error
+  execution:
+    network: forbidden
+    credentials: forbidden
+    source_mutation: forbidden
+    archive_extraction: temporary-directory-only
+
+inputs:
+  manifest:
+    path: tests/corpus/manifest.json
+    selector_fields: [vendor, model]
+    required_fields: [vendor, model, tarball, arcname]
+    tarball_base:
+      repository_manifest: repository-root
+      external_test_manifest: manifest-parent
+  archive:
+    allowed_member_types: [regular-file, directory]
+    reject_member_types: [absolute-path, path-traversal, symlink, hardlink, device]
+    hydrated_lfs_required: true
+    source_root: manifest.arcname
+    regular_file_layout: direct-children-only
+    extraction: none; validated members are read without filesystem extraction
+    limits:
+      members: 20000
+      bytes_per_regular_file: 67108864
+      total_uncompressed_bytes: 1073741824
+  fixtures:
+    json_glob: "_redfish_v1*.json"
+    metadata_xml_name: "_redfish_v1_$metadata.xml"
+    metadata_xml_policy: optional-or-record-missing
+    optional_route_map:
+      name: corpus_routes.json
+      schema: redfish_ctl.corpus_routes/v1
+      shape:
+        schema: redfish_ctl.corpus_routes/v1
+        routes:
+          type: array
+          item_required_fields: [route, sourceFixture]
+      purpose: explicit route recovery for fixtures without a usable @odata.id
+    sidecars:
+      disposition: sidecar
+      names:
+        - corpus_manifest.json
+        - corpus_routes.json
+        - rest_api_map.status.json
+        - rest_api_map.npy
+      notes:
+        rest_api_map.status.json: HTTP status/error metadata, never route authority
+        rest_api_map.npy: legacy pickle-bearing data; converter MUST NOT load it
+
+profile_identity:
+  expression: "<lowercase-vendor>-<lowercase-model>"
+  allowed_pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+  examples:
+    - {vendor: dell, model: xr8620t, profile_id: dell-xr8620t}
+    - {vendor: supermicro, model: gb300, profile_id: supermicro-gb300}
+
+known_source_findings:
+  - id: dell-xr8620t-canonical-alias-subset
+    source_sha256: c8cb181ce22e6955b266bc4c0363daef431837f23444120e96c066456d3de3bb
+    tree_sha256: 242c76b9786347df51e5a39141f7ae1d40da36017f26c551aad2c5b145801801
+    observed_by: tools/corpus_tree.py plan
+    result: pass
+    classification: project-specific
+    counts:
+      input_regular_files: 995
+      emitted_files: 881
+      excluded_fragment_files: 70
+      excluded_canonical_alias_files: 44
+      unresolved_files: 0
+      conflict_files: 0
+    alias_payload_comparison:
+      byte_identical: 41
+      json_equivalent: 3
+    evidence: >-
+      The affected fixtures are reachable through a /Systems/... request path
+      but their top-level @odata.id identifies the corresponding /Chassis/...
+      canonical resource. Every canonical fixture exists and all 44 alias
+      payloads parse equal to it, so the aliases are explicitly excluded.
+    remaining_requirement: authoritative CI activation
+
+# Route recovery is intentionally NOT a reverse filename operation. The
+# existing flattening function replaces '/' with '_', but real Redfish path
+# segments also contain underscores. That transform is therefore one-way.
+route_recovery:
+  forbidden:
+    - split_flat_filename_on_underscore
+    - infer_missing_uri_from_filename_segments
+    - silently_drop_unresolved_fixture
+  canonicalize_candidate:
+    accept:
+      scheme: none
+      authority: none
+      path_prefix: /redfish/v1
+      query: none
+      fragment: none
+    normalize:
+      - parse_as_uri_reference
+      - inspect-path-component-for-encoded-separators
+      - percent-decode-path-component-once
+      - remove_one_trailing_slash_except_service_root
+      - preserve_case
+    validation_order:
+      - reject-malformed-percent-encoding
+      - reject-encoded-slash-or-backslash-before-decoding
+      - percent-decode-path-component-once
+      - reject-unsafe-decoded-segments
+    reject:
+      - malformed_percent_encoding
+      - empty_internal_segment
+      - dot_segment
+      - dot_dot_segment
+      - backslash
+      - nul
+      - encoded_path_separator
+    relative_uri:
+      disposition: blocking-unresolved
+      reason: output routing requires an absolute path rooted at /redfish/v1
+  ordered_sources:
+    - id: explicit-route-map
+      authority: >-
+        A route + sourceFixture row from corpus_routes.json matching the safe
+        JSON schema declared under inputs.fixtures.optional_route_map.
+    - id: top-level-odata-id
+      authority: "A JSON object's top-level @odata.id."
+    - id: discovered-odata-link
+      authority: >-
+        A nested @odata.id discovered while walking outward from the ServiceRoot;
+        its existing forward-flattened filename identifies the target fixture.
+    - id: service-root-anchor
+      authority: >-
+        The exact legacy filename _redfish_v1.json maps to /redfish/v1 only.
+    - id: metadata-anchor
+      authority: >-
+        The exact legacy filename _redfish_v1_$metadata.xml maps to
+        /redfish/v1/$metadata only.
+  agreement:
+    rule: all available authoritative sources for one fixture MUST resolve to one route
+    disagreement: blocking-conflict
+    canonical_alias_subset:
+      disposition: record-excluded
+      required_evidence:
+        - discovered-or-explicit-alias-route-forward-matches-source-fixture
+        - top-level-odata-id-identifies-a-different-canonical-route
+        - canonical-source-fixture-exists
+        - canonical-source-fixture-claims-the-canonical-route
+        - alias-and-canonical-payloads-parse-to-equal-json
+      emitted: canonical-source-fixture-only
+      report_reason: canonical-alias-subset
+      any_missing_evidence: blocking-conflict
+      note: >-
+        This is a declared subset policy, not route synthesis. The alternate
+        vendor URI is not served by the converted profile.
+  forward_filename_check:
+    json_function: '"_" + route.strip("/").replace("/", "_") + ".json"'
+    special:
+      /redfish/v1/$metadata: _redfish_v1_$metadata.xml
+    comparison: case-insensitive
+    mismatch: blocking-conflict
+    mismatch_example:
+      synthetic: true
+      source_fixture: _redfish_v1_Systems_System_0.json
+      authoritative_odata_id: /redfish/v1/Systems/HGX_Baseboard_0
+      disposition: blocking-conflict
+  traversal:
+    start: /redfish/v1
+    link_key: "@odata.id"
+    order: breadth-first-then-full-canonical-uri-lexical
+    scope: all nested objects and arrays
+    external_link_policy: record-excluded
+  non_routes:
+    fragment_selector:
+      example: /redfish/v1/Chassis/System.Embedded.1/Assembly#/Assemblies/0
+      disposition: record-excluded
+      reason: URI fragments are never sent in an HTTP request
+    query_variant:
+      disposition: blocking-unresolved
+      reason: one tree path cannot preserve multiple query-specific responses
+    context_uri:
+      key: "@odata.context"
+      disposition: ignore-for-routing
+    captured_fragment_file:
+      filename_indicator: "#"
+      disposition: record-excluded
+      reason: legacy discovery persisted a client-side fragment as a file
+
+path_mapping:
+  strip_prefix: /redfish/v1
+  construction:
+    route_source: route-recovery-authoritative-result
+    algorithm:
+      - use-canonicalized-route-from-route-recovery
+      - remove-exact-prefix-/redfish/v1
+      - split-remaining-path-on-forward-slash
+      - create-one-directory-per-nonempty-segment
+      - write-payload-to-terminal-index-file
+    filename_role: validation-only
+    ordinary_terminal: index.json
+    special_terminals:
+      "$metadata": index.xml
+    resource_kind_exceptions: none
+    note: >-
+      Systems, BIOS Settings, TaskService Tasks, JobService Jobs, and OEM
+      resources all use the same recursive path construction. Resource type
+      never changes directory routing.
+  rules:
+    - route: /redfish/v1
+      destination: <profile-root>/index.json
+      content_type: application/json
+    - route: /redfish/v1/
+      destination: <profile-root>/index.json
+      content_type: application/json
+    - route: /redfish/v1/$metadata
+      destination: <profile-root>/$metadata/index.xml
+      content_type: application/xml
+    - route: /redfish/v1/odata
+      destination: <profile-root>/odata/index.json
+      content_type: application/json
+    - route: /redfish/v1/<segment>/...
+      destination: <profile-root>/<segment>/.../index.json
+      content_type: application/json
+  example:
+    request: /redfish/v1/AccountService/Accounts
+    source_fixture: _redfish_v1_AccountService_Accounts.json
+    destination: <profile-root>/AccountService/Accounts/index.json
+  underscore_segment_example:
+    source_fixture: _redfish_v1_Systems_HGX_Baseboard_0.json
+    authoritative_odata_id: /redfish/v1/Systems/HGX_Baseboard_0
+    forward_filename_check: match
+    destination: <profile-root>/Systems/HGX_Baseboard_0/index.json
+    forbidden_destination: <profile-root>/Systems/HGX/Baseboard/0/index.json
+  recursive_example:
+    authoritative_odata_id: /redfish/v1/Systems/437XR1138R2/Bios/Settings
+    segments: [Systems, 437XR1138R2, Bios, Settings]
+    destination: <profile-root>/Systems/437XR1138R2/Bios/Settings/index.json
+  missing_special_document:
+    disposition: record-missing
+    synthesis: forbidden
+
+payload_fidelity:
+  json:
+    validation: parse-to-object-or-array
+    write: byte-for-byte-copy
+    invalid_disposition: unresolved
+  xml:
+    validation: well-formed
+    write: byte-for-byte-copy
+    invalid_disposition: unresolved
+  rewriting:
+    odata_ids: forbidden
+    vendor_oem_data: forbidden
+    host_or_identity_fields: forbidden
+    synthetic_resources: forbidden
+  sensitive_data:
+    rule: input corpora MUST already satisfy repository redaction gates
+    converter_redaction: forbidden
+
+collisions:
+  source_fixture_to_multiple_routes: blocking
+  multiple_source_fixtures_to_route:
+    default: blocking-for-every-claimant
+    exception: canonical-alias-subset-excluded-before-collision-evaluation
+  case_folded_destination_collision: blocking-on-every-filesystem
+  file_directory_collision: blocking
+  existing_output:
+    identical_bytes: allowed
+    different_bytes: blocking
+
+accountability:
+  equation: >-
+    input_regular_files = emitted_files + excluded_files + unresolved_files
+    + sidecar_files
+  silent_loss: forbidden
+  terminal_statuses: [emitted, excluded, unresolved, sidecar]
+  conflict_source_disposition: unresolved
+  conflict_files_count: subset-of-unresolved-files
+  service_root:
+    required: true
+    expected_route: /redfish/v1
+    expected_destination: <profile-root>/index.json
+  link_closure:
+    rule: >-
+      Every in-scope @odata.id found in an emitted payload is either emitted,
+      recorded as missing from the source capture, or recorded as an excluded
+      non-route.
+
+report:
+  path: "<output>/<profile-id>.conversion.json"
+  schema: redfish_ctl.corpus_tree_conversion_report/v1
+  required_fields:
+    - schema
+    - profileId
+    - profileKind
+    - source
+    - sourceSha256
+    - treeSha256
+    - counts
+    - mappings
+    - excluded
+    - unresolved
+    - missingLinks
+    - conflicts
+    - result
+  source_fields: [vendor, model, tarball, arcname]
+  counts_fields:
+    - inputRegularFiles
+    - emittedFiles
+    - excludedFiles
+    - unresolvedFiles
+    - sidecarFiles
+    - conflictFiles
+  mapping_fields: [route, sourceFixture, destination, sha256]
+  destination_base: profile-root
+  destination_format: relative-posix-path
+  result_values: [pass, fail]
+  pass_conditions:
+    conflicts: 0
+    unresolved: 0
+    service_root_present: true
+    accountability_equation: true
+
+hashes:
+  algorithm: sha256
+  source_input: raw-compressed-tarball-bytes
+  mapping_content: raw-emitted-bytes
+  tree_excludes: conversion-report
+  tree_input: >-
+    UTF-8 relative destination path, one NUL byte, lowercase content sha256,
+    and one newline for every emitted file in lexical destination order
+  report_serialization:
+    encoding: utf-8
+    json_sort_keys: true
+    json_separators: [",", ":"]
+    ensure_ascii: false
+    allow_nan: false
+    final_newline: true
+
+determinism:
+  input_order: lexical
+  report_array_order: lexical-by-route-then-source
+  timestamps_in_output: forbidden
+  same_input_contract: same-tree-and-report-sha256
+
+verification:
+  required:
+    - every emitted JSON file parses
+    - every emitted XML file is well-formed
+    - every destination remains inside profile-root
+    - every mapping hash matches its emitted bytes
+    - ServiceRoot exists at profile-root/index.json
+    - top-level @odata.id matches its mapped route when present
+    - link closure is fully accounted for
+    - no blocking collision or unresolved fixture exists
+    - the conversion report accounting equation balances
+    - a second conversion produces identical tree and report hashes
+  server_smoke:
+    command: >-
+      python k8s/sandbox/mock_bmc_server.py --mockup-dir <profile-root>
+      --port <ephemeral-port>
+    methods: [GET]
+    required_routes:
+      - /redfish/v1/
+      - /redfish/v1/AccountService
+    note: >-
+      This proves directory-protocol compatibility and payload fidelity only;
+      it is not DMTF conformance evidence.

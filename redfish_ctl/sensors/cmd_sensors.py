@@ -12,12 +12,11 @@ Author Mus spyroot@gmail.com
 from abc import abstractmethod
 from typing import Optional
 
-from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
-from ..redfish_manager import CommandResult
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_manager import CommandResult, RedfishManager
 
 
-class Sensors(IDracManager,
+class Sensors(RedfishManager,
               scm_type=ApiRequestType.Sensors,
               name='sensors',
               metaclass=Singleton):
@@ -55,6 +54,7 @@ class Sensors(IDracManager,
                 verbose: Optional[bool] = False,
                 do_async: Optional[bool] = False,
                 do_expanded: Optional[bool] = False,
+                preserve_errors: Optional[bool] = False,
                 **kwargs) -> CommandResult:
         """Walk every Chassis Sensors collection and collect readings.
 
@@ -68,6 +68,8 @@ class Sensors(IDracManager,
         :param do_async: issue the underlying queries on the async event loop when True.
         :param do_expanded: force an expanded ($expand) Sensors query and skip the
             per-member fallback.
+        :param preserve_errors: re-raise failures for exporter health accounting;
+            standalone reads remain tolerant by default.
         :return: CommandResult whose data is a list of sensor rows
             {Chassis, Name, Reading, ReadingUnits, ReadingType, Health}.
         """
@@ -77,6 +79,8 @@ class Sensors(IDracManager,
             try:
                 cdata = self.base_query(chassis_uri, do_async=do_async).data or {}
             except Exception:
+                if preserve_errors:
+                    raise
                 continue
             link = cdata.get("Sensors")
             sensors_uri = link.get("@odata.id") if isinstance(link, dict) else None
@@ -88,15 +92,20 @@ class Sensors(IDracManager,
             # GET when a BMC rejects $expand (some OpenBMC/iLO builds 400 on it); the
             # per-member loop below then fetches each sensor individually.
             coll = {}
+            query_error = None
             for want_expand in (True, False):
                 if want_expand is False and do_expanded:
                     break  # caller forced expand; don't fall back to slow per-member
                 try:
                     coll = self.base_query(sensors_uri, do_async=do_async,
                                            do_expanded=want_expand).data or {}
+                    query_error = None
                     break
-                except Exception:
+                except Exception as exc:
+                    query_error = exc
                     coll = {}
+            if preserve_errors and query_error is not None:
+                raise query_error
             for member in coll.get("Members", []):
                 if not isinstance(member, dict):
                     continue
@@ -108,6 +117,8 @@ class Sensors(IDracManager,
                     try:
                         sd = self.base_query(uri, do_async=do_async).data
                     except Exception:
+                        if preserve_errors:
+                            raise
                         continue
                 if isinstance(sd, dict) and "Reading" in sd:
                     status = sd.get("Status") or {}

@@ -1,0 +1,137 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: StatusCatalog
+metadata:
+  name: dmtf-dsp0266-1.24.0-http-status-codes
+spec:
+  source:
+    document: DSP0266
+    version: 1.24.0
+    sections: ["8.3"]
+    table: 14
+  policy:
+    clientsUnderstandAllListed: required
+    servicesUseListedWithAdditionalConstraints: required
+    unlistedCodes:
+      classification: implementation_specific
+      automaticallyInvalid: false
+    defaultClientError: 400
+    defaultServiceError: 500
+  statuses:
+    - code: 200
+      reason: OK
+      class: success
+      semantic: completed_with_representation
+      body: required
+    - code: 201
+      reason: Created
+      class: success
+      semantic: create_completed
+      headers:
+        Location: required_created_resource_uri
+      body:
+        postCreate: optional_created_resource_representation
+        postAction: required_action_response
+    - code: 202
+      reason: Accepted
+      class: success
+      semantic: accepted_not_complete
+      headers:
+        Location: required_task_monitor_uri
+        Retry-After: optional
+      body: optional_but_if_present_must_be_Task
+    - code: 204
+      reason: No Content
+      class: success
+      semantic: completed_without_representation
+      body: forbidden
+    - code: 301
+      reason: Moved Permanently
+      class: redirect
+      semantic: resource_permanently_moved
+    - code: 302
+      reason: Found
+      class: redirect
+      semantic: resource_temporarily_moved
+    - code: 304
+      reason: Not Modified
+      class: redirect
+      semantic: conditional_get_unchanged
+      body: forbidden_by_http
+    - code: 400
+      reason: Bad Request
+      class: client_error
+      semantic: invalid_or_missing_request_information
+      body: required_redfish_error
+    - code: 401
+      reason: Unauthorized
+      class: client_error
+      semantic: missing_or_invalid_authentication
+      preferredMessage: Base.AccessUnauthorized
+    - code: 403
+      reason: Forbidden
+      class: client_error
+      semantic: authenticated_but_not_authorized
+      preferredMessage: Base.InsufficientPrivilege
+    - code: 404
+      reason: Not Found
+      class: client_error
+      semantic: resource_uri_does_not_exist_or_is_hidden
+    - code: 405
+      reason: Method Not Allowed
+      class: client_error
+      semantic: method_not_supported_for_target_uri
+      headers:
+        Allow: required_supported_methods
+    - code: 406
+      reason: Not Acceptable
+      class: client_error
+      semantic: requested_representation_not_available
+    - code: 409
+      reason: Conflict
+      class: client_error
+      semantic: create_or_update_conflicts_with_current_resource_state
+    - code: 410
+      reason: Gone
+      class: client_error
+      semantic: resource_permanently_unavailable
+    - code: 411
+      reason: Length Required
+      class: client_error
+      semantic: content_length_required
+    - code: 412
+      reason: Precondition Failed
+      class: client_error
+      semantic: supplied_precondition_failed
+    - code: 413
+      reason: Payload Too Large
+      class: client_error
+      semantic: request_or_multipart_part_exceeds_supported_size
+    - code: 415
+      reason: Unsupported Media Type
+      class: client_error
+      semantic: unsupported_request_content_type
+    - code: 428
+      reason: Precondition Required
+      class: client_error
+      semantic: required_precondition_missing
+    - code: 431
+      reason: Request Header Field Too Large
+      class: client_error
+      semantic: request_headers_too_large
+    - code: 500
+      reason: Internal Server Error
+      class: server_error
+      semantic: unexpected_service_failure
+      body: required_redfish_error
+    - code: 501
+      reason: Not Implemented
+      class: server_error
+      semantic: functionality_or_method_not_supported_anywhere
+    - code: 503
+      reason: Service Unavailable
+      class: server_error
+      semantic: temporary_overload_initialization_or_maintenance
+    - code: 507
+      reason: Insufficient Storage
+      class: server_error
+      semantic: service_cannot_construct_response_due_to_response_size

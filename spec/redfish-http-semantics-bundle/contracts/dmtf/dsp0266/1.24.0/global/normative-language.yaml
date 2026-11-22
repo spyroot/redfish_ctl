@@ -1,0 +1,24 @@
+apiVersion: redfish.semantics/v1alpha1
+kind: ProtocolRuleSet
+metadata:
+  name: dmtf-normative-language
+spec:
+  vocabulary:
+    shall:
+      strength: required
+      conformanceFailureWhenViolated: true
+    shall_not:
+      strength: prohibited
+      conformanceFailureWhenViolated: true
+    should:
+      strength: recommended
+      conformanceFailureWhenViolated: false
+    should_not:
+      strength: discouraged
+      conformanceFailureWhenViolated: false
+    may:
+      strength: permitted
+      conformanceFailureWhenViolated: false
+    declarative:
+      strength: defined_behavior
+      conformanceFailureWhenViolated: true

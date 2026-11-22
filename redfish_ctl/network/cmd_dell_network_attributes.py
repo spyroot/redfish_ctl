@@ -14,7 +14,7 @@ from typing import Optional
 from ..cmd_exceptions import InvalidArgument
 from ..cmd_utils import from_json_spec
 from ..idrac_manager import IDracManager
-from ..idrac_shared import REDFISH_API, ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
 
 

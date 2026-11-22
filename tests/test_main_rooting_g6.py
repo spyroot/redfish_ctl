@@ -92,12 +92,11 @@ def _boom(exc):
 def test_main_roots_preflight_and_dispatch_under_one_operation(span_exporter, monkeypatch):
     """main() opens ONE operation root named by the command; the preflight and the
     dispatched command's BMC calls nest under it — orphan roots == 0."""
-    monkeypatch.setattr(rm, "IDracManager", _FakeManager)
     monkeypatch.setattr(rm, "_redfish_query_from_args", lambda *a, **k: _EmptyQuery())
     monkeypatch.setattr(rm, "process_respond", lambda *a, **k: {})
     monkeypatch.setattr(rm, "json_printer", lambda *a, **k: None)
 
-    rm.main(_args(), _CMD_MAP)
+    rm.main(_args(), _CMD_MAP, _FakeManager)
 
     spans = span_exporter.get_finished_spans()
     roots = [s for s in spans if s.parent is None]
@@ -119,15 +118,15 @@ def test_main_flushes_on_every_exit(monkeypatch):
     monkeypatch.setattr(rm.tracing, "shutdown", lambda *a, **k: flushes.append(1))
 
     monkeypatch.setattr(rm, "_run", lambda *a, **k: None)
-    rm.main(_args(), _CMD_MAP)
+    rm.main(_args(), _CMD_MAP, _FakeManager)
     assert len(flushes) == 1
 
     monkeypatch.setattr(rm, "_run", _boom(KeyboardInterrupt()))
     with pytest.raises(KeyboardInterrupt):
-        rm.main(_args(), _CMD_MAP)
+        rm.main(_args(), _CMD_MAP, _FakeManager)
     assert len(flushes) == 2
 
     monkeypatch.setattr(rm, "_run", _boom(SystemExit(143)))
     with pytest.raises(SystemExit):
-        rm.main(_args(), _CMD_MAP)
+        rm.main(_args(), _CMD_MAP, _FakeManager)
     assert len(flushes) == 3

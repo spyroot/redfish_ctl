@@ -8,7 +8,6 @@ Example::
 from __future__ import annotations
 
 import argparse
-import os
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -18,9 +17,11 @@ from typing import Any, Mapping
 import yaml
 
 from ..api import RedfishApiError, get_sensors, get_system, get_thermal
+from ..config import named_env
 from ..idrac_manager import IDracManager
-from ..idrac_shared import ApiRequestType, Singleton
+from ..redfish_api_common import ApiRequestType, Singleton
 from ..redfish_manager import CommandResult
+from ..telemetry import tracing
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,7 @@ def _env_value(raw: Mapping[str, Any], field: str, env_field: str, default: str)
         return str(value)
     env_name = raw.get(env_field)
     if env_name:
-        return os.environ.get(str(env_name), default)
+        return named_env(str(env_name), default)
     return default
 
 
@@ -173,10 +174,10 @@ def _node_manager(node: FleetNode) -> IDracManager:
     :return: a :class:`IDracManager` bound to the node.
     """
     return IDracManager(
-        idrac_ip=node.address,
-        idrac_username=node.username,
-        idrac_password=node.password,
-        idrac_port=node.port,
+        host=node.address,
+        username=node.username,
+        password=node.password,
+        port=node.port,
         insecure=node.insecure,
         is_http=node.use_http,
     )
@@ -230,6 +231,38 @@ def read_node(node: FleetNode) -> dict[str, Any]:
         return _error_row(node, exc)
 
 
+def _read_node_with_span(
+    node: FleetNode,
+    coordinator_links: tuple[Any, ...],
+) -> dict[str, Any]:
+    """Read one fleet node inside an independent root linked to its coordinator.
+
+    :param node: fleet node to read.
+    :param coordinator_links: links captured from the fleet coordinator span.
+    :return: the node summary returned by :func:`read_node`.
+    """
+    with tracing.operation_span(
+        "fleet.node",
+        parent_policy=tracing.SpanParentPolicy.ROOT,
+        attributes={"server.address": node.address},
+        links=coordinator_links,
+    ) as span:
+        try:
+            result = read_node(node)
+        except Exception as exc:
+            tracing.record_exception(span, exc)
+            raise
+        if result.get("ok"):
+            tracing.record_success(span)
+        else:
+            tracing.record_error(
+                span,
+                str(result.get("error") or "fleet node read failed"),
+                "fleet_node_error",
+            )
+        return result
+
+
 def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]:
     """Fan out read-only status calls across inventory nodes.
 
@@ -244,9 +277,14 @@ def read_fleet(nodes: tuple[FleetNode, ...], concurrency: int) -> dict[str, Any]
 
     max_concurrency = max(1, min(int(concurrency or 1), len(nodes)))
     rows_by_index: dict[int, dict[str, Any]] = {}
+    coordinator_links = tracing.link_to_current_span()
     with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
         future_to_index = {
-            executor.submit(read_node, node): index
+            executor.submit(
+                _read_node_with_span,
+                node,
+                coordinator_links,
+            ): index
             for index, node in enumerate(nodes)
         }
         for future in as_completed(future_to_index):
