@@ -484,6 +484,10 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
     trusted_external_jobs = _trusted_external_jobs(registry)
     default_tags = (ci.get("default") or {}).get("tags") or []
     real_jobs = _real_gitlab_jobs(ci)
+    protected_jobs = registry.get("protected_jobs", {})
+    resource_group = registry.get("protected_resource_group")
+    for name in sorted(protected_jobs.keys() - real_jobs.keys()):
+        failures.append(f"protected GitLab job missing: {name}")
     external_names = [
         job["name"]
         for include in registry.get("trusted_includes") or []
@@ -564,7 +568,22 @@ def _check_gitlab(registry: dict) -> tuple[list[str], bool]:
                 token in name
                 for token in ("apply", "deploy", "publish", "rollback")
             )
-            if protected_action and not _merge_request_explicitly_blocked(job):
+            protected_job = protected_jobs.get(name)
+            if protected_job:
+                expected_when = protected_job["when"]
+                valid_lock = (
+                    bool(resource_group)
+                    and job.get("resource_group") == resource_group
+                    and (job.get("variables") or {}).get("MUTATION_LOCK") == resource_group
+                )
+                if (
+                    job.get("allow_failure") is not False
+                    or f"{runner_tag}-protected" not in (tags or [])
+                    or not _protected_template_rules_match(job, expected_when)
+                    or (protected_job["serialized"] and not valid_lock)
+                ):
+                    failures.append(f"gitlab job {name}: protected lifecycle rule drift")
+            elif protected_action and not _merge_request_explicitly_blocked(job):
                 failures.append(
                     f"gitlab job {name}: mutation is not explicitly denied "
                     "in a merge-request pipeline")

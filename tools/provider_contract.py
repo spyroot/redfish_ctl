@@ -86,6 +86,24 @@ def provider_host(root: Path, provider_name: str = "builder") -> str:
     return host
 
 
+def project_ci_host(root: Path) -> str:
+    """Read the tracked self-managed CI host or its declared legacy provider.
+
+    :param root: Consumer repository root.
+    :returns: Verified bare CI hostname.
+    """
+    config = root / ".gitlab-ci.yml"
+    if config.is_file():
+        pipeline = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+        value = (pipeline.get("variables") or {}).get("REDFISH_CI_SERVER_HOST")
+        if value is not None:
+            host = _https_base_url(f"https://{value}", label="tracked CI host")
+            if host.hostname != value or host.path or host.port is not None:
+                raise ProviderContractError("tracked CI authority must be one bare hostname")
+            return value
+    return provider_host(root)
+
+
 def require_provider_repository(repository: object, base_url: object) -> str:
     """Validate and return a repository URL below the approved provider base."""
     approved = _https_base_url(base_url, label="approved provider base URL")

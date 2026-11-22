@@ -9,10 +9,12 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import textwrap
 import threading
 import time
 from pathlib import Path
+from typing import Final
 
 import jsonschema
 import pytest
@@ -44,6 +46,13 @@ SMOKE_EVIDENCE_SCHEMA = REPO_ROOT / "schemas" / "smoke-evidence.schema.json"
 DIGEST = "sha256:" + ("a" * 64)
 COMMIT = "b" * 40
 STANDARDS_REVISION = "c" * 40
+STANDARDS_PROOF_ENV: Final = "REDFISH_STANDARDS_PROOF_FILE"
+STANDARDS_MANIFEST_PATH: Final = "manifest.yaml"
+STANDARDS_BINDING_SCHEMA_PATH: Final = "schemas/project-standards-binding.schema.json"
+STANDARDS_PROOF_CONTRACTS: Final = ("ci", "smoke-testing")
+STANDARDS_PROOF_RESOLUTION_ERROR: Final = (
+    "local Standards proof cannot resolve the pinned commit and files"
+)
 
 
 def _yaml(path: Path) -> dict:
@@ -120,7 +129,7 @@ def test_required_ci_jobs_keep_project_environment_and_tool_contract() -> None:
     }
     for job in ("project-ci-cpu-validation", "gate-merge"):
         assert merge_tools <= set(records[job]["requiredTools"])
-    assert "builder-project-resolve-binding" in records["gate-integration"][
+    assert "kubectl" in records["gate-integration"][
         "requiredTools"
     ]
 
@@ -225,6 +234,7 @@ def _root(tmp_path: Path) -> Path:
 def _ci_env_for(root: Path, job: str = "gate-merge") -> dict[str, str]:
     """Return CI identity matching the fixture repository's exact HEAD."""
     env = _ci_env(job=job)
+    env["PATH"] = os.environ["PATH"]
     env["CI_COMMIT_SHA"] = subprocess.check_output(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         text=True,
@@ -534,11 +544,16 @@ def test_observe_gate_counts_nonnumeric_warning_forms_as_non_green(
 
 
 def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
-    """A timed-out gate returns bounded evidence without a surviving child."""
+    """A timed-out gate returns bounded evidence and removes its report staging."""
     root = _root(tmp_path)
     command = root / "timeout.sh"
     command.write_text(
-        "#!/bin/sh\nprintf 'started\\n'\nsleep 5\n",
+        "#!/bin/sh\n"
+        "mkdir -p reports\n"
+        'stage="$(mktemp -d "${REDFISH_CI_SCRATCH_DIR:-reports}/.test-evidence.XXXXXX")"\n'
+        'printf "%s\\n" "$stage" > reports/staging-path\n'
+        'printf "<testsuite/>\\n" > "$stage/junit.xml"\n'
+        "sleep 5\n",
         encoding="utf-8",
     )
     command.chmod(0o755)
@@ -546,11 +561,13 @@ def test_observe_gate_timeout_stops_the_process_group(tmp_path: Path) -> None:
     observations = observe_gate(
         command=str(command),
         root=root,
-        timeout_seconds=0.1,
+        timeout_seconds=0.5,
     )
 
     assert observations["timed_out"] is True
     assert observations["return_code"] == 124
+    report_stage = root / (root / "reports/staging-path").read_text(encoding="utf-8").strip()
+    assert not report_stage.exists()
 
 
 def test_smoke_timeout_comes_from_inventory_and_is_observed(
@@ -777,22 +794,38 @@ def test_observe_smoke_rejects_probe_warnings_and_required_skips(
     assert evidence["skipped_required_tests"] == expected_skips
 
 
+@pytest.mark.parametrize("gate_timeout", [8, 1], ids=["outer-deadline", "gate-deadline"])
 def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
-    tmp_path: Path,
+    tmp_path: Path, gate_timeout: int,
 ) -> None:
-    """A hung exact-command smoke probe is bounded and does not leak children."""
+    """Either replay deadline stops the nested gate and removes its reports."""
     root = tmp_path / "repo"
     root.mkdir()
     root = _root(root)
     child_pid_path = tmp_path / "probe-child.pid"
+    staging_path = tmp_path / "probe-staging"
     child_script = tmp_path / "probe_child.py"
     child_script.write_text(
+        f"#!{sys.executable}\n"
         "import os\n"
-        "import pathlib\n"
-        "import sys\n"
         "import time\n"
-        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8')\n"
+        "from pathlib import Path\n"
+        "stage = Path(os.environ['REDFISH_CI_SCRATCH_DIR'])\n"
+        "(stage / 'junit.xml').write_text('<testsuite/>', encoding='utf-8')\n"
+        "Path(os.environ['PROBE_STAGING_PATH']).write_text(str(stage), encoding='utf-8')\n"
+        "Path(os.environ['PROBE_CHILD_PID']).write_text(str(os.getpid()), encoding='utf-8')\n"
         "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    child_script.chmod(0o755)
+    replay_script = tmp_path / "replay.py"
+    replay_script.write_text(
+        "import os\n"
+        "from pathlib import Path\n"
+        "from tools.ci_evidence import observe_gate\n"
+        "result = observe_gate(command=os.environ['PROBE_CHILD_SCRIPT'], "
+        "root=Path.cwd(), timeout_seconds=int(os.environ['PROBE_GATE_TIMEOUT']))\n"
+        "raise SystemExit(result['return_code'])\n",
         encoding="utf-8",
     )
     scripts = root / "scripts"
@@ -804,8 +837,7 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
         "  printf 'python3 missing\\n' >&2\n"
         "  exit 1\n"
         "}\n"
-        'python3 "$PROBE_CHILD_SCRIPT" "$PROBE_CHILD_PID" &\n'
-        "sleep 5\n",
+        'exec python3 "$PROBE_REPLAY_SCRIPT"\n',
         encoding="utf-8",
     )
     check.chmod(0o755)
@@ -815,7 +847,7 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
         "command": "./scripts/check.sh --profile merge",
         "requiredTools": ["sh"],
         "artifactUnderTest": {"type": "repository", "digestSource": "git-commit"},
-        "timeoutSeconds": 1,
+        "timeoutSeconds": 2,
     }
     gate_observations = {
         **_gate_observations(),
@@ -825,6 +857,10 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
     env = _ci_env_for(root)
     env["PROBE_CHILD_PID"] = str(child_pid_path)
     env["PROBE_CHILD_SCRIPT"] = str(child_script)
+    env["PROBE_STAGING_PATH"] = str(staging_path)
+    env["PROBE_REPLAY_SCRIPT"] = str(replay_script)
+    env["PROBE_GATE_TIMEOUT"] = str(gate_timeout)
+    env["PYTHONPATH"] = str(REPO_ROOT)
     child_pid: int | None = None
     child_running = False
     start = time.monotonic()
@@ -853,12 +889,13 @@ def test_observe_smoke_probe_timeout_is_bounded_and_reaps_child(
             except ProcessLookupError:
                 pass
 
-    assert elapsed < 3
+    assert elapsed < 4
     assert smoke_observations["idempotent_noop"] is False
     assert smoke_observations["cleanup_status"] == "passed"
     assert smoke_observations["remaining"] == []
     assert child_pid is not None
     assert child_running is False
+    assert not Path(staging_path.read_text(encoding="utf-8")).exists()
 
 
 @pytest.mark.parametrize("timeout", [59, 3601, True, None])
@@ -1072,28 +1109,19 @@ def test_focused_execution_cannot_emit_release_blocking_smoke() -> None:
     assert selected == inventory["spec"]["smokeTests"][0]
 
 
-def test_required_jobs_have_local_artifacts_or_external_contracts() -> None:
-    """Required jobs have local artifacts or one exact provider contract."""
+def test_required_jobs_have_local_artifacts() -> None:
+    """Required jobs publish exact local gate and smoke artifacts."""
     registry = _yaml(REPO_ROOT / "gates/manifest.yaml")
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     smoke = _yaml(REPO_ROOT / "inventory/ci/smoke-tests.yaml")
     smoke_jobs = {record["job"] for record in smoke["spec"]["smokeTests"]}
-    external_jobs = {
-        job["name"]: job
-        for include in registry["trusted_includes"]
-        for job in include.get("jobs", [])
-    }
     assert ci["gate-merge"]["script"] == [
         "./scripts/check.sh --list",
         "./scripts/check.sh --profile merge",
+        "COVERAGE_FILE=reports/tests/.coverage coverage report",
     ]
     for job_name in registry["required_jobs"]:
         assert job_name in smoke_jobs
-        if job_name in external_jobs:
-            assert job_name not in ci
-            assert external_jobs[job_name]["required"] is True
-            assert external_jobs[job_name]["allowFailure"] is False
-            continue
         assert job_name in ci
         paths = _artifact_paths(ci[job_name])
         assert f"reports/ci/{job_name}.json" in paths
@@ -1128,6 +1156,48 @@ def test_evidence_sanitizer_rejects_missing_evidence(tmp_path: Path) -> None:
     )
     assert proc.returncode == 1
     assert "missing" in (proc.stdout + proc.stderr).lower()
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "xml-boundary",
+        "credential-value",
+        "credential-attribute",
+        "credential-property",
+        "credential-comment",
+        "malformed",
+    ],
+)
+def test_evidence_sanitizer_understands_junit_fields(
+    tmp_path: Path, variant: str,
+) -> None:
+    """JUnit markup may mention a password without publishing a secret."""
+    reports = tmp_path / "reports"
+    junit = reports / "tests" / "junit.xml"
+    junit.parent.mkdir(parents=True)
+    payload = '<testsuite><testcase name="test_password" time="0.123"/></testsuite>'
+    fake_credential = "fixture-secret-value"
+    if variant == "credential-value":
+        payload = payload.replace("test_password", f"password: {fake_credential}")
+    elif variant == "credential-attribute":
+        payload = payload.replace(' time=', f' password="{fake_credential}" time=')
+    elif variant == "credential-property":
+        payload = payload.replace(
+            "<testsuite>",
+            f'<testsuite><properties><property name="password" value="{fake_credential}"/></properties>',
+        )
+    elif variant == "credential-comment":
+        payload = f"<!--password: {fake_credential}-->{payload}"
+    elif variant == "malformed":
+        payload = payload.removesuffix("</testsuite>")
+    junit.write_text(payload, encoding="utf-8")
+    proc = subprocess.run(
+        [str(SANITIZER)], cwd=REPO_ROOT, capture_output=True, text=True,
+        timeout=30, check=False, env={**os.environ, "EVIDENCE_DIR": str(reports)},
+    )
+    assert proc.returncode == (0 if variant == "xml-boundary" else 1)
+    assert fake_credential not in proc.stdout + proc.stderr
 
 
 def test_dispatch_rejects_raw_argument_without_echoing_it() -> None:
@@ -1201,6 +1271,35 @@ def test_dispatch_ref_is_explicit_safe_and_dispatch_only() -> None:
     assert proc.returncode == 2
     assert unsafe not in combined
     assert "safe branch ref" in combined
+
+
+@pytest.mark.parametrize("status", [0, 1, 78], ids=["passed", "failed", "blocked"])
+def test_native_dispatch_returns_without_running_local_gates(tmp_path: Path, status: int) -> None:
+    """The native dispatch exit code is authoritative for the CLI invocation."""
+    root = _root(tmp_path)
+    (root / "standards-binding.yaml").write_text(
+        yaml.safe_dump({"metadata": {"name": "fixture-project"}, "spec": {"providers": []}}),
+        encoding="utf-8",
+    )
+    scripts = root / "scripts"
+    (scripts / "gates").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(CHECK_SH, scripts / "check.sh")
+    (scripts / "gates/dcloud_dispatch.bash").write_text(
+        'dispatch_dcloud() { printf "%s\\n" "fixture-receipt"; return "$FIXTURE_STATUS"; }\n',
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        ["/bin/bash", str(scripts / "check.sh"), "--profile", "merge", "--dispatch", "--ref", "fixture"],
+        cwd=root,
+        env={**_off_cluster_env(), "FIXTURE_STATUS": str(status)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert proc.returncode == status, proc.stderr
+    assert proc.stdout == "fixture-receipt\n"
+    assert "REFUSING" not in proc.stderr
 
 
 def test_dispatch_forwards_immutable_ref_and_exact_commit(tmp_path: Path) -> None:
@@ -1449,28 +1548,13 @@ def test_schema_gate_owns_exact_standards_and_provider_validation() -> None:
     assert 'repository = f"{repository}.git"' in source
     assert "JOB-TOKEN:" not in source
 
-    binding = _yaml(REPO_ROOT / "standards-binding.yaml")
-    provider = _yaml(REPO_ROOT / binding["spec"]["providers"][0]["binding"])
     ci = _yaml(REPO_ROOT / ".gitlab-ci.yml")
     manifest = _yaml(REPO_ROOT / "gates/manifest.yaml")
-    include_identities = {
-        (record["project"], record["ref"], record["file"])
-        for record in ci["include"]
-    }
-    trusted_identities = {
-        (record["project"], record["ref"], record["file"])
-        for record in manifest["trusted_includes"]
-    }
-    resource_identity = (
-        provider["spec"]["dispatch"]["project"],
-        provider["spec"]["source"]["revision"],
-        "/ci/templates/project-ci-resource-jobs.yml",
-    )
-    assert include_identities == trusted_identities
-    assert resource_identity in include_identities
+    assert not ci.get("include")
+    assert not manifest.get("trusted_includes")
     assert "@sha256:" in ci["default"]["image"]
-    assert ci["variables"]["PROJECT_CI_CPU_COMMAND"] == (
-        "./tools/project-ci-cpu-validation.sh"
+    assert ci["variables"]["REDFISH_STANDARDS_PACKAGE_API"] == (
+        "https://gitlab.dcloud.run/api/v4"
     )
 
 
@@ -1495,11 +1579,13 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
     """Build one shared baseline whose pinned schemas differ from local drift."""
     baseline = tmp_path_factory.mktemp("provider-free-schema")
     authority = baseline / "standards"
-    binding_schema_path = "schemas/project-standards-binding.schema.json"
     revision = _commit_local_authority(
         authority,
         {
-            binding_schema_path: json.dumps(
+            STANDARDS_MANIFEST_PATH: yaml.safe_dump(
+                {"spec": {"readOrder": [{"id": name} for name in STANDARDS_PROOF_CONTRACTS]}}
+            ),
+            STANDARDS_BINDING_SCHEMA_PATH: json.dumps(
                 {
                     "type": "object",
                     "required": ["apiVersion", "spec"],
@@ -1516,7 +1602,7 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
         },
     )
     # Reading the authority's working tree would reject even the valid case.
-    (authority / binding_schema_path).write_text(
+    (authority / STANDARDS_BINDING_SCHEMA_PATH).write_text(
         json.dumps({"not": {}}), encoding="utf-8"
     )
     project = baseline / "project"
@@ -1533,6 +1619,7 @@ def provider_free_schema_baseline(tmp_path_factory: pytest.TempPathFactory) -> P
                         "revision": revision,
                     },
                     "providers": [],
+                    "requiredContracts": list(STANDARDS_PROOF_CONTRACTS),
                 },
             }
         ),
@@ -1603,6 +1690,192 @@ def test_schema_gate_validates_provider_free_project_against_exact_pin(
     else:
         with pytest.raises(error, match=message):
             schema_gate.run(env={})
+
+
+@pytest.fixture(scope="module")
+def standards_proof_baseline(
+    tmp_path_factory: pytest.TempPathFactory, provider_free_schema_baseline: Path
+) -> tuple[Path, dict[str, Path]]:
+    """Capture a sparse Git pack and retain its project fixture for all cases."""
+    project = tmp_path_factory.mktemp("standards-proof") / "project"
+    shutil.copytree(provider_free_schema_baseline, project)
+    binding_path = project / "standards-binding.yaml"
+    binding = _yaml(binding_path)
+    source = binding["spec"]["source"]
+    git = ("git", "-C", source["localPath"])
+    revision = source["revision"]
+    selectors = (
+        revision,
+        f"{revision}^{{tree}}",
+        f"{revision}:schemas",
+        f"{revision}:{STANDARDS_MANIFEST_PATH}",
+        f"{revision}:{STANDARDS_BINDING_SCHEMA_PATH}",
+    )
+    objects = subprocess.check_output((*git, "rev-parse", *selectors)).splitlines()
+
+    def pack(name: str, object_ids: list[bytes]) -> Path:
+        target = project.parent / name
+        with target.open("wb") as stream:
+            subprocess.run(
+                (*git, "pack-objects", "--stdout", "--window=0"),
+                input=b"\n".join(object_ids) + b"\n",
+                stdout=stream,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        return target
+
+    source["localPath"] = str(project / "unavailable-standards")
+    binding_path.write_text(yaml.safe_dump(binding), encoding="utf-8")
+    invalid = project.parent / "invalid.pack"
+    invalid.write_bytes(b"not a Git pack\n")
+    return project, {
+        "complete": pack("complete.pack", objects),
+        "invalid": invalid,
+        "missing": project.parent / "missing.pack",
+        "missing-bound-file": pack("missing-schema.pack", objects[:-1]),
+    }
+
+
+@pytest.mark.parametrize(
+    ("proof_kind", "revision", "required_contracts", "message"),
+    [
+        pytest.param("complete", None, None, None, id="exact-pack-without-fetch"),
+        pytest.param(
+            "invalid",
+            None,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="invalid-pack",
+        ),
+        pytest.param(
+            "missing",
+            None,
+            None,
+            "local Standards proof file is unavailable",
+            id="missing-pack-file",
+        ),
+        pytest.param(
+            "complete",
+            STANDARDS_REVISION,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="wrong-pinned-commit",
+        ),
+        pytest.param(
+            "missing-bound-file",
+            None,
+            None,
+            STANDARDS_PROOF_RESOLUTION_ERROR,
+            id="missing-bound-file",
+        ),
+        pytest.param(
+            "complete",
+            None,
+            tuple(reversed(STANDARDS_PROOF_CONTRACTS)),
+            "binding contracts differ from the pinned Standards manifest",
+            id="manifest-contract-order-mismatch",
+        ),
+    ],
+)
+def test_schema_gate_verifies_sparse_standards_proof(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    standards_proof_baseline: tuple[Path, dict[str, Path]],
+    proof_kind: str,
+    revision: str | None,
+    required_contracts: tuple[str, ...] | None,
+    message: str | None,
+) -> None:
+    """Accept only an exact, complete Standards proof for the binding."""
+    baseline, proofs = standards_proof_baseline
+    project = tmp_path / "project"
+    shutil.copytree(baseline, project)
+    binding_path = project / "standards-binding.yaml"
+    binding = _yaml(binding_path)
+    if revision is not None:
+        binding["spec"]["source"]["revision"] = revision
+    if required_contracts is not None:
+        binding["spec"]["requiredContracts"] = list(required_contracts)
+    binding_path.write_text(yaml.safe_dump(binding), encoding="utf-8")
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", project)
+    monkeypatch.setattr(
+        schema_gate,
+        "_checkout_exact_authority",
+        lambda *args, **kwargs: pytest.fail("the proof path tried to fetch Standards"),
+    )
+    env = {STANDARDS_PROOF_ENV: str(proofs[proof_kind])}
+    if message is None:
+        schema_gate.run(env=env)
+    else:
+        with pytest.raises(schema_gate.SchemaGateError, match=message):
+            schema_gate.run(env=env)
+
+
+@pytest.mark.parametrize(
+    ("api_url", "http_status", "message"),
+    [
+        ("https://ci.example.invalid/api/v4", 200, None),
+        ("https://other.example.invalid/api/v4", 200, "differs from the GitLab job origin"),
+        ("https://ci.example.invalid/api/v4", 302, "returned HTTP 302"),
+        ("https://ci.example.invalid/api/v4", 404, "returned HTTP 404"),
+    ],
+)
+def test_schema_gate_reads_proof_only_from_the_job_project(
+    monkeypatch: pytest.MonkeyPatch,
+    standards_proof_baseline: tuple[Path, dict[str, Path]],
+    api_url: str,
+    http_status: int,
+    message: str | None,
+) -> None:
+    """Bind the package download to the job's project and reject redirects."""
+    project, proofs = standards_proof_baseline
+    binding = _yaml(project / "standards-binding.yaml")
+    revision = binding["spec"]["source"]["revision"]
+    connection_hosts: list[str] = []
+
+    class Response:
+        status = http_status
+
+        @staticmethod
+        def read(limit: int) -> bytes:
+            return proofs["complete"].read_bytes()[:limit]
+
+    class Connection:
+        def __init__(self, host: str, *, port: int | None, timeout: int):
+            assert port is None
+            assert timeout > 0
+            connection_hosts.append(host)
+
+        def request(self, method: str, path: str, *, headers: dict[str, str]) -> None:
+            assert method == "GET"
+            assert path == (
+                f"/api/v4/projects/169/packages/generic/local-standards-proof/"
+                f"{revision}/standards.pack"
+            )
+            assert headers == {"JOB-TOKEN": "example-token"}
+
+        def getresponse(self) -> Response:
+            return Response()
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(schema_gate, "HTTPSConnection", Connection)
+    monkeypatch.setattr(schema_gate, "REPO_ROOT", project)
+    env = {
+        "CI_SERVER_URL": "https://ci.example.invalid",
+        "CI_PROJECT_ID": "169",
+        "CI_JOB_TOKEN": "example-token",
+        "REDFISH_STANDARDS_PACKAGE_API": api_url,
+    }
+    if message is None:
+        schema_gate.run(env)
+    else:
+        with pytest.raises(schema_gate.SchemaGateError, match=message):
+            schema_gate.run(env)
+    expected = ["ci.example.invalid"] if api_url == "https://ci.example.invalid/api/v4" else []
+    assert connection_hosts == expected
 
 
 def test_provider_coordinates_come_from_the_tracked_binding(tmp_path: Path) -> None:

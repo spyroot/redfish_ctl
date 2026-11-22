@@ -21,6 +21,8 @@ dependencies:
   - pyyaml>=6.0
   # Test + lint tooling
   - pytest>=7
+  - pytest-cov>=6.1
+  - psutil>=5.9
   - requests-mock>=1.10
   - numpy
   - make

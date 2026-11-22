@@ -72,6 +72,23 @@
         "minLength": 1
       }
     },
+    "protected_resource_group": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protected_jobs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["when", "serialized"],
+        "additionalProperties": false,
+        "properties": {
+          "when": {"enum": ["manual", "on_success"]},
+          "serialized": {"type": "boolean"}
+        }
+      }
+    },
     "trusted_includes": {
       "type": "array",
       "minItems": 1,

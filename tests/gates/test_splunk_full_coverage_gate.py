@@ -176,7 +176,7 @@ def test_scheduled_gate_is_required_and_uses_the_guarded_runner():
 
     ci = yaml.safe_load((REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8"))
     job = ci["gate-scheduled"]
-    assert "homelab-k8s" in job["tags"]
+    assert set(job["tags"]) == {"redfish_ctl", "redfish_ctl-protected"}
     assert job["script"] == ["./scripts/check.sh --profile scheduled"]
     assert job["rules"] == [
         {

@@ -9,9 +9,9 @@ metadata:
 # Profiles: merge (MR/pre-merge, no cluster mutation) | integration (needs cluster, no BMC mutation)
 #           | scheduled (read-only production canaries) | deploy (live apply, protected pipeline only)
 #           | repository-export (public boundary: internal -> GitLab.com/GitHub).
-# Runner tag: every CI job carries homelab-k8s.
+# Runner tag: every CI job carries redfish_ctl.
 version: 1
-runner_tag: homelab-k8s
+runner_tag: redfish_ctl
 # GitLab jobs that MUST exist and MUST NOT use allow_failure (meta.required-jobs checks these when
 # .gitlab-ci.yml is present).
 required_jobs:
@@ -20,41 +20,17 @@ required_jobs:
   - gate-integration
   - gate-scheduled
 
-# GitLab resolves this content-addressed provider template before creating a
-# pipeline. The meta-gate permits only these hidden templates or concrete jobs
-# from the exact immutable includes; floating refs and unknown content fail.
-trusted_includes:
-  - project: spyroot/builder
-    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
-    file: /ci/templates/project-service.yml
-    templates:
-      - {name: .builder-project-image-publish, mutates: true}
-      - {name: .builder-project-chart-publish, mutates: true}
-      - {name: .builder-project-deploy-plan, mutates: false}
-      - {name: .builder-project-deploy, mutates: true}
-      - {name: .builder-project-verify, mutates: false}
-      - {name: .builder-project-live-test, mutates: false}
-      - {name: .builder-project-rollback, mutates: true}
-      - {name: .builder-project-release-evidence, mutates: false}
-  - project: spyroot/builder
-    ref: d3234c26f71f5a229bba28971d37ff38085c1da3
-    file: /ci/templates/project-ci-resource-jobs.yml
-    jobs:
-      - name: project-ci-cpu-validation
-        required: true
-        mutates: false
-        stage: project-ci-validation
-        image: >-
-          harbor.rnd.embedings.ai/spyroot/builder/toolbox@sha256:bba5761e8248eec533b270a4d16966f8440ba2a81287e7ff63907c8b3a483fc9
-        tags: [homelab-k8s, homelab-k8s-validation]
-        allowFailure: false
-        script:
-          - >-
-            test -n "${PROJECT_CI_CPU_COMMAND:-}" || {
-            printf "BLOCKER: PROJECT_CI_CPU_COMMAND is required\n" >&2;
-            printf "SAFE_NEXT_STEP: scripts/check.sh --profile github\n" >&2;
-            exit 78; }
-          - bash -lc "$PROJECT_CI_CPU_COMMAND"
+# Keep the complete simulator lifecycle on the protected runner and branch.
+protected_resource_group: redfish-ctl-dmtf-sim
+protected_jobs:
+  project-service-image-publish: {when: manual, serialized: false}
+  project-service-chart-publish: {when: manual, serialized: false}
+  project-service-deploy-plan: {when: on_success, serialized: false}
+  project-service-deploy: {when: manual, serialized: true}
+  project-service-verify: {when: on_success, serialized: false}
+  project-service-live-test: {when: on_success, serialized: false}
+  project-service-release-evidence: {when: on_success, serialized: false}
+  project-service-rollback: {when: manual, serialized: true}
 
 mandatory_ids:
   - meta.gate-registry
@@ -138,7 +114,7 @@ gates:
   - {id: kubernetes.render, profile: merge, command: scripts/gates/kubernetes/render.sh, required: true, mutates: false}
   - {id: kubernetes.schema, profile: merge, command: scripts/gates/kubernetes/schema.sh, required: true, mutates: false}
   - {id: kubernetes.policy, profile: merge, command: scripts/gates/kubernetes/policy.sh, required: true, mutates: false}
-  # --- integration: read-only Builder service binding plus live GitLab token checks; no BMC mutation ---
+  # --- integration: read-only namespace and service binding plus live GitLab token checks; no BMC mutation ---
   - {id: integration.namespace, profile: integration, command: scripts/gates/integration/namespace-test.sh, required: true, mutates: false}
   # --- scheduled: read-only production canaries ---
   - {id: telemetry.full-coverage, profile: scheduled, command: scripts/gates/scheduled/telemetry-full-coverage.sh, required: true, mutates: false}

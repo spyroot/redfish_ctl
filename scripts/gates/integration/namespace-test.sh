@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
-# integration.namespace (integration, mutates:false): resolve and validate the
-# namespace selected by the Builder project-service binding.
-#
-# This gate never creates a Namespace. Builder owns namespace bootstrap and the
-# bounded namespace executor. The consumer supplies only its runtime CI project
-# identity and validates the namespace returned by the provider resolver.
+# integration.namespace (integration, mutates:false): validate the simulator
+# namespace binding and confirm the self-managed runner can read its target.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 source scripts/gates/integration/project_service_binding.bash
+
+if [[ -n ${REDFISH_CI_SERVER_HOST:-} ]]; then
+    namespace="${REDFISH_SIM_NAMESPACE:-}"
+    service="${PROJECT_SERVICE_NAME:-}"
+    if [[ ${CI_SERVER_HOST:-} != "$REDFISH_CI_SERVER_HOST" ]] ||
+        ! project_service_coordinates_valid "$namespace" "$service.$namespace.svc" 80 http; then
+        echo "integration.namespace: invalid DCloud authority or service binding" >&2
+        exit 78
+    fi
+    kubectl --namespace "$namespace" --request-timeout=10s get configmap kube-root-ca.crt -o name
+    echo "integration.namespace: OK ($namespace; service http://$service.$namespace.svc:80)"
+    exit 0
+fi
 
 consumer="${CI_PROJECT_NAME:-}"
 service="${PROJECT_SERVICE_NAME:-}"

@@ -13,13 +13,14 @@ import signal
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Iterator, Mapping, Sequence
 
 import jsonschema
 import yaml
 
-from tools.provider_contract import ProviderContractError, provider_host
+from tools.provider_contract import ProviderContractError, project_ci_host
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -41,10 +42,71 @@ _CREDENTIAL_RE = re.compile(
     r"[Bb]earer [A-Za-z0-9._-]{20,}|glpat-[A-Za-z0-9_-]{20,}|"
     r"ghp_[A-Za-z0-9]{30,}|password[\"' :=]+[^ *]{6,}"
 )
+_TEST_REPORTS = {Path("tests/junit.xml"), Path("tests/coverage.xml")}
+_XML_COMMENTS_AND_INSTRUCTIONS = re.compile(r"<!--.*?-->|<\?.*?\?>", re.DOTALL)
+_SCRATCH_ENV = "REDFISH_CI_SCRATCH_DIR"
+_SMOKE_PARENT_SESSION_ENV = "REDFISH_CI_SMOKE_PARENT_SESSION"
 
 
 class EvidenceError(ValueError):
     """Raised when required exact-identity evidence cannot be established."""
+
+
+def _xml_report_fields(node: ET.Element) -> Iterator[str]:
+    """Keep literal XML attributes and named JUnit properties paired with their values."""
+    yield node.tag
+    yield node.text or ""
+    yield node.tail or ""
+    for name, value in node.attrib.items():
+        yield value
+        yield f"{name}={value}"
+    if node.tag == "property" and "name" in node.attrib and "value" in node.attrib:
+        yield f"{node.attrib['name']}={node.attrib['value']}"
+
+
+def _xml_report_has_credentials(payload: bytes) -> bool:
+    """Scan XML content fields without matching across markup boundaries."""
+    text = payload.decode("utf-8")
+    if "<!DOCTYPE" in text:
+        raise EvidenceError("XML evidence must not contain a document type")
+    if any(
+        _CREDENTIAL_RE.search(markup.group())
+        for markup in _XML_COMMENTS_AND_INSTRUCTIONS.finditer(text)
+    ):
+        return True
+    root = ET.fromstring(text)
+    return any(
+        _CREDENTIAL_RE.search(value)
+        for node in root.iter()
+        for value in _xml_report_fields(node)
+    )
+
+
+def validate_evidence_tree(directory: Path) -> None:
+    """Reject secret-shaped content and unreadable reports throughout an evidence tree."""
+    if not directory.is_dir():
+        raise EvidenceError("required evidence directory is missing")
+
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
+    try:
+        for parent, _, files in os.walk(directory, onerror=raise_walk_error):
+            for name in files:
+                path = Path(parent) / name
+                if path.is_symlink():
+                    continue
+                payload = path.read_bytes()
+                if path.relative_to(directory) in _TEST_REPORTS:
+                    contains_credentials = _xml_report_has_credentials(payload)
+                else:
+                    contains_credentials = b"\0" not in payload and bool(
+                        _CREDENTIAL_RE.search(payload.decode("utf-8", errors="replace"))
+                    )
+                if contains_credentials:
+                    raise EvidenceError("secret-shaped content found in evidence; sanitize before upload")
+    except (ET.ParseError, OSError, UnicodeError) as error:
+        raise EvidenceError("evidence scan failed") from error
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -334,6 +396,7 @@ def observe_gate(
         command=command,
         root=root,
         timeout_seconds=timeout_seconds,
+        join_smoke_session=True,
     )
     output_sanitized = _CREDENTIAL_RE.search(output) is None
     if output_sanitized:
@@ -373,6 +436,7 @@ def _run_captured_command(
     root: Path,
     timeout_seconds: float,
     env: Mapping[str, str] | None = None,
+    join_smoke_session: bool = False,
 ) -> tuple[str, int, bool]:
     """Run one command while privately retaining its ordered output.
 
@@ -380,12 +444,16 @@ def _run_captured_command(
     evidence parsing. Output is returned only after the complete capture can be
     scanned for secret-shaped content. A new process group lets a timeout stop
     the gate and any child processes that inherited the output pipe.
+    The parent owns the command's scratch directory, so a killed child cannot
+    leave unvalidated staged reports behind.
 
     :param command: executable path or exact argument vector.
     :param root: working directory for the gate.
     :param timeout_seconds: positive wall-clock limit.
     :param env: optional subprocess environment; inherits the caller environment
         when omitted.
+    :param join_smoke_session: reuse the verified smoke replay session, if
+        present, so either deadline terminates the whole replay.
     :return: combined output, effective return code, and timeout flag.
     """
     command_args = [command] if isinstance(command, str) else list(command)
@@ -393,27 +461,41 @@ def _run_captured_command(
         isinstance(value, str) and value for value in command_args
     ):
         raise EvidenceError("captured command argument vector is invalid")
-    process = subprocess.Popen(
-        command_args,
-        cwd=root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    timed_out = False
-    try:
-        output, _ = process.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
-        timed_out = True
+    selected_env = dict(os.environ if env is None else env)
+    parent_scratch = selected_env.get(_SCRATCH_ENV)
+    smoke_session = False
+    if join_smoke_session:
+        parent_session = selected_env.pop(_SMOKE_PARENT_SESSION_ENV, "")
+        session_id = os.getsid(0)
+        smoke_session = (
+            bool(parent_scratch)
+            and parent_session.isdecimal()
+            and int(parent_session) != session_id
+            and os.getpgrp() == session_id
+        )
+    with tempfile.TemporaryDirectory(prefix=".redfish-ci-", dir=parent_scratch or root) as scratch:
+        selected_env[_SCRATCH_ENV] = scratch
+        process = subprocess.Popen(
+            command_args,
+            cwd=root,
+            env=selected_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            start_new_session=not smoke_session,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        timed_out = False
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
+            output, _ = process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            try:
+                os.killpg(os.getpgrp() if smoke_session else process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            output, _ = process.communicate()
 
     return output, 124 if timed_out else process.returncode, timed_out
 
@@ -516,7 +598,11 @@ def observe_smoke(
     probe_job = f"{selected_env.get('CI_JOB_NAME', 'smoke')}-probe"
     if not _SAFE_NAME_RE.fullmatch(probe_job):
         raise EvidenceError("derived smoke probe job name is unsafe")
-    probe_env = {**selected_env, "CI_JOB_NAME": probe_job}
+    probe_env = {
+        **selected_env,
+        "CI_JOB_NAME": probe_job,
+        _SMOKE_PARENT_SESSION_ENV: str(os.getsid(0)),
+    }
     probe_output, probe_return_code, probe_timed_out = _run_captured_command(
         command=command_args,
         root=root,
@@ -546,7 +632,7 @@ def observe_smoke(
     protected_surface = smoke_class != "protected-live"
     if smoke_class == "protected-live":
         try:
-            expected_provider_host = provider_host(root)
+            expected_provider_host = project_ci_host(root)
         except (OSError, ProviderContractError, yaml.YAMLError):
             expected_provider_host = ""
         protected_surface = (
@@ -796,3 +882,22 @@ def write_evidence(
         if temporary is not None and temporary.exists():
             temporary.unlink()
     return finalized
+
+
+def main() -> int:
+    """Validate the evidence directory supplied by the guarded shell gate."""
+    if len(sys.argv) != 2:
+        print("usage: python -m tools.ci_evidence <evidence-directory>", file=sys.stderr)
+        return 2
+    directory = Path(sys.argv[1])
+    try:
+        validate_evidence_tree(directory)
+    except EvidenceError as error:
+        print(f"evidence.sanitized: {error}", file=sys.stderr)
+        return 1
+    print(f"evidence.sanitized: OK ({directory} clean)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

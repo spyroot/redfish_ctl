@@ -48,9 +48,11 @@ spec:
       {{- end }}
       securityContext:
         runAsNonRoot: true
+        {{- if not .Values.securityContext.useNamespaceIds }}
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+        {{- end }}
         seccompProfile:
           type: RuntimeDefault
       containers:

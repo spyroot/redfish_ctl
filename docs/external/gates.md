@@ -18,27 +18,24 @@ Kubernetes is the execution authority. `scripts/check.sh` is the entry point:
 Off-cluster, `check.sh --profile` refuses; a gate never runs on a workstation.
 The configured CI invokes `scripts/gates/run.sh` internally; operators must use
 the guarded `scripts/check.sh` entry point.
-See [CI/CD Pipeline](ci.md#internal-validation-paths) for guarded dispatch.
+See [CI/CD Pipeline](ci.md#dispatch-an-exact-branch-check) for guarded dispatch.
 
 ## Profiles
 
 - **merge** — merge-request / pre-merge. Static + unit + render. No cluster mutation, no production
   credentials.
-- **integration** — read-only Builder namespace and service binding validation plus live GitLab token
+- **integration** — read-only simulator namespace and service binding validation plus live GitLab token
   checks. No cluster or BMC mutation.
 - **scheduled** — read-only production canaries and drift checks. No BMC mutation.
 - **deploy** — live apply. Protected pipeline only, manual, serialized. Never reachable from a
   merge-request pipeline.
 
-## Trusted provider includes
+## Protected simulator jobs
 
-`trusted_includes` in `gates/manifest.yaml` is the only allow-list for
-provider-owned GitLab templates. Each entry pins the provider project, exact
-40-character commit, template file, permitted hidden templates, and their
-mutation classification. A local wrapper must still declare its stage, runner tags, rules, and
-`allow_failure: false`, so `tools/gate_meta.py` can reject a floating include,
-unknown template, or merge-request-reachable mutation. The protected simulator
-job sequence is documented in [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
+`protected_jobs` in `gates/manifest.yaml` declares the eight protected
+simulator jobs, their branch rules, and which jobs share the release lock.
+`tools/gate_meta.py` checks these constraints against the root pipeline.
+See [CI/CD Pipeline](ci.md#protected-dmtf-simulator-deployment).
 
 ## Selected gate summary
 
@@ -49,20 +46,20 @@ it without executing a gate.
 | id | profile | mutates | what it checks | fails when |
 | -- | ------- | ------- | -------------- | ---------- |
 | `meta.gate-registry` | merge | no | registry is schema-valid, ids unique, commands exist+executable, mandatory present | any registry inconsistency |
-| `meta.ci-runner-tags` | merge | no | every GitLab job carries the `homelab-k8s` tag | a job missing the tag |
+| `meta.ci-runner-tags` | merge | no | every GitLab job carries the `redfish_ctl` tag | a job missing the tag |
 | `meta.required-jobs` | merge | no | required jobs and their smoke contracts/evidence paths exist, with no `allow_failure` or MR-reachable live apply | a required job or smoke contract is missing or misconfigured |
 | `repo.no-secrets` | merge | no | no committed secrets (gitleaks) | a secret is found, or the scanner is absent |
 | `repo.shellcheck` | merge | no | maintained shell scripts pass the full ShellCheck style baseline | any ShellCheck finding, or shellcheck absent |
 | `repo.format` | merge | no | ruff over files changed vs `origin/main` | a lint finding, or ruff absent |
 | `repo.yaml` | merge | no | YAML syntax and duplicate-key policy from `.yamllint` | yamllint is absent, or a configured error or parse failure occurs |
-| `repo.schemas` | merge | no | the registry and tracked bindings match the pinned schemas and provider include | a local authority checkout, exact revision, schema, or provider include does not match |
+| `repo.schemas` | merge | no | the registry and tracked binding match the exact Standards revision | the authorized source or proof is unavailable, or its schema or manifest differs |
 | `repo.no-agent-names` | merge | no | no AI-agent identity in tracked content or new commit messages | an agent name appears |
 | `repo.no-agent-files` | merge | no | no agent instruction/artifact file is tracked in the published mainline | an agent file is tracked |
 | `unit.all` | merge | no | the offline unit suite, with live and vendored-schema-only lanes explicitly excluded | any selected test fails or skips at runtime |
 | `kubernetes.render` | merge | no | manifests + Helm chart render/parse | a render/parse error |
 | `kubernetes.schema` | merge | no | manifests validate against the k8s API schemas (kubeconform) | a schema error, or kubeconform absent |
 | `kubernetes.policy` | merge | no | manifest security/best-practice policy (kube-linter) | a policy violation, or the linter absent |
-| `integration.namespace` | integration | no | Builder resolves a valid owned namespace and service endpoint for the runtime project | the provider binding is unavailable, incomplete, or invalid; the consumer never creates either resource |
+| `integration.namespace` | integration | no | the protected runner validates the configured simulator service coordinates and reads the namespace's CA ConfigMap | the binding is invalid or the protected runner cannot read the target |
 | `telemetry.full-coverage` | scheduled | no | every cataloged `hw.*` metric has valid Splunk MTS liveness evidence; quiet condition-gated metrics are explicit `NOT_APPLICABLE` | an always-on metric is missing/inactive, or any query/payload is invalid |
 | `gitlab.project-token.exists` | integration | no | the CI project token authenticates | token invalid/expired |
 | `gitlab.project-token.project-bound` | integration | no | the token is the project bot, bound to its project | not a project-bound bot token |
@@ -81,10 +78,12 @@ Formatting-only rules are explicitly not applicable to this syntax and data
 integrity gate. Duplicate keys are an explicit error, `yamllint` is required,
 and the gate uses no runtime warning suppression or parse-only fallback.
 
-The `repo.schemas` gate reads `spec.source.localPath`, defined in
-`standards-binding.yaml` and `builder-binding.yaml`, and checks out each
-authority's pinned `spec.source.revision` in a temporary local clone. It uses no
-network credential; a missing local checkout or exact commit fails closed.
+The `repo.schemas` gate validates the exact `spec.source.revision` from
+`standards-binding.yaml`. It checks out the pinned local Standards source when
+available. DCloud supplies the exact Git object proof from the private project
+Package Registry through the same-project job token. The gate rejects an
+unavailable proof, a mismatched commit, missing bound files, or a contract list
+that differs from the authenticated manifest.
 
 ## Telemetry liveness checks
 

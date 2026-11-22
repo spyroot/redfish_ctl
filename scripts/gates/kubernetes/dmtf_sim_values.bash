@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Sourceable deterministic image identity for offline DMTF simulator chart gates.
 
+# shellcheck disable=SC2034 # consumed by the simulator chart gates.
+DMTF_SIM_DCLOUD_VALUES=charts/dmtf-sim/values-dcloud.yaml
+
 dmtf_sim_set_helm_values() {
   local source_commit="${1:?source commit is required}"
   local image_repository="registry.invalid/redfish/dmtf-sim"

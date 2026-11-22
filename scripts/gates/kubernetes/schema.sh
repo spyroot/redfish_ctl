@@ -32,6 +32,7 @@ files="$(git ls-files \
   'k8s/*.yaml' 'k8s/**/*.yaml' \
   'charts/*.yaml' 'charts/**/*.yaml' | while read -r f; do
   case "$(basename "$f")" in Chart.yaml | values.yaml) continue ;; esac
+  [[ "$f" != "$DMTF_SIM_DCLOUD_VALUES" ]] || continue
   grep -qE '\{\{|__[A-Z0-9_]+__' "$f" || echo "$f"
 done)"
 if [ -z "$files" ]; then
@@ -45,6 +46,10 @@ helm template "$controller_release" charts/redfish-controller \
 helm template "$simulator_release" charts/dmtf-sim \
   --namespace "$simulator_namespace" \
   --skip-tests \
+  "${DMTF_SIM_HELM_VALUES[@]}" |
+  kubeconform -ignore-missing-schemas -summary
+helm template "$simulator_release" charts/dmtf-sim \
+  --namespace "$simulator_namespace" --skip-tests --values "$DMTF_SIM_DCLOUD_VALUES" \
   "${DMTF_SIM_HELM_VALUES[@]}" |
   kubeconform -ignore-missing-schemas -summary
 helm template "$simulator_release" charts/dmtf-sim \

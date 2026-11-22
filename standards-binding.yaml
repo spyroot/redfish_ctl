@@ -6,7 +6,7 @@ spec:
   source:
     localPath: /Users/spyroot/dev/standards
     repository: https://gitlab.rnd.embedings.ai/spyroot/standards.git
-    revision: 39b0243d958db9e07bc528c4290bc94d48dbc49e
+    revision: e1e3784504a3878a91460684735482ef90c825f5
   requiredContracts:
     - ci
     - unit-testing
@@ -29,10 +29,7 @@ spec:
     - work-classification
     - go-standards
     - linter-schemas
-  providers:
-    - name: builder
-      type: external
-      binding: builder-binding.yaml
+  providers: []
   projectAdditions:
     - TEAM_GUIDE.md
   exceptions: []
