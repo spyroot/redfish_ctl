@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import textwrap
+from http import HTTPStatus
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ SUBSCRIPTIONS_PATH = "/redfish/v1/EventService/Subscriptions"
 SUBSCRIPTION_ONE_PATH = f"{SUBSCRIPTIONS_PATH}/1"
 DESTINATION = "https://listener.example.com/redfish/events"
 CREATED_SUBSCRIPTION_PATH = f"{SUBSCRIPTIONS_PATH}/created"
+JSON_MEDIA_TYPE = "application/json"
 
 
 def _request_type(name):
@@ -71,11 +73,14 @@ def _response(status_code, body="{}", headers=None):
     return response
 
 
-def _replace_post_response(service, status_code, headers=None):
+def _replace_post_response(service, status_code, headers=None, *, required_content_type=None):
     requests_mock = pytest.importorskip("requests_mock")
 
     def post_cb(request, context):
         service.requests.append(request)
+        if required_content_type and request.headers.get("Content-Type") != required_content_type:
+            context.status_code = HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value
+            return json.dumps(_error_payload(context.status_code))
         context.status_code = status_code
         for key, value in (headers or {}).items():
             context.headers[key] = value
@@ -164,15 +169,18 @@ def test_subscription_create_confirm_posts_event_destination_payload(
     }
 
 
-def test_subscription_create_confirm_returns_created_location(
+@pytest.mark.parametrize("do_async", [False, True])
+def test_subscription_create_confirm_uses_plain_json_and_returns_created_location(
     redfish_mock_factory,
+    do_async,
 ):
-    """subscription-create reports the 201 Location of the new EventDestination."""
+    """Both transports work with a CIMC-style strict JSON media type check."""
     manager, service = redfish_mock_factory("supermicro")
     _replace_post_response(
         service,
         201,
         headers={"Location": CREATED_SUBSCRIPTION_PATH},
+        required_content_type=JSON_MEDIA_TYPE,
     )
 
     result = manager.sync_invoke(
@@ -180,6 +188,7 @@ def test_subscription_create_confirm_returns_created_location(
         "subscription-create",
         destination=DESTINATION,
         confirm=True,
+        do_async=do_async,
     )
 
     posts = [request for request in service.requests if request.method == "POST"]
@@ -191,36 +200,7 @@ def test_subscription_create_confirm_returns_created_location(
     assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
     assert len(posts) == 1
     assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
-
-
-def test_subscription_create_confirm_async_returns_created_location(
-    redfish_mock_factory,
-):
-    """subscription-create --async preserves the EventDestination Location."""
-    manager, service = redfish_mock_factory("supermicro")
-    _replace_post_response(
-        service,
-        201,
-        headers={"Location": CREATED_SUBSCRIPTION_PATH},
-    )
-
-    result = manager.sync_invoke(
-        _request_type("SubscriptionCreate"),
-        "subscription-create",
-        destination=DESTINATION,
-        confirm=True,
-        do_async=True,
-    )
-
-    posts = [request for request in service.requests if request.method == "POST"]
-    assert result.error is None
-    assert result.data["action"] == "create"
-    assert result.data["target"] == SUBSCRIPTIONS_PATH
-    assert result.data["status"] == "RedfishApiRespond.Created"
-    assert result.data["status_code"] == 201
-    assert result.data["location"] == CREATED_SUBSCRIPTION_PATH
-    assert len(posts) == 1
-    assert posts[0].path.lower() == SUBSCRIPTIONS_PATH.lower()
+    assert posts[0].headers["Content-Type"] == JSON_MEDIA_TYPE
 
 
 def test_subscription_create_async_accepts_direct_response_from_transport(
