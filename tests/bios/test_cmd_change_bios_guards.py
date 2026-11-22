@@ -25,10 +25,20 @@ def bios_cmd():
     )
 
 
-def _serve_registry(monkeypatch, cmd, data):
-    """Make the command's registry query return ``data``."""
+def _serve_registry(
+    monkeypatch: pytest.MonkeyPatch, cmd: BiosChangeSettings, data: object,
+) -> None:
+    """Serve one standard BIOS registry chain ending in the supplied response."""
+    system_uri = "/redfish/v1/Systems/1"
+    registry_uri = "/redfish/v1/RegistryStore/BiosTest.json"
+    resources = {
+        "/redfish/v1/Systems": [{"@odata.id": system_uri}],
+        f"{system_uri}/Bios": {"AttributeRegistry": "BiosTest"},
+        "/redfish/v1/Registries/BiosTest": {"Location": [{"Uri": registry_uri}]},
+        registry_uri: data,
+    }
     monkeypatch.setattr(
-        cmd, "base_query", lambda *a, **k: CommandResult(data, None, None, None)
+        cmd, "base_query", lambda uri, **kwargs: CommandResult(resources.get(uri), None, None, None)
     )
 
 

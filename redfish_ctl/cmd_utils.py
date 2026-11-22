@@ -10,6 +10,34 @@ import os
 import warnings
 from pathlib import Path
 from typing import Optional
+from urllib.parse import unquote
+
+from .cmd_exceptions import InvalidArgument
+from .redfish_shared import RedfishApi
+
+
+def validate_redfish_path(path: str, *, label: str = "Redfish URI") -> None:
+    """Validate the path component of a Redfish resource URI.
+
+    :param path: parsed URI path, preserved as supplied for the request.
+    :param label: text that identifies the caller's URI in a validation error.
+    :raises InvalidArgument: if the path is outside Redfish or has traversal segments.
+    """
+    root = RedfishApi.Version
+    if path != root and not path.startswith(f"{root}/"):
+        raise InvalidArgument(f"{label} must start with {root}")
+
+    decoded = path
+    for _ in range(3):
+        next_decoded = unquote(decoded)
+        if next_decoded == decoded:
+            break
+        decoded = next_decoded
+
+    if "\\" in decoded:
+        raise InvalidArgument(f"{label} must use forward slashes")
+    if any(segment in {".", ".."} for segment in decoded.split("/")):
+        raise InvalidArgument(f"{label} must not contain path traversal segments")
 
 
 def from_json_spec(from_spec: str):

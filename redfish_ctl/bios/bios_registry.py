@@ -13,12 +13,101 @@ redfish_ctl bios-registry --attr_list --attr_name SystemServiceTag,OldSetupPassw
 Author Mus spyroot@gmail.com
 """
 from abc import abstractmethod
+from collections.abc import Iterator
+from http import HTTPStatus
 from typing import Optional
+from urllib.parse import quote
 
+from ..cmd_exceptions import ResourceNotFound
 from ..cmd_utils import save_if_needed
-from ..redfish_api_common import ApiRequestType, Singleton
+from ..redfish_api_common import REDFISH_API, ApiRequestType, Singleton
 from ..redfish_manager import CommandResult, RedfishManager
 from ..redfish_shared import RedfishApi, RedfishJson
+
+
+def _query_bios_resource(
+        manager: RedfishManager, uri: str, do_async: Optional[bool], *,
+        do_expanded: Optional[bool] = False,
+        filename: Optional[str] = None) -> CommandResult:
+    """Read an optional BIOS resource and preserve all errors except HTTP 404.
+
+    :param manager: the manager bound to the caller's controller.
+    :param uri: the BIOS resource path.
+    :param do_async: whether to use the asynchronous GET transport.
+    :param do_expanded: whether to expand collection links.
+    :param filename: optional destination for the raw resource response.
+    :return: the query result, with absent data on HTTP 404.
+    :raises ResourceNotFound: when the query reports a different failure status.
+    """
+    try:
+        return manager.base_query(
+            uri, do_async=do_async, do_expanded=do_expanded, filename=filename,
+        )
+    except ResourceNotFound as exc:
+        if not exc.args or getattr(exc.args[0], "status_code", None) != HTTPStatus.NOT_FOUND:
+            raise
+        return CommandResult(None, None, None, None)
+
+
+def _standard_bios_registry_uris(
+        manager: RedfishManager, bios_uri: str, do_async: Optional[bool]) -> Iterator[str]:
+    """Find the local registry file locations named by the BIOS resource.
+
+    :param manager: the manager bound to the caller's controller.
+    :param bios_uri: the BIOS resource path.
+    :param do_async: whether to use the asynchronous GET transport.
+    :return: an iterator of the validated registry file paths in advertised order.
+    """
+    bios = _query_bios_resource(manager, bios_uri, do_async).data
+    name = bios.get("AttributeRegistry") if isinstance(bios, dict) else None
+    if not isinstance(name, str) or not name or "/" in name:
+        return
+
+    uri = manager._local_resource_uri(f"{RedfishApi.Version}/Registries/{quote(name, safe='')}")
+    if not uri:
+        return
+    metadata = _query_bios_resource(manager, uri, do_async).data
+    locations = metadata.get(RedfishJson.Location) if isinstance(metadata, dict) else None
+    if not isinstance(locations, list):
+        return
+    for location in locations:
+        if isinstance(location, dict):
+            registry_uri = manager._local_resource_uri(location.get("Uri"))
+            if registry_uri:
+                yield registry_uri
+
+
+def _query_bios_registry(
+        manager: RedfishManager, do_async: Optional[bool], *,
+        do_expanded: Optional[bool] = False,
+        filename: Optional[str] = None) -> CommandResult:
+    """Read the attribute registry named by BIOS for inspection or staging.
+
+    :param manager: the manager bound to the caller's controller.
+    :param do_async: whether to use the asynchronous GET transport.
+    :param do_expanded: whether to expand links in the registry response.
+    :param filename: optional destination for the raw registry response.
+    :return: the registry response or an empty result if unavailable.
+    """
+    system_uri = manager.managed_system_uri
+    if not system_uri:
+        return CommandResult(None, None, None, None)
+
+    bios_uri = f"{system_uri}{RedfishApi.Bios}"
+    for registry_uri in _standard_bios_registry_uris(manager, bios_uri, do_async):
+        result = _query_bios_resource(
+            manager, registry_uri, do_async,
+            do_expanded=do_expanded, filename=filename,
+        )
+        if result.error is not None or result.data is not None:
+            return result
+
+    if manager.uses_dell_job_semantics:
+        return _query_bios_resource(
+            manager, f"{system_uri}{REDFISH_API.BiosRegistry}", do_async,
+            do_expanded=do_expanded, filename=filename,
+        )
+    return CommandResult(None, None, None, None)
 
 
 class BiosRegistry(RedfishManager,
@@ -31,40 +120,6 @@ class BiosRegistry(RedfishManager,
     def __init__(self, *args, **kwargs):
         """Construct the bios-registry command, forwarding credentials to the base manager."""
         super(BiosRegistry, self).__init__(*args, **kwargs)
-
-    def _resolve_registry_uri(self, do_async):
-        """Locate the BIOS attribute registry URI vendor-neutrally.
-
-        Dell exposes it directly at ``{system}/Bios/BiosRegistry``. The standard
-        Redfish way (iLO and others): ``Bios.AttributeRegistry`` names a registry
-        resolved under ``/redfish/v1/Registries/<name>``, whose ``Location[].Uri``
-        points at the registry JSON. Prefer the Dell subpath when it resolves,
-        otherwise follow the standard AttributeRegistry -> Registries -> Uri chain.
-        Falls back to the Dell path so existing behavior is unchanged.
-
-        :param do_async: note async will subscribe to an event loop.
-        :return: the resolved BIOS registry URI, defaulting to the Dell subpath.
-        """
-        dell_uri = f"{self.managed_system_uri}/Bios/BiosRegistry"
-        try:
-            if (self.base_query(dell_uri, do_async=do_async).data or {}).get("RegistryEntries"):
-                return dell_uri
-        except Exception:
-            pass
-        try:
-            bios = self.base_query(f"{self.managed_system_uri}/Bios",
-                                   do_async=do_async).data or {}
-            name = bios.get("AttributeRegistry")
-            if name:
-                reg = self.base_query(f"{RedfishApi.Version}/Registries/{name}",
-                                      do_async=do_async).data or {}
-                for loc in reg.get("Location", []):
-                    uri = loc.get("Uri") if isinstance(loc, dict) else None
-                    if uri:
-                        return uri
-        except Exception:
-            pass
-        return dell_uri
 
     @staticmethod
     @abstractmethod
@@ -145,20 +200,16 @@ class BiosRegistry(RedfishManager,
         :param data_type: accepted for CLI compatibility; not used by this command.
         :return: CommandResult and if filename provide will save to a file.
         """
-        target_api = self._resolve_registry_uri(do_async)
-        try:
-            cmd_result = self.base_query(target_api,
-                                         filename=None,
-                                         do_async=do_async,
-                                         do_expanded=do_expanded)
-        except Exception:
-            return CommandResult([], None, None, None)
+        cmd_result = _query_bios_registry(self, do_async, do_expanded=do_expanded)
+        if cmd_result.error is not None:
+            return cmd_result
         filtered_result = []
         attribute_names = None
 
         # Tolerate a resource that has no registry entries (e.g. registry not
         # reachable on this host) instead of raising a KeyError.
-        registry = (cmd_result.data or {}).get('RegistryEntries')
+        registry = cmd_result.data.get(RedfishJson.RegistryEntries) \
+            if isinstance(cmd_result.data, dict) else None
         if not isinstance(registry, dict) or RedfishJson.Attributes not in registry:
             return CommandResult([], None, None, None)
         data = registry[RedfishJson.Attributes]
